@@ -1,0 +1,307 @@
+import { db } from "./client"
+import type {
+  TradeFinderSetupData,
+  TradeFinderSetupStatus,
+  TradeFinderScoreBreakdown,
+  TradeFinderTimeframeSet,
+  TradeDirection,
+  ZoneData,
+  TrendData,
+  CurveData,
+} from "@fxflow/types"
+
+/** Safely convert a Prisma date (may be invalid with libsql adapter) to ISO string */
+function safeIso(val: unknown): string {
+  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString()
+  if (typeof val === "string" && val) {
+    const d = new Date(val)
+    if (!isNaN(d.getTime())) return d.toISOString()
+  }
+  if (typeof val === "number") return new Date(val).toISOString()
+  return new Date().toISOString()
+}
+
+// ─── Mappers ────────────────────────────────────────────────────────────────
+
+function toSetupData(row: {
+  id: string
+  instrument: string
+  direction: string
+  timeframeSet: string
+  status: string
+  entryPrice: number
+  stopLoss: number
+  takeProfit: number
+  riskPips: number
+  rewardPips: number
+  rrRatio: string
+  positionSize: number
+  scoresJson: string
+  scoreTotal: number
+  zoneJson: string
+  trendJson: string | null
+  curveJson: string | null
+  distanceToEntry: number
+  resultSourceId: string | null
+  autoPlaced: boolean
+  placedAt: Date | null
+  detectedAt: Date
+  lastUpdatedAt: Date
+}): TradeFinderSetupData {
+  const scores = JSON.parse(row.scoresJson) as TradeFinderScoreBreakdown
+  const zone = JSON.parse(row.zoneJson) as ZoneData
+  const trendData = row.trendJson ? (JSON.parse(row.trendJson) as TrendData) : null
+  const curveData = row.curveJson ? (JSON.parse(row.curveJson) as CurveData) : null
+
+  return {
+    id: row.id,
+    instrument: row.instrument,
+    direction: row.direction as TradeDirection,
+    timeframeSet: row.timeframeSet as TradeFinderTimeframeSet,
+    status: row.status as TradeFinderSetupStatus,
+    zone,
+    scores,
+    entryPrice: row.entryPrice,
+    stopLoss: row.stopLoss,
+    takeProfit: row.takeProfit,
+    riskPips: row.riskPips,
+    rewardPips: row.rewardPips,
+    rrRatio: row.rrRatio,
+    positionSize: row.positionSize,
+    trendData,
+    curveData,
+    distanceToEntryPips: row.distanceToEntry,
+    detectedAt: safeIso(row.detectedAt),
+    lastUpdatedAt: safeIso(row.lastUpdatedAt),
+    resultSourceId: row.resultSourceId,
+    autoPlaced: row.autoPlaced,
+    placedAt: row.placedAt ? safeIso(row.placedAt) : null,
+  }
+}
+
+// ─── Queries ────────────────────────────────────────────────────────────────
+
+/** Get all active/approaching setups, ordered by score descending */
+export async function getActiveSetups(): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: { status: { in: ["active", "approaching"] } },
+    orderBy: { scoreTotal: "desc" },
+  })
+  return rows.map(toSetupData)
+}
+
+/** Get setups for a specific instrument */
+export async function getSetupsByInstrument(instrument: string): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: { instrument, status: { in: ["active", "approaching"] } },
+    orderBy: { scoreTotal: "desc" },
+  })
+  return rows.map(toSetupData)
+}
+
+/** Get setup history (placed, filled, invalidated, expired) */
+export async function getSetupHistory(limit = 50): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: { status: { in: ["placed", "filled", "invalidated", "expired"] } },
+    orderBy: { lastUpdatedAt: "desc" },
+    take: limit,
+  })
+  return rows.map(toSetupData)
+}
+
+/** Get a single setup by ID */
+export async function getSetup(id: string): Promise<TradeFinderSetupData | null> {
+  const row = await db.tradeFinderSetup.findUnique({ where: { id } })
+  return row ? toSetupData(row) : null
+}
+
+// ─── Mutations ──────────────────────────────────────────────────────────────
+
+export interface CreateSetupInput {
+  instrument: string
+  direction: TradeDirection
+  timeframeSet: TradeFinderTimeframeSet
+  entryPrice: number
+  stopLoss: number
+  takeProfit: number
+  riskPips: number
+  rewardPips: number
+  rrRatio: string
+  positionSize: number
+  scores: TradeFinderScoreBreakdown
+  zone: ZoneData
+  trendData: TrendData | null
+  curveData: CurveData | null
+  distanceToEntryPips: number
+}
+
+export async function createSetup(input: CreateSetupInput): Promise<TradeFinderSetupData> {
+  const row = await db.tradeFinderSetup.create({
+    data: {
+      instrument: input.instrument,
+      direction: input.direction,
+      timeframeSet: input.timeframeSet,
+      entryPrice: input.entryPrice,
+      stopLoss: input.stopLoss,
+      takeProfit: input.takeProfit,
+      riskPips: input.riskPips,
+      rewardPips: input.rewardPips,
+      rrRatio: input.rrRatio,
+      positionSize: input.positionSize,
+      scoresJson: JSON.stringify(input.scores),
+      scoreTotal: input.scores.total,
+      zoneJson: JSON.stringify(input.zone),
+      trendJson: input.trendData ? JSON.stringify(input.trendData) : null,
+      curveJson: input.curveData ? JSON.stringify(input.curveData) : null,
+      distanceToEntry: input.distanceToEntryPips,
+    },
+  })
+  return toSetupData(row)
+}
+
+export async function updateSetupStatus(
+  id: string,
+  status: TradeFinderSetupStatus,
+  extra?: { resultSourceId?: string; distanceToEntry?: number; autoPlaced?: boolean },
+): Promise<void> {
+  const data: Record<string, unknown> = {
+    status,
+    lastUpdatedAt: new Date(),
+  }
+  if (extra?.resultSourceId !== undefined) data.resultSourceId = extra.resultSourceId
+  if (extra?.distanceToEntry !== undefined) data.distanceToEntry = extra.distanceToEntry
+  if (extra?.autoPlaced !== undefined) data.autoPlaced = extra.autoPlaced
+  if (status === "placed") data.placedAt = new Date()
+  if (status === "expired" || status === "invalidated") data.expiredAt = new Date()
+
+  await db.tradeFinderSetup.update({ where: { id }, data })
+}
+
+export async function updateSetupScores(
+  id: string,
+  scores: TradeFinderScoreBreakdown,
+  distanceToEntry: number,
+  positionSize?: number,
+): Promise<void> {
+  const data: Record<string, unknown> = {
+    scoresJson: JSON.stringify(scores),
+    scoreTotal: scores.total,
+    distanceToEntry,
+    lastUpdatedAt: new Date(),
+  }
+  if (positionSize !== undefined) data.positionSize = positionSize
+
+  await db.tradeFinderSetup.update({ where: { id }, data })
+}
+
+/** Remove old history setups beyond retention limit */
+export async function pruneSetupHistory(keepCount = 200): Promise<number> {
+  const historyStatuses = ["placed", "filled", "invalidated", "expired"]
+  const total = await db.tradeFinderSetup.count({
+    where: { status: { in: historyStatuses } },
+  })
+
+  if (total <= keepCount) return 0
+
+  const toDelete = await db.tradeFinderSetup.findMany({
+    where: { status: { in: historyStatuses } },
+    orderBy: { lastUpdatedAt: "asc" },
+    take: total - keepCount,
+    select: { id: true },
+  })
+
+  const result = await db.tradeFinderSetup.deleteMany({
+    where: { id: { in: toDelete.map((r) => r.id) } },
+  })
+
+  return result.count
+}
+
+/** Check if a setup already exists for this instrument+direction+timeframeSet.
+ *  Includes "placed" and "filled" to prevent re-detecting the same zone after order placement. */
+export async function findExistingSetup(
+  instrument: string,
+  direction: TradeDirection,
+  timeframeSet: TradeFinderTimeframeSet,
+): Promise<TradeFinderSetupData | null> {
+  const row = await db.tradeFinderSetup.findFirst({
+    where: {
+      instrument,
+      direction,
+      timeframeSet,
+      status: { in: ["active", "approaching", "placed", "filled"] },
+    },
+  })
+  return row ? toSetupData(row) : null
+}
+
+// ─── Auto-Trade Helpers ────────────────────────────────────────────────────
+
+/** Count currently pending auto-placed setups (placed but not yet filled/cancelled) */
+export async function countPendingAutoPlaced(): Promise<number> {
+  return db.tradeFinderSetup.count({
+    where: { status: "placed", autoPlaced: true },
+  })
+}
+
+/** Count auto-placed setups in the last 24 hours (uses placedAt for accuracy) */
+export async function countAutoPlacedToday(): Promise<number> {
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  return db.tradeFinderSetup.count({
+    where: {
+      autoPlaced: true,
+      placedAt: { gte: twentyFourHoursAgo },
+    },
+  })
+}
+
+/** Get all pending auto-placed setups (for cancel-all) */
+export async function getPendingAutoPlacedSetups(): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: { status: "placed", autoPlaced: true },
+    orderBy: { lastUpdatedAt: "desc" },
+  })
+  return rows.map(toSetupData)
+}
+
+/** Get total risk pips across all pending auto-placed setups (for risk cap) */
+export async function getAutoPlacedTotalRiskPips(): Promise<{ instrument: string; riskPips: number; positionSize: number }[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: { status: "placed", autoPlaced: true },
+    select: { instrument: true, riskPips: true, positionSize: true },
+  })
+  return rows
+}
+
+/** Clear all active/approaching setups */
+export async function clearActiveSetups(): Promise<number> {
+  const result = await db.tradeFinderSetup.deleteMany({
+    where: { status: { in: ["active", "approaching"] } },
+  })
+  return result.count
+}
+
+/** Clear setup history (placed, filled, invalidated, expired) */
+export async function clearSetupHistory(): Promise<number> {
+  const result = await db.tradeFinderSetup.deleteMany({
+    where: { status: { in: ["placed", "filled", "invalidated", "expired"] } },
+  })
+  return result.count
+}
+
+/** Find a setup by its OANDA result source ID (order or trade ID) */
+export async function findSetupByResultSourceId(sourceId: string): Promise<TradeFinderSetupData | null> {
+  const row = await db.tradeFinderSetup.findFirst({
+    where: { resultSourceId: sourceId },
+  })
+  return row ? toSetupData(row) : null
+}
+
+/** Get all "placed" auto-placed setups (for fill/cancel detection during validation) */
+export async function getPlacedAutoSetups(): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: { status: "placed", autoPlaced: true, resultSourceId: { not: null } },
+    orderBy: { lastUpdatedAt: "desc" },
+  })
+  return rows.map(toSetupData)
+}

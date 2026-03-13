@@ -1,0 +1,78 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Landmark, Radio, Search, Sparkles, type LucideIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface SettingsNavItem {
+  label: string
+  href: string
+  icon: LucideIcon
+}
+
+const SETTINGS_NAV: SettingsNavItem[] = [
+  { label: "OANDA", href: "/settings/oanda", icon: Landmark },
+  { label: "Trade Finder", href: "/settings/trade-finder", icon: Search },
+  { label: "TradingView Alerts", href: "/settings/tv-alerts", icon: Radio },
+  { label: "AI Analysis", href: "/settings/ai", icon: Sparkles },
+]
+
+export function SettingsNav() {
+  const pathname = usePathname()
+
+  return (
+    <nav aria-label="Settings navigation">
+      {/* Desktop: vertical sidebar */}
+      <ul className="hidden md:flex md:flex-col md:gap-1">
+        {SETTINGS_NAV.map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isActive
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground",
+                )}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <item.icon className="size-4 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+
+      {/* Mobile: horizontal scrollable tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-2 md:hidden">
+        {SETTINGS_NAV.map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "hover:bg-accent hover:text-accent-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                isActive
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground",
+              )}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <item.icon className="size-4 shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}

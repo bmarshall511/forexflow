@@ -1,0 +1,45 @@
+{
+  "name": "@fxflow/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@fxflow/db": "workspace:*",
+    "@fxflow/shared": "workspace:*",
+    "@fxflow/types": "workspace:*",
+    "@libsql/client": "^0.15",
+    "@prisma/adapter-libsql": "^7.4.1",
+    "@prisma/client": "^7",
+    "class-variance-authority": "^0.7",
+    "clsx": "^2.1",
+    "lightweight-charts": "^5.1.0",
+    "lucide-react": "^0.475",
+    "next": "^15",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.4.3",
+    "react": "^19",
+    "react-dom": "^19",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "25.3.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^15",
+    "eslint-config-prettier": "^10",
+    "tailwindcss": "^4",
+    "typescript": "^5.7"
+  }
+}

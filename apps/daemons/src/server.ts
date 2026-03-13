@@ -1,0 +1,696 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { WebSocketServer, WebSocket } from "ws"
+import type { StateManager } from "./state-manager.js"
+import type { CredentialWatcher } from "./db/credential-watcher.js"
+import type { OandaTradeSyncer } from "./oanda/trade-syncer.js"
+import type { NotificationEmitter } from "./notification-emitter.js"
+import type { CFWorkerClient } from "./tv-alerts/cf-worker-client.js"
+import type { TVAlertsState } from "./tv-alerts/alerts-state.js"
+import type { ConditionMonitor } from "./ai/condition-monitor.js"
+import type { AnyDaemonMessage, AiClaudeModel, AiAnalysisDepth, AiAnalysisTriggeredBy } from "@fxflow/types"
+
+// Late-bound references (set after creation in index.ts)
+let _cfWorkerClient: CFWorkerClient | null = null
+export function setCFWorkerClient(client: CFWorkerClient): void {
+  _cfWorkerClient = client
+}
+
+let _conditionMonitor: ConditionMonitor | null = null
+export function setConditionMonitor(monitor: ConditionMonitor): void {
+  _conditionMonitor = monitor
+}
+
+let _tvAlertsState: TVAlertsState | null = null
+export function setTVAlertsState(state: TVAlertsState): void {
+  _tvAlertsState = state
+}
+
+import type { TradeFinderScanner } from "./trade-finder/scanner.js"
+let _tradeFinderScanner: TradeFinderScanner | null = null
+export function setTradeFinderScanner(scanner: TradeFinderScanner): void {
+  _tradeFinderScanner = scanner
+}
+
+import type { DigestGenerator } from "./ai/digest-generator.js"
+let _digestGenerator: DigestGenerator | null = null
+export function setDigestGenerator(generator: DigestGenerator): void {
+  _digestGenerator = generator
+}
+
+interface ServerDeps {
+  stateManager: StateManager
+  credentialWatcher: CredentialWatcher
+  tradeSyncer?: OandaTradeSyncer
+  notificationEmitter?: NotificationEmitter
+}
+
+/** Read the full request body as a string. */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on("data", (chunk: Buffer) => chunks.push(chunk))
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()))
+    req.on("error", reject)
+  })
+}
+
+/** Send a JSON response. */
+function sendJson(res: ServerResponse, status: number, data: unknown): void {
+  res.writeHead(status, { "Content-Type": "application/json" })
+  res.end(JSON.stringify(data))
+}
+
+export async function startServer(port: number, deps: ServerDeps) {
+  const { stateManager, credentialWatcher, tradeSyncer } = deps
+  const connectedClients = new Set<WebSocket>()
+
+  // HTTP server for REST endpoints
+  const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+    // CORS headers for local development
+    res.setHeader("Access-Control-Allow-Origin", "*")
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204)
+      res.end()
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/status") {
+      const snapshot = stateManager.getSnapshot()
+      sendJson(res, 200, { ok: true, data: snapshot })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/health") {
+      sendJson(res, 200, { ok: true, uptime: process.uptime() })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/refresh-credentials") {
+      credentialWatcher.checkNow().then(() => {
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] refresh-credentials error:", err)
+        sendJson(res, 500, { ok: false, error: "Internal error" })
+      })
+      return
+    }
+
+    // ─── Trade Action Endpoints ──────────────────────────────────────────
+
+    if (req.method === "POST" && req.url === "/actions/refresh-positions") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      tradeSyncer.refreshPositions().then(() => {
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] refresh-positions error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/cancel-order") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { sourceOrderId, reason } = JSON.parse(body)
+        if (!sourceOrderId) {
+          sendJson(res, 400, { ok: false, error: "sourceOrderId is required" })
+          return
+        }
+        await tradeSyncer.cancelOrder(sourceOrderId, reason)
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] cancel-order error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/cancel-all-orders") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { sourceOrderIds, reason } = JSON.parse(body)
+        const result = await tradeSyncer.cancelAllOrders(sourceOrderIds, reason)
+        sendJson(res, 200, { ok: true, data: result })
+      }).catch((err) => {
+        console.error("[server] cancel-all-orders error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/close-all-trades") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { sourceTradeIds, reason } = JSON.parse(body)
+        const result = await tradeSyncer.closeAllTrades(sourceTradeIds, reason)
+        sendJson(res, 200, { ok: true, data: result })
+      }).catch((err) => {
+        console.error("[server] close-all-trades error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/close-trade") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { sourceTradeId, units, reason } = JSON.parse(body)
+        if (!sourceTradeId) {
+          sendJson(res, 400, { ok: false, error: "sourceTradeId is required" })
+          return
+        }
+        await tradeSyncer.closeTrade(sourceTradeId, units, reason)
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] close-trade error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/modify-trade") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { sourceTradeId, stopLoss, takeProfit } = JSON.parse(body)
+        if (!sourceTradeId) {
+          sendJson(res, 400, { ok: false, error: "sourceTradeId is required" })
+          return
+        }
+        const verified = await tradeSyncer.modifyTradeSLTP(sourceTradeId, stopLoss, takeProfit)
+        sendJson(res, 200, { ok: true, data: verified })
+      }).catch((err) => {
+        console.error("[server] modify-trade error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/modify-pending-order") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { sourceOrderId, stopLoss, takeProfit, entryPrice, gtdTime } = JSON.parse(body)
+        if (!sourceOrderId) {
+          sendJson(res, 400, { ok: false, error: "sourceOrderId is required" })
+          return
+        }
+        const verified = await tradeSyncer.modifyPendingOrderSLTP(sourceOrderId, stopLoss, takeProfit, entryPrice, gtdTime)
+        sendJson(res, 200, { ok: true, data: verified })
+      }).catch((err) => {
+        console.error("[server] modify-pending-order error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/place-order") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const request = JSON.parse(body)
+        if (!request.instrument || !request.direction || !request.orderType || !request.units) {
+          sendJson(res, 400, { ok: false, error: "instrument, direction, orderType, and units are required" })
+          return
+        }
+        if (request.orderType === "LIMIT" && request.entryPrice === undefined) {
+          sendJson(res, 400, { ok: false, error: "entryPrice is required for LIMIT orders" })
+          return
+        }
+        if (request.units <= 0) {
+          sendJson(res, 400, { ok: false, error: "units must be positive" })
+          return
+        }
+        const data = await tradeSyncer.placeOrder(request)
+        sendJson(res, 200, { ok: true, data })
+      }).catch((err) => {
+        console.error("[server] place-order error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // ─── TV Alerts Endpoints ──────────────────────────────────────────
+
+    if (req.method === "POST" && req.url === "/actions/tv-alerts/kill-switch") {
+      readBody(req).then((body) => {
+        const { enabled } = JSON.parse(body) as { enabled?: boolean }
+        if (typeof enabled !== "boolean") {
+          sendJson(res, 400, { ok: false, error: "enabled (boolean) is required" })
+          return
+        }
+        // Update in-memory state (DB already updated by the web API route).
+        // setEnabled triggers emit() → onChange listener → broadcast to all WS clients.
+        if (_tvAlertsState) {
+          _tvAlertsState.setEnabled(enabled)
+        }
+        sendJson(res, 200, { ok: true, enabled })
+      }).catch((err) => {
+        console.error("[server] tv-alerts kill-switch error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/actions/tv-alerts/config") {
+      import("@fxflow/db").then(async ({ getTVAlertsConfig }) => {
+        const config = await getTVAlertsConfig()
+        sendJson(res, 200, { ok: true, data: config })
+      }).catch((err) => {
+        console.error("[server] tv-alerts config error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/tv-alerts/reconnect-cf") {
+      if (!_cfWorkerClient) {
+        sendJson(res, 503, { ok: false, error: "TV Alerts module not available" })
+        return
+      }
+      import("@fxflow/db").then(async ({ getTVAlertsConfig }) => {
+        const dbConfig = await getTVAlertsConfig()
+        const url = dbConfig.cfWorkerUrl
+        const secret = dbConfig.cfWorkerSecret
+        if (url) {
+          _cfWorkerClient!.reconnect(url, secret)
+          console.log("[server] TV Alerts: reconnecting to CF Worker with new config")
+        } else {
+          _cfWorkerClient!.reconnect("", "")
+          console.log("[server] TV Alerts: disconnecting CF Worker (URL cleared)")
+        }
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] tv-alerts reconnect-cf error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/tv-alerts/clear-cooldown") {
+      if (!_tvAlertsState) {
+        sendJson(res, 503, { ok: false, error: "TV Alerts state not available" })
+        return
+      }
+      readBody(req).then((body) => {
+        const { instrument } = JSON.parse(body) as { instrument?: string }
+        if (!instrument) {
+          sendJson(res, 400, { ok: false, error: "instrument is required" })
+          return
+        }
+        _tvAlertsState!.clearCooldown(instrument)
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] tv-alerts clear-cooldown error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // Re-read signal count from DB and sync daemon in-memory state.
+    // Called after clearing signal history so status broadcasts reflect the correct count.
+    if (req.method === "POST" && req.url === "/actions/tv-alerts/reset-signal-history") {
+      if (!_tvAlertsState) {
+        sendJson(res, 503, { ok: false, error: "TV Alerts state not available" })
+        return
+      }
+      import("@fxflow/db").then(async ({ getTodaySignalCount }) => {
+        const count = await getTodaySignalCount()
+        _tvAlertsState!.setSignalCountToday(count)
+        sendJson(res, 200, { ok: true, data: { signalCountToday: count } })
+      }).catch((err) => {
+        console.error("[server] tv-alerts reset-signal-history error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // ─── AI Analysis Endpoints ──────────────────────────────────────────
+
+    if (req.method === "POST" && req.url?.startsWith("/actions/ai/analyze/")) {
+      const tradeId = req.url.replace("/actions/ai/analyze/", "")
+      if (!tradeId || !tradeSyncer) {
+        sendJson(res, 400, { ok: false, error: "tradeId is required" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { model, depth, triggeredBy, tradeStatus } = JSON.parse(body) as {
+          model: AiClaudeModel
+          depth: AiAnalysisDepth
+          triggeredBy?: AiAnalysisTriggeredBy
+          tradeStatus: string
+        }
+
+        const { createAnalysis } = await import("@fxflow/db")
+        const { executeAnalysis } = await import("./ai/analysis-executor.js")
+
+        const analysis = await createAnalysis({
+          tradeId,
+          depth,
+          model,
+          tradeStatus,
+          triggeredBy: triggeredBy ?? "user",
+        })
+
+        // Execute async in background — progress streamed via WebSocket
+        void executeAnalysis({
+          analysisId: analysis.id,
+          tradeId,
+          depth,
+          model,
+          tradeStatus,
+          triggeredBy: triggeredBy ?? "user",
+          stateManager,
+          tradeSyncer,
+          broadcast,
+          conditionMonitor: _conditionMonitor,
+        })
+
+        sendJson(res, 200, { ok: true, data: { analysisId: analysis.id } })
+      }).catch((err) => {
+        console.error("[server] ai/analyze error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    if (req.method === "POST" && req.url?.startsWith("/actions/ai/cancel/")) {
+      const analysisId = req.url.replace("/actions/ai/cancel/", "")
+      if (!analysisId) {
+        sendJson(res, 400, { ok: false, error: "analysisId is required" })
+        return
+      }
+      void (async () => {
+        try {
+          const { cancelActiveAnalysis } = await import("./ai/analysis-executor.js")
+          cancelActiveAnalysis(analysisId)
+          const { cancelAnalysis } = await import("@fxflow/db")
+          await cancelAnalysis(analysisId)
+          sendJson(res, 200, { ok: true })
+        } catch (err) {
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        }
+      })()
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/ai/cancel-all-running") {
+      void (async () => {
+        try {
+          const { cancelAllActiveAnalyses } = await import("./ai/analysis-executor.js")
+          const aborted = cancelAllActiveAnalyses()
+          // Also mark any DB rows still in running/pending as cancelled
+          const { db } = await import("@fxflow/db")
+          const { count } = await db.aiAnalysis.updateMany({
+            where: { status: { in: ["running", "pending"] } },
+            data: { status: "cancelled", errorMessage: "Cancelled by user (bulk clear)" },
+          })
+          sendJson(res, 200, { ok: true, data: { aborted, cancelled: count } })
+        } catch (err) {
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        }
+      })()
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/ai/reload-condition") {
+      if (!_conditionMonitor) {
+        sendJson(res, 503, { ok: false, error: "Condition monitor not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { conditionId, action } = JSON.parse(body) as { conditionId: string; action?: string }
+        if (!conditionId) {
+          sendJson(res, 400, { ok: false, error: "conditionId is required" })
+          return
+        }
+        if (action === "remove") {
+          _conditionMonitor!.removeCondition(conditionId)
+        } else {
+          await _conditionMonitor!.reloadCondition(conditionId)
+        }
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // POST /actions/ai/generate-digest — trigger manual digest generation
+    if (req.method === "POST" && req.url === "/actions/ai/generate-digest") {
+      if (!_digestGenerator) {
+        sendJson(res, 503, { ok: false, error: "Digest generator not available" })
+        return
+      }
+      readBody(req).then(async (body) => {
+        const { period, periodStart, periodEnd } = JSON.parse(body) as {
+          period: "weekly" | "monthly"
+          periodStart: string
+          periodEnd: string
+        }
+        if (!period || !periodStart || !periodEnd) {
+          sendJson(res, 400, { ok: false, error: "period, periodStart, and periodEnd are required" })
+          return
+        }
+        // Trigger generation in background (don't block the response)
+        void _digestGenerator!.generateDigest(period, new Date(periodStart), new Date(periodEnd))
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] ai/generate-digest error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // ─── Chart Subscriptions ────────────────────────────────────────────
+
+    if (req.method === "POST" && req.url === "/chart-subscriptions") {
+      readBody(req).then((body) => {
+        const { instruments } = JSON.parse(body) as { instruments?: string[] }
+        stateManager.setChartInstruments(instruments ?? [])
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        console.error("[server] chart-subscriptions error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // ─── Trade Finder ──────────────────────────────────────────────────
+
+    if (req.method === "GET" && req.url === "/trade-finder/status") {
+      if (!_tradeFinderScanner) {
+        sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })
+        return
+      }
+      sendJson(res, 200, { ok: true, data: _tradeFinderScanner.getScanStatus() })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/trade-finder/auto-trade-events") {
+      if (!_tradeFinderScanner) {
+        sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })
+        return
+      }
+      sendJson(res, 200, { ok: true, data: _tradeFinderScanner.getAutoTradeEvents() })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/trade-finder/scan") {
+      if (!_tradeFinderScanner) {
+        sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })
+        return
+      }
+      _tradeFinderScanner.triggerScan().then(() => {
+        sendJson(res, 200, { ok: true })
+      }).catch((err) => {
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // Cancel all pending auto-placed orders
+    if (req.method === "POST" && req.url === "/actions/trade-finder/cancel-auto") {
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      import("@fxflow/db").then(async ({ getPendingAutoPlacedSetups, updateSetupStatus: updateStatus }) => {
+        const autoSetups = await getPendingAutoPlacedSetups()
+        let cancelled = 0
+        for (const setup of autoSetups) {
+          if (setup.resultSourceId) {
+            try {
+              await tradeSyncer!.cancelOrder(setup.resultSourceId, "User cancelled all auto-trades")
+              await updateStatus(setup.id, "invalidated")
+              cancelled++
+            } catch (err) {
+              console.warn(`[server] Failed to cancel auto-placed order ${setup.resultSourceId}:`, (err as Error).message)
+            }
+          }
+        }
+        sendJson(res, 200, { ok: true, data: { cancelled, total: autoSetups.length } })
+      }).catch((err) => {
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // Clear active setups
+    if (req.method === "POST" && req.url === "/actions/trade-finder/clear-active") {
+      import("@fxflow/db").then(async ({ clearActiveSetups }) => {
+        const count = await clearActiveSetups()
+        sendJson(res, 200, { ok: true, data: { cleared: count } })
+      }).catch((err) => {
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // Clear setup history
+    if (req.method === "POST" && req.url === "/actions/trade-finder/clear-history") {
+      import("@fxflow/db").then(async ({ clearSetupHistory }) => {
+        const count = await clearSetupHistory()
+        sendJson(res, 200, { ok: true, data: { cleared: count } })
+      }).catch((err) => {
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    // Clear auto-trade activity log
+    if (req.method === "POST" && req.url === "/actions/trade-finder/clear-activity") {
+      if (!_tradeFinderScanner) {
+        sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })
+        return
+      }
+      _tradeFinderScanner.clearAutoTradeEvents()
+      sendJson(res, 200, { ok: true, data: { cleared: true } })
+      return
+    }
+
+    if (req.method === "POST" && req.url?.startsWith("/actions/trade-finder/place/")) {
+      const setupId = req.url.replace("/actions/trade-finder/place/", "")
+      if (!tradeSyncer) {
+        sendJson(res, 503, { ok: false, error: "Trade syncer not available" })
+        return
+      }
+      import("@fxflow/db").then(async ({ getSetup, updateSetupStatus: updateStatus }) => {
+        const setup = await getSetup(setupId)
+        if (!setup) {
+          sendJson(res, 404, { ok: false, error: "Setup not found" })
+          return
+        }
+        const body = await readBody(req)
+        const { orderType } = JSON.parse(body || "{}") as { orderType?: "MARKET" | "LIMIT" }
+
+        // Derive the LTF from the setup's timeframe set for tagging the trade
+        const { TIMEFRAME_SET_MAP } = await import("@fxflow/types")
+        const tfMap = TIMEFRAME_SET_MAP[setup.timeframeSet]
+        const ltfTimeframe = (tfMap?.ltf ?? null) as import("@fxflow/types").Timeframe | null
+
+        const result = await tradeSyncer!.placeOrder({
+          instrument: setup.instrument,
+          direction: setup.direction,
+          orderType: orderType ?? "LIMIT",
+          units: setup.positionSize,
+          entryPrice: orderType === "MARKET" ? undefined : setup.entryPrice,
+          stopLoss: setup.stopLoss,
+          takeProfit: setup.takeProfit,
+          timeframe: ltfTimeframe,
+          placedVia: "trade_finder",
+        })
+
+        await updateStatus(setupId, "placed", { resultSourceId: result.sourceId })
+        sendJson(res, 200, { ok: true, data: result })
+      }).catch((err) => {
+        console.error("[server] trade-finder place error:", err)
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      })
+      return
+    }
+
+    sendJson(res, 404, { ok: false, error: "Not found" })
+  })
+
+  // WebSocket server (upgrade from same HTTP server)
+  const wss = new WebSocketServer({ server: httpServer })
+
+  wss.on("connection", (ws: WebSocket) => {
+    connectedClients.add(ws)
+    console.log(`[ws] Client connected (${connectedClients.size} total)`)
+
+    // Send full snapshot immediately on connect
+    const snapshot = stateManager.getSnapshot()
+    ws.send(
+      JSON.stringify({
+        type: "status_snapshot",
+        timestamp: new Date().toISOString(),
+        data: snapshot,
+      }),
+    )
+
+    // Send current positions if available
+    const positions = stateManager.getPositions()
+    if (positions) {
+      ws.send(
+        JSON.stringify({
+          type: "positions_update",
+          timestamp: new Date().toISOString(),
+          data: positions,
+        }),
+      )
+    }
+
+    ws.on("close", () => {
+      connectedClients.delete(ws)
+      console.log(`[ws] Client disconnected (${connectedClients.size} total)`)
+    })
+
+    ws.on("error", (err) => {
+      console.error("[ws] Client error:", err.message)
+      connectedClients.delete(ws)
+    })
+  })
+
+  // Start listening
+  await new Promise<void>((resolve) => {
+    httpServer.listen(port, () => resolve())
+  })
+
+  // Broadcast to all connected clients
+  function broadcast(message: AnyDaemonMessage): void {
+    const json = JSON.stringify(message)
+    for (const client of connectedClients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(json)
+      }
+    }
+  }
+
+  return { httpServer, wss, broadcast }
+}

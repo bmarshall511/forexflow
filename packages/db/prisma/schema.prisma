@@ -1,0 +1,410 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Settings {
+  id                Int      @id @default(1)
+  tradingMode       String   @default("practice")
+  practiceToken     String? // AES-256-GCM encrypted
+  practiceAccountId String?
+  liveToken         String? // AES-256-GCM encrypted
+  liveAccountId     String?
+  riskPercent       Float    @default(1.0) // Global risk % for position sizing
+  updatedAt         DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  severity  String // "critical" | "warning" | "info"
+  source    String // "internet" | "oanda_api" | "oanda_stream" | "daemon" | "ai_analysis" | "trade_condition"
+  title     String
+  message   String
+  metadata  String? // JSON: optional deep-link data e.g. { analysisId, tradeId, conditionId }
+  dismissed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([dismissed, createdAt])
+  @@index([severity, createdAt])
+}
+
+model Trade {
+  id                   String       @id @default(uuid())
+  source               String // "oanda"
+  sourceTradeId        String // OANDA trade/order ID
+  status               String // "pending" | "open" | "closed"
+  instrument           String // "EUR_USD"
+  direction            String // "long" | "short"
+  orderType            String? // "LIMIT" | "STOP" | "MARKET" etc.
+  entryPrice           Float
+  exitPrice            Float?
+  stopLoss             Float?
+  takeProfit           Float?
+  trailingStopDistance  Float?
+  initialUnits         Float
+  currentUnits         Float
+  realizedPL           Float    @default(0)
+  unrealizedPL         Float    @default(0)
+  financing            Float    @default(0)
+  closeReason          String? // "STOP_LOSS_ORDER" | "TAKE_PROFIT_ORDER" etc.
+  timeInForce          String? // "GTC" | "GTD"
+  gtdTime              String?
+  mfe                  Float? // Max Favorable Excursion (pips)
+  mae                  Float? // Max Adverse Excursion (pips)
+  notes                String?
+  timeframe            String? // OANDA granularity code, e.g. "M5", "H1", "D"
+  metadata             String? // JSON for source-specific extensibility
+  openedAt             DateTime
+  closedAt             DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  events               TradeEvent[]
+  tags                 TradeTag[]
+  analyses             AiAnalysis[]
+  conditions           TradeCondition[]
+
+  @@unique([source, sourceTradeId])
+  @@index([status, openedAt])
+  @@index([status, closedAt])
+  @@index([instrument, status])
+}
+
+model Tag {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  color     String // hex like "#3B82F6"
+  createdAt DateTime   @default(now())
+  trades    TradeTag[]
+}
+
+model TradeTag {
+  id         String   @id @default(uuid())
+  tradeId    String
+  trade      Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@unique([tradeId, tagId])
+  @@index([tradeId])
+  @@index([tagId])
+}
+
+model TradeEvent {
+  id        String   @id @default(uuid())
+  tradeId   String
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  eventType String // "PARTIAL_CLOSE" | "SL_MODIFIED" | "TP_MODIFIED" | "TSL_MODIFIED"
+  detail    String // JSON with event-specific data
+  createdAt DateTime @default(now())
+
+  @@index([tradeId, createdAt])
+}
+
+model ChartLayout {
+  id        Int      @id @default(1)
+  layout    String   @default("single") // ChartGridLayout
+  panels    String   @default("[]") // JSON: ChartPanelConfig[]
+  updatedAt DateTime @updatedAt
+}
+
+model TVAlertsConfig {
+  id                  Int      @id @default(1)
+  enabled             Boolean  @default(false)
+  webhookToken        String   @default("")
+  positionSizePercent Float    @default(1.0)
+  cooldownSeconds     Int      @default(60)
+  maxOpenPositions    Int      @default(3)
+  dailyLossLimit      Float    @default(0)
+  pairWhitelist       String   @default("[]") // JSON array of instrument strings
+  marketHoursFilter   Boolean  @default(true)
+  dedupWindowSeconds  Int      @default(5)
+  showChartMarkers    Boolean  @default(true)
+  soundEnabled        Boolean  @default(true)
+  cfWorkerUrl         String   @default("")
+  cfWorkerSecret      String   @default("")
+  updatedAt           DateTime @updatedAt
+}
+
+model AiSettings {
+  id               Int      @id @default(1)
+  claudeApiKey     String? // AES-256-GCM encrypted
+  finnhubApiKey    String? // AES-256-GCM encrypted
+  defaultModel     String   @default("claude-sonnet-4-6")
+  autoAnalysisJson String   @default("{}") // JSON: AiAutoAnalysisSettings
+  updatedAt        DateTime @updatedAt
+}
+
+model AiAnalysis {
+  id              String   @id @default(uuid())
+  tradeId         String
+  trade           Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  status          String // "pending" | "running" | "completed" | "failed" | "cancelled"
+  depth           String // "quick" | "standard" | "deep"
+  model           String // claude model ID
+  tradeStatus     String // snapshot of trade status at analysis time
+  triggeredBy     String   @default("user") // "user" | "auto_pending" | "auto_fill" | "auto_close" | "auto_interval"
+  contextSnapshot String   @default("{}") // JSON: full context sent to Claude
+  rawResponse     String? // full streamed Claude text
+  sections        String? // JSON: AiAnalysisSections (parsed structured response)
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  costUsd         Float    @default(0)
+  durationMs      Int      @default(0)
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tradeId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+model TradeCondition {
+  id                String           @id @default(uuid())
+  tradeId           String
+  trade             Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  triggerType       String // "price_reaches" | "price_breaks_above" | "price_breaks_below" | "pnl_pips" | "pnl_currency" | "time_reached" | "duration_hours" | "trailing_stop"
+  triggerValue      String // JSON: { price: 1.1050 } | { pips: 20 } | { distance_pips: 15, step_pips: 5 } | etc.
+  actionType        String // "close_trade" | "partial_close" | "move_stop_loss" | "move_take_profit" | "cancel_order" | "notify"
+  actionParams      String           @default("{}") // JSON: action-specific params
+  status            String           @default("active") // "active" | "waiting" | "executing" | "triggered" | "expired" | "cancelled"
+  label             String?
+  createdBy         String           @default("user") // "user" | "ai"
+  analysisId        String? // reference if created from AI analysis
+  priority          Int              @default(0) // lower = higher priority for conflict resolution
+  parentConditionId String? // For condition chains: child waits until parent triggers
+  parentCondition   TradeCondition?  @relation("ConditionChain", fields: [parentConditionId], references: [id], onDelete: SetNull)
+  childConditions   TradeCondition[] @relation("ConditionChain")
+  expiresAt         DateTime?
+  triggeredAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([tradeId, status])
+  @@index([status])
+  @@index([triggerType, status])
+  @@index([parentConditionId])
+}
+
+// ─── AI Recommendation Tracking ─────────────────────────────────────────────
+
+model AiRecommendationOutcome {
+  id                String    @id @default(uuid())
+  analysisId        String
+  tradeId           String
+  recommendedAction String // "hold" | "close" | "adjust" | "reduce" | "watch" | "exit_now"
+  winProbability    Float
+  qualityScore      Float
+  actionFollowed    Boolean   @default(false)
+  actionFollowedAt  DateTime?
+  tradeOutcome      String? // "win" | "loss" | "breakeven"
+  actualPnl         Float?
+  resolvedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([analysisId])
+  @@index([tradeId])
+  @@index([tradeOutcome, createdAt])
+}
+
+// ─── AI Weekly/Monthly Digest ───────────────────────────────────────────────
+
+model AiDigest {
+  id           String   @id @default(uuid())
+  period       String // "weekly" | "monthly"
+  periodStart  DateTime
+  periodEnd    DateTime
+  status       String   @default("pending") // "pending" | "running" | "completed" | "failed"
+  sections     String? // JSON: AiDigestSections
+  rawResponse  String?
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costUsd      Float    @default(0)
+  durationMs   Int      @default(0)
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([period, periodStart])
+  @@index([status])
+}
+
+model TVAlertSignal {
+  id               String    @id @default(uuid())
+  source           String    @default("ut_bot_alerts") // Extensible for future modules
+  instrument       String // OANDA format: "EUR_USD"
+  direction        String // "buy" | "sell"
+  status           String // TVAlertStatus
+  rejectionReason  String? // TVAlertRejectionReason
+  rawPayload       String // JSON: TVWebhookPayload
+  resultTradeId    String? // OANDA source trade ID
+  executionDetails String? // JSON: TVExecutionDetails
+  isTest           Boolean   @default(false)
+  signalTime       DateTime? // TradingView candle close time (from rawPayload.time)
+  receivedAt       DateTime
+  processedAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  auditEvents      SignalAuditEvent[]
+
+  @@index([instrument, receivedAt])
+  @@index([status, receivedAt])
+  @@index([source, receivedAt])
+  @@index([receivedAt])
+  @@index([resultTradeId])
+}
+
+model SignalAuditEvent {
+  id        String        @id @default(uuid())
+  signalId  String
+  signal    TVAlertSignal @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  stage     String        // "received" | "config_loaded" | "dedup_checked" | "validated" | "executing" | "executed" | "rejected" | "failed"
+  detail    String        // JSON: { reason?, direction?, instrument?, duration_ms?, raw_payload?, ... }
+  timestamp DateTime      @default(now())
+
+  @@index([signalId, timestamp])
+}
+
+// ─── Supply & Demand Zones ──────────────────────────────────────────────────
+
+model SupplyDemandZone {
+  id              String   @id @default(uuid())
+  instrument      String // "EUR_USD"
+  timeframe       String // "H1"
+  type            String // "demand" | "supply"
+  formation       String // "DBR" | "RBR" | "RBD" | "DBD"
+  proximalLine    Float
+  distalLine      Float
+  width           Float
+  widthPips       Float
+  baseStartTime   Int // Unix seconds
+  baseEndTime     Int // Unix seconds
+  baseCandles     Int
+  baseStartIndex  Int
+  baseEndIndex    Int
+  scoreStrength   Float    @default(0)
+  scoreTime       Float    @default(0)
+  scoreFreshness  Float    @default(0)
+  scoreTotal      Float    @default(0)
+  scoresJson      String   @default("{}") // Full ZoneScores JSON
+  riskRewardJson  String   @default("{}") // ZoneRiskReward JSON
+  status          String   @default("active") // "active" | "tested" | "invalidated"
+  penetrationPct  Float    @default(0)
+  testCount       Int      @default(0)
+  firstDetectedAt DateTime @default(now())
+  lastConfirmedAt DateTime @default(now())
+  lastScoredAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([instrument, timeframe, baseStartTime, baseEndTime, type])
+  @@index([instrument, timeframe, status])
+  @@index([instrument, timeframe, scoreTotal])
+  @@index([status])
+}
+
+model ZoneSettings {
+  id           Int      @id @default(1)
+  settingsJson String   @default("{}") // JSON: ZoneDisplaySettings
+  updatedAt    DateTime @updatedAt
+}
+
+model DetectedTrend {
+  id               String   @id @default(uuid())
+  instrument       String // "EUR_USD"
+  timeframe        String // "H1"
+  direction        String? // "up" | "down" | null (range)
+  status           String // "forming" | "confirmed" | "terminated"
+  swingPointsJson  String   @default("[]") // JSON: SwingPoint[]
+  segmentsJson     String   @default("[]") // JSON: TrendSegment[]
+  controllingSwing String? // JSON: SwingPoint | null
+  currentPrice     Float
+  candlesAnalyzed  Int
+  computedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([instrument, timeframe, computedAt])
+  @@index([instrument, timeframe, status])
+}
+
+model CurveSnapshot {
+  id            String   @id @default(uuid())
+  instrument    String
+  timeframe     String
+  supplyDistal  Float
+  demandDistal  Float
+  highThreshold Float
+  lowThreshold  Float
+  position      String // "high" | "middle" | "low" | "above" | "below"
+  currentPrice  Float
+  computedAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([instrument, timeframe, computedAt])
+}
+
+model TrendSettings {
+  id           Int      @id @default(1)
+  settingsJson String   @default("{}") // JSON: TrendDisplaySettings
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Trade Finder ──────────────────────────────────────────────────────────
+
+model TradeFinderConfig {
+  id                            Int      @id @default(1)
+  enabled                       Boolean  @default(false)
+  minScore                      Float    @default(7.0)
+  maxEnabledPairs               Int      @default(10)
+  approachingAtrMultiple        Float    @default(1.5) // Distance in ATR multiples to mark "approaching"
+  autoTradeEnabled              Boolean  @default(false)
+  autoTradeMinScore             Float    @default(9.0) // Separate threshold for auto-trade
+  autoTradeMaxConcurrent        Int      @default(3) // Max pending auto-placed orders at once
+  autoTradeMaxDaily             Int      @default(5) // Max auto-trades per 24h
+  autoTradeMaxRiskPercent       Float    @default(6.0) // Total risk cap across auto-trades
+  autoTradeMinRR               Float    @default(1.5) // Minimum R:R ratio for auto-trade (e.g. 1.5 = 1.5:1)
+  autoTradeCancelOnInvalidation Boolean  @default(true) // Cancel pending auto-orders when zone invalidated
+  pairsJson                     String   @default("[]") // JSON: TradeFinderPairConfig[]
+  updatedAt                     DateTime @updatedAt
+}
+
+model TradeFinderSetup {
+  id               String   @id @default(uuid())
+  instrument       String
+  direction        String // "long" | "short"
+  timeframeSet     String // "hourly" | "daily" | "weekly" | "monthly"
+  status           String   @default("active") // "active" | "approaching" | "placed" | "invalidated" | "expired"
+  entryPrice       Float
+  stopLoss         Float
+  takeProfit       Float
+  riskPips         Float
+  rewardPips       Float
+  rrRatio          String // e.g. "2.5:1"
+  positionSize     Float
+  scoresJson       String   @default("{}") // JSON: TradeFinderScoreBreakdown
+  scoreTotal       Float    @default(0)
+  zoneJson         String   @default("{}") // JSON: ZoneData (the driving LTF zone)
+  trendJson        String? // JSON: TrendData snapshot
+  curveJson        String? // JSON: CurveData snapshot
+  distanceToEntry  Float    @default(0) // pips from current price to entry
+  resultSourceId   String? // OANDA trade/order ID if placed
+  autoPlaced       Boolean  @default(false) // Whether auto-traded
+  placedAt         DateTime? // When auto-trade placed the order (for daily cap)
+  detectedAt       DateTime @default(now())
+  lastUpdatedAt    DateTime @default(now())
+  expiredAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([instrument, status])
+  @@index([status, scoreTotal])
+  @@index([status, detectedAt])
+  @@index([autoPlaced, placedAt])
+}

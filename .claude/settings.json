@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "*.github.com",
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "npmjs.com",
+        "*.npmjs.com",
+        "registry.npmjs.org"
+      ],
+      "allowLocalBinding": true
+    }
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Edit(./secrets/**)"
+    ],
+    "ask": [
+      "Bash(rm -rf *)",
+      "Bash(sudo rm -rf *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(npm publish*)"
+    ],
+    "allow": ["Bash", "Read", "Edit", "Write", "WebFetch"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-bash.mjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-on-edit.mjs",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

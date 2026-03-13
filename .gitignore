@@ -1,0 +1,75 @@
+# deps
+node_modules/
+**/node_modules/
+
+# next
+.next/
+out/
+dist/
+build/
+
+# caches
+.turbo/
+.cache/
+.eslintcache
+
+# coverage
+coverage/
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env / secrets
+.env
+.env.*
+secrets/
+**/*.pem
+**/*.key
+
+# databases
+*.sqlite
+*.sqlite3
+*.db
+
+# prisma generated
+**/generated/prisma/
+
+# cloudflare
+.wrangler/
+**/.wrangler/
+
+# database journals
+*.db-shm
+*.db-wal
+*.db-journal
+
+# data directory (runtime databases)
+data/
+
+# pnpm store
+.pnpm-store/
+
+# build cache
+tsconfig.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+.agents/
+
+# dev orchestrator state
+.dev/
+
+# personal / private docs
+docs/lightning-talk-script.md
+docs/blog-post-personal.md
+
+# Claude local-only files
+.claude/settings.local.json
+CLAUDE.local.md

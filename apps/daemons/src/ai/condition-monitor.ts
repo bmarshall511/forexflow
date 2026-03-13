@@ -1,0 +1,612 @@
+import type { TradeConditionData, PositionPriceTick, AnyDaemonMessage } from "@fxflow/types"
+import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
+
+interface PriceMap {
+  [instrument: string]: number // mid price
+}
+
+interface CachedTradeData {
+  id: string
+  instrument: string
+  entryPrice: number
+  direction: "long" | "short"
+  currentUnits: number
+  stopLoss: number | null
+  openedAt: number // epoch ms
+  status: string
+  fetchedAt: number
+}
+
+const TRADE_CACHE_TTL_MS = 60_000 // 60 seconds
+
+/**
+ * ConditionMonitor evaluates active trade conditions against live price ticks
+ * and time-based triggers. Executes actions via OandaTradeSyncer.
+ *
+ * Loaded from DB on startup and kept in-memory. Synced on every trade change.
+ */
+export class ConditionMonitor {
+  private readonly conditions = new Map<string, TradeConditionData>() // conditionId → condition
+  private readonly priceMap: PriceMap = {}
+  private readonly tradeSyncer: OandaTradeSyncer
+  private readonly broadcast: (msg: AnyDaemonMessage) => void
+  private checkTimer: NodeJS.Timeout | null = null
+  private readonly tradeDataCache = new Map<string, CachedTradeData>()
+  private lastTrailTime = new Map<string, number>()
+
+  constructor(tradeSyncer: OandaTradeSyncer, broadcast: (msg: AnyDaemonMessage) => void) {
+    this.tradeSyncer = tradeSyncer
+    this.broadcast = broadcast
+  }
+
+  async start(): Promise<void> {
+    // Recover conditions stuck in "executing" state from a previous crash
+    try {
+      const { recoverExecutingConditions } = await import("@fxflow/db")
+      const recovered = await recoverExecutingConditions()
+      if (recovered > 0) {
+        console.warn(`[condition-monitor] Recovered ${recovered} condition(s) stuck in "executing" state from previous crash`)
+      }
+    } catch (err) {
+      console.error("[condition-monitor] Failed to recover executing conditions:", (err as Error).message)
+    }
+
+    // Crash recovery: activate orphaned child conditions whose parent already triggered
+    try {
+      const { db } = await import("@fxflow/db")
+      const orphanedChildren = await db.tradeCondition.findMany({
+        where: {
+          status: "waiting",
+          parentConditionId: { not: null },
+          parentCondition: { status: "triggered" },
+        },
+        select: { id: true },
+      })
+
+      if (orphanedChildren.length > 0) {
+        console.log(`[condition-monitor] Crash recovery: activating ${orphanedChildren.length} orphaned child conditions`)
+        for (const child of orphanedChildren) {
+          await db.tradeCondition.update({
+            where: { id: child.id },
+            data: { status: "active" },
+          })
+        }
+      }
+    } catch (err) {
+      console.error("[condition-monitor] Failed to recover orphaned child conditions:", (err as Error).message)
+    }
+
+    await this.loadFromDB()
+    this.startTimeBasedChecks()
+    console.log(`[condition-monitor] Loaded ${this.conditions.size} active conditions`)
+  }
+
+  stop(): void {
+    if (this.checkTimer) {
+      clearInterval(this.checkTimer)
+      this.checkTimer = null
+    }
+  }
+
+  /** Called when a condition is created or updated via the web API */
+  async reloadCondition(conditionId: string): Promise<void> {
+    try {
+      const { db } = await import("@fxflow/db")
+      const row = await db.tradeCondition.findUnique({ where: { id: conditionId } })
+      if (!row || row.status !== "active") {
+        this.conditions.delete(conditionId)
+        return
+      }
+
+      let triggerValue: Record<string, unknown>
+      let actionParams: Record<string, unknown>
+      try {
+        triggerValue = JSON.parse(row.triggerValue) as Record<string, unknown>
+        actionParams = JSON.parse(row.actionParams) as Record<string, unknown>
+      } catch (parseErr) {
+        console.error(`[condition-monitor] Invalid JSON in condition ${conditionId}:`, (parseErr as Error).message)
+        return // Skip this condition — don't add malformed data to in-memory map
+      }
+
+      const condition: TradeConditionData = {
+        id: row.id,
+        tradeId: row.tradeId,
+        triggerType: row.triggerType as TradeConditionData["triggerType"],
+        triggerValue,
+        actionType: row.actionType as TradeConditionData["actionType"],
+        actionParams,
+        status: row.status as TradeConditionData["status"],
+        label: row.label,
+        createdBy: row.createdBy as "user" | "ai",
+        analysisId: row.analysisId,
+        priority: row.priority,
+        expiresAt: row.expiresAt?.toISOString() ?? null,
+        parentConditionId: row.parentConditionId ?? null,
+        triggeredAt: null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      }
+      this.conditions.set(conditionId, condition)
+    } catch (err) {
+      console.error("[condition-monitor] reloadCondition error:", err)
+    }
+  }
+
+  removeCondition(conditionId: string): void {
+    this.conditions.delete(conditionId)
+  }
+
+  /** Invalidate cached trade data (call when trade status changes) */
+  invalidateTradeCache(tradeId: string): void {
+    this.tradeDataCache.delete(tradeId)
+  }
+
+  /** Called by OandaStreamClient on every price tick */
+  onPriceTick(tick: PositionPriceTick): void {
+    const mid = (tick.bid + tick.ask) / 2
+    this.priceMap[tick.instrument] = mid
+    this.evaluatePriceConditions(tick.instrument, mid).catch((err) => {
+      console.error(`[condition-monitor] Price condition evaluation error for ${tick.instrument}:`, (err as Error).message)
+    })
+  }
+
+  // ─── Private ──────────────────────────────────────────────────────────────
+
+  private async loadFromDB(): Promise<void> {
+    try {
+      const { listActiveConditions } = await import("@fxflow/db")
+      const active = await listActiveConditions()
+      this.conditions.clear()
+      for (const c of active) {
+        this.conditions.set(c.id, c)
+      }
+    } catch (err) {
+      console.error("[condition-monitor] loadFromDB error:", err)
+    }
+  }
+
+  private startTimeBasedChecks(): void {
+    // Check time-based conditions every 60 seconds
+    this.checkTimer = setInterval(() => {
+      void this.evaluateTimeConditions()
+      void this.expireOldConditions()
+    }, 60_000)
+  }
+
+  private async evaluatePriceConditions(instrument: string, currentPrice: number): Promise<void> {
+    const toCheck: TradeConditionData[] = []
+
+    for (const condition of this.conditions.values()) {
+      if (condition.status !== "active") continue
+
+      const triggerType = condition.triggerType
+      if (
+        triggerType === "price_reaches" ||
+        triggerType === "price_breaks_above" ||
+        triggerType === "price_breaks_below" ||
+        triggerType === "pnl_pips" ||
+        triggerType === "pnl_currency" ||
+        triggerType === "trailing_stop"
+      ) {
+        toCheck.push(condition)
+      }
+    }
+
+    for (const condition of toCheck) {
+      const tradeData = await this.getTradeData(condition.tradeId)
+      if (!tradeData || tradeData.instrument !== instrument) continue
+
+      // Trailing stop is a persistent condition — handle separately
+      if (condition.triggerType === "trailing_stop") {
+        const result = this.evaluateTrailingStop(condition, currentPrice, tradeData)
+        if (result?.shouldMove) {
+          // Throttle: skip if last trail was < 2s ago
+          const now = Date.now()
+          const lastTrail = this.lastTrailTime.get(condition.id) ?? 0
+          if (now - lastTrail < 2000) continue
+
+          try {
+            await this.executeConditionAction({
+              ...condition,
+              actionType: "move_stop_loss",
+              actionParams: { price: result.newSL },
+            })
+
+            this.lastTrailTime.set(condition.id, now)
+
+            // Invalidate trade data cache so next tick sees new SL
+            this.invalidateTradeCache(tradeData.id)
+
+            // Create audit trail
+            const { createTradeEvent } = await import("@fxflow/db")
+            await createTradeEvent({
+              tradeId: condition.tradeId,
+              eventType: "CONDITION_TRIGGERED",
+              detail: JSON.stringify({
+                conditionId: condition.id,
+                label: condition.label,
+                triggerType: "trailing_stop",
+                actionType: "move_stop_loss",
+                newSL: result.newSL,
+                currentPrice,
+              }),
+            })
+          } catch (err) {
+            console.error(`[condition-monitor] Trailing stop SL move failed for ${condition.id}:`, (err as Error).message)
+          }
+        }
+        continue
+      }
+
+      const triggered = this.checkPriceCondition(condition, currentPrice, instrument, tradeData)
+      if (triggered) {
+        await this.triggerCondition(condition, currentPrice)
+      }
+    }
+  }
+
+  private checkPriceCondition(
+    condition: TradeConditionData,
+    currentPrice: number,
+    instrument: string,
+    tradeData?: CachedTradeData,
+  ): boolean {
+    const val = condition.triggerValue
+    const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+
+    switch (condition.triggerType) {
+      case "price_reaches": {
+        const target = val.price as number | undefined
+        if (!target) return false
+        // Triggered when price is within 0.5 pip of the target
+        return Math.abs(currentPrice - target) <= pip * 0.5
+      }
+
+      case "price_breaks_above": {
+        const target = val.price as number | undefined
+        if (!target) return false
+        return currentPrice >= target
+      }
+
+      case "price_breaks_below": {
+        const target = val.price as number | undefined
+        if (!target) return false
+        return currentPrice <= target
+      }
+
+      case "pnl_pips": {
+        if (!tradeData) return false
+        const targetPips = val.pips as number | undefined
+        if (targetPips === undefined) return false
+        const priceDiff = tradeData.direction === "long"
+          ? currentPrice - tradeData.entryPrice
+          : tradeData.entryPrice - currentPrice
+        const currentPips = priceDiff / pip
+
+        // Support direction: "profit" (default) triggers when profit >= target
+        //                     "loss" triggers when unrealized loss >= target (absolute)
+        const direction = (val.direction as string) ?? "profit"
+        if (direction === "loss") {
+          return currentPips <= -(Math.abs(targetPips))
+        }
+        return currentPips >= targetPips
+      }
+
+      case "pnl_currency": {
+        if (!tradeData) return false
+        // UI sends "amount", AI suggestions may send "currency" — accept both
+        const targetCurrency = (val.amount ?? val.currency) as number | undefined
+        if (targetCurrency === undefined) return false
+
+        // Calculate approximate unrealized P&L in account currency
+        // P&L = (currentPrice - entryPrice) * units for long, inverse for short
+        const priceDiff = tradeData.direction === "long"
+          ? currentPrice - tradeData.entryPrice
+          : tradeData.entryPrice - currentPrice
+        const units = Math.abs(tradeData.currentUnits)
+        // For most USD-quoted pairs, P&L ≈ priceDiff * units
+        // For cross pairs, this is an approximation (exact conversion needs live rates)
+        const estimatedPnl = priceDiff * units
+
+        const direction = (val.direction as string) ?? "profit"
+        if (direction === "loss") {
+          return estimatedPnl <= -(Math.abs(targetCurrency))
+        }
+        return estimatedPnl >= targetCurrency
+      }
+
+      default:
+        return false
+    }
+  }
+
+  private async evaluateTimeConditions(): Promise<void> {
+    const now = new Date()
+
+    for (const condition of this.conditions.values()) {
+      if (condition.status !== "active") continue
+
+      if (condition.triggerType === "time_reached") {
+        const target = condition.triggerValue.timestamp as string | undefined
+        if (target && new Date(target) <= now) {
+          await this.triggerCondition(condition, null)
+        }
+      }
+
+      if (condition.triggerType === "duration_hours") {
+        const hours = condition.triggerValue.hours as number | undefined
+        if (!hours) continue
+
+        // Use cached trade data instead of direct DB query (M3 fix)
+        const tradeData = await this.getTradeData(condition.tradeId)
+        if (!tradeData || tradeData.status !== "open") continue
+
+        const durationMs = now.getTime() - tradeData.openedAt
+        const durationHours = durationMs / 3600000
+        if (durationHours >= hours) {
+          await this.triggerCondition(condition, null)
+        }
+      }
+    }
+  }
+
+  private async expireOldConditions(): Promise<void> {
+    try {
+      const { expireOldConditions } = await import("@fxflow/db")
+      const count = await expireOldConditions()
+      if (count > 0) {
+        // Remove expired from in-memory map
+        for (const [id, condition] of this.conditions.entries()) {
+          if (condition.expiresAt && new Date(condition.expiresAt) < new Date()) {
+            this.conditions.delete(id)
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  private async triggerCondition(condition: TradeConditionData, currentPrice: number | null): Promise<void> {
+    // Step 1: Remove from in-memory map immediately (prevent concurrent re-evaluation)
+    this.conditions.delete(condition.id)
+
+    const { updateConditionStatus, createTradeEvent, createNotification } = await import("@fxflow/db")
+
+    // Step 2: Mark as "executing" in DB BEFORE running the action (C2 crash safety)
+    // If daemon crashes after this point, startup recovery will find it
+    try {
+      await updateConditionStatus(condition.id, "executing")
+    } catch (err) {
+      console.error(`[condition-monitor] Failed to set executing status for ${condition.id}:`, (err as Error).message)
+      // Re-add to memory so it can be retried on next tick
+      this.conditions.set(condition.id, condition)
+      return
+    }
+
+    let success = false
+    let errorMsg: string | undefined
+
+    try {
+      console.log(`[condition-monitor] Triggering condition ${condition.id}: ${condition.actionType}`)
+
+      // Step 3: Execute the action
+      await this.executeConditionAction(condition)
+      success = true
+
+      // Step 4a: Mark condition as triggered in DB after successful execution
+      await updateConditionStatus(condition.id, "triggered", new Date())
+
+      // Activate child conditions in the chain
+      try {
+        const { activateChildConditions } = await import("@fxflow/db")
+        const activatedIds = await activateChildConditions(condition.id)
+        for (const childId of activatedIds) {
+          await this.reloadCondition(childId)
+        }
+        if (activatedIds.length > 0) {
+          console.log(`[condition-monitor] Activated ${activatedIds.length} child condition(s) for parent ${condition.id}`)
+        }
+      } catch (chainErr) {
+        console.error(`[condition-monitor] Failed to activate child conditions for ${condition.id}:`, (chainErr as Error).message)
+      }
+
+      // Log as trade event for audit trail
+      await createTradeEvent({
+        tradeId: condition.tradeId,
+        eventType: "CONDITION_TRIGGERED",
+        detail: JSON.stringify({
+          conditionId: condition.id,
+          label: condition.label,
+          triggerType: condition.triggerType,
+          triggerValue: condition.triggerValue,
+          actionType: condition.actionType,
+          actionParams: condition.actionParams,
+          currentPrice,
+        }),
+      })
+    } catch (err) {
+      errorMsg = (err as Error).message
+      success = false
+      console.error(`[condition-monitor] Failed to execute condition ${condition.id}:`, errorMsg)
+
+      // Step 4b: Execution failed — revert to "active" and re-add to memory for retry
+      try {
+        await updateConditionStatus(condition.id, "active")
+      } catch { /* best effort revert */ }
+      this.conditions.set(condition.id, condition)
+    }
+
+    // Broadcast condition triggered event
+    this.broadcast({
+      type: "condition_triggered",
+      timestamp: new Date().toISOString(),
+      data: {
+        conditionId: condition.id,
+        tradeId: condition.tradeId,
+        instrument: await this.getTradeInstrument(condition.tradeId),
+        label: condition.label,
+        actionType: condition.actionType,
+        success,
+        error: errorMsg,
+      },
+    })
+
+    // Create notification
+    await createNotification({
+      severity: success ? "info" : "warning",
+      source: "trade_condition",
+      title: success ? "Trade Condition Triggered" : "Condition Action Failed",
+      message: success
+        ? `${condition.label ?? condition.actionType}: ${condition.actionType.replace("_", " ")} executed`
+        : `${condition.label ?? condition.actionType}: ${errorMsg}`,
+      metadata: { conditionId: condition.id, tradeId: condition.tradeId },
+    })
+  }
+
+  private async executeConditionAction(condition: TradeConditionData): Promise<void> {
+    // Get the trade's source trade ID
+    const { db } = await import("@fxflow/db")
+    const trade = await db.trade.findUnique({
+      where: { id: condition.tradeId },
+      select: { sourceTradeId: true, status: true, direction: true, entryPrice: true },
+    })
+
+    if (!trade) throw new Error(`Trade ${condition.tradeId} not found`)
+
+    const params = condition.actionParams
+
+    switch (condition.actionType) {
+      case "close_trade":
+        await this.tradeSyncer.closeTrade(
+          trade.sourceTradeId,
+          undefined,
+          `Condition triggered: ${condition.label ?? "automated condition"}`,
+        )
+        break
+
+      case "partial_close": {
+        const units = params.units as number | undefined
+        if (!units) throw new Error("partial_close requires units param")
+        await this.tradeSyncer.closeTrade(
+          trade.sourceTradeId,
+          units,
+          `Partial close condition: ${condition.label ?? "automated"}`,
+        )
+        break
+      }
+
+      case "move_stop_loss": {
+        const stopLoss = params.price as number | undefined
+        if (!stopLoss) throw new Error("move_stop_loss requires price param")
+        if (trade.status === "open") {
+          await this.tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, stopLoss, undefined)
+        } else if (trade.status === "pending") {
+          await this.tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, stopLoss, undefined)
+        }
+        break
+      }
+
+      case "move_take_profit": {
+        const takeProfit = params.price as number | undefined
+        if (!takeProfit) throw new Error("move_take_profit requires price param")
+        if (trade.status === "open") {
+          await this.tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, undefined, takeProfit)
+        } else if (trade.status === "pending") {
+          await this.tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, undefined, takeProfit)
+        }
+        break
+      }
+
+      case "cancel_order":
+        if (trade.status !== "pending") {
+          throw new Error(`Cannot cancel order — trade status is "${trade.status}", expected "pending"`)
+        }
+        await this.tradeSyncer.cancelOrder(
+          trade.sourceTradeId,
+          `Condition triggered: ${condition.label ?? "automated condition"}`,
+        )
+        break
+
+      case "notify":
+        // Notification is already created above — no additional action needed
+        break
+
+      default:
+        throw new Error(`Unknown action type: ${condition.actionType}`)
+    }
+  }
+
+  private evaluateTrailingStop(
+    condition: TradeConditionData,
+    currentPrice: number,
+    tradeData: CachedTradeData,
+  ): { shouldMove: boolean; newSL: number } | null {
+    const triggerValue = typeof condition.triggerValue === "string"
+      ? JSON.parse(condition.triggerValue)
+      : condition.triggerValue
+    const distancePips = triggerValue.distance_pips as number
+    const stepPips = (triggerValue.step_pips ?? distancePips) as number
+    const instrument = tradeData.instrument
+    const direction = tradeData.direction
+    const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+    const distance = distancePips * pip
+    const step = stepPips * pip
+
+    // Calculate ideal SL based on current price
+    const idealSL = direction === "long"
+      ? currentPrice - distance
+      : currentPrice + distance
+
+    const currentSL = tradeData.stopLoss
+    if (!currentSL) return { shouldMove: true, newSL: Math.round(idealSL / pip) * pip }
+
+    // Only move SL in favorable direction by at least step_pips
+    if (direction === "long" && idealSL > currentSL + step * 0.5) {
+      return { shouldMove: true, newSL: Math.round(idealSL / pip) * pip }
+    }
+    if (direction === "short" && idealSL < currentSL - step * 0.5) {
+      return { shouldMove: true, newSL: Math.round(idealSL / pip) * pip }
+    }
+    return null
+  }
+
+  private async getTradeData(tradeId: string): Promise<CachedTradeData | null> {
+    const cached = this.tradeDataCache.get(tradeId)
+    if (cached && Date.now() - cached.fetchedAt < TRADE_CACHE_TTL_MS) {
+      return cached
+    }
+
+    try {
+      const { db } = await import("@fxflow/db")
+      const trade = await db.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, instrument: true, entryPrice: true, direction: true, currentUnits: true, stopLoss: true, openedAt: true, status: true },
+      })
+      if (trade) {
+        const data: CachedTradeData = {
+          id: trade.id,
+          instrument: trade.instrument,
+          entryPrice: trade.entryPrice,
+          direction: trade.direction as "long" | "short",
+          currentUnits: trade.currentUnits,
+          stopLoss: trade.stopLoss,
+          openedAt: trade.openedAt.getTime(),
+          status: trade.status,
+          fetchedAt: Date.now(),
+        }
+        this.tradeDataCache.set(tradeId, data)
+        return data
+      }
+    } catch {
+      // ignore
+    }
+    return null
+  }
+
+  /** @deprecated Use getTradeData instead */
+  private async getTradeInstrument(tradeId: string): Promise<string> {
+    const data = await this.getTradeData(tradeId)
+    return data?.instrument ?? ""
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "fxflow": {
+      "command": "pnpm",
+      "args": ["--filter", "@fxflow/mcp-server", "exec", "tsx", "src/index.ts"],
+      "env": {
+        "DAEMON_URL": "http://localhost:4100"
+      }
+    }
+  }
+}
