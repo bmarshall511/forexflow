@@ -90,7 +90,7 @@ export function PerfSessionPerformance({ data }: SessionPerformanceChartProps) {
             />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: theme.grid }} />
             <Bar dataKey="totalPL" radius={[4, 4, 0, 0]} maxBarSize={48}>
-              {data.map((entry, i) => {
+              {data.map((entry) => {
                 const sessionIndex =
                   entry.session.toLowerCase() === "asian"
                     ? 0

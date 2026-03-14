@@ -68,7 +68,6 @@ export function useTVAlertsPerformance(): PerfData {
   const fetchAll = useCallback(async (p: PerfPeriod) => {
     setIsLoading(true)
     const dateFrom = periodToDateFrom(p)
-    const dateQ = dateFrom ? `&dateFrom=${dateFrom}` : ""
     const fromQ = dateFrom ? `?from=${dateFrom}` : ""
     const analyticsQ = `?source=${SOURCE}${dateFrom ? `&dateFrom=${dateFrom}` : ""}`
 

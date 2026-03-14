@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { Suspense, useState, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { PinPad } from "@/components/auth/pin-pad"
@@ -32,7 +32,7 @@ function Logo() {
   )
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") ?? "/"
@@ -155,5 +155,13 @@ export default function LoginPage() {
         disabled={loading || pin.length >= PIN_LENGTH}
       />
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }
