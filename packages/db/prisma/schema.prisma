@@ -8,14 +8,15 @@ datasource db {
 }
 
 model Settings {
-  id                Int      @id @default(1)
-  tradingMode       String   @default("practice")
-  practiceToken     String? // AES-256-GCM encrypted
-  practiceAccountId String?
-  liveToken         String? // AES-256-GCM encrypted
-  liveAccountId     String?
-  riskPercent       Float    @default(1.0) // Global risk % for position sizing
-  updatedAt         DateTime @updatedAt
+  id                    Int      @id @default(1)
+  tradingMode           String   @default("practice")
+  practiceToken         String? // AES-256-GCM encrypted
+  practiceAccountId     String?
+  liveToken             String? // AES-256-GCM encrypted
+  liveAccountId         String?
+  riskPercent           Float    @default(1.0) // Global risk % for position sizing
+  onboardingCompleted   Boolean  @default(false)
+  updatedAt             DateTime @updatedAt
 }
 
 model Notification {
@@ -189,6 +190,7 @@ model TradeCondition {
   @@index([status])
   @@index([triggerType, status])
   @@index([parentConditionId])
+  @@index([expiresAt])
 }
 
 // ─── AI Recommendation Tracking ─────────────────────────────────────────────
@@ -407,6 +409,7 @@ model TradeFinderSetup {
   @@index([status, scoreTotal])
   @@index([status, detectedAt])
   @@index([autoPlaced, placedAt])
+  @@index([placedAt])
 }
 
 // ─── AI Trader ──────────────────────────────────────────────────────────────
@@ -496,6 +499,44 @@ model AiTraderMarketData {
 
   @@index([dataType, dataKey, expiresAt])
   @@index([dataType, expiresAt])
+}
+
+// ─── Price Alerts ────────────────────────────────────────────────────────────
+
+model PriceAlert {
+  id           String    @id @default(cuid())
+  instrument   String // e.g., "EUR_USD"
+  direction    String // "above" | "below"
+  targetPrice  Float
+  currentPrice Float // price when alert was created
+  label        String?
+  status       String    @default("active") // "active" | "triggered" | "expired" | "cancelled"
+  repeating    Boolean   @default(false) // if true, re-arms after trigger
+  triggeredAt  DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status])
+  @@index([instrument, status])
+  @@index([expiresAt])
+}
+
+model EconomicEvent {
+  id        String   @id @default(cuid())
+  title     String
+  currency  String   // e.g., "USD", "EUR"
+  impact    String   // "low" | "medium" | "high"
+  actual    String?
+  forecast  String?
+  previous  String?
+  timestamp DateTime // when the event occurs
+  fetchedAt DateTime @default(now())
+
+  @@unique([title, timestamp])
+  @@index([timestamp])
+  @@index([currency, timestamp])
+  @@index([impact, timestamp])
 }
 
 model AiTraderStrategyPerformance {

@@ -293,6 +293,15 @@ export async function cancelConditionsForTrade(tradeId: string): Promise<number>
   return result.count
 }
 
+/** Expire all active/executing conditions for a trade (used when trade closes to prevent race conditions) */
+export async function expireConditionsForTrade(tradeId: string): Promise<number> {
+  const result = await db.tradeCondition.updateMany({
+    where: { tradeId, status: { in: ["active", "executing"] } },
+    data: { status: "expired" },
+  })
+  return result.count
+}
+
 /** Activate child conditions in a chain after the parent is triggered */
 export async function activateChildConditions(parentConditionId: string): Promise<string[]> {
   const children = await db.tradeCondition.findMany({

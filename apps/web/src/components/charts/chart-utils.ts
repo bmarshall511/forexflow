@@ -1,5 +1,6 @@
 import type { DeepPartial } from "lightweight-charts"
 import type { ChartOptions, CandlestickStyleOptions, SeriesOptionsCommon } from "lightweight-charts"
+import { getChartTheme } from "@/lib/chart-theme"
 
 export interface CandleApiData {
   time: number
@@ -24,20 +25,21 @@ export const CANDLE_COUNTS: Record<string, number> = {
 
 /** Chart options respecting current theme */
 export function getChartOptions(isDark: boolean, height: number): DeepPartial<ChartOptions> {
+  const theme = getChartTheme(isDark)
   return {
     height,
     layout: {
-      background: { color: "transparent" },
-      textColor: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+      background: { color: theme.background },
+      textColor: theme.text,
       fontSize: 10,
     },
     grid: {
-      vertLines: { color: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" },
-      horzLines: { color: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" },
+      vertLines: { color: theme.grid },
+      horzLines: { color: theme.grid },
     },
     crosshair: {
-      horzLine: { labelBackgroundColor: isDark ? "#374151" : "#e5e7eb" },
-      vertLine: { labelBackgroundColor: isDark ? "#374151" : "#e5e7eb" },
+      horzLine: { labelBackgroundColor: theme.crosshair },
+      vertLine: { labelBackgroundColor: theme.crosshair },
     },
     rightPriceScale: { borderVisible: false },
     timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
@@ -52,13 +54,14 @@ export function getCandlestickOptions(
   decimals: number,
   minMove: number,
 ): DeepPartial<CandlestickStyleOptions & SeriesOptionsCommon> {
+  const theme = getChartTheme(isDark)
   return {
-    upColor: isDark ? "#22c55e" : "#16a34a",
-    downColor: isDark ? "#ef4444" : "#dc2626",
-    borderUpColor: isDark ? "#22c55e" : "#16a34a",
-    borderDownColor: isDark ? "#ef4444" : "#dc2626",
-    wickUpColor: isDark ? "#22c55e" : "#16a34a",
-    wickDownColor: isDark ? "#ef4444" : "#dc2626",
+    upColor: theme.upCandle,
+    downColor: theme.downCandle,
+    borderUpColor: theme.upCandle,
+    borderDownColor: theme.downCandle,
+    wickUpColor: theme.upWick,
+    wickDownColor: theme.downWick,
     lastValueVisible: false,
     priceLineVisible: false,
     priceFormat: { type: "price", precision: decimals, minMove },

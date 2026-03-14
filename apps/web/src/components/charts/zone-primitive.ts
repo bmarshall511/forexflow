@@ -11,14 +11,7 @@ import type {
   Coordinate,
 } from "lightweight-charts"
 import type { ZoneData } from "@fxflow/types"
-
-// ─── Colors & Constants ─────────────────────────────────────────────────────
-
-const DEMAND_COLOR = "#22c55e"
-const SUPPLY_COLOR = "#ef4444"
-const HTF_DEMAND_COLOR = "#16a34a"
-const HTF_SUPPLY_COLOR = "#dc2626"
-const INVALIDATED_COLOR = "#6b7280"
+import { getChartTheme, type ChartTheme } from "@/lib/chart-theme"
 
 function getZoneOpacity(score: number): number {
   if (score >= 4.5) return 0.15
@@ -27,10 +20,10 @@ function getZoneOpacity(score: number): number {
   return 0.05
 }
 
-function getZoneColor(zone: ZoneData, isHigherTf: boolean): string {
-  if (zone.status === "invalidated") return INVALIDATED_COLOR
-  if (zone.type === "demand") return isHigherTf ? HTF_DEMAND_COLOR : DEMAND_COLOR
-  return isHigherTf ? HTF_SUPPLY_COLOR : SUPPLY_COLOR
+function getZoneColor(zone: ZoneData, isHigherTf: boolean, theme: ChartTheme): string {
+  if (zone.status === "invalidated") return theme.invalidatedZone
+  if (zone.type === "demand") return isHigherTf ? theme.htfDemandZone : theme.demandZone
+  return isHigherTf ? theme.htfSupplyZone : theme.supplyZone
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -125,6 +118,7 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
     const { chart, series, zones, higherTfZones, isDark, nearestDemandId, nearestSupplyId } =
       this._source
     if (!chart || !series) return
+    const theme = getChartTheme(isDark)
 
     target.useMediaCoordinateSpace(({ context }) => {
       const timeScale = chart.timeScale()
@@ -135,13 +129,23 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
 
       // Draw higher-TF zones first (behind primary)
       for (const zone of higherTfZones) {
-        this._drawZone(context, zone, timeScale, series, chartWidth, true, false, isDark)
+        this._drawZone(context, zone, timeScale, series, chartWidth, true, false, isDark, theme)
       }
 
       // Draw primary zones
       for (const zone of zones) {
         const isNearest = zone.id === nearestDemandId || zone.id === nearestSupplyId
-        this._drawZone(context, zone, timeScale, series, chartWidth, false, isNearest, isDark)
+        this._drawZone(
+          context,
+          zone,
+          timeScale,
+          series,
+          chartWidth,
+          false,
+          isNearest,
+          isDark,
+          theme,
+        )
       }
     })
   }
@@ -155,6 +159,7 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
     isHigherTf: boolean,
     isNearest: boolean,
     isDark: boolean,
+    theme: ChartTheme,
   ): void {
     const proximalY = series.priceToCoordinate(zone.proximalLine) as Coordinate | null
     const distalY = series.priceToCoordinate(zone.distalLine) as Coordinate | null
@@ -173,7 +178,7 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
 
     if (height < 1) return
 
-    const color = getZoneColor(zone, isHigherTf)
+    const color = getZoneColor(zone, isHigherTf, theme)
     const opacity = zone.status === "invalidated" ? 0.04 : getZoneOpacity(zone.scores.total)
 
     ctx.save()
@@ -338,10 +343,11 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
     const allZones = [...this._zones, ...this._higherTfZones]
     const dec = this._decimals
     const isDark = this._isDark
+    const theme = getChartTheme(isDark)
 
     for (const zone of allZones) {
       const isHTF = this._higherTfZones.includes(zone)
-      const color = getZoneColor(zone, isHTF)
+      const color = getZoneColor(zone, isHTF, theme)
       const bgColor = isDark ? darken(color) : lighten(color)
       const txtColor = color
 

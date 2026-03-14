@@ -34,6 +34,9 @@ import {
 import { AiAnalysisCell } from "./ai-analysis-cell"
 import { MoreHorizontal, Eye, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useBulkSelection } from "@/hooks/use-bulk-selection"
+import { BulkActionBar } from "./bulk-action-bar"
 
 interface TradeHistoryTableProps {
   trades: ClosedTradeData[]
@@ -67,6 +70,7 @@ export function TradeHistoryTable({
   const [sort, setSort] = useState<SortState>({ key: "closedAt", direction: "desc" })
   const [drawerTrade, setDrawerTrade] = useState<ClosedTradeData | null>(null)
   const [aiAnalysisTrade, setAiAnalysisTrade] = useState<ClosedTradeData | null>(null)
+  const bulk = useBulkSelection<ClosedTradeData>()
 
   const handleSort = (key: string) => setSort(nextSort(sort, key))
 
@@ -188,6 +192,19 @@ export function TradeHistoryTable({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={
+                    bulk.isAllSelected(sorted)
+                      ? true
+                      : bulk.isSomeSelected(sorted)
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={() => bulk.toggleAll(sorted)}
+                  aria-label="Select all trades"
+                />
+              </TableHead>
               <SortableHead
                 label="Pair"
                 sortKey="instrument"
@@ -321,6 +338,16 @@ export function TradeHistoryTable({
                     if (e.button === 0) setDrawerTrade(trade)
                   }}
                 >
+                  <TableCell
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={bulk.isSelected(trade.id)}
+                      onCheckedChange={() => bulk.toggle(trade.id)}
+                      aria-label={`Select ${trade.instrument.replace("_", "/")} trade`}
+                    />
+                  </TableCell>
                   <TableCell className="text-xs font-medium">
                     {trade.instrument.replace("_", "/")}
                   </TableCell>
@@ -472,6 +499,7 @@ export function TradeHistoryTable({
         open={!!aiAnalysisTrade}
         onOpenChange={(open) => !open && setAiAnalysisTrade(null)}
       />
+      <BulkActionBar count={bulk.count} type="closed" onClear={bulk.clear} />
     </>
   )
 }

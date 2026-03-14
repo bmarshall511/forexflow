@@ -153,3 +153,14 @@ export {
   type LiquiditySweep,
   type EqualLevel,
 } from "./smc-detector"
+
+export {
+  FxFlowError,
+  OandaApiError,
+  DbError,
+  SignalError,
+  AiError,
+  ValidationError,
+} from "./errors"
+
+export { Logger } from "./logger"

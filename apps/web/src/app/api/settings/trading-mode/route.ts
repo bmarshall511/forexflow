@@ -1,25 +1,18 @@
 import { NextResponse } from "next/server"
 import { setTradingMode } from "@fxflow/db"
-import type { ApiResponse, UpdateTradingModeRequest } from "@fxflow/types"
+import type { ApiResponse } from "@fxflow/types"
+import { UpdateTradingModeSchema } from "@fxflow/types"
+import { parseBody, apiSuccess, apiError } from "@/lib/api-validation"
 
 export async function PUT(request: Request): Promise<NextResponse<ApiResponse>> {
   try {
-    const body = (await request.json()) as UpdateTradingModeRequest
+    const parsed = await parseBody(request, UpdateTradingModeSchema)
+    if (!parsed.success) return parsed.response
 
-    if (body.mode !== "live" && body.mode !== "practice") {
-      return NextResponse.json(
-        { ok: false, error: "Invalid mode. Must be 'live' or 'practice'" },
-        { status: 400 },
-      )
-    }
-
-    await setTradingMode(body.mode)
-    return NextResponse.json({ ok: true })
+    await setTradingMode(parsed.data.mode)
+    return apiSuccess(undefined)
   } catch (error) {
     console.error("[PUT /api/settings/trading-mode]", error)
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    )
+    return apiError(error instanceof Error ? error.message : "Unknown error", 500)
   }
 }

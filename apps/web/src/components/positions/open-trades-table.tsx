@@ -56,6 +56,10 @@ import {
 import { AiAnalysisCell } from "./ai-analysis-cell"
 import { MoreHorizontal, Eye, XCircle, Sparkles, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SpreadDisplay } from "@/components/ui/spread-display"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useBulkSelection } from "@/hooks/use-bulk-selection"
+import { BulkActionBar } from "./bulk-action-bar"
 
 interface OpenTradesTableProps {
   trades: OpenTradeData[]
@@ -98,6 +102,8 @@ export function OpenTradesTable({
   } = useTradeActions()
   const { positions, setPositions } = useDaemonStatus()
   const [isClosingAll, setIsClosingAll] = useState(false)
+  const bulk = useBulkSelection<OpenTradeData>()
+  const [isBulkClosing, setIsBulkClosing] = useState(false)
 
   // Deep-link support: open the AI sheet when a specific trade is passed from the parent
   useEffect(() => {
@@ -260,6 +266,21 @@ export function OpenTradesTable({
     }
   }
 
+  const handleBulkClose = async () => {
+    const ids = stableResult.filter((t) => bulk.isSelected(t.id)).map((t) => t.sourceTradeId)
+    if (ids.length === 0) return
+    setIsBulkClosing(true)
+    try {
+      const result = await closeAllTrades(ids)
+      if (result.succeeded > 0) {
+        bulk.clear()
+        await refreshPositions()
+      }
+    } finally {
+      setIsBulkClosing(false)
+    }
+  }
+
   if (stableResult.length === 0) {
     return <div className="text-muted-foreground py-12 text-center text-sm">No open trades</div>
   }
@@ -347,6 +368,19 @@ export function OpenTradesTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <Checkbox
+                checked={
+                  bulk.isAllSelected(stableResult)
+                    ? true
+                    : bulk.isSomeSelected(stableResult)
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={() => bulk.toggleAll(stableResult)}
+                aria-label="Select all trades"
+              />
+            </TableHead>
             <SortableHead
               label="Pair"
               sortKey="instrument"
@@ -384,6 +418,9 @@ export function OpenTradesTable({
               className="text-right"
               title="Current market price"
             />
+            <TableHead className="text-right" title="Current bid/ask spread">
+              Spread
+            </TableHead>
             <SortableHead
               label="Stop"
               sortKey="stopLoss"
@@ -473,6 +510,16 @@ export function OpenTradesTable({
                   if (e.button === 0) setDrawerTrade(trade)
                 }}
               >
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={bulk.isSelected(trade.id)}
+                    onCheckedChange={() => bulk.toggle(trade.id)}
+                    aria-label={`Select ${trade.instrument.replace("_", "/")} trade`}
+                  />
+                </TableCell>
                 <TableCell className="text-xs font-medium">
                   {trade.instrument.replace("_", "/")}
                 </TableCell>
@@ -507,6 +554,15 @@ export function OpenTradesTable({
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {(() => {
+                    const tick = pricesByInstrument?.get(trade.instrument)
+                    if (!tick) return <span className="text-muted-foreground text-xs">—</span>
+                    return (
+                      <SpreadDisplay bid={tick.bid} ask={tick.ask} instrument={trade.instrument} />
+                    )
+                  })()}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                   {trade.stopLoss ?? "—"}
@@ -641,6 +697,13 @@ export function OpenTradesTable({
         tradeStatus="open"
         open={!!aiAnalysisTrade}
         onOpenChange={(open) => !open && setAiAnalysisTrade(null)}
+      />
+      <BulkActionBar
+        count={bulk.count}
+        type="open"
+        onClose={handleBulkClose}
+        onClear={bulk.clear}
+        isLoading={isBulkClosing}
       />
     </>
   )

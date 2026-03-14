@@ -357,6 +357,7 @@ export async function migrateFilledPendingOrders(
 export async function removeStalePendingOrders(
   activeSourceIds: string[],
   source: TradeSource,
+  closedAt?: Date,
 ): Promise<number> {
   const result = await db.trade.updateMany({
     where: {
@@ -367,7 +368,7 @@ export async function removeStalePendingOrders(
     data: {
       status: "closed",
       closeReason: "ORDER_CANCEL",
-      closedAt: new Date(),
+      closedAt: closedAt ?? new Date(),
     },
   })
   return result.count

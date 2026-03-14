@@ -16,6 +16,8 @@ interface CFSignalMessage {
   timestamp: string
 }
 
+const SIGNAL_DEDUP_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
 /**
  * Outbound WebSocket client connecting the daemon to the CF Worker Durable Object.
  * Handles authentication, reconnection with exponential backoff, and heartbeat monitoring.
@@ -30,6 +32,8 @@ export class CFWorkerClient {
   private disposed = false
   private onSignal: (payload: TVWebhookPayload, instrument: string) => void
   private onConnectionChange: (connected: boolean) => void
+  /** Tracks recently processed signalIds to prevent duplicate processing on reconnect flush */
+  private recentSignalIds = new Map<string, number>()
 
   constructor(
     private config: CFWorkerClientConfig,
@@ -92,6 +96,22 @@ export class CFWorkerClient {
       if (msg.type === "signal") {
         const signalMsg = msg as CFSignalMessage
         if (signalMsg.payload && signalMsg.instrument) {
+          // Idempotency check: skip duplicate signals replayed on reconnect
+          const { signalId } = signalMsg.payload
+          if (signalId) {
+            if (this.recentSignalIds.has(signalId)) {
+              console.log(
+                `[cf-worker-client] Skipping duplicate signal signalId=${signalId} instrument=${signalMsg.instrument}`,
+              )
+              this.ws?.send(
+                JSON.stringify({ type: "signal_ack", timestamp: new Date().toISOString() }),
+              )
+              return
+            }
+            this.recentSignalIds.set(signalId, Date.now())
+            this.pruneRecentSignalIds()
+          }
+
           this.onSignal(signalMsg.payload, signalMsg.instrument)
           // Send ack
           this.ws?.send(JSON.stringify({ type: "signal_ack", timestamp: new Date().toISOString() }))
@@ -184,6 +204,16 @@ export class CFWorkerClient {
     if (this.heartbeatTimer) {
       clearTimeout(this.heartbeatTimer)
       this.heartbeatTimer = null
+    }
+  }
+
+  /** Remove signalIds older than the dedup TTL to bound memory usage. */
+  private pruneRecentSignalIds(): void {
+    const cutoff = Date.now() - SIGNAL_DEDUP_TTL_MS
+    for (const [id, ts] of this.recentSignalIds) {
+      if (ts < cutoff) {
+        this.recentSignalIds.delete(id)
+      }
     }
   }
 }

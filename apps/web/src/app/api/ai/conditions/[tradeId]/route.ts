@@ -1,11 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { listConditionsForTrade, createCondition } from "@fxflow/db"
-import type {
-  ApiResponse,
-  TradeConditionData,
-  TradeConditionTriggerType,
-  TradeConditionActionType,
-} from "@fxflow/types"
+import type { ApiResponse, TradeConditionData } from "@fxflow/types"
+import { CreateConditionSchema } from "@fxflow/types"
+import { parseBody, apiSuccess, apiError } from "@/lib/api-validation"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
@@ -32,25 +29,11 @@ export async function POST(
 ): Promise<NextResponse<ApiResponse<TradeConditionData>>> {
   try {
     const { tradeId } = await params
-    const body = (await request.json()) as {
-      triggerType: TradeConditionTriggerType
-      triggerValue: Record<string, unknown>
-      actionType: TradeConditionActionType
-      actionParams?: Record<string, unknown>
-      label?: string
-      priority?: number
-      expiresAt?: string
-      analysisId?: string
-      parentConditionId?: string
-      status?: "active" | "waiting"
-    }
 
-    if (!body.triggerType || !body.actionType || !body.triggerValue) {
-      return NextResponse.json(
-        { ok: false, error: "triggerType, triggerValue, and actionType are required" },
-        { status: 400 },
-      )
-    }
+    const parsed = await parseBody(request, CreateConditionSchema)
+    if (!parsed.success) return parsed.response
+
+    const body = parsed.data
 
     const condition = await createCondition({
       tradeId,
@@ -78,12 +61,9 @@ export async function POST(
       console.warn("[POST /api/ai/conditions/[tradeId]] Failed to notify daemon")
     }
 
-    return NextResponse.json({ ok: true, data: condition })
+    return apiSuccess(condition)
   } catch (error) {
     console.error("[POST /api/ai/conditions/[tradeId]]", error)
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    )
+    return apiError(error instanceof Error ? error.message : "Unknown error", 500)
   }
 }

@@ -25,6 +25,9 @@ import { priceToPips } from "./pip-utils"
 import { computeATR } from "./zone-utils"
 import { getDefaultSwingStrength } from "./trend-defaults"
 
+/** Maximum number of candles to process. Inputs exceeding this are sliced to the most recent candles. */
+const MAX_CANDLES = 500
+
 let nextId = 0
 function uid(): string {
   return `sw_${Date.now()}_${++nextId}`
@@ -53,6 +56,13 @@ export function detectTrend(
   config: TrendDetectionConfig,
   currentPrice: number,
 ): TrendData {
+  if (candles.length > MAX_CANDLES) {
+    console.warn(
+      `[detectTrend] Input has ${candles.length} candles, exceeding MAX_CANDLES (${MAX_CANDLES}). Slicing to most recent ${MAX_CANDLES}.`,
+    )
+    candles = candles.slice(-MAX_CANDLES)
+  }
+
   const n = candles.length
   if (n < 10) {
     return emptyTrend(instrument, timeframe, currentPrice, n)

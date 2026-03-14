@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { toast } from "sonner"
 import type { TradeActionResponse, PlaceOrderRequest, PlaceOrderResponseData } from "@fxflow/types"
+import { playSound } from "@/lib/sounds"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
@@ -105,7 +106,10 @@ export function useTradeActions(): UseTradeActionsReturn {
   const closeTrade = useCallback(
     async (sourceTradeId: string, units?: number, reason?: string): Promise<boolean> => {
       const ok = await callDaemon("/actions/close-trade", { sourceTradeId, units, reason })
-      if (ok) toast.success(units ? "Partial close submitted" : "Trade closed")
+      if (ok) {
+        toast.success(units ? "Partial close submitted" : "Trade closed", { duration: 10000 })
+        playSound("trade_fill")
+      }
       return ok
     },
     [callDaemon],
@@ -127,7 +131,11 @@ export function useTradeActions(): UseTradeActionsReturn {
         }
         const result = json.data!
         if (result.failed === 0) {
-          toast.success(`${result.succeeded} ${result.succeeded === 1 ? "trade" : "trades"} closed`)
+          toast.success(
+            `${result.succeeded} ${result.succeeded === 1 ? "trade" : "trades"} closed`,
+            { duration: 10000 },
+          )
+          playSound("trade_fill")
         } else {
           toast.warning(`${result.succeeded} closed, ${result.failed} failed`)
         }
@@ -212,7 +220,8 @@ export function useTradeActions(): UseTradeActionsReturn {
         }
         const data = json.data!
         if (data.filled) {
-          toast.success(`Market order filled @ ${data.fillPrice}`)
+          toast.success(`Market order filled @ ${data.fillPrice}`, { duration: 10000 })
+          playSound("trade_fill")
         } else {
           toast.success("Limit order placed")
         }

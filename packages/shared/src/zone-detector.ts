@@ -19,6 +19,9 @@ import {
 } from "./zone-utils"
 import { scoreZone, type RawZoneCandidate } from "./zone-scorer"
 
+/** Maximum number of candles to process. Inputs exceeding this are sliced to the most recent candles. */
+const MAX_CANDLES = 500
+
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
 /** Generate a deterministic ID from zone properties for deduplication. */
@@ -193,6 +196,13 @@ export function detectZones(
   config: ZoneDetectionConfig,
   currentPrice: number,
 ): ZoneDetectionResult {
+  if (candles.length > MAX_CANDLES) {
+    console.warn(
+      `[detectZones] Input has ${candles.length} candles, exceeding MAX_CANDLES (${MAX_CANDLES}). Slicing to most recent ${MAX_CANDLES}.`,
+    )
+    candles = candles.slice(-MAX_CANDLES)
+  }
+
   const emptyResult: ZoneDetectionResult = {
     instrument,
     timeframe,

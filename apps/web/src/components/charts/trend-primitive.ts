@@ -10,14 +10,7 @@ import type {
   ITimeScaleApi,
 } from "lightweight-charts"
 import type { TrendData, TrendVisualSettings, SwingPoint, TrendSegment } from "@fxflow/types"
-
-// ─── Colors ──────────────────────────────────────────────────────────────────
-
-const UPTREND_COLOR = "#3b82f6" // blue
-const DOWNTREND_COLOR = "#f97316" // orange
-const RANGE_COLOR = "#94a3b8" // slate
-const UP_SEG_COLOR = "#3b82f6" // blue — impulsion in uptrend
-const DOWN_SEG_COLOR = "#f97316" // orange — correction in uptrend (reversed for downtrend)
+import { getChartTheme, type ChartTheme } from "@/lib/chart-theme"
 
 // ─── Price Axis View ─────────────────────────────────────────────────────────
 
@@ -88,17 +81,19 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     const { trendData, visuals, series, timeScale, isDark, htfTrendData } = this._source
     if (!series || !timeScale) return
 
+    const theme = getChartTheme(isDark)
+
     target.useMediaCoordinateSpace(({ context: ctx }) => {
       const dpr = window.devicePixelRatio || 1
 
       // Draw HTF trend first (behind primary)
       if (htfTrendData && htfTrendData.swingPoints.length >= 2) {
-        this._drawTrend(ctx, htfTrendData, visuals, series, timeScale, isDark, dpr, 0.4)
+        this._drawTrend(ctx, htfTrendData, visuals, series, timeScale, isDark, dpr, 0.4, theme)
       }
 
       // Draw primary trend
       if (trendData && trendData.swingPoints.length >= 2) {
-        this._drawTrend(ctx, trendData, visuals, series, timeScale, isDark, dpr, 1.0)
+        this._drawTrend(ctx, trendData, visuals, series, timeScale, isDark, dpr, 1.0, theme)
       }
     })
   }
@@ -112,19 +107,20 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     isDark: boolean,
     dpr: number,
     opacityScale: number,
+    theme: ChartTheme,
   ): void {
     const trendColor =
       data.direction === "up"
-        ? UPTREND_COLOR
+        ? theme.upTrend
         : data.direction === "down"
-          ? DOWNTREND_COLOR
-          : RANGE_COLOR
+          ? theme.downTrend
+          : theme.rangeTrend
 
     ctx.save()
 
     // ─── Trend Boxes ─────────────────────────────────────────────
     if (visuals.showBoxes && data.segments.length > 0) {
-      this._drawBoxes(ctx, data, visuals, series, timeScale, isDark, opacityScale)
+      this._drawBoxes(ctx, data, visuals, series, timeScale, isDark, opacityScale, theme)
     }
 
     // ─── Trend Lines ─────────────────────────────────────────────
@@ -134,12 +130,12 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
 
     // ─── Swing Markers ───────────────────────────────────────────
     if (visuals.showMarkers && data.swingPoints.length > 0) {
-      this._drawMarkers(ctx, data, series, timeScale, trendColor, opacityScale)
+      this._drawMarkers(ctx, data, series, timeScale, trendColor, opacityScale, isDark)
     }
 
     // ─── Swing Labels ────────────────────────────────────────────
     if (visuals.showLabels && data.swingPoints.length > 0) {
-      this._drawLabels(ctx, data, series, timeScale, isDark, opacityScale)
+      this._drawLabels(ctx, data, series, timeScale, isDark, opacityScale, theme)
     }
 
     // ─── Controlling Swing Line ──────────────────────────────────
@@ -165,6 +161,7 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     timeScale: ITimeScaleApi<Time>,
     isDark: boolean,
     opacityScale: number,
+    theme: ChartTheme,
   ): void {
     const opacity = visuals.boxOpacity * opacityScale
 
@@ -182,7 +179,7 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       const isWithTrend =
         (data.direction === "up" && seg.direction === "up") ||
         (data.direction === "down" && seg.direction === "down")
-      const color = isWithTrend ? UP_SEG_COLOR : DOWN_SEG_COLOR
+      const color = isWithTrend ? theme.trendImpulse : theme.trendCorrection
 
       ctx.fillStyle = hexToRgba(color, opacity)
       const x = Math.min(fromX, toX)
@@ -236,6 +233,7 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     timeScale: ITimeScaleApi<Time>,
     trendColor: string,
     opacityScale: number,
+    isDark: boolean,
   ): void {
     const radius = 4
 
@@ -251,8 +249,8 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       ctx.fillStyle = hexToRgba(trendColor, 0.9 * opacityScale)
       ctx.fill()
 
-      // White border ring
-      ctx.strokeStyle = hexToRgba("#ffffff", 0.6 * opacityScale)
+      // Border ring (adapts to theme)
+      ctx.strokeStyle = hexToRgba(isDark ? "#ffffff" : "#000000", 0.6 * opacityScale)
       ctx.lineWidth = 1.5
       ctx.stroke()
     }
@@ -265,6 +263,7 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     timeScale: ITimeScaleApi<Time>,
     isDark: boolean,
     opacityScale: number,
+    theme: ChartTheme,
   ): void {
     ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
     ctx.textAlign = "center"
@@ -283,7 +282,7 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       // Determine label color based on context
       const isPositive = label === "HH" || label === "HL"
       const isNegative = label === "LL" || label === "LH"
-      const pillColor = isPositive ? UPTREND_COLOR : isNegative ? DOWNTREND_COLOR : RANGE_COLOR
+      const pillColor = isPositive ? theme.upTrend : isNegative ? theme.downTrend : theme.rangeTrend
 
       const metrics = ctx.measureText(label)
       const padX = 4
@@ -469,12 +468,13 @@ export class TrendPrimitive implements ISeriesPrimitive<Time> {
     }
 
     const isDark = this._isDark
+    const theme = getChartTheme(isDark)
     const trendColor =
       data.direction === "up"
-        ? UPTREND_COLOR
+        ? theme.upTrend
         : data.direction === "down"
-          ? DOWNTREND_COLOR
-          : RANGE_COLOR
+          ? theme.downTrend
+          : theme.rangeTrend
 
     views.push(
       new TrendAxisView(

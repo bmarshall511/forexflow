@@ -1,18 +1,24 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Header } from "./header"
 import { Sidebar } from "./sidebar"
 import { MobileSidebar } from "./mobile-sidebar"
 import { OfflineBanner } from "./offline-banner"
+import { CommandPalette } from "@/components/ui/command-palette"
+import { ShortcutsHelp } from "@/components/ui/shortcuts-help"
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { useNavigationShortcuts } from "@/hooks/use-navigation-shortcuts"
+import { useCommandPalette } from "@/hooks/use-command-palette"
 import { useSidebar } from "@/hooks/use-sidebar"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toggleSidebar, toggleMobileSidebar } = useSidebar()
   const isMobile = useIsMobile()
+  const { open: paletteOpen, setOpen: setPaletteOpen, commands } = useCommandPalette()
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   const handleToggle = useCallback(() => {
     if (isMobile) {
@@ -22,7 +28,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isMobile, toggleSidebar, toggleMobileSidebar])
 
+  const handleShortcutsToggle = useCallback(() => {
+    setShortcutsOpen((prev) => !prev)
+  }, [])
+
   useKeyboardShortcut("b", handleToggle, { ctrlOrMeta: true })
+  useNavigationShortcuts(handleShortcutsToggle)
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -47,6 +58,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
+      <ShortcutsHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </TooltipProvider>
   )
 }

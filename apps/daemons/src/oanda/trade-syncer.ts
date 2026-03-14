@@ -57,12 +57,18 @@ export class OandaTradeSyncer {
   onOrderFilled: ((tradeId: string) => void) | null = null
   onTradeClosed: ((tradeId: string) => void) | null = null
 
+  /** Called before a trade is removed from PositionManager, to persist final MFE/MAE. */
+  onTradeClosing: ((sourceTradeId: string) => Promise<void>) | null = null
+
   /** Track known sourceOrderIds/TradeIds to detect new arrivals */
   private knownPendingSourceIds = new Set<string>()
   private knownOpenSourceIds = new Set<string>()
 
   /** Prevent concurrent reconcile calls from racing */
   private reconcileInProgress = false
+
+  /** Per-instrument mutex: serializes DB upserts for the same instrument */
+  private instrumentMutex = new Map<string, Promise<void>>()
 
   constructor(
     private stateManager: StateManager,
@@ -1044,6 +1050,10 @@ export class OandaTradeSyncer {
     this.abortController?.abort()
     this.abortController = new AbortController()
 
+    // Capture reconcile start time — closer to the actual OANDA state snapshot
+    // than new Date() at DB write time, which can lag due to migration queries.
+    const reconcileTimestamp = new Date()
+
     let pendingOrders: PendingOrderData[]
     let openTrades: OpenTradeData[]
 
@@ -1108,102 +1118,129 @@ export class OandaTradeSyncer {
         )
       }
 
-      await removeStalePendingOrders(activeOrderIds, "oanda")
+      await removeStalePendingOrders(activeOrderIds, "oanda", reconcileTimestamp)
 
-      for (const order of pendingOrders) {
-        const dbRecord = await upsertTrade({
-          source: "oanda",
-          sourceTradeId: order.sourceOrderId,
-          status: "pending",
-          instrument: order.instrument,
-          direction: order.direction,
-          orderType: order.orderType,
-          entryPrice: order.entryPrice,
-          stopLoss: order.stopLoss,
-          takeProfit: order.takeProfit,
-          trailingStopDistance: order.trailingStopDistance,
-          initialUnits: order.units,
-          currentUnits: order.units,
-          timeInForce: order.timeInForce,
-          gtdTime: order.gtdTime,
-          openedAt: new Date(order.createdAt),
-        })
-        order.id = dbRecord.id
-        // Enrich with DB metadata (timeframe, notes, source override)
-        order.timeframe = (dbRecord.timeframe as PendingOrderData["timeframe"]) ?? null
-        order.notes = dbRecord.notes ?? null
-        if (dbRecord.metadata) {
-          try {
-            const meta = JSON.parse(dbRecord.metadata)
-            if (meta.placedVia === "fxflow") order.source = "manual"
-            else if (meta.placedVia === "ut_bot_alerts") order.source = "ut_bot_alerts"
-            else if (meta.placedVia === "trade_finder") order.source = "trade_finder"
-            else if (meta.placedVia === "trade_finder_auto") order.source = "trade_finder_auto"
-          } catch {
-            /* ignore malformed metadata */
+      // Group pending orders and open trades by instrument for parallel processing.
+      // Each instrument's DB upserts are serialized via its own mutex, but different
+      // instruments proceed concurrently. Lifecycle callbacks are collected and fired
+      // after all instrument work completes to avoid interleaving with shared state.
+      const ordersByInstrument = groupByInstrument(pendingOrders, (o) => o.instrument)
+      const tradesByInstrument = groupByInstrument(openTrades, (t) => t.instrument)
+      const allInstruments = new Set([...ordersByInstrument.keys(), ...tradesByInstrument.keys()])
+
+      // Collect lifecycle events to fire after all instruments are processed
+      const newPendingCallbacks: string[] = []
+      const newFilledCallbacks: string[] = []
+
+      const instrumentPromises = [...allInstruments].map((instrument) =>
+        this.withInstrumentMutex(instrument, async () => {
+          const instrumentOrders = ordersByInstrument.get(instrument) ?? []
+          const instrumentTrades = tradesByInstrument.get(instrument) ?? []
+
+          for (const order of instrumentOrders) {
+            const dbRecord = await upsertTrade({
+              source: "oanda",
+              sourceTradeId: order.sourceOrderId,
+              status: "pending",
+              instrument: order.instrument,
+              direction: order.direction,
+              orderType: order.orderType,
+              entryPrice: order.entryPrice,
+              stopLoss: order.stopLoss,
+              takeProfit: order.takeProfit,
+              trailingStopDistance: order.trailingStopDistance,
+              initialUnits: order.units,
+              currentUnits: order.units,
+              timeInForce: order.timeInForce,
+              gtdTime: order.gtdTime,
+              openedAt: new Date(order.createdAt),
+            })
+            order.id = dbRecord.id
+            // Enrich with DB metadata (timeframe, notes, source override)
+            order.timeframe = (dbRecord.timeframe as PendingOrderData["timeframe"]) ?? null
+            order.notes = dbRecord.notes ?? null
+            if (dbRecord.metadata) {
+              try {
+                const meta = JSON.parse(dbRecord.metadata)
+                if (meta.placedVia === "fxflow") order.source = "manual"
+                else if (meta.placedVia === "ut_bot_alerts") order.source = "ut_bot_alerts"
+                else if (meta.placedVia === "trade_finder") order.source = "trade_finder"
+                else if (meta.placedVia === "trade_finder_auto") order.source = "trade_finder_auto"
+              } catch {
+                /* ignore malformed metadata */
+              }
+            }
+            // Track new pending orders for lifecycle callbacks
+            if (!this.knownPendingSourceIds.has(order.sourceOrderId) && this.hasBackfilled) {
+              this.knownPendingSourceIds.add(order.sourceOrderId)
+              newPendingCallbacks.push(dbRecord.id)
+            } else {
+              this.knownPendingSourceIds.add(order.sourceOrderId)
+            }
           }
-        }
-        // Fire onPendingCreated for new pending orders (not seen before)
-        if (!this.knownPendingSourceIds.has(order.sourceOrderId) && this.hasBackfilled) {
-          this.knownPendingSourceIds.add(order.sourceOrderId)
-          if (this.onPendingCreated) {
-            this.onPendingCreated(dbRecord.id)
+
+          for (const trade of instrumentTrades) {
+            // Detect orders that transitioned pending → open (just filled)
+            const wasKnownPending = this.knownPendingSourceIds.has(trade.sourceTradeId)
+            const dbRecord = await upsertTrade({
+              source: "oanda",
+              sourceTradeId: trade.sourceTradeId,
+              status: "open",
+              instrument: trade.instrument,
+              direction: trade.direction,
+              entryPrice: trade.entryPrice,
+              stopLoss: trade.stopLoss,
+              takeProfit: trade.takeProfit,
+              trailingStopDistance: trade.trailingStopDistance,
+              initialUnits: trade.initialUnits,
+              currentUnits: trade.currentUnits,
+              realizedPL: trade.realizedPL,
+              unrealizedPL: trade.unrealizedPL,
+              financing: trade.financing,
+              openedAt: new Date(trade.openedAt),
+            })
+            trade.id = dbRecord.id
+            // Enrich with DB metadata (timeframe, notes, MFE/MAE, source override)
+            trade.timeframe = (dbRecord.timeframe as OpenTradeData["timeframe"]) ?? null
+            trade.notes = dbRecord.notes ?? null
+            trade.mfe = dbRecord.mfe
+            trade.mae = dbRecord.mae
+            if (dbRecord.metadata) {
+              try {
+                const meta = JSON.parse(dbRecord.metadata)
+                if (meta.placedVia === "fxflow") trade.source = "manual"
+                else if (meta.placedVia === "ut_bot_alerts") trade.source = "ut_bot_alerts"
+                else if (meta.placedVia === "trade_finder") trade.source = "trade_finder"
+                else if (meta.placedVia === "trade_finder_auto") trade.source = "trade_finder_auto"
+              } catch {
+                /* ignore malformed metadata */
+              }
+            }
+            // Track new open trades for lifecycle callbacks
+            if (!this.knownOpenSourceIds.has(trade.sourceTradeId) && this.hasBackfilled) {
+              this.knownOpenSourceIds.add(trade.sourceTradeId)
+              if (wasKnownPending) {
+                this.knownPendingSourceIds.delete(trade.sourceTradeId)
+              }
+              newFilledCallbacks.push(dbRecord.id)
+            } else {
+              this.knownOpenSourceIds.add(trade.sourceTradeId)
+            }
           }
-        } else {
-          this.knownPendingSourceIds.add(order.sourceOrderId)
-        }
+        }),
+      )
+
+      await Promise.all(instrumentPromises)
+
+      // Fire lifecycle callbacks sequentially after all instrument upserts complete.
+      // This avoids races between callbacks and the shared known-ID sets above.
+      for (const dbId of newPendingCallbacks) {
+        this.onPendingCreated?.(dbId)
+      }
+      for (const dbId of newFilledCallbacks) {
+        this.onOrderFilled?.(dbId)
       }
 
-      for (const trade of openTrades) {
-        // Detect orders that transitioned pending → open (just filled)
-        const wasKnownPending = this.knownPendingSourceIds.has(trade.sourceTradeId)
-        const dbRecord = await upsertTrade({
-          source: "oanda",
-          sourceTradeId: trade.sourceTradeId,
-          status: "open",
-          instrument: trade.instrument,
-          direction: trade.direction,
-          entryPrice: trade.entryPrice,
-          stopLoss: trade.stopLoss,
-          takeProfit: trade.takeProfit,
-          trailingStopDistance: trade.trailingStopDistance,
-          initialUnits: trade.initialUnits,
-          currentUnits: trade.currentUnits,
-          realizedPL: trade.realizedPL,
-          unrealizedPL: trade.unrealizedPL,
-          financing: trade.financing,
-          openedAt: new Date(trade.openedAt),
-        })
-        trade.id = dbRecord.id
-        // Enrich with DB metadata (timeframe, notes, MFE/MAE, source override)
-        trade.timeframe = (dbRecord.timeframe as OpenTradeData["timeframe"]) ?? null
-        trade.notes = dbRecord.notes ?? null
-        trade.mfe = dbRecord.mfe
-        trade.mae = dbRecord.mae
-        if (dbRecord.metadata) {
-          try {
-            const meta = JSON.parse(dbRecord.metadata)
-            if (meta.placedVia === "fxflow") trade.source = "manual"
-            else if (meta.placedVia === "ut_bot_alerts") trade.source = "ut_bot_alerts"
-            else if (meta.placedVia === "trade_finder") trade.source = "trade_finder"
-            else if (meta.placedVia === "trade_finder_auto") trade.source = "trade_finder_auto"
-          } catch {
-            /* ignore malformed metadata */
-          }
-        }
-        // Fire onOrderFilled for trades that just filled OR new open trades
-        if (!this.knownOpenSourceIds.has(trade.sourceTradeId) && this.hasBackfilled) {
-          this.knownOpenSourceIds.add(trade.sourceTradeId)
-          if (wasKnownPending) {
-            this.knownPendingSourceIds.delete(trade.sourceTradeId)
-          }
-          if (this.onOrderFilled) {
-            this.onOrderFilled(dbRecord.id)
-          }
-        } else {
-          this.knownOpenSourceIds.add(trade.sourceTradeId)
-        }
-      }
       // Mark any DB "open" trades that are no longer in OANDA as closed
       const activeTradeIds = openTrades.map((t) => t.sourceTradeId)
       const orphaned = await closeOrphanedTrades("oanda", activeTradeIds)
@@ -1238,8 +1275,34 @@ export class OandaTradeSyncer {
       console.error("[trade-syncer] Failed to fetch closed trades:", (error as Error).message)
     }
 
+    // Step 3b: Persist final MFE/MAE for trades about to leave the open set
+    if (this.onTradeClosing) {
+      const newOpenIds = new Set(openTrades.map((t) => t.sourceTradeId))
+      for (const sourceTradeId of this.knownOpenSourceIds) {
+        if (!newOpenIds.has(sourceTradeId)) {
+          try {
+            await this.onTradeClosing(sourceTradeId)
+          } catch {
+            // Non-critical — best-effort persistence
+          }
+        }
+      }
+    }
+
     // Step 4: ALWAYS update PositionManager — OANDA data is the source of truth
     this.positionManager.batchUpdate(pendingOrders, openTrades, closedToday)
+  }
+
+  /**
+   * Acquire a per-instrument mutex via Promise chaining.
+   * Ensures DB upserts for the same instrument are serialized, while different
+   * instruments proceed concurrently. Mirrors the pattern in SignalProcessor.
+   */
+  private withInstrumentMutex(instrument: string, fn: () => Promise<void>): Promise<void> {
+    const prev = this.instrumentMutex.get(instrument) ?? Promise.resolve()
+    const current = prev.then(fn, fn) // Run fn regardless of previous result
+    this.instrumentMutex.set(instrument, current)
+    return current
   }
 }
 
@@ -1314,4 +1377,19 @@ function mapFillReasonToCloseReason(reason?: string): TradeCloseReason {
   if (reason.includes("MARKET_ORDER") || reason.includes("TRADE_CLOSE")) return "MARKET_ORDER"
   if (reason.includes("LINKED")) return "LINKED_TRADE_CLOSED"
   return "UNKNOWN"
+}
+
+/** Group an array of items by instrument key for parallel processing. */
+function groupByInstrument<T>(items: T[], getKey: (item: T) => string): Map<string, T[]> {
+  const map = new Map<string, T[]>()
+  for (const item of items) {
+    const key = getKey(item)
+    const group = map.get(key)
+    if (group) {
+      group.push(item)
+    } else {
+      map.set(key, [item])
+    }
+  }
+  return map
 }

@@ -15,7 +15,13 @@ import {
   Clock,
   Tag,
 } from "lucide-react"
-import type { TradeDirection, PlaceOrderRequest, Timeframe, TradeTagData } from "@fxflow/types"
+import type {
+  TradeDirection,
+  PlaceOrderRequest,
+  Timeframe,
+  TradeTagData,
+  OpenTradeData,
+} from "@fxflow/types"
 import {
   formatInstrument,
   formatPips,
@@ -44,6 +50,8 @@ import { LOT_UNITS } from "@/hooks/use-order-ticket"
 import type { UseOrderTicketReturn, UnitsMode } from "@/hooks/use-order-ticket"
 import type { PlaceableOrderType } from "@fxflow/types"
 import { TagEditor } from "@/components/positions/tag-editor"
+import { SpreadDisplay } from "@/components/ui/spread-display"
+import { CorrelationWarning } from "@/components/positions/correlation-warning"
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +64,8 @@ interface OrderTicketPanelProps {
   accountCurrency: string
   /** Pre-created hook return — lifted to page level for chart overlay sync */
   ticket: UseOrderTicketReturn
+  /** Current open trades for correlation warnings */
+  openTrades?: OpenTradeData[]
   onClose: () => void
   onSubmit: (request: PlaceOrderRequest) => Promise<boolean>
 }
@@ -102,6 +112,7 @@ function OrderTicketContent({
   accountBalance,
   accountCurrency,
   ticket,
+  openTrades = [],
   onClose,
   onSubmit,
 }: OrderTicketPanelProps) {
@@ -213,9 +224,11 @@ function OrderTicketContent({
               <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
                 Spread
               </span>
-              <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                {ticket.spreadPips !== null ? `${formatPips(ticket.spreadPips)} pips` : "—"}
-              </span>
+              {displayBid !== null && displayAsk !== null ? (
+                <SpreadDisplay bid={displayBid} ask={displayAsk} instrument={instrument} />
+              ) : (
+                <span className="text-muted-foreground font-mono text-xs tabular-nums">—</span>
+              )}
             </div>
             <div className="flex flex-1 flex-col items-center">
               <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Ask</span>
@@ -224,6 +237,15 @@ function OrderTicketContent({
               </span>
             </div>
           </div>
+
+          {/* Correlation warning */}
+          {openTrades.length > 0 && (
+            <CorrelationWarning
+              instrument={instrument}
+              direction={direction}
+              openTrades={openTrades}
+            />
+          )}
 
           {/* Order type */}
           <SectionCard

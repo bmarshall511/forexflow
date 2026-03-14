@@ -22,6 +22,7 @@ import type {
   TrendVisualSettings,
 } from "@fxflow/types"
 import { getDecimalPlaces } from "@fxflow/shared"
+import { getChartTheme } from "@/lib/chart-theme"
 import { ZonePrimitive } from "./zone-primitive"
 import { CurvePrimitive } from "./curve-primitive"
 import { TrendPrimitive } from "./trend-primitive"
@@ -253,14 +254,15 @@ function StandaloneChartInner({
   useEffect(() => {
     const series = seriesRef.current
     if (!series) return
+    const theme = getChartTheme(isDark)
 
     if (overlayIsLimit && overlayEntry != null) {
       if (entryLineRef.current) {
-        entryLineRef.current.applyOptions({ price: overlayEntry })
+        entryLineRef.current.applyOptions({ price: overlayEntry, color: theme.entryLine })
       } else {
         entryLineRef.current = series.createPriceLine({
           price: overlayEntry,
-          color: "#f59e0b",
+          color: theme.entryLine,
           lineWidth: 2,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
@@ -271,7 +273,7 @@ function StandaloneChartInner({
       series.removePriceLine(entryLineRef.current)
       entryLineRef.current = null
     }
-  }, [overlayEntry, overlayIsLimit])
+  }, [overlayEntry, overlayIsLimit, isDark])
 
   // ─── Order overlay: sync SL line ─────────────────────────────────────────
   const overlaySL = orderOverlay?.stopLoss ?? null
@@ -279,14 +281,15 @@ function StandaloneChartInner({
   useEffect(() => {
     const series = seriesRef.current
     if (!series) return
+    const theme = getChartTheme(isDark)
 
     if (overlaySL != null) {
       if (slLineRef.current) {
-        slLineRef.current.applyOptions({ price: overlaySL })
+        slLineRef.current.applyOptions({ price: overlaySL, color: theme.slLine })
       } else {
         slLineRef.current = series.createPriceLine({
           price: overlaySL,
-          color: "#ef4444",
+          color: theme.slLine,
           lineWidth: 2,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
@@ -297,7 +300,7 @@ function StandaloneChartInner({
       series.removePriceLine(slLineRef.current)
       slLineRef.current = null
     }
-  }, [overlaySL])
+  }, [overlaySL, isDark])
 
   // ─── Order overlay: sync TP line ─────────────────────────────────────────
   const overlayTP = orderOverlay?.takeProfit ?? null
@@ -305,14 +308,15 @@ function StandaloneChartInner({
   useEffect(() => {
     const series = seriesRef.current
     if (!series) return
+    const theme = getChartTheme(isDark)
 
     if (overlayTP != null) {
       if (tpLineRef.current) {
-        tpLineRef.current.applyOptions({ price: overlayTP })
+        tpLineRef.current.applyOptions({ price: overlayTP, color: theme.tpLine })
       } else {
         tpLineRef.current = series.createPriceLine({
           price: overlayTP,
-          color: "#22c55e",
+          color: theme.tpLine,
           lineWidth: 2,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
@@ -323,7 +327,7 @@ function StandaloneChartInner({
       series.removePriceLine(tpLineRef.current)
       tpLineRef.current = null
     }
-  }, [overlayTP])
+  }, [overlayTP, isDark])
 
   // ─── Order overlay: clean up lines when overlay is removed ───────────────
   useEffect(() => {

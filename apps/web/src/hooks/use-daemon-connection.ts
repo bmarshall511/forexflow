@@ -23,6 +23,7 @@ import type {
   AiTraderScanStatus,
   AiTraderScanProgressData,
   AiTraderScanLogEntry,
+  PriceAlertData,
   AnyDaemonMessage,
 } from "@fxflow/types"
 
@@ -92,6 +93,8 @@ export interface DaemonConnectionState {
   lastAiTraderScanLogEntry: AiTraderScanLogEntry | null
   /** Most recent AI Trader event (trade placed/managed/closed, opportunity removed) */
   lastAiTraderEvent: Record<string, unknown> | null
+  /** Most recent price alert triggered event */
+  lastPriceAlertTriggered: PriceAlertData | null
   /** True after the first connection attempt has completed (success or failure) */
   connectionAttempted: boolean
 }
@@ -147,6 +150,9 @@ export function useDaemonConnection(): DaemonConnectionState {
   const [lastAiTraderScanLogEntry, setLastAiTraderScanLogEntry] =
     useState<AiTraderScanLogEntry | null>(null)
   const [lastAiTraderEvent, setLastAiTraderEvent] = useState<Record<string, unknown> | null>(null)
+  const [lastPriceAlertTriggered, setLastPriceAlertTriggered] = useState<PriceAlertData | null>(
+    null,
+  )
   const [connectionAttempted, setConnectionAttempted] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -333,6 +339,9 @@ export function useDaemonConnection(): DaemonConnectionState {
             case "ai_trader_opportunity_removed":
               setLastAiTraderEvent(msg.data as Record<string, unknown>)
               break
+            case "price_alert_triggered":
+              setLastPriceAlertTriggered(msg.data)
+              break
             case "error":
               console.warn("[daemon-ws] Error from daemon:", msg.data.message)
               break
@@ -436,5 +445,6 @@ export function useDaemonConnection(): DaemonConnectionState {
     lastAiTraderScanProgress,
     lastAiTraderScanLogEntry,
     lastAiTraderEvent,
+    lastPriceAlertTriggered,
   }
 }

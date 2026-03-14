@@ -171,6 +171,20 @@ export class NotificationEmitter {
     })
   }
 
+  /** Emit a notification from the Price Alert module. */
+  async emitPriceAlert(
+    title: string,
+    message: string,
+    severity: "info" | "warning" | "critical" = "info",
+  ): Promise<void> {
+    await this.emit({
+      severity,
+      source: "price_alert",
+      title,
+      message,
+    })
+  }
+
   /** Emit a notification from the AI Trader module. */
   async emitAiTrader(
     title: string,

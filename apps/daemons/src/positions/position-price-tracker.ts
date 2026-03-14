@@ -23,6 +23,9 @@ export class PositionPriceTracker {
   /** Called immediately on each price tick (before throttle) — used by ConditionMonitor */
   onPriceTick: ((tick: PositionPriceTick) => void) | null = null
 
+  /** Additional instrument sources (e.g., AlertMonitor) merged into the subscription list. */
+  private extraInstrumentSources: Array<() => string[]> = []
+
   constructor(
     private stateManager: StateManager,
     private positionManager: PositionManager,
@@ -57,9 +60,18 @@ export class PositionPriceTracker {
 
   // ─── Instrument tracking ──────────────────────────────────────────────────
 
+  /** Register an extra instrument source (e.g., AlertMonitor). Triggers re-evaluation. */
+  addInstrumentSource(source: () => string[]): void {
+    this.extraInstrumentSources.push(source)
+    this.evaluateInstruments()
+  }
+
   private evaluateInstruments(): void {
-    const instruments = this.positionManager.getActiveInstruments()
-    const sorted = instruments.sort()
+    const instrumentSet = new Set(this.positionManager.getActiveInstruments())
+    for (const source of this.extraInstrumentSources) {
+      for (const inst of source()) instrumentSet.add(inst)
+    }
+    const sorted = Array.from(instrumentSet).sort()
 
     if (JSON.stringify(sorted) === JSON.stringify(this.currentInstruments)) return
 
@@ -245,6 +257,23 @@ export class PositionPriceTracker {
       } catch {
         // Ignore — trade may have been closed between check and persist
       }
+    }
+  }
+
+  /**
+   * Immediately persist MFE/MAE for a single trade (called when a trade closes).
+   * No-op if the trade has no watermark data in the map.
+   */
+  async persistMfeMaeForTrade(sourceTradeId: string): Promise<void> {
+    const state = this.positionManager.getMfeMae(sourceTradeId)
+    if (!state) return
+    try {
+      await updateTradeMfeMae("oanda", sourceTradeId, state.mfe, state.mae)
+    } catch (err) {
+      console.warn(
+        `[pos-price] Failed to persist MFE/MAE for closing trade ${sourceTradeId}:`,
+        (err as Error).message,
+      )
     }
   }
 

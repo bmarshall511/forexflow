@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, type ReactNode } from "re
 import { useNotifications, type UseNotificationsReturn } from "@/hooks/use-notifications"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { useInternetStatus } from "@/hooks/use-internet-status-context"
+import { playSound } from "@/lib/sounds"
 
 const NotificationContext = createContext<UseNotificationsReturn | null>(null)
 
@@ -20,6 +21,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (lastNotification) {
       notifications.addFromWs(lastNotification)
+
+      // Play sound based on notification type
+      const isFillNotification =
+        lastNotification.title.toLowerCase().includes("filled") ||
+        lastNotification.title.toLowerCase().includes("order fill")
+      if (isFillNotification) {
+        playSound("trade_fill")
+      } else if (lastNotification.severity === "critical") {
+        playSound("alert_trigger")
+      } else {
+        playSound("notification")
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastNotification])

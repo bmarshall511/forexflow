@@ -19,6 +19,7 @@ import { TradeControlBar } from "@/components/charts/trade-control-bar"
 import { OrderTicketPanel } from "@/components/charts/order-ticket-panel"
 import { ChartGrid } from "@/components/charts/chart-grid"
 import { MobileChartSwiper } from "@/components/charts/mobile-chart-swiper"
+import { ErrorBoundary } from "@/components/ui/error-boundary"
 
 /** Map of panel index → assigned trade */
 type TradesByPanel = Record<number, TradeUnion>
@@ -439,32 +440,34 @@ export default function ChartsPage() {
       {/* Chart grid + order ticket */}
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 flex-1 flex-col">
-          {isMobile ? (
-            <MobileChartSwiper
-              panels={layout.panels}
-              onPanelChange={setPanel}
-              chartPrices={priceMap}
-              tradeCharts={tradeCharts}
-              onClearTrade={clearPanelTrade}
-              onOrderEntry={handleOrderEntry}
-              orderOverlay={orderOverlay}
-              orderOverlayPanelIndex={orderTicket?.panelIndex}
-            />
-          ) : (
-            <ChartGrid
-              layout={layout.layout}
-              panels={layout.panels}
-              onPanelChange={setPanel}
-              chartPrices={priceMap}
-              activeIndex={activeIndex}
-              onActiveChange={setActiveIndex}
-              tradeCharts={tradeCharts}
-              onClearTrade={clearPanelTrade}
-              onOrderEntry={handleOrderEntry}
-              orderOverlay={orderOverlay}
-              orderOverlayPanelIndex={orderTicket?.panelIndex}
-            />
-          )}
+          <ErrorBoundary>
+            {isMobile ? (
+              <MobileChartSwiper
+                panels={layout.panels}
+                onPanelChange={setPanel}
+                chartPrices={priceMap}
+                tradeCharts={tradeCharts}
+                onClearTrade={clearPanelTrade}
+                onOrderEntry={handleOrderEntry}
+                orderOverlay={orderOverlay}
+                orderOverlayPanelIndex={orderTicket?.panelIndex}
+              />
+            ) : (
+              <ChartGrid
+                layout={layout.layout}
+                panels={layout.panels}
+                onPanelChange={setPanel}
+                chartPrices={priceMap}
+                activeIndex={activeIndex}
+                onActiveChange={setActiveIndex}
+                tradeCharts={tradeCharts}
+                onClearTrade={clearPanelTrade}
+                onOrderEntry={handleOrderEntry}
+                orderOverlay={orderOverlay}
+                orderOverlayPanelIndex={orderTicket?.panelIndex}
+              />
+            )}
+          </ErrorBoundary>
         </div>
         {orderTicket && (
           <OrderTicketPanel
@@ -475,6 +478,7 @@ export default function ChartsPage() {
             accountBalance={accountOverview?.summary.balance ?? 0}
             accountCurrency={accountOverview?.summary.currency ?? "USD"}
             ticket={ticket}
+            openTrades={openWithPrices}
             onClose={handleCloseOrderTicket}
             onSubmit={handlePlaceOrder}
           />

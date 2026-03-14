@@ -1,7 +1,8 @@
 // @fxflow/db — shared database client, encryption, and service layer
 
 export { db } from "./client"
-export { encrypt, decrypt } from "./encryption"
+export { encrypt, decrypt, reEncrypt } from "./encryption"
+export { rotateEncryptionKeys } from "./key-rotation-service"
 export {
   getSettings,
   setTradingMode,
@@ -11,6 +12,8 @@ export {
   testConnection,
   getRiskPercent,
   setRiskPercent,
+  getOnboardingCompleted,
+  setOnboardingCompleted,
 } from "./settings-service"
 
 export {
@@ -113,6 +116,7 @@ export {
   listActiveConditions,
   expireOldConditions,
   cancelConditionsForTrade,
+  expireConditionsForTrade,
   getAllConditionSummaries,
   recoverExecutingConditions,
   activateChildConditions,
@@ -258,3 +262,48 @@ export {
   type UpsertPerformanceInput,
   type TradeStatsInput,
 } from "./ai-trader-performance-service"
+
+export {
+  createPriceAlert,
+  listPriceAlerts,
+  getPriceAlert,
+  updatePriceAlert,
+  deletePriceAlert,
+  triggerPriceAlert,
+  getActiveAlertsForInstrument,
+  getActiveAlertInstruments,
+  expireOldAlerts,
+  cancelAllAlerts,
+} from "./price-alert-service"
+
+export {
+  getResetPreflightStatus,
+  getModuleDataCounts,
+  resetModule,
+  resetTradingData,
+  resetFactory,
+  getDatabasePath,
+  deleteDatabaseFile,
+  type ResetModule,
+  type PreflightStatus,
+  type ResetResult,
+} from "./reset-service"
+
+export {
+  upsertEconomicEvents,
+  getUpcomingEvents,
+  getEventsInRange,
+  cleanupOldEvents,
+  type EconomicEventInput,
+} from "./calendar-service"
+
+export {
+  getPerformanceSummary,
+  getPerformanceByInstrument,
+  getPerformanceBySession,
+  getPerformanceByDayOfWeek,
+  getPerformanceByHourOfDay,
+  getPerformanceBySource,
+  getMfeMaeDistribution,
+  getEquityCurve,
+} from "./analytics-service"

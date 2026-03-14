@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getTradeFinderConfig, updateTradeFinderConfig } from "@fxflow/db"
 import type { ApiResponse, TradeFinderConfigData } from "@fxflow/types"
+import { TradeFinderConfigUpdateSchema } from "@fxflow/types"
+import { parseBody, apiSuccess, apiError } from "@/lib/api-validation"
 
 export async function GET(): Promise<NextResponse<ApiResponse<TradeFinderConfigData>>> {
   try {
@@ -19,14 +21,13 @@ export async function PUT(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse<TradeFinderConfigData>>> {
   try {
-    const body = await request.json()
-    const config = await updateTradeFinderConfig(body)
-    return NextResponse.json({ ok: true, data: config })
+    const parsed = await parseBody(request, TradeFinderConfigUpdateSchema)
+    if (!parsed.success) return parsed.response
+
+    const config = await updateTradeFinderConfig(parsed.data)
+    return apiSuccess(config)
   } catch (error) {
     console.error("[PUT /api/trade-finder/config]", error)
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    )
+    return apiError(error instanceof Error ? error.message : "Unknown error", 500)
   }
 }

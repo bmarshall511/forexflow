@@ -52,6 +52,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { AiAnalysisCell } from "./ai-analysis-cell"
 import { MoreHorizontal, Eye, XCircle, Sparkles, Trash2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useBulkSelection } from "@/hooks/use-bulk-selection"
+import { BulkActionBar } from "./bulk-action-bar"
 
 interface PendingOrdersTableProps {
   orders: PendingOrderData[]
@@ -116,6 +119,8 @@ export function PendingOrdersTable({
     isLoading: actionLoading,
   } = useTradeActions()
   const [isCancellingAll, setIsCancellingAll] = useState(false)
+  const bulk = useBulkSelection<PendingOrderData>()
+  const [isBulkCancelling, setIsBulkCancelling] = useState(false)
 
   useEffect(() => {
     if (triggerAiFor) setAiAnalysisOrder(triggerAiFor)
@@ -235,6 +240,20 @@ export function PendingOrdersTable({
     }
   }
 
+  const handleBulkCancel = async () => {
+    const ids = filtered.filter((o) => bulk.isSelected(o.id)).map((o) => o.sourceOrderId)
+    if (ids.length === 0) return
+    setIsBulkCancelling(true)
+    try {
+      const result = await cancelAllOrders(ids)
+      if (result.succeeded > 0) {
+        bulk.clear()
+      }
+    } finally {
+      setIsBulkCancelling(false)
+    }
+  }
+
   if (filtered.length === 0) {
     return <div className="text-muted-foreground py-12 text-center text-sm">No pending orders</div>
   }
@@ -323,6 +342,19 @@ export function PendingOrdersTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <Checkbox
+                checked={
+                  bulk.isAllSelected(filtered)
+                    ? true
+                    : bulk.isSomeSelected(filtered)
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={() => bulk.toggleAll(filtered)}
+                aria-label="Select all orders"
+              />
+            </TableHead>
             <SortableHead
               label="Pair"
               sortKey="instrument"
@@ -451,6 +483,16 @@ export function PendingOrdersTable({
                   if (e.button === 0) setDrawerOrder(order)
                 }}
               >
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={bulk.isSelected(order.id)}
+                    onCheckedChange={() => bulk.toggle(order.id)}
+                    aria-label={`Select ${order.instrument.replace("_", "/")} order`}
+                  />
+                </TableCell>
                 <TableCell className="text-xs font-medium">
                   {order.instrument.replace("_", "/")}
                 </TableCell>
@@ -620,6 +662,13 @@ export function PendingOrdersTable({
         tradeStatus="pending"
         open={!!aiAnalysisOrder}
         onOpenChange={(open) => !open && setAiAnalysisOrder(null)}
+      />
+      <BulkActionBar
+        count={bulk.count}
+        type="pending"
+        onCancel={handleBulkCancel}
+        onClear={bulk.clear}
+        isLoading={isBulkCancelling}
       />
     </>
   )

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { DataTile } from "@/components/ui/data-tile"
 import { TabNav, TabNavButton } from "@/components/ui/tab-nav"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/ui/page-header"
 import { cn } from "@/lib/utils"
 import {
   RefreshCw,
@@ -129,15 +130,13 @@ export function AiTraderDashboard() {
 
   return (
     <div className="min-h-screen">
-      <div className="border-b px-4 pb-8 pt-6 md:px-6">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">AI Trader</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              AI-powered trade discovery and execution
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
+      <PageHeader
+        title="AI Trader"
+        subtitle="AI-powered trade discovery and execution"
+        icon={Bot}
+        bordered
+        actions={
+          <>
             <ScanControlButtons
               isScanning={!!isScanning}
               isPaused={isPaused}
@@ -152,9 +151,9 @@ export function AiTraderDashboard() {
                 <span className="hidden sm:inline">Settings</span>
               </Link>
             </Button>
-          </div>
-        </div>
-
+          </>
+        }
+      >
         <ScannerStatusBar status={status} progress={progress} />
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -183,7 +182,7 @@ export function AiTraderDashboard() {
             icon={<DollarSign className="size-3" />}
           />
         </div>
-      </div>
+      </PageHeader>
 
       <TabNav label="AI trader sections">
         <TabNavButton

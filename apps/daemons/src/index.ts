@@ -13,6 +13,7 @@ import {
   setTradeFinderScanner,
   setDigestGenerator,
   setAiTraderScanner,
+  setAlertMonitor,
 } from "./server.js"
 import { StateManager } from "./state-manager.js"
 import { CredentialWatcher } from "./db/credential-watcher.js"
@@ -34,6 +35,10 @@ import { AutoAnalyzer } from "./ai/auto-analyzer.js"
 import { DigestGenerator } from "./ai/digest-generator.js"
 import { TradeFinderScanner } from "./trade-finder/scanner.js"
 import { AiTraderScanner } from "./ai-trader/scanner.js"
+import { AlertMonitor } from "./alerts/alert-monitor.js"
+import { CalendarFetcher } from "./calendar/calendar-fetcher.js"
+import { CleanupScheduler } from "./cleanup-scheduler.js"
+import { PlacementGate } from "./placement-gate.js"
 import { getConfig } from "./config.js"
 import type { AnyDaemonMessage } from "@fxflow/types"
 
@@ -72,6 +77,8 @@ async function main() {
 
   // 5. Position tracking system
   const positionManager = new PositionManager()
+  // Centralized gate — will be wired into SignalProcessor, TradeFinderScanner, AiTraderScanner
+  const _placementGate = new PlacementGate(positionManager)
   const tradeSyncer = new OandaTradeSyncer(stateManager, positionManager, {
     reconcileIntervalMs: config.tradeReconcileIntervalMs,
     backfillDays: config.tradeBackfillDays,
@@ -138,6 +145,16 @@ async function main() {
     void notificationEmitter.emitUserAction(title, message)
   }
 
+  // 11b. Price Alert Monitor — standalone price level alerts
+  const alertMonitor = new AlertMonitor(broadcast, (title, message, severity) => {
+    void notificationEmitter.emitPriceAlert(title, message, severity)
+  })
+  await alertMonitor.initialize()
+  setAlertMonitor(alertMonitor)
+
+  // Register alert instruments with the pricing stream
+  positionPriceTracker.addInstrumentSource(() => alertMonitor.getMonitoredInstruments())
+
   // 12. TV Alerts module — always initialized; CF Worker URL resolved from DB or env
   const tvAlertsState = new TVAlertsState()
   const signalProcessor = new SignalProcessor(
@@ -197,9 +214,10 @@ async function main() {
   setConditionMonitor(conditionMonitor)
   await conditionMonitor.start()
 
-  // Wire price ticks to condition monitor + AI Trader (via PositionPriceTracker — the actual pricing stream)
+  // Wire price ticks to condition monitor + AI Trader + Alert Monitor (via PositionPriceTracker)
   positionPriceTracker.onPriceTick = (tick) => {
     conditionMonitor.onPriceTick(tick)
+    alertMonitor.onPriceTick(tick.instrument, tick.bid, tick.ask)
     const mid = (tick.bid + tick.ask) / 2
     aiTraderScanner.onPriceTick(tick.instrument, mid)
   }
@@ -231,12 +249,12 @@ async function main() {
     // Check if this fill corresponds to an AI Trader opportunity
     void aiTraderScanner.onOrderFilled(tradeId)
   }
+  tradeSyncer.onTradeClosing = (sourceTradeId) =>
+    positionPriceTracker.persistMfeMaeForTrade(sourceTradeId)
   tradeSyncer.onTradeClosed = (tradeId) => {
     void autoAnalyzer.onTradeClosed(tradeId)
-    // Cancel all active conditions for the trade when it closes
-    void import("@fxflow/db")
-      .then(({ cancelConditionsForTrade }) => cancelConditionsForTrade(tradeId))
-      .catch(() => {})
+    // Expire all in-memory + DB conditions for the closed trade (prevents race condition)
+    conditionMonitor.onTradeClosed(tradeId)
     // Resolve recommendation outcomes for accuracy tracking
     void import("@fxflow/db")
       .then(async ({ resolveOutcomes, db }) => {
@@ -297,6 +315,17 @@ async function main() {
   setAiTraderScanner(aiTraderScanner)
   await aiTraderScanner.start()
 
+  // 12f. Economic calendar fetcher — periodic Finnhub calendar sync
+  const calendarFetcher = new CalendarFetcher(async () => {
+    const { getDecryptedFinnhubKey } = await import("@fxflow/db")
+    return getDecryptedFinnhubKey()
+  })
+  calendarFetcher.start()
+
+  // 12g. Cleanup scheduler — daily DB maintenance during market close hours
+  const cleanupScheduler = new CleanupScheduler()
+  cleanupScheduler.start()
+
   // Resolve CF Worker URL: DB config > env var > local wrangler dev fallback
   {
     const { getTVAlertsConfig } = await import("@fxflow/db")
@@ -345,6 +374,9 @@ async function main() {
     digestGenerator.stop()
     tradeFinderScanner.stop()
     aiTraderScanner.stop()
+    alertMonitor.stop()
+    calendarFetcher.stop()
+    cleanupScheduler.stop()
     process.exit(0)
   }
   process.on("SIGINT", shutdown)

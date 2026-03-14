@@ -59,9 +59,11 @@ export function DataTile({
           {label}
         </span>
       </div>
-      <p className={cn("font-mono text-sm font-semibold tabular-nums", valueColorStyles[variant])}>
+      <div
+        className={cn("font-mono text-sm font-semibold tabular-nums", valueColorStyles[variant])}
+      >
         {value}
-      </p>
+      </div>
       {subtitle && <p className="text-muted-foreground truncate text-[10px]">{subtitle}</p>}
       {sparkline && <div className="pt-1">{sparkline}</div>}
     </div>

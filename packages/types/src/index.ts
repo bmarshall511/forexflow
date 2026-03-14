@@ -649,6 +649,7 @@ export type NotificationSource =
   | "trade_condition"
   | "trade_finder"
   | "ai_trader"
+  | "price_alert"
 
 /** A notification displayed in the header notification panel. */
 export interface NotificationData {
@@ -735,6 +736,8 @@ export type DaemonMessageType =
   | "trade_finder_auto_trade_filled"
   | "trade_finder_auto_trade_cancelled"
   | "trade_finder_auto_trade_skipped"
+  // Price Alerts
+  | "price_alert_triggered"
   // AI Trader
   | "ai_trader_opportunity_found"
   | "ai_trader_opportunity_updated"
@@ -992,6 +995,7 @@ export type AnyDaemonMessage =
   | AiTraderTradePlacedMessage
   | AiTraderTradeManagedMessage
   | AiTraderTradeClosedMessage
+  | PriceAlertTriggeredMessage
 
 // ─── TradingView Alerts ────────────────────────────────────────────────────
 
@@ -1037,6 +1041,8 @@ export interface TVWebhookPayload {
   time?: string
   /** Auth token embedded in payload (optional secondary auth) */
   token?: string
+  /** Unique signal ID assigned by CF Worker for idempotent processing */
+  signalId?: string
 }
 
 /** Processed and validated signal */
@@ -2714,3 +2720,176 @@ export const AI_TRADER_DEFAULT_PROFILES: Record<AiTraderProfile, boolean> = {
   swing: true,
   news: false,
 }
+
+// ─── Economic Calendar ───────────────────────────────────────────────────────
+
+/** Impact level for an economic event. */
+export type EconomicEventImpact = "low" | "medium" | "high"
+
+/** Persisted economic calendar event returned by the API. */
+export interface EconomicEventData {
+  id: string
+  title: string
+  currency: string
+  impact: EconomicEventImpact
+  actual: string | null
+  forecast: string | null
+  previous: string | null
+  /** ISO timestamp of when the event occurs. */
+  timestamp: string
+}
+
+// ─── Price Alerts ────────────────────────────────────────────────────────────
+
+/** Direction condition for a standalone price alert. */
+export type PriceAlertDirection = "above" | "below"
+
+/** Lifecycle status of a standalone price alert. */
+export type PriceAlertStatus = "active" | "triggered" | "expired" | "cancelled"
+
+/** Serialized price alert data for the API/UI. */
+export interface PriceAlertData {
+  /** Alert ID. */
+  id: string
+  /** Instrument in OANDA format (e.g., "EUR_USD"). */
+  instrument: string
+  /** Whether target is above or below current price. */
+  direction: PriceAlertDirection
+  /** Price level that triggers the alert. */
+  targetPrice: number
+  /** Price when the alert was created. */
+  currentPrice: number
+  /** Optional user-provided note. */
+  label: string | null
+  /** Current lifecycle status. */
+  status: PriceAlertStatus
+  /** If true, re-arms after triggering. */
+  repeating: boolean
+  /** ISO timestamp when the alert was triggered; null if not yet triggered. */
+  triggeredAt: string | null
+  /** ISO timestamp when the alert expires; null for no expiry. */
+  expiresAt: string | null
+  /** ISO timestamp when the alert was created. */
+  createdAt: string
+}
+
+/** WebSocket message broadcast when a price alert triggers. */
+export interface PriceAlertTriggeredMessage extends DaemonMessage<PriceAlertData> {
+  type: "price_alert_triggered"
+}
+
+// ─── Performance Analytics ──────────────────────────────────────────────────
+
+/** Filters for analytics queries. All fields are optional. */
+export interface AnalyticsFilters {
+  dateFrom?: Date
+  dateTo?: Date
+  instrument?: string
+  /** placedVia value from metadata (enriched source). */
+  source?: string
+  direction?: "long" | "short"
+}
+
+/** Overall performance summary across all filtered trades. */
+export interface PerformanceSummary {
+  totalTrades: number
+  wins: number
+  losses: number
+  breakevens: number
+  /** Win rate as a decimal (0-1). */
+  winRate: number
+  totalPL: number
+  avgPL: number
+  /** Sum of winning PL / abs(sum of losing PL). Capped at 999 when no losses. */
+  profitFactor: number
+  /** (winRate * avgWin) - (lossRate * avgLoss). */
+  expectancy: number
+  /** Average reward-to-risk ratio from SL/TP, where available. */
+  avgRR: number
+  avgHoldTimeMinutes: number
+  largestWin: number
+  largestLoss: number
+  currentStreak: { type: "win" | "loss"; count: number }
+  longestWinStreak: number
+  longestLossStreak: number
+}
+
+/** Performance breakdown for a single instrument. */
+export interface InstrumentPerformance {
+  instrument: string
+  trades: number
+  wins: number
+  losses: number
+  winRate: number
+  totalPL: number
+  avgPL: number
+  profitFactor: number
+}
+
+/** Performance breakdown for a trading session. */
+export interface SessionPerformance {
+  session: string
+  trades: number
+  wins: number
+  winRate: number
+  totalPL: number
+  profitFactor: number
+}
+
+/** Performance breakdown for a day of the week. */
+export interface DayOfWeekPerformance {
+  /** 0=Sunday through 6=Saturday. */
+  day: number
+  dayName: string
+  trades: number
+  wins: number
+  winRate: number
+  totalPL: number
+}
+
+/** Performance breakdown for an hour of the day. */
+export interface HourOfDayPerformance {
+  /** 0-23 (UTC). */
+  hour: number
+  trades: number
+  wins: number
+  winRate: number
+  totalPL: number
+}
+
+/** Performance breakdown by trade source (placedVia). */
+export interface SourcePerformance {
+  source: string
+  sourceLabel: string
+  trades: number
+  wins: number
+  winRate: number
+  totalPL: number
+  profitFactor: number
+}
+
+/** MFE/MAE data point for a single trade. */
+export interface MfeMaeEntry {
+  tradeId: string
+  instrument: string
+  outcome: string
+  /** Maximum Favorable Excursion in pips, or null if not tracked. */
+  mfePips: number | null
+  /** Maximum Adverse Excursion in pips, or null if not tracked. */
+  maePips: number | null
+  realizedPL: number
+  holdTimeMinutes: number
+}
+
+/** Single data point on the equity curve. */
+export interface EquityCurvePoint {
+  /** ISO date string (YYYY-MM-DD). */
+  date: string
+  cumulativePL: number
+  tradeCount: number
+  balance?: number
+}
+
+// ─── Zod Schemas ────────────────────────────────────────────────────────────
+
+export * from "./schemas"

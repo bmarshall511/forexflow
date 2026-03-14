@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Sparkles, ListChecks, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TabNav, TabNavButton } from "@/components/ui/tab-nav"
+import { PageHeader } from "@/components/ui/page-header"
 import { AiStatsBar } from "./ai-stats-bar"
 import { AiAnalysesTab } from "./ai-analyses-tab"
 import { AiConditionsTab } from "./ai-conditions-tab"
@@ -17,24 +18,22 @@ export function AiAnalysisDashboard() {
   return (
     <div className="min-h-screen">
       {/* ─── Hero Header ─── */}
-      <div className="border-b px-4 pb-8 pt-6 md:px-6">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">AI Analysis</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              All AI analyses and automated conditions across your trades
-            </p>
-          </div>
-          <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5 text-xs" asChild>
+      <PageHeader
+        title="AI Analysis"
+        subtitle="All AI analyses and automated conditions across your trades"
+        icon={Sparkles}
+        bordered
+        actions={
+          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" asChild>
             <Link href="/settings/ai">
               <Settings2 className="size-3.5" />
               <span className="hidden sm:inline">Settings</span>
             </Link>
           </Button>
-        </div>
-
+        }
+      >
         <AiStatsBar />
-      </div>
+      </PageHeader>
 
       {/* ─── Tab Navigation ─── */}
       <TabNav label="AI Analysis sections">

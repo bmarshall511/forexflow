@@ -102,6 +102,8 @@ export class AlertRouter implements DurableObject {
           ? parseFloat(rawPrice) || undefined
           : undefined
 
+    const signalId = crypto.randomUUID()
+
     const payload: TVWebhookPayload = {
       action: action as "buy" | "sell",
       ticker,
@@ -109,6 +111,7 @@ export class AlertRouter implements DurableObject {
       exchange: typeof body.exchange === "string" ? body.exchange : undefined,
       interval: typeof body.interval === "string" ? body.interval : undefined,
       time: typeof body.time === "string" ? body.time : undefined,
+      signalId,
     }
 
     const signal: SignalMessage = {

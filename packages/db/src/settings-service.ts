@@ -210,6 +210,32 @@ export async function setRiskPercent(percent: number): Promise<void> {
 }
 
 /**
+ * Check whether the user has completed the onboarding wizard.
+ *
+ * @returns true if onboarding has been completed
+ */
+export async function getOnboardingCompleted(): Promise<boolean> {
+  try {
+    const settings = await getOrCreateSettings()
+    return settings.onboardingCompleted
+  } catch {
+    // Column may not exist yet if schema hasn't been pushed — skip onboarding
+    return true
+  }
+}
+
+/**
+ * Mark onboarding as completed.
+ */
+export async function setOnboardingCompleted(): Promise<void> {
+  await getOrCreateSettings()
+  await db.settings.update({
+    where: { id: 1 },
+    data: { onboardingCompleted: true },
+  })
+}
+
+/**
  * Test the OANDA API connection for a trading mode by making a live API call.
  *
  * @param mode - The trading mode to test ("practice" or "live")

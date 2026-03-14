@@ -43,6 +43,7 @@ src/
 
 - **shadcn/ui**: extend via composition, never fork the base components.
 - **Shared UI primitives**:
+  - `PageHeader` — `components/ui/page-header.tsx` (icon, title, subtitle, actions, children, bordered)
   - `TabNav` / `TabNavButton` — `components/ui/tab-nav.tsx`
   - `PriceCard` / `StatRow` — `components/ui/price-card.tsx`
   - `DataTile` — `components/ui/data-tile.tsx`
@@ -54,7 +55,7 @@ src/
 
 Every feature page follows this structure:
 
-1. Hero header (title + subtitle + action buttons)
+1. Hero header (page icon + title + subtitle + action buttons via `PageHeader`)
 2. Status/summary tiles (DataTile grid)
 3. Sticky `TabNav` for sub-sections
 4. Tab content area

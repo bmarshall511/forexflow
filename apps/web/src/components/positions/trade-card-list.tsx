@@ -30,10 +30,18 @@ import { CancelOrderDialog } from "./cancel-order-dialog"
 import { AiAnalysisSheet } from "@/components/ai/ai-analysis-sheet"
 import { useTradeActions } from "@/hooks/use-trade-actions"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
-import { ArrowUpDown, Trash2 } from "lucide-react"
+import {
+  ArrowUpDown,
+  Trash2,
+  Clock,
+  CircleDot,
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
+import { EmptyState } from "@/components/ui/empty-state"
 import { compareValues, type SortState } from "./sortable-head"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 
 type TradeCardVariant = "pending" | "open" | "closed"
 
@@ -216,13 +224,23 @@ export function TradeCardList({
 
   if (sorted.length === 0) {
     return (
-      <div className="text-muted-foreground py-12 text-center text-sm">
-        {variant === "pending"
-          ? "No orders waiting to fill"
-          : variant === "open"
-            ? "No live trades right now"
-            : "No past trades to show"}
-      </div>
+      <EmptyState
+        icon={variant === "pending" ? Clock : variant === "open" ? CircleDot : TrendingUp}
+        title={
+          variant === "pending"
+            ? "No pending orders"
+            : variant === "open"
+              ? "No open trades"
+              : "No trade history"
+        }
+        description={
+          variant === "pending"
+            ? "Limit and stop orders will appear here when placed."
+            : variant === "open"
+              ? "Place your first trade to see it here."
+              : "Closed trades will appear here after your positions are resolved."
+        }
+      />
     )
   }
 

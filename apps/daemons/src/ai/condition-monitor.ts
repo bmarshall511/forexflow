@@ -149,6 +149,40 @@ export class ConditionMonitor {
     this.conditions.delete(conditionId)
   }
 
+  /**
+   * Called when a trade is closed. Removes all in-memory conditions for the trade
+   * and expires them in the DB (fire-and-forget) to prevent the race condition
+   * where a condition action executes against an already-closed trade.
+   */
+  onTradeClosed(tradeId: string): void {
+    // Remove all conditions for this trade from the in-memory map immediately
+    for (const [id, condition] of this.conditions.entries()) {
+      if (condition.tradeId === tradeId) {
+        this.conditions.delete(id)
+      }
+    }
+
+    // Invalidate cached trade data so stale "open" status is not used
+    this.tradeDataCache.delete(tradeId)
+
+    // Expire in DB — fire-and-forget so we don't block the close flow
+    void import("@fxflow/db")
+      .then(({ expireConditionsForTrade }) => expireConditionsForTrade(tradeId))
+      .then((count) => {
+        if (count > 0) {
+          console.log(
+            `[condition-monitor] Expired ${count} condition(s) for closed trade ${tradeId}`,
+          )
+        }
+      })
+      .catch((err) => {
+        console.error(
+          `[condition-monitor] Failed to expire conditions for trade ${tradeId}:`,
+          (err as Error).message,
+        )
+      })
+  }
+
   /** Invalidate cached trade data (call when trade status changes) */
   invalidateTradeCache(tradeId: string): void {
     this.tradeDataCache.delete(tradeId)
@@ -510,6 +544,18 @@ export class ConditionMonitor {
     })
 
     if (!trade) throw new Error(`Trade ${condition.tradeId} not found`)
+
+    // Guard: skip execution if the trade is already closed (race condition safety)
+    if (trade.status === "closed") {
+      console.log(
+        `[condition-monitor] Skipping action for condition ${condition.id} — trade ${condition.tradeId} is already closed`,
+      )
+      // Mark as expired rather than re-throwing so triggerCondition does not retry
+      const { updateConditionStatus } = await import("@fxflow/db")
+      await updateConditionStatus(condition.id, "expired")
+      this.conditions.delete(condition.id)
+      return
+    }
 
     const params = condition.actionParams
 

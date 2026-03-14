@@ -30,6 +30,7 @@ import { TimeframeSelect } from "./timeframe-select"
 import { TagEditor } from "./tag-editor"
 import { NotesEditor } from "./notes-editor"
 import { TradeEventsTimeline } from "./trade-events-timeline"
+import { PartialCloseTimeline } from "./partial-close-timeline"
 import { TradeStatusBanner } from "./trade-status-banner"
 import { RiskRewardDisplay } from "./risk-reward-display"
 import type { PositionPriceTick } from "@fxflow/types"
@@ -38,6 +39,7 @@ import { createEntryLevel, createExitLevel } from "@/components/charts/chart-mar
 import type { TradeLevel } from "@/components/charts/trade-level-primitive"
 import { TradeEditorPanel } from "./trade-editor-panel"
 import { AiAnalysisSheet } from "@/components/ai/ai-analysis-sheet"
+import { TradeReplayDialog } from "@/components/analytics/trade-replay-dialog"
 import { useTradeDetail } from "@/hooks/use-trade-detail"
 import { useAiAnalysis } from "@/hooks/use-ai-analysis"
 import { useTags } from "@/hooks/use-tags"
@@ -52,6 +54,8 @@ import {
   Sparkles,
   Shield,
   Info,
+  Scissors,
+  PlayCircle,
 } from "lucide-react"
 
 export type TradeUnion =
@@ -87,6 +91,7 @@ export function TradeDetailDrawer({
 }: TradeDetailDrawerProps) {
   const tradeId = trade?.id ?? null
   const [aiSheetOpen, setAiSheetOpen] = useState(false)
+  const [replayOpen, setReplayOpen] = useState(false)
   const { detail, isLoading, updateNotes, updateTimeframe, assignTag, removeTag, refetch } =
     useTradeDetail(tradeId)
   const { history: aiHistory } = useAiAnalysis(tradeId)
@@ -583,6 +588,27 @@ export function TradeDetailDrawer({
                 <TradeEventsTimeline events={detail.events} />
               </SectionCard>
             )}
+
+            {/* Partial Close Timeline */}
+            {detail?.events &&
+              detail.events.some((e) => e.eventType === "PARTIAL_CLOSE") &&
+              trade._type !== "pending" && (
+                <SectionCard
+                  icon={Scissors}
+                  title="Scale-Out History"
+                  helper="How the position was reduced over time through partial closes."
+                >
+                  <PartialCloseTimeline
+                    events={detail.events}
+                    originalUnits={
+                      trade._type === "open" ? trade.initialUnits : (trade as ClosedTradeData).units
+                    }
+                    instrument={trade.instrument}
+                    entryTime={trade.openedAt}
+                    currency={currency}
+                  />
+                </SectionCard>
+              )}
           </div>
 
           {/* Footer — action buttons */}
@@ -601,6 +627,18 @@ export function TradeDetailDrawer({
                 </span>
               )}
             </Button>
+
+            {trade._type === "closed" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => setReplayOpen(true)}
+              >
+                <PlayCircle className="size-3" />
+                Replay Trade
+              </Button>
+            )}
 
             <div className="flex-1" />
 
@@ -635,6 +673,11 @@ export function TradeDetailDrawer({
         open={aiSheetOpen}
         onOpenChange={setAiSheetOpen}
       />
+
+      {/* Trade Replay Dialog */}
+      {trade._type === "closed" && (
+        <TradeReplayDialog tradeId={tradeId} open={replayOpen} onOpenChange={setReplayOpen} />
+      )}
     </>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useDaemonStatus } from "./use-daemon-status"
 import type {
   PositionsData,
@@ -67,6 +67,26 @@ export function usePositions(): UsePositionsReturn {
     }
     return new Map(priceAccumulator.current)
   }, [positionsPrices])
+
+  // Evict stale prices for instruments no longer in pending/open positions.
+  // Computed from positions only, so it changes infrequently (not on every tick).
+  const activeInstruments = useMemo(() => {
+    if (!positions) return new Set<string>()
+    const instruments = new Set<string>()
+    for (const order of positions.pending) instruments.add(order.instrument)
+    for (const trade of positions.open) instruments.add(trade.instrument)
+    return instruments
+  }, [positions])
+
+  useEffect(() => {
+    const acc = priceAccumulator.current
+    if (acc.size === 0) return
+    for (const key of acc.keys()) {
+      if (!activeInstruments.has(key)) {
+        acc.delete(key)
+      }
+    }
+  }, [activeInstruments])
 
   // Merge latest prices into open trades + compute live unrealized P/L
   const openWithPrices = useMemo(() => {

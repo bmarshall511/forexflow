@@ -49,6 +49,12 @@ export function setAiTraderScanner(scanner: AiTraderScanner): void {
   _aiTraderScanner = scanner
 }
 
+import type { AlertMonitor } from "./alerts/alert-monitor.js"
+let _alertMonitor: AlertMonitor | null = null
+export function setAlertMonitor(monitor: AlertMonitor): void {
+  _alertMonitor = monitor
+}
+
 interface ServerDeps {
   stateManager: StateManager
   credentialWatcher: CredentialWatcher
@@ -97,6 +103,39 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "GET" && req.url === "/health") {
       sendJson(res, 200, { ok: true, uptime: process.uptime() })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/health/detailed") {
+      const mem = process.memoryUsage()
+      const snapshot = stateManager.getSnapshot()
+      sendJson(res, 200, {
+        ok: true,
+        data: {
+          uptimeSeconds: snapshot.uptimeSeconds,
+          startedAt: snapshot.startedAt,
+          memory: {
+            rss: mem.rss,
+            heapUsed: mem.heapUsed,
+            heapTotal: mem.heapTotal,
+            external: mem.external,
+          },
+          wsClients: connectedClients.size,
+          oanda: snapshot.oanda,
+          market: snapshot.market,
+          tradingMode: snapshot.tradingMode,
+          tvAlerts: snapshot.tvAlerts
+            ? {
+                enabled: snapshot.tvAlerts.enabled,
+                cfWorkerConnected: snapshot.tvAlerts.cfWorkerConnected,
+              }
+            : null,
+          tradeFinder: _tradeFinderScanner
+            ? { enabled: true, scanStatus: _tradeFinderScanner.getScanStatus() }
+            : { enabled: false, scanStatus: null },
+          aiTrader: _aiTraderScanner ? { enabled: true } : { enabled: false },
+        },
+      })
       return
     }
 
@@ -845,6 +884,19 @@ export async function startServer(port: number, deps: ServerDeps) {
         .catch((err) => {
           sendJson(res, 500, { ok: false, error: (err as Error).message })
         })
+      return
+    }
+
+    // ─── Price Alert Endpoints ───────────────────────────────────────────
+
+    if (req.method === "POST" && req.url === "/actions/alerts/reload") {
+      if (!_alertMonitor) {
+        sendJson(res, 503, { ok: false, error: "Alert monitor not available" })
+        return
+      }
+      void _alertMonitor.reload().then(() => {
+        sendJson(res, 200, { ok: true })
+      })
       return
     }
 

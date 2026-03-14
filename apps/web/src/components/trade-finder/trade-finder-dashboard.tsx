@@ -17,11 +17,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Scan, Settings2, Zap, Trash2, Crosshair, History, Activity } from "lucide-react"
+import { Scan, Settings2, Zap, Trash2, Crosshair, History, Activity, Search } from "lucide-react"
 import { SetupCard } from "./setup-card"
 import { AutoTradeLog } from "./auto-trade-log"
 import { toast } from "sonner"
 import { formatRelativeTime } from "@fxflow/shared"
+import { PageHeader } from "@/components/ui/page-header"
 import { cn } from "@/lib/utils"
 
 type Tab = "active" | "history" | "activity"
@@ -94,15 +95,13 @@ export function TradeFinderDashboard() {
   return (
     <div className="min-h-screen">
       {/* ─── Hero Header ─── */}
-      <div className="border-b px-4 pb-8 pt-6 md:px-6">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Trade Finder</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Scans the market for high-probability trade setups across multiple timeframes
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
+      <PageHeader
+        title="Trade Finder"
+        subtitle="Scans the market for high-probability trade setups across multiple timeframes"
+        icon={Search}
+        bordered
+        actions={
+          <>
             {config && (
               <Button
                 variant={config.autoTradeEnabled ? "default" : "outline"}
@@ -134,9 +133,9 @@ export function TradeFinderDashboard() {
                 <span className="hidden sm:inline">Settings</span>
               </Link>
             </Button>
-          </div>
-        </div>
-
+          </>
+        }
+      >
         {/* Status tiles */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatusTile
@@ -166,7 +165,7 @@ export function TradeFinderDashboard() {
             variant={scanStatus?.isScanning ? "warning" : "default"}
           />
         </div>
-      </div>
+      </PageHeader>
 
       {/* ─── Tab Navigation ─── */}
       <TabNav label="Trade finder sections">

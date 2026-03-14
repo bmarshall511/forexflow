@@ -7,6 +7,9 @@ import {
   Sparkles,
   Search,
   Bot,
+  Bell,
+  TrendingUp,
+  Shield,
   type LucideIcon,
 } from "lucide-react"
 
@@ -39,6 +42,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard", href: "/", icon: LayoutDashboard },
       { label: "Positions", href: "/positions", icon: Crosshair, badgeKey: "positions" },
       { label: "Charts", href: "/charts", icon: LineChart },
+      { label: "Analytics", href: "/analytics", icon: TrendingUp },
+      { label: "Risk", href: "/risk", icon: Shield },
     ],
   },
   {
@@ -48,6 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "TradingView Alerts", href: "/tv-alerts", icon: Radio, badgeKey: "tvAlerts" },
       { label: "AI Analysis", href: "/ai-analysis", icon: Sparkles, badgeKey: "aiAnalysis" },
       { label: "AI Trader", href: "/ai-trader", icon: Bot, badgeKey: "aiTrader" },
+      { label: "Alerts", href: "/alerts", icon: Bell },
     ],
   },
   {
