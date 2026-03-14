@@ -1,0 +1,11 @@
+# Cloudflare Tunnel configuration for FXFlow
+#
+# Copy this file to ~/.cloudflared/config.yml after running setup-tunnel.sh
+# Replace <TUNNEL_ID> with your actual tunnel ID.
+
+tunnel: <TUNNEL_ID>
+credentials-file: /Users/<USERNAME>/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  # All traffic routes to the Next.js server (which proxies WS to daemon)
+  - service: http://localhost:3000

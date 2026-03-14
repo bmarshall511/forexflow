@@ -5,5 +5,4 @@ updates:
     schedule:
       interval: "weekly"
     labels:
-      - "deps"
-      - "ci"
+      - "dependencies"

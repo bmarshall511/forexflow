@@ -60,6 +60,7 @@ interface ServerDeps {
   credentialWatcher: CredentialWatcher
   tradeSyncer?: OandaTradeSyncer
   notificationEmitter?: NotificationEmitter
+  allowedOrigins?: string[]
 }
 
 /** Read the full request body as a string. */
@@ -79,15 +80,21 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 }
 
 export async function startServer(port: number, deps: ServerDeps) {
-  const { stateManager, credentialWatcher, tradeSyncer } = deps
+  const { stateManager, credentialWatcher, tradeSyncer, allowedOrigins } = deps
   const connectedClients = new Set<WebSocket>()
 
   // HTTP server for REST endpoints
   const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
-    // CORS headers for local development
-    res.setHeader("Access-Control-Allow-Origin", "*")
+    // CORS: restrict to allowed origins (defaults to localhost:3000)
+    const origin = req.headers.origin ?? ""
+    const isAllowed =
+      !allowedOrigins || allowedOrigins.length === 0 || allowedOrigins.includes(origin)
+    res.setHeader("Access-Control-Allow-Origin", isAllowed ? origin || "*" : "")
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
     res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    if (isAllowed && origin) {
+      res.setHeader("Vary", "Origin")
+    }
 
     if (req.method === "OPTIONS") {
       res.writeHead(204)

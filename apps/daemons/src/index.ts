@@ -92,6 +92,7 @@ async function main() {
     stateManager,
     credentialWatcher,
     tradeSyncer,
+    allowedOrigins: config.allowedOrigins,
   })
 
   // 7. Wire state changes to broadcast

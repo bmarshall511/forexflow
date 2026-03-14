@@ -126,7 +126,12 @@ packages/
   +------+------+                 +----------+---------+               +-------+
          |                                   |
          +-----------> SQLite <--------------+
-                      (Prisma)
+         |             (Prisma)
+         |
+  +------v------+
+  |  Cloudflare  |    (optional — for remote/mobile access)
+  |    Tunnel    |-----> Phone / Remote Device (PWA)
+  +--------------+
 ```
 
 The daemon is the central hub — it maintains persistent streaming connections to OANDA for prices and transaction events, reconciles state into the database every 2 minutes, processes signals from the Cloudflare Worker, runs AI analyses, monitors trade conditions on every price tick, and broadcasts everything to connected web clients via WebSocket.
@@ -237,6 +242,38 @@ If you want TradingView alert automation:
 AI features require an Anthropic API key. Configure at **Settings > AI** (per-trade analysis) or **Settings > AI Trader** (autonomous scanner). Keys are encrypted at rest using AES-256-GCM.
 
 The AI Trader can optionally use FRED and Alpha Vantage API keys for macroeconomic data context — configure them in **Settings > AI Trader > API Keys**.
+
+### Remote Access (optional)
+
+Access FXFlow from your phone or any device — zero configuration needed:
+
+```bash
+pnpm dev    # Starts app + Cloudflare Quick Tunnel automatically
+```
+
+The remote URL is printed in the terminal and shown in **Settings > Security**. Open it on your phone. The URL changes each restart — that's fine for personal use.
+
+Use `pnpm dev:local` to skip the tunnel and run locally only.
+
+**Security layers:**
+
+- **PIN authentication** — app-level 6-digit PIN with lockout protection
+- **HTTPS encryption** — via Cloudflare tunnel
+- **Unguessable URL** — random subdomain on each start
+- **Security headers** — X-Frame-Options, HSTS, etc. via Next.js
+- **Rate limiting** — brute-force protection on auth endpoints
+
+For a persistent URL, set up a [named tunnel](docs/ai/remote-access.md#named-tunnels-advanced).
+
+### PWA Support
+
+FXFlow is installable as a Progressive Web App on mobile devices:
+
+1. Open the app in your mobile browser
+2. Tap "Add to Home Screen" (iOS Safari) or install prompt (Android Chrome)
+3. The app launches in standalone mode — looks and feels like a native app
+
+Features: offline fallback page, app icons, standalone display mode, theme-color integration.
 
 ---
 

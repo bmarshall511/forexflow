@@ -27,20 +27,44 @@ import type {
   AnyDaemonMessage,
 } from "@fxflow/types"
 
-const DAEMON_WS_URL =
-  typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_DAEMON_URL ?? "ws://localhost:4100") : ""
+/**
+ * Auto-detect whether to connect directly to the daemon (local dev)
+ * or through the WebSocket proxy (remote/production).
+ *
+ * Local: browser is on localhost → connect to daemon on port 4100 directly.
+ * Remote: browser is on a tunnel/domain → use /ws proxy path through same origin.
+ */
+function resolveDaemonUrls(): { wsUrl: string; restUrl: string } {
+  if (typeof window === "undefined") return { wsUrl: "", restUrl: "" }
 
-const DAEMON_REST_URL =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100")
-    : ""
+  const host = window.location.hostname
+  const isLocal = host === "localhost" || host === "127.0.0.1"
+
+  if (isLocal) {
+    return {
+      wsUrl: process.env.NEXT_PUBLIC_DAEMON_URL ?? "ws://localhost:4100",
+      restUrl: process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100",
+    }
+  }
+
+  // Remote: proxy through same origin
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`
+  const restUrl = "" // REST calls go through Next.js API routes (same origin)
+  return { wsUrl, restUrl }
+}
+
+const { wsUrl: DAEMON_WS_URL, restUrl: DAEMON_REST_URL } = resolveDaemonUrls()
 
 const RECONNECT_BASE_DELAY = 2000
 const RECONNECT_MAX_DELAY = 30000
+const REST_POLL_INTERVAL = 5000
 
 export interface DaemonConnectionState {
   /** Whether the WebSocket is currently connected to the daemon */
   isConnected: boolean
+  /** Whether the daemon is reachable via REST (fallback when WS is unavailable) */
+  isReachable: boolean
   /** Full status snapshot (null until first message received) */
   snapshot: DaemonStatusSnapshot | null
   /** Latest OANDA health data */
@@ -154,6 +178,7 @@ export function useDaemonConnection(): DaemonConnectionState {
     null,
   )
   const [connectionAttempted, setConnectionAttempted] = useState(false)
+  const [isReachable, setIsReachable] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptRef = useRef(0)
@@ -379,35 +404,77 @@ export function useDaemonConnection(): DaemonConnectionState {
     reconnectTimerRef.current = setTimeout(() => connectRef.current(), delay)
   }
 
+  // REST fetch helper — used for initial load and polling fallback
+  const fetchStatusViaRest = useRef(() => {
+    const restBase = DAEMON_REST_URL || "/api/daemon"
+
+    fetch(`${restBase}/status`)
+      .then((res) =>
+        res.ok ? (res.json() as Promise<{ ok: boolean; data: DaemonStatusSnapshot }>) : null,
+      )
+      .then((json) => {
+        if (json?.ok && json.data && mountedRef.current) {
+          setIsReachable(true)
+          setSnapshot(json.data)
+          setOanda(json.data.oanda)
+          setMarket(json.data.market)
+          setAccountOverview(json.data.accountOverview ?? null)
+          if (json.data.positions) setPositions(json.data.positions)
+          if (json.data.tvAlerts) setTVAlertsStatus(json.data.tvAlerts)
+        }
+      })
+      .catch(() => {
+        if (mountedRef.current) {
+          setIsReachable(false)
+          setConnectionAttempted(true)
+        }
+      })
+
+    fetch(`${restBase}/trade-finder/status`)
+      .then((res) =>
+        res.ok ? (res.json() as Promise<{ ok: boolean; data: TradeFinderScanStatus }>) : null,
+      )
+      .then((json) => {
+        if (json?.ok && json.data && mountedRef.current) {
+          setTradeFinderScanStatus(json.data)
+        }
+      })
+      .catch(() => {})
+
+    fetch(`${restBase}/ai-trader/status`)
+      .then((res) =>
+        res.ok ? (res.json() as Promise<{ ok: boolean; data: AiTraderScanStatus }>) : null,
+      )
+      .then((json) => {
+        if (json?.ok && json.data && mountedRef.current) {
+          setLastAiTraderScanStatus(json.data)
+        }
+      })
+      .catch(() => {})
+  })
+
   useEffect(() => {
     mountedRef.current = true
 
-    // Fetch initial snapshot via REST (before WS connects)
-    if (DAEMON_REST_URL) {
-      fetch(`${DAEMON_REST_URL}/status`)
-        .then((res) =>
-          res.ok ? (res.json() as Promise<{ ok: boolean; data: DaemonStatusSnapshot }>) : null,
-        )
-        .then((json) => {
-          if (json?.ok && json.data && mountedRef.current) {
-            setSnapshot(json.data)
-            setOanda(json.data.oanda)
-            setMarket(json.data.market)
-            setAccountOverview(json.data.accountOverview ?? null)
-            if (json.data.positions) setPositions(json.data.positions)
-            if (json.data.tvAlerts) setTVAlertsStatus(json.data.tvAlerts)
-          }
-        })
-        .catch(() => {
-          if (mountedRef.current) setConnectionAttempted(true)
-        })
-    }
+    // Initial REST fetch
+    fetchStatusViaRest.current()
 
     // Establish WebSocket connection
     connectRef.current()
 
+    // REST polling fallback: when WS proxy is unavailable (dev mode + remote),
+    // poll via REST to keep the UI updated with daemon status
+    const pollTimer = setInterval(() => {
+      if (!mountedRef.current) return
+      // Only poll when WS isn't connected — WS is more efficient
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        fetchStatusViaRest.current()
+      }
+    }, REST_POLL_INTERVAL)
+
     return () => {
       mountedRef.current = false
+      clearInterval(pollTimer)
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       if (wsRef.current) {
         wsRef.current.onclose = null // Prevent reconnect on cleanup
@@ -418,6 +485,7 @@ export function useDaemonConnection(): DaemonConnectionState {
 
   return {
     isConnected,
+    isReachable,
     connectionAttempted,
     snapshot,
     oanda,

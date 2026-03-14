@@ -90,6 +90,7 @@ Canonical standards with full detail live in:
 - `docs/ai/realtime.md` — WebSocket and realtime patterns
 - `docs/ai/testing.md` — testing approach
 - `docs/ai/accessibility-aaa.md` — accessibility requirements
+- `docs/ai/remote-access.md` — remote access, auth, PWA, tunnel setup
 
 ## Claude Rules
 

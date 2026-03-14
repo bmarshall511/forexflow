@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { OandaStatusPopover } from "./oanda-status-popover"
 import { DaemonStatusPopover } from "./daemon-status-popover"
 import { TVAlertsStatusPopover } from "./tv-alerts-status-popover"
+import { RemoteAccessStatusPopover } from "./remote-access-status-popover"
 import type { StatusState } from "./status-indicator"
 
 // Priority order: higher = worse
@@ -50,11 +51,14 @@ function getHealthSummary(statuses: StatusState[]): string {
 interface SystemHealthRowProps {
   label: string
   status: StatusState
+  statusLabel?: string
   expandable?: boolean
   isOpen?: boolean
 }
 
-function SystemHealthRow({ label, status, expandable, isOpen }: SystemHealthRowProps) {
+function SystemHealthRow({ label, status, statusLabel, expandable, isOpen }: SystemHealthRowProps) {
+  const displayLabel = statusLabel ?? statusLabels[status]
+
   return (
     <div className="flex items-center justify-between py-1.5">
       <div className="flex items-center gap-2">
@@ -71,7 +75,7 @@ function SystemHealthRow({ label, status, expandable, isOpen }: SystemHealthRowP
             status === "connected" ? "text-muted-foreground" : "text-foreground font-medium",
           )}
         >
-          {statusLabels[status]}
+          {displayLabel}
         </span>
         {expandable && (
           <ChevronDown
@@ -88,11 +92,20 @@ function SystemHealthRow({ label, status, expandable, isOpen }: SystemHealthRowP
 }
 
 export function HeaderSystemHealth() {
-  const { isConnected, snapshot, oanda, accountOverview, tvAlertsStatus } = useDaemonStatus()
+  const { isConnected, isReachable, snapshot, oanda, accountOverview, tvAlertsStatus } =
+    useDaemonStatus()
   const { isOnline, isChecking } = useInternetStatus()
   const [oandaOpen, setOandaOpen] = useState(false)
   const [daemonOpen, setDaemonOpen] = useState(false)
   const [tvAlertsOpen, setTVAlertsOpen] = useState(false)
+  const [remoteOpen, setRemoteOpen] = useState(false)
+
+  const { isRemote, hostname } = useMemo(() => {
+    if (typeof window === "undefined") return { isRemote: false, hostname: "localhost" }
+    const h = window.location.hostname
+    const local = h === "localhost" || h === "127.0.0.1" || h === "::1"
+    return { isRemote: !local, hostname: h }
+  }, [])
 
   const internetStatus: StatusState = isOnline
     ? "connected"
@@ -100,8 +113,10 @@ export function HeaderSystemHealth() {
       ? "connecting"
       : "disconnected"
 
-  const daemonStatus: StatusState = isConnected ? "connected" : "disconnected"
-  const oandaStatus: StatusState = isConnected && oanda ? oanda.status : "disconnected"
+  // Daemon is reachable via WS (local) or REST polling (remote dev mode)
+  const daemonUp = isConnected || isReachable
+  const daemonStatus: StatusState = daemonUp ? "connected" : "disconnected"
+  const oandaStatus: StatusState = daemonUp && oanda ? oanda.status : "disconnected"
 
   // TV Alerts / CF Worker status: derive from daemon-reported tvAlertsStatus
   const tvAlertsHealthStatus: StatusState = tvAlertsStatus
@@ -148,6 +163,30 @@ export function HeaderSystemHealth() {
           {/* Internet */}
           <SystemHealthRow label="Internet" status={internetStatus} />
 
+          {/* Remote Access — collapsible detail */}
+          <Collapsible open={remoteOpen} onOpenChange={setRemoteOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="hover:bg-accent/50 -mx-1 w-full rounded-sm px-1 transition-colors"
+                aria-label={`Remote Access: ${isRemote ? "Remote" : "Local"}. Click to ${remoteOpen ? "collapse" : "expand"} details.`}
+              >
+                <SystemHealthRow
+                  label="Remote Access"
+                  status="connected"
+                  statusLabel={isRemote ? "Remote" : "Local"}
+                  expandable
+                  isOpen={remoteOpen}
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-border bg-muted/30 mt-1 rounded-md border p-3">
+                <RemoteAccessStatusPopover isRemote={isRemote} hostname={hostname} />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
           {/* TV Alerts / CF Worker — collapsible detail */}
           <Collapsible open={tvAlertsOpen} onOpenChange={setTVAlertsOpen}>
             <CollapsibleTrigger asChild>
@@ -166,7 +205,7 @@ export function HeaderSystemHealth() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="border-border bg-muted/30 mt-1 rounded-md border p-3">
-                <TVAlertsStatusPopover tvAlerts={tvAlertsStatus} isConnected={isConnected} />
+                <TVAlertsStatusPopover tvAlerts={tvAlertsStatus} isConnected={daemonUp} />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -184,7 +223,7 @@ export function HeaderSystemHealth() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="border-border bg-muted/30 mt-1 rounded-md border p-3">
-                <OandaStatusPopover oanda={oanda} isConnected={isConnected} currency={currency} />
+                <OandaStatusPopover oanda={oanda} isConnected={daemonUp} currency={currency} />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -207,7 +246,7 @@ export function HeaderSystemHealth() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="border-border bg-muted/30 mt-1 rounded-md border p-3">
-                <DaemonStatusPopover snapshot={snapshot} isConnected={isConnected} />
+                <DaemonStatusPopover snapshot={snapshot} isConnected={daemonUp} />
               </div>
             </CollapsibleContent>
           </Collapsible>

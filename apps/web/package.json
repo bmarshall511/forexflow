@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
+    "start": "node dist/server.js",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start:local": "next start"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -31,7 +32,8 @@
     "react-dom": "^19",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "ws": "^8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -44,6 +46,7 @@
     "eslint-config-next": "^15",
     "eslint-config-prettier": "^10",
     "tailwindcss": "^4",
-    "typescript": "^5.7"
+    "typescript": "^5.7",
+    "@types/ws": "^8"
   }
 }

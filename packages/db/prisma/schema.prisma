@@ -522,6 +522,26 @@ model PriceAlert {
   @@index([expiresAt])
 }
 
+// ─── Authentication ─────────────────────────────────────────────────────────
+
+model AuthPin {
+  id             String    @id @default(cuid())
+  pinHash        String // bcrypt hash of PIN
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  sessionExpiry  Int       @default(86400) // seconds (default 24h)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model AuthSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  device    String? // user-agent for session management UI
+  createdAt DateTime @default(now())
+}
+
 model EconomicEvent {
   id        String   @id @default(cuid())
   title     String

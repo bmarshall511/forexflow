@@ -8,7 +8,8 @@
   },
   "packageManager": "pnpm@10.11.0",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "./scripts/dev.sh",
+    "dev:local": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

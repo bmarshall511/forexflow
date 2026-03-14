@@ -1,6 +1,22 @@
 // @fxflow/db — shared database client, encryption, and service layer
 
 export { db } from "./client"
+
+export {
+  hasPin,
+  createPin,
+  verifyPin,
+  changePin,
+  getSessionExpiry,
+  updateSessionExpiry,
+  createSession,
+  validateSession,
+  deleteSession,
+  deleteAllSessions,
+  listActiveSessions,
+  revokeSession,
+  cleanupExpiredSessions,
+} from "./auth-service"
 export { encrypt, decrypt, reEncrypt } from "./encryption"
 export { rotateEncryptionKeys } from "./key-rotation-service"
 export {
@@ -306,4 +322,5 @@ export {
   getPerformanceBySource,
   getMfeMaeDistribution,
   getEquityCurve,
+  getSourceBreakdown,
 } from "./analytics-service"

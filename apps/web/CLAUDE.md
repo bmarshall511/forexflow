@@ -3,13 +3,15 @@
 ## Architecture
 
 - Server Components by default. Add `"use client"` only for interactive/stateful components.
-- No `middleware.ts`. No Server Actions — all mutations go through REST API routes.
+- `middleware.ts` handles PIN authentication (session cookie validation, redirect to /login or /setup).
+- No Server Actions — all mutations go through REST API routes.
 - Theme: next-themes, class-based dark/light, dark is default.
 
 ## Directory Structure
 
 ```
 src/
+  app/(auth)/      # Auth pages (login, setup) — outside main layout
   app/(app)/       # Pages behind layout (dashboard, positions, charts, etc.)
   app/api/         # Route handlers (route.ts files)
   components/
@@ -73,9 +75,29 @@ Every feature page follows this structure:
 - Data hooks handle loading/error states internally.
 - Examples: `use-positions.ts`, `use-ai-analysis.ts`, `use-trade-finder.ts`.
 
+## Authentication
+
+- PIN-based auth via `middleware.ts` — checks `fxflow_session` cookie against DB.
+- First-time setup: `/setup` page creates PIN + auto-logs in.
+- Login: `/login` page with numeric keypad, lockout after 5 failed attempts.
+- Session management: Settings > Security (change PIN, session duration, active sessions).
+- Rate limiting on `/api/auth/login` (5 req/min per IP) via `lib/rate-limit.ts`.
+
+## Remote Access
+
+- `server.ts` — custom Next.js server that proxies `/ws` WebSocket to daemon:4100 (production only).
+- `use-daemon-connection.ts` auto-detects local vs remote and switches between direct daemon connection and proxy.
+- `/api/daemon/[...path]` — REST proxy route for daemon calls when remote.
+- In dev mode (no WS proxy), `use-daemon-connection.ts` falls back to REST polling every 5s. `isReachable` state tracks REST-based connectivity alongside `isConnected` (WebSocket).
+- `/api/settings/tunnel-status` — returns tunnel status + URL (read from `data/.tunnel-url` written by `dev.sh`).
+- PWA manifest + service worker for installable mobile experience.
+- See `docs/ai/remote-access.md` for full architecture.
+
 ## Gotchas
 
-- No `middleware.ts` exists — don't create one.
+- `middleware.ts` handles auth — public paths are exempted (api/auth, static assets).
+- **Middleware always fetches `http://localhost:${PORT}/api/auth/status`** — never `request.nextUrl.origin`, which fails when the request arrives via a tunnel URL.
 - API routes that proxy to daemon must handle daemon-down errors gracefully.
 - WS reconnection is handled automatically by `use-daemon-connection.ts`.
 - `use-daemon-status.ts` vs `use-daemon-connection.ts`: status is the consumer hook, connection is the provider.
+- `server.ts` is only used in production (`pnpm start`). Dev mode uses `next dev` directly (no WS proxy — REST polling fills the gap).

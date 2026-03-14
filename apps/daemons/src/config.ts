@@ -12,6 +12,7 @@ export interface DaemonConfig {
   priceThrottleMs: number
   cfWorkerWsUrl: string
   cfWorkerDaemonSecret: string
+  allowedOrigins: string[]
 }
 
 export function getConfig(): DaemonConfig {
@@ -29,5 +30,8 @@ export function getConfig(): DaemonConfig {
     priceThrottleMs: parseInt(process.env.DAEMON_PRICE_THROTTLE ?? "500", 10),
     cfWorkerWsUrl: process.env.CF_WORKER_WS_URL ?? "",
     cfWorkerDaemonSecret: process.env.CF_WORKER_DAEMON_SECRET ?? "",
+    allowedOrigins: process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
+      : ["http://localhost:3000"],
   }
 }

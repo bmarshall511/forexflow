@@ -18,7 +18,8 @@ function formatDateTime(date: Date): string {
 }
 
 export function MarketStatus() {
-  const { isConnected, market, oanda } = useDaemonStatus()
+  const { isConnected, isReachable, market, oanda } = useDaemonStatus()
+  const daemonUp = isConnected || isReachable
   const [now, setNow] = useState(() => new Date())
   const [mounted, setMounted] = useState(false)
 
@@ -29,7 +30,7 @@ export function MarketStatus() {
   }, [])
 
   // Only trust daemon market data when OANDA stream is actively feeding it
-  const trustDaemonMarket = isConnected && market && oanda?.streamConnected === true
+  const trustDaemonMarket = daemonUp && market && oanda?.streamConnected === true
   const open = trustDaemonMarket ? market.isOpen : isMarketExpectedOpen(now)
   const closeLabel = trustDaemonMarket && !market.isOpen ? market.closeLabel : null
 

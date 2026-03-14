@@ -9,6 +9,7 @@ import {
   Sparkles,
   Bot,
   Activity,
+  Shield,
   AlertTriangle,
   type LucideIcon,
 } from "lucide-react"
@@ -27,6 +28,7 @@ const SETTINGS_NAV: SettingsNavItem[] = [
   { label: "TradingView Alerts", href: "/settings/tv-alerts", icon: Radio },
   { label: "AI Analysis", href: "/settings/ai", icon: Sparkles },
   { label: "AI Trader", href: "/settings/ai-trader", icon: Bot },
+  { label: "Security", href: "/settings/security", icon: Shield },
   { label: "System", href: "/settings/system", icon: Activity },
   { label: "Reset", href: "/settings/reset", icon: AlertTriangle, variant: "destructive" },
 ]
