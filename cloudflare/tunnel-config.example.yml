@@ -1,6 +1,7 @@
 # Cloudflare Tunnel configuration for FXFlow
 #
-# Copy this file to ~/.cloudflared/config.yml after running setup-tunnel.sh
+# Copy this file to ~/.cloudflared/config.yml after running scripts/setup-tunnel.sh
+# Or set up manually — see docs/ai/remote-access.md § Named Tunnels
 # Replace <TUNNEL_ID> with your actual tunnel ID.
 
 tunnel: <TUNNEL_ID>
