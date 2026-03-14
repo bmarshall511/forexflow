@@ -5,6 +5,7 @@ import type {
   TradeSource, AnalyticsFilters, PerformanceSummary, InstrumentPerformance,
   SessionPerformance, DayOfWeekPerformance, HourOfDayPerformance,
   SourcePerformance, MfeMaeEntry, EquityCurvePoint,
+  SourcePeriodStats, SourceDetailedPerformance,
 } from "@fxflow/types" // prettier-ignore
 
 const SRC: Record<TradeSource, string> = {
@@ -291,4 +292,123 @@ export async function getEquityCurve(filters?: AnalyticsFilters): Promise<Equity
       tc += count
       return { date, cumulativePL: cum, tradeCount: tc }
     })
+}
+
+// ─── Source Breakdown ───────────────────────────────────────────────────────
+
+const EMPTY_PERIOD: SourcePeriodStats = {
+  trades: 0,
+  wins: 0,
+  losses: 0,
+  winRate: 0,
+  totalPL: 0,
+  avgPL: 0,
+  avgWin: 0,
+  avgLoss: 0,
+  avgRR: 0,
+  profitFactor: 0,
+  expectancy: 0,
+}
+
+function computePeriodStats(rows: Row[]): SourcePeriodStats {
+  if (rows.length === 0) return { ...EMPTY_PERIOD }
+  const g = agg(rows)
+  const wins = rows.filter((t) => t.realizedPL > 0)
+  const losses = rows.filter((t) => t.realizedPL < 0)
+  const grossWin = wins.reduce((s, t) => s + t.realizedPL, 0)
+  const grossLoss = losses.reduce((s, t) => s + Math.abs(t.realizedPL), 0)
+  const avgWin = wins.length > 0 ? grossWin / wins.length : 0
+  const avgLoss = losses.length > 0 ? grossLoss / losses.length : 0
+
+  let rrSum = 0,
+    rrN = 0
+  for (const t of rows) {
+    if (t.stopLoss !== null && t.takeProfit !== null && t.stopLoss !== t.entryPrice) {
+      const risk = Math.abs(t.entryPrice - t.stopLoss)
+      const reward = Math.abs(t.takeProfit - t.entryPrice)
+      if (risk > 0) {
+        rrSum += reward / risk
+        rrN++
+      }
+    }
+  }
+
+  const n = rows.length
+  return {
+    trades: n,
+    wins: g.wins,
+    losses: g.losses,
+    winRate: g.winRate,
+    totalPL: g.totalPL,
+    avgPL: g.avgPL,
+    avgWin,
+    avgLoss: -avgLoss,
+    avgRR: rrN > 0 ? rrSum / rrN : 0,
+    profitFactor: g.profitFactor,
+    expectancy: g.winRate * avgWin - (g.losses / n) * avgLoss,
+  }
+}
+
+function startOfWeek(d: Date): Date {
+  const r = new Date(d)
+  r.setDate(r.getDate() - r.getDay())
+  r.setHours(0, 0, 0, 0)
+  return r
+}
+
+export async function getSourceBreakdown(): Promise<SourceDetailedPerformance[]> {
+  // Fetch all closed trades once (no date filter)
+  const allClosed = await fetchClosed()
+
+  // Fetch open trades for unrealized P&L
+  const openRows = await db.trade.findMany({
+    where: { status: "open" },
+    select: { source: true, metadata: true, realizedPL: true },
+  })
+
+  // Period boundaries
+  const now = new Date()
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
+  const weekStart = startOfWeek(now)
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const yearStart = new Date(now.getFullYear(), 0, 1)
+
+  // Group closed trades by enriched source
+  const closedBySource = groupBy(allClosed, (t) => enrichSource(t.source, t.metadata))
+
+  // Group open trades by enriched source
+  const openBySource = new Map<string, { count: number; unrealizedPL: number }>()
+  for (const o of openRows) {
+    const src = enrichSource(o.source, o.metadata)
+    const entry = openBySource.get(src) ?? { count: 0, unrealizedPL: 0 }
+    entry.count++
+    entry.unrealizedPL += o.realizedPL
+    openBySource.set(src, entry)
+  }
+
+  // Collect all unique sources
+  const allSources = new Set([...closedBySource.keys(), ...openBySource.keys()])
+
+  const results: SourceDetailedPerformance[] = []
+  for (const source of allSources) {
+    const closed = closedBySource.get(source as TradeSource) ?? []
+    const open = openBySource.get(source) ?? { count: 0, unrealizedPL: 0 }
+
+    const filterByDate = (from: Date) => closed.filter((t) => t.closedAt && t.closedAt >= from)
+
+    results.push({
+      source,
+      sourceLabel: SRC[source as TradeSource] ?? source,
+      openTrades: open.count,
+      unrealizedPL: open.unrealizedPL,
+      today: computePeriodStats(filterByDate(todayStart)),
+      thisWeek: computePeriodStats(filterByDate(weekStart)),
+      thisMonth: computePeriodStats(filterByDate(monthStart)),
+      thisYear: computePeriodStats(filterByDate(yearStart)),
+      allTime: computePeriodStats(closed),
+    })
+  }
+
+  return results.sort((a, b) => b.allTime.trades - a.allTime.trades)
 }

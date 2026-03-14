@@ -2868,6 +2868,37 @@ export interface SourcePerformance {
   profitFactor: number
 }
 
+/** Period-level stats for a single trade source. */
+export interface SourcePeriodStats {
+  trades: number
+  wins: number
+  losses: number
+  winRate: number
+  totalPL: number
+  avgPL: number
+  avgWin: number
+  avgLoss: number
+  avgRR: number
+  profitFactor: number
+  expectancy: number
+}
+
+/** Full performance breakdown for a single trade source across time periods. */
+export interface SourceDetailedPerformance {
+  source: string
+  sourceLabel: string
+  /** Currently open trades for this source */
+  openTrades: number
+  /** Unrealized P&L for open trades */
+  unrealizedPL: number
+  /** Stats by period */
+  today: SourcePeriodStats
+  thisWeek: SourcePeriodStats
+  thisMonth: SourcePeriodStats
+  thisYear: SourcePeriodStats
+  allTime: SourcePeriodStats
+}
+
 /** MFE/MAE data point for a single trade. */
 export interface MfeMaeEntry {
   tradeId: string
