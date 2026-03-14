@@ -32,17 +32,24 @@ const EMPTY_SUMMARY: PositionsSummary = {
 }
 
 export function usePositions(): UsePositionsReturn {
-  const { isConnected, oanda, positions, positionsPrices } = useDaemonStatus()
+  const { isConnected, connectionAttempted, oanda, positions, positionsPrices } = useDaemonStatus()
+
+  // Daemon is unreachable: connection was attempted but failed and we have no data
+  const isDaemonDown = connectionAttempted && !isConnected && oanda === null
 
   const isLoaded = positions !== null
-  const isConfigured = oanda?.status !== "unconfigured"
+  const isConfigured = isDaemonDown || oanda?.status !== "unconfigured"
 
   // Health check has run and reported an error (not just "hasn't loaded yet")
-  const hasError = oanda !== null
-    && oanda.status !== "unconfigured"
-    && oanda.lastHealthCheck !== null
-    && !oanda.accountValid
-  const errorMessage = oanda?.errorMessage ?? null
+  const hasError =
+    isDaemonDown ||
+    (oanda !== null &&
+      oanda.status !== "unconfigured" &&
+      oanda.lastHealthCheck !== null &&
+      !oanda.accountValid)
+  const errorMessage = isDaemonDown
+    ? "Daemon is not running. Start it with `pnpm dev` or check for errors."
+    : (oanda?.errorMessage ?? null)
 
   // Accumulate price ticks across partial WebSocket updates (merge, not replace)
   const priceAccumulator = useRef(new Map<string, PositionPriceTick>())
@@ -71,9 +78,10 @@ export function usePositions(): UsePositionsReturn {
 
       const currentPrice = trade.direction === "long" ? tick.bid : tick.ask
       // Compute live unrealized P/L from price movement
-      const unrealizedPL = trade.direction === "long"
-        ? (currentPrice - trade.entryPrice) * trade.currentUnits
-        : (trade.entryPrice - currentPrice) * trade.currentUnits
+      const unrealizedPL =
+        trade.direction === "long"
+          ? (currentPrice - trade.entryPrice) * trade.currentUnits
+          : (trade.entryPrice - currentPrice) * trade.currentUnits
       return {
         ...trade,
         currentPrice,
@@ -88,10 +96,7 @@ export function usePositions(): UsePositionsReturn {
 
     const todayWins = positions.closed.filter((t) => t.outcome === "win").length
     const todayLosses = positions.closed.filter((t) => t.outcome === "loss").length
-    const todayNetPL = positions.closed.reduce(
-      (sum, t) => sum + t.realizedPL + t.financing,
-      0,
-    )
+    const todayNetPL = positions.closed.reduce((sum, t) => sum + t.realizedPL + t.financing, 0)
 
     return {
       pendingCount: positions.pending.length,

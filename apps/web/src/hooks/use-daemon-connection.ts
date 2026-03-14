@@ -19,13 +19,15 @@ import type {
   TradeFinderSetupData,
   TradeFinderScanStatus,
   TradeFinderAutoTradeEvent,
+  AiTraderOpportunityData,
+  AiTraderScanStatus,
+  AiTraderScanProgressData,
+  AiTraderScanLogEntry,
   AnyDaemonMessage,
 } from "@fxflow/types"
 
 const DAEMON_WS_URL =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_DAEMON_URL ?? "ws://localhost:4100")
-    : ""
+  typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_DAEMON_URL ?? "ws://localhost:4100") : ""
 
 const DAEMON_REST_URL =
   typeof window !== "undefined"
@@ -80,6 +82,18 @@ export interface DaemonConnectionState {
   tradeFinderScanStatus: TradeFinderScanStatus | null
   /** Most recent auto-trade event (placed/filled/skipped/cancelled) */
   lastAutoTradeEvent: TradeFinderAutoTradeEvent | null
+  /** Most recent AI Trader opportunity (found or updated) */
+  lastAiTraderOpportunity: AiTraderOpportunityData | null
+  /** Latest AI Trader scan status */
+  lastAiTraderScanStatus: AiTraderScanStatus | null
+  /** Latest AI Trader scan progress (real-time during scans) */
+  lastAiTraderScanProgress: AiTraderScanProgressData | null
+  /** Most recent scan log entry (for real-time activity feed) */
+  lastAiTraderScanLogEntry: AiTraderScanLogEntry | null
+  /** Most recent AI Trader event (trade placed/managed/closed, opportunity removed) */
+  lastAiTraderEvent: Record<string, unknown> | null
+  /** True after the first connection attempt has completed (success or failure) */
+  connectionAttempted: boolean
 }
 
 export function useDaemonConnection(): DaemonConnectionState {
@@ -94,15 +108,46 @@ export function useDaemonConnection(): DaemonConnectionState {
   const [chartPrices, setChartPrices] = useState<PositionsPriceData | null>(null)
   const [tvAlertsStatus, setTVAlertsStatus] = useState<TVAlertsStatusData | null>(null)
   const [lastTVSignal, setLastTVSignal] = useState<TVAlertSignal | null>(null)
-  const [lastAiAnalysisStarted, setLastAiAnalysisStarted] = useState<AiAnalysisStartedMessage["data"] | null>(null)
-  const [lastAiAnalysisUpdate, setLastAiAnalysisUpdate] = useState<AiAnalysisUpdateMessage["data"] | null>(null)
-  const [lastAiAnalysisCompleted, setLastAiAnalysisCompleted] = useState<AiAnalysisCompletedMessage["data"] | null>(null)
-  const [lastAiAutoDisabled, setLastAiAutoDisabled] = useState<AiAutoAnalysisDisabledMessage["data"] | null>(null)
-  const [lastConditionTriggered, setLastConditionTriggered] = useState<ConditionTriggeredMessage["data"] | null>(null)
-  const [lastTradeFinderSetup, setLastTradeFinderSetup] = useState<TradeFinderSetupData | null>(null)
-  const [lastTradeFinderRemoved, setLastTradeFinderRemoved] = useState<{ setupId: string; instrument: string; reason: string } | null>(null)
-  const [tradeFinderScanStatus, setTradeFinderScanStatus] = useState<TradeFinderScanStatus | null>(null)
-  const [lastAutoTradeEvent, setLastAutoTradeEvent] = useState<TradeFinderAutoTradeEvent | null>(null)
+  const [lastAiAnalysisStarted, setLastAiAnalysisStarted] = useState<
+    AiAnalysisStartedMessage["data"] | null
+  >(null)
+  const [lastAiAnalysisUpdate, setLastAiAnalysisUpdate] = useState<
+    AiAnalysisUpdateMessage["data"] | null
+  >(null)
+  const [lastAiAnalysisCompleted, setLastAiAnalysisCompleted] = useState<
+    AiAnalysisCompletedMessage["data"] | null
+  >(null)
+  const [lastAiAutoDisabled, setLastAiAutoDisabled] = useState<
+    AiAutoAnalysisDisabledMessage["data"] | null
+  >(null)
+  const [lastConditionTriggered, setLastConditionTriggered] = useState<
+    ConditionTriggeredMessage["data"] | null
+  >(null)
+  const [lastTradeFinderSetup, setLastTradeFinderSetup] = useState<TradeFinderSetupData | null>(
+    null,
+  )
+  const [lastTradeFinderRemoved, setLastTradeFinderRemoved] = useState<{
+    setupId: string
+    instrument: string
+    reason: string
+  } | null>(null)
+  const [tradeFinderScanStatus, setTradeFinderScanStatus] = useState<TradeFinderScanStatus | null>(
+    null,
+  )
+  const [lastAutoTradeEvent, setLastAutoTradeEvent] = useState<TradeFinderAutoTradeEvent | null>(
+    null,
+  )
+  const [lastAiTraderOpportunity, setLastAiTraderOpportunity] =
+    useState<AiTraderOpportunityData | null>(null)
+  const [lastAiTraderScanStatus, setLastAiTraderScanStatus] = useState<AiTraderScanStatus | null>(
+    null,
+  )
+  const [lastAiTraderScanProgress, setLastAiTraderScanProgress] =
+    useState<AiTraderScanProgressData | null>(null)
+  const [lastAiTraderScanLogEntry, setLastAiTraderScanLogEntry] =
+    useState<AiTraderScanLogEntry | null>(null)
+  const [lastAiTraderEvent, setLastAiTraderEvent] = useState<Record<string, unknown> | null>(null)
+  const [connectionAttempted, setConnectionAttempted] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptRef = useRef(0)
@@ -123,6 +168,7 @@ export function useDaemonConnection(): DaemonConnectionState {
       ws.onopen = () => {
         if (!mountedRef.current) return
         setIsConnected(true)
+        setConnectionAttempted(true)
         reconnectAttemptRef.current = 0
       }
 
@@ -192,25 +238,101 @@ export function useDaemonConnection(): DaemonConnectionState {
               setTradeFinderScanStatus(msg.data)
               break
             case "trade_finder_auto_trade_placed": {
-              const d = msg.data as { setupId: string; instrument: string; direction: string; score: number; sourceId: string; entryPrice: number }
-              setLastAutoTradeEvent({ type: "placed", setupId: d.setupId, instrument: d.instrument, direction: d.direction as "long" | "short", score: d.score, sourceId: d.sourceId, entryPrice: d.entryPrice, timestamp: msg.timestamp })
+              const d = msg.data as {
+                setupId: string
+                instrument: string
+                direction: string
+                score: number
+                sourceId: string
+                entryPrice: number
+              }
+              setLastAutoTradeEvent({
+                type: "placed",
+                setupId: d.setupId,
+                instrument: d.instrument,
+                direction: d.direction as "long" | "short",
+                score: d.score,
+                sourceId: d.sourceId,
+                entryPrice: d.entryPrice,
+                timestamp: msg.timestamp,
+              })
               break
             }
             case "trade_finder_auto_trade_filled": {
-              const d = msg.data as { setupId: string; instrument: string; direction: string; score: number; sourceId: string }
-              setLastAutoTradeEvent({ type: "filled", setupId: d.setupId, instrument: d.instrument, direction: d.direction as "long" | "short", score: d.score, sourceId: d.sourceId, timestamp: msg.timestamp })
+              const d = msg.data as {
+                setupId: string
+                instrument: string
+                direction: string
+                score: number
+                sourceId: string
+              }
+              setLastAutoTradeEvent({
+                type: "filled",
+                setupId: d.setupId,
+                instrument: d.instrument,
+                direction: d.direction as "long" | "short",
+                score: d.score,
+                sourceId: d.sourceId,
+                timestamp: msg.timestamp,
+              })
               break
             }
             case "trade_finder_auto_trade_cancelled": {
-              const d = msg.data as { setupId: string; instrument: string; reason: string; sourceOrderId: string }
-              setLastAutoTradeEvent({ type: "cancelled", setupId: d.setupId, instrument: d.instrument, direction: "long", score: 0, reason: d.reason, sourceId: d.sourceOrderId, timestamp: msg.timestamp })
+              const d = msg.data as {
+                setupId: string
+                instrument: string
+                reason: string
+                sourceOrderId: string
+              }
+              setLastAutoTradeEvent({
+                type: "cancelled",
+                setupId: d.setupId,
+                instrument: d.instrument,
+                direction: "long",
+                score: 0,
+                reason: d.reason,
+                sourceId: d.sourceOrderId,
+                timestamp: msg.timestamp,
+              })
               break
             }
             case "trade_finder_auto_trade_skipped": {
-              const d = msg.data as { setupId: string; instrument: string; score: number; reason: string }
-              setLastAutoTradeEvent({ type: "skipped", setupId: d.setupId, instrument: d.instrument, direction: "long", score: d.score, reason: d.reason, timestamp: msg.timestamp })
+              const d = msg.data as {
+                setupId: string
+                instrument: string
+                score: number
+                reason: string
+              }
+              setLastAutoTradeEvent({
+                type: "skipped",
+                setupId: d.setupId,
+                instrument: d.instrument,
+                direction: "long",
+                score: d.score,
+                reason: d.reason,
+                timestamp: msg.timestamp,
+              })
               break
             }
+            case "ai_trader_opportunity_found":
+            case "ai_trader_opportunity_updated":
+              setLastAiTraderOpportunity(msg.data)
+              break
+            case "ai_trader_scan_status":
+              setLastAiTraderScanStatus(msg.data)
+              break
+            case "ai_trader_scan_progress":
+              setLastAiTraderScanProgress(msg.data)
+              break
+            case "ai_trader_scan_log_entry":
+              setLastAiTraderScanLogEntry(msg.data as AiTraderScanLogEntry)
+              break
+            case "ai_trader_trade_placed":
+            case "ai_trader_trade_managed":
+            case "ai_trader_trade_closed":
+            case "ai_trader_opportunity_removed":
+              setLastAiTraderEvent(msg.data as Record<string, unknown>)
+              break
             case "error":
               console.warn("[daemon-ws] Error from daemon:", msg.data.message)
               break
@@ -223,6 +345,7 @@ export function useDaemonConnection(): DaemonConnectionState {
       ws.onclose = () => {
         if (!mountedRef.current) return
         setIsConnected(false)
+        setConnectionAttempted(true)
         wsRef.current = null
         scheduleReconnect()
       }
@@ -237,10 +360,12 @@ export function useDaemonConnection(): DaemonConnectionState {
 
   function scheduleReconnect() {
     if (!mountedRef.current) return
-    const delay = Math.min(
-      RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptRef.current),
-      RECONNECT_MAX_DELAY,
-    ) + Math.random() * 1000 // jitter to prevent thundering herd
+    const delay =
+      Math.min(
+        RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptRef.current),
+        RECONNECT_MAX_DELAY,
+      ) +
+      Math.random() * 1000 // jitter to prevent thundering herd
     reconnectAttemptRef.current++
     reconnectTimerRef.current = setTimeout(() => connectRef.current(), delay)
   }
@@ -251,7 +376,9 @@ export function useDaemonConnection(): DaemonConnectionState {
     // Fetch initial snapshot via REST (before WS connects)
     if (DAEMON_REST_URL) {
       fetch(`${DAEMON_REST_URL}/status`)
-        .then((res) => (res.ok ? (res.json() as Promise<{ ok: boolean; data: DaemonStatusSnapshot }>) : null))
+        .then((res) =>
+          res.ok ? (res.json() as Promise<{ ok: boolean; data: DaemonStatusSnapshot }>) : null,
+        )
         .then((json) => {
           if (json?.ok && json.data && mountedRef.current) {
             setSnapshot(json.data)
@@ -263,7 +390,7 @@ export function useDaemonConnection(): DaemonConnectionState {
           }
         })
         .catch(() => {
-          // Daemon not available, will get data when WS connects
+          if (mountedRef.current) setConnectionAttempted(true)
         })
     }
 
@@ -280,5 +407,34 @@ export function useDaemonConnection(): DaemonConnectionState {
     }
   }, [])
 
-  return { isConnected, snapshot, oanda, market, lastNotification, accountOverview, positions, setPositions, positionsPrices, chartPrices, tvAlertsStatus, setTVAlertsStatus, lastTVSignal, lastAiAnalysisStarted, lastAiAnalysisUpdate, lastAiAnalysisCompleted, lastAiAutoDisabled, lastConditionTriggered, lastTradeFinderSetup, lastTradeFinderRemoved, tradeFinderScanStatus, lastAutoTradeEvent }
+  return {
+    isConnected,
+    connectionAttempted,
+    snapshot,
+    oanda,
+    market,
+    lastNotification,
+    accountOverview,
+    positions,
+    setPositions,
+    positionsPrices,
+    chartPrices,
+    tvAlertsStatus,
+    setTVAlertsStatus,
+    lastTVSignal,
+    lastAiAnalysisStarted,
+    lastAiAnalysisUpdate,
+    lastAiAnalysisCompleted,
+    lastAiAutoDisabled,
+    lastConditionTriggered,
+    lastTradeFinderSetup,
+    lastTradeFinderRemoved,
+    tradeFinderScanStatus,
+    lastAutoTradeEvent,
+    lastAiTraderOpportunity,
+    lastAiTraderScanStatus,
+    lastAiTraderScanProgress,
+    lastAiTraderScanLogEntry,
+    lastAiTraderEvent,
+  }
 }

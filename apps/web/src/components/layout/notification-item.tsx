@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { X, Sparkles, Target } from "lucide-react"
+import { X, Sparkles, Target, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import type { NotificationData } from "@fxflow/types"
@@ -31,8 +31,10 @@ interface NotificationItemProps {
 }
 
 function SourceIcon({ source }: { source: string }) {
-  if (source === "ai_analysis") return <Sparkles className="size-3 text-primary shrink-0 mt-0.5" />
-  if (source === "trade_condition") return <Target className="size-3 text-cyan-500 shrink-0 mt-0.5" />
+  if (source === "ai_analysis") return <Sparkles className="text-primary mt-0.5 size-3 shrink-0" />
+  if (source === "trade_condition")
+    return <Target className="mt-0.5 size-3 shrink-0 text-cyan-500" />
+  if (source === "ai_trader") return <Bot className="mt-0.5 size-3 shrink-0 text-violet-500" />
   return null
 }
 
@@ -40,11 +42,15 @@ function DeepLink({ notification }: { notification: NotificationData }) {
   if (!notification.metadata) return null
 
   let meta: Record<string, string> = {}
-  try { meta = JSON.parse(notification.metadata) as Record<string, string> } catch { return null }
+  try {
+    meta = JSON.parse(notification.metadata) as Record<string, string>
+  } catch {
+    return null
+  }
 
   if (notification.source === "ai_analysis" && meta.tradeId) {
     return (
-      <Link href="/positions" className="mt-1 inline-flex text-[10px] text-primary hover:underline">
+      <Link href="/positions" className="text-primary mt-1 inline-flex text-[10px] hover:underline">
         View trade on Positions →
       </Link>
     )
@@ -52,8 +58,19 @@ function DeepLink({ notification }: { notification: NotificationData }) {
 
   if (notification.source === "trade_condition" && meta.tradeId) {
     return (
-      <Link href="/positions" className="mt-1 inline-flex text-[10px] text-primary hover:underline">
+      <Link href="/positions" className="text-primary mt-1 inline-flex text-[10px] hover:underline">
         View trade on Positions →
+      </Link>
+    )
+  }
+
+  if (notification.source === "ai_trader") {
+    return (
+      <Link
+        href="/ai-trader"
+        className="mt-1 inline-flex text-[10px] text-violet-500 hover:underline"
+      >
+        View AI Trader →
       </Link>
     )
   }
@@ -76,12 +93,16 @@ export function NotificationItem({ notification, onDismiss, onDelete }: Notifica
       onKeyDown={(e) => {
         if (e.key === "Delete" || e.key === "Backspace") {
           e.preventDefault()
-          dismissed ? onDelete(id) : onDismiss(id)
+          if (dismissed) {
+            onDelete(id)
+          } else {
+            onDismiss(id)
+          }
         }
       }}
     >
       {/* Severity dot or source icon */}
-      {source === "ai_analysis" || source === "trade_condition" ? (
+      {source === "ai_analysis" || source === "trade_condition" || source === "ai_trader" ? (
         <SourceIcon source={source} />
       ) : (
         <span
@@ -96,15 +117,15 @@ export function NotificationItem({ notification, onDismiss, onDelete }: Notifica
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-semibold text-foreground truncate">{title}</span>
-          <span className="shrink-0 text-[11px] text-muted-foreground">
+          <span className="text-foreground truncate text-sm font-semibold">{title}</span>
+          <span className="text-muted-foreground shrink-0 text-[11px]">
             {formatRelativeTime(createdAt)}
           </span>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{message}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{message}</p>
         <DeepLink notification={notification} />
         {dismissed && (
-          <span className="mt-1 inline-block text-[10px] uppercase tracking-wider text-muted-foreground/60">
+          <span className="text-muted-foreground/60 mt-1 inline-block text-[10px] uppercase tracking-wider">
             Dismissed
           </span>
         )}
@@ -116,11 +137,15 @@ export function NotificationItem({ notification, onDismiss, onDelete }: Notifica
         size="icon-sm"
         className={cn(
           "shrink-0 opacity-0 transition-opacity",
-          "group-hover:opacity-100 group-focus-within:opacity-100",
+          "group-focus-within:opacity-100 group-hover:opacity-100",
         )}
         onClick={(e) => {
           e.stopPropagation()
-          dismissed ? onDelete(id) : onDismiss(id)
+          if (dismissed) {
+            onDelete(id)
+          } else {
+            onDismiss(id)
+          }
         }}
         aria-label={dismissed ? `Delete notification: ${title}` : `Dismiss notification: ${title}`}
       >

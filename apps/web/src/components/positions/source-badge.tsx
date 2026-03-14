@@ -29,6 +29,10 @@ const SOURCE_CONFIG: Record<TradeSource, { label: string; className: string }> =
     label: "Trade Finder (Automatic)",
     className: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
   },
+  ai_trader: {
+    label: "AI Trade",
+    className: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+  },
 }
 
 interface SourceBadgeProps {
@@ -41,7 +45,7 @@ export function SourceBadge({ source, className }: SourceBadgeProps) {
   return (
     <Badge
       variant="outline"
-      className={cn("text-[10px] px-1.5 py-0 font-medium", config.className, className)}
+      className={cn("px-1.5 py-0 text-[10px] font-medium", config.className, className)}
     >
       {config.label}
     </Badge>

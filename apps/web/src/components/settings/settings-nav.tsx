@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Landmark, Radio, Search, Sparkles, type LucideIcon } from "lucide-react"
+import { Landmark, Radio, Search, Sparkles, Bot, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface SettingsNavItem {
@@ -16,6 +16,7 @@ const SETTINGS_NAV: SettingsNavItem[] = [
   { label: "Trade Finder", href: "/settings/trade-finder", icon: Search },
   { label: "TradingView Alerts", href: "/settings/tv-alerts", icon: Radio },
   { label: "AI Analysis", href: "/settings/ai", icon: Sparkles },
+  { label: "AI Trader", href: "/settings/ai-trader", icon: Bot },
 ]
 
 export function SettingsNav() {
@@ -34,10 +35,8 @@ export function SettingsNav() {
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   "hover:bg-accent hover:text-accent-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground",
+                  "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
+                  isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
@@ -60,10 +59,8 @@ export function SettingsNav() {
               className={cn(
                 "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 "hover:bg-accent hover:text-accent-foreground",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                isActive
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground",
+                "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
+                isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground",
               )}
               aria-current={isActive ? "page" : undefined}
             >

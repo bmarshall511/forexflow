@@ -1,6 +1,12 @@
 import type { StateManager } from "./state-manager.js"
 import type { PositionManager } from "./positions/position-manager.js"
-import type { AnyDaemonMessage, OandaHealthData, NotificationData, NotificationSource, PositionsData } from "@fxflow/types"
+import type {
+  AnyDaemonMessage,
+  OandaHealthData,
+  NotificationData,
+  NotificationSource,
+  PositionsData,
+} from "@fxflow/types"
 import { createNotification, cleanupOldNotifications } from "@fxflow/db"
 import { formatCurrency } from "@fxflow/shared"
 
@@ -138,7 +144,11 @@ export class NotificationEmitter {
   }
 
   /** Emit a notification from the TV Alerts module. */
-  async emitTVAlert(title: string, message: string, severity: "info" | "warning" | "critical" = "info"): Promise<void> {
+  async emitTVAlert(
+    title: string,
+    message: string,
+    severity: "info" | "warning" | "critical" = "info",
+  ): Promise<void> {
     await this.emit({
       severity,
       source: "tv_alerts",
@@ -148,10 +158,28 @@ export class NotificationEmitter {
   }
 
   /** Emit a notification from the Trade Finder module. */
-  async emitTradeFinder(title: string, message: string, severity: "info" | "warning" | "critical" = "info"): Promise<void> {
+  async emitTradeFinder(
+    title: string,
+    message: string,
+    severity: "info" | "warning" | "critical" = "info",
+  ): Promise<void> {
     await this.emit({
       severity,
       source: "trade_finder",
+      title,
+      message,
+    })
+  }
+
+  /** Emit a notification from the AI Trader module. */
+  async emitAiTrader(
+    title: string,
+    message: string,
+    severity: "info" | "warning" | "critical" = "info",
+  ): Promise<void> {
+    await this.emit({
+      severity,
+      source: "ai_trader",
       title,
       message,
     })

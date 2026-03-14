@@ -5,7 +5,15 @@ import { resolve } from "path"
 // dotenv won't override vars already set, so .env.local takes precedence.
 dotenv.config({ path: resolve(process.cwd(), ".env.local") })
 dotenv.config({ path: resolve(process.cwd(), ".env") })
-import { startServer, setCFWorkerClient, setTVAlertsState, setConditionMonitor, setTradeFinderScanner, setDigestGenerator } from "./server.js"
+import {
+  startServer,
+  setCFWorkerClient,
+  setTVAlertsState,
+  setConditionMonitor,
+  setTradeFinderScanner,
+  setDigestGenerator,
+  setAiTraderScanner,
+} from "./server.js"
 import { StateManager } from "./state-manager.js"
 import { CredentialWatcher } from "./db/credential-watcher.js"
 import { OandaStreamClient } from "./oanda/stream-client.js"
@@ -25,6 +33,7 @@ import { ConditionMonitor } from "./ai/condition-monitor.js"
 import { AutoAnalyzer } from "./ai/auto-analyzer.js"
 import { DigestGenerator } from "./ai/digest-generator.js"
 import { TradeFinderScanner } from "./trade-finder/scanner.js"
+import { AiTraderScanner } from "./ai-trader/scanner.js"
 import { getConfig } from "./config.js"
 import type { AnyDaemonMessage } from "@fxflow/types"
 
@@ -158,13 +167,17 @@ async function main() {
 
   // Refresh TV alerts active count + daily P&L when positions change
   positionManager.onPositionsChange((positions) => {
-    const autoCount = positions.open.filter((t) => tvAlertsState.isAutoTrade(t.sourceTradeId)).length
+    const autoCount = positions.open.filter((t) =>
+      tvAlertsState.isAutoTrade(t.sourceTradeId),
+    ).length
     tvAlertsState.setActiveAutoPositions(autoCount)
 
     // Refresh daily P&L from DB (async, best-effort)
-    void import("@fxflow/db").then(({ getTodayAutoTradePL }) =>
-      getTodayAutoTradePL().then((pl) => tvAlertsState.updateDailyPL(pl)),
-    ).catch(() => {})
+    void import("@fxflow/db")
+      .then(({ getTodayAutoTradePL }) =>
+        getTodayAutoTradePL().then((pl) => tvAlertsState.updateDailyPL(pl)),
+      )
+      .catch(() => {})
   })
 
   // Wire TV alerts status broadcasts
@@ -184,9 +197,11 @@ async function main() {
   setConditionMonitor(conditionMonitor)
   await conditionMonitor.start()
 
-  // Wire price ticks to condition monitor (via PositionPriceTracker — the actual pricing stream)
+  // Wire price ticks to condition monitor + AI Trader (via PositionPriceTracker — the actual pricing stream)
   positionPriceTracker.onPriceTick = (tick) => {
     conditionMonitor.onPriceTick(tick)
+    const mid = (tick.bid + tick.ask) / 2
+    aiTraderScanner.onPriceTick(tick.instrument, mid)
   }
 
   // 12c. Auto Analyzer — automatically analyzes trades on lifecycle events
@@ -213,26 +228,32 @@ async function main() {
     void autoAnalyzer.onOrderFilled(tradeId)
     // Check if this fill corresponds to a Trade Finder auto-placed setup
     void tradeFinderScanner.onOrderFilled(tradeId)
+    // Check if this fill corresponds to an AI Trader opportunity
+    void aiTraderScanner.onOrderFilled(tradeId)
   }
   tradeSyncer.onTradeClosed = (tradeId) => {
     void autoAnalyzer.onTradeClosed(tradeId)
     // Cancel all active conditions for the trade when it closes
-    void import("@fxflow/db").then(({ cancelConditionsForTrade }) =>
-      cancelConditionsForTrade(tradeId)
-    ).catch(() => {})
+    void import("@fxflow/db")
+      .then(({ cancelConditionsForTrade }) => cancelConditionsForTrade(tradeId))
+      .catch(() => {})
     // Resolve recommendation outcomes for accuracy tracking
-    void import("@fxflow/db").then(async ({ resolveOutcomes, db }) => {
-      const trade = await db.trade.findUnique({
-        where: { id: tradeId },
-        select: { realizedPL: true },
+    void import("@fxflow/db")
+      .then(async ({ resolveOutcomes, db }) => {
+        const trade = await db.trade.findUnique({
+          where: { id: tradeId },
+          select: { realizedPL: true },
+        })
+        if (trade) {
+          const outcome = trade.realizedPL > 0 ? "win" : trade.realizedPL < 0 ? "loss" : "breakeven"
+          await resolveOutcomes(tradeId, outcome, trade.realizedPL)
+          // Notify AI Trader of closed trade
+          void aiTraderScanner.onTradeClosed(tradeId, trade.realizedPL)
+        }
       })
-      if (trade) {
-        const outcome = trade.realizedPL > 0 ? "win" : trade.realizedPL < 0 ? "loss" : "breakeven"
-        await resolveOutcomes(tradeId, outcome, trade.realizedPL)
-      }
-    }).catch((err) =>
-      console.warn("[daemon] Failed to resolve recommendation outcomes:", (err as Error).message)
-    )
+      .catch((err) =>
+        console.warn("[daemon] Failed to resolve recommendation outcomes:", (err as Error).message),
+      )
   }
 
   // 12d. Trade Finder Scanner
@@ -269,6 +290,12 @@ async function main() {
   )
 
   await tradeFinderScanner.start()
+
+  // 12e. AI Trader Scanner — autonomous trade discovery and management
+  const aiTraderScanner = new AiTraderScanner(stateManager, tradeSyncer, positionManager, broadcast)
+  aiTraderScanner.setNotificationEmitter(notificationEmitter)
+  setAiTraderScanner(aiTraderScanner)
+  await aiTraderScanner.start()
 
   // Resolve CF Worker URL: DB config > env var > local wrangler dev fallback
   {
@@ -317,6 +344,7 @@ async function main() {
     autoAnalyzer.stop()
     digestGenerator.stop()
     tradeFinderScanner.stop()
+    aiTraderScanner.stop()
     process.exit(0)
   }
   process.on("SIGINT", shutdown)

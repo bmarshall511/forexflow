@@ -7,8 +7,12 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "FXFlow",
+  title: {
+    default: "FXFlow",
+    template: "%s | FXFlow",
+  },
   description: "Forex trading platform",
+  applicationName: "FXFlow",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -21,21 +21,28 @@ export interface AccountOverviewState {
 }
 
 export function useAccountOverview(): AccountOverviewState {
-  const { oanda, accountOverview } = useDaemonStatus()
+  const { isConnected, connectionAttempted, oanda, accountOverview } = useDaemonStatus()
+
+  // Daemon is unreachable: connection was attempted but failed and we have no data
+  const isDaemonDown = connectionAttempted && !isConnected && oanda === null
 
   // Health check has run and reported an error (not just "hasn't loaded yet")
-  const hasError = oanda !== null
-    && oanda.status !== "unconfigured"
-    && oanda.lastHealthCheck !== null
-    && !oanda.accountValid
+  const hasError =
+    isDaemonDown ||
+    (oanda !== null &&
+      oanda.status !== "unconfigured" &&
+      oanda.lastHealthCheck !== null &&
+      !oanda.accountValid)
 
   return {
     data: accountOverview,
     isLoaded: accountOverview !== null,
     isAccountValid: oanda?.accountValid ?? false,
-    isConfigured: oanda?.status !== "unconfigured",
+    isConfigured: isDaemonDown || oanda?.status !== "unconfigured",
     hasError,
-    errorMessage: oanda?.errorMessage ?? null,
+    errorMessage: isDaemonDown
+      ? "Daemon is not running. Start it with `pnpm dev` or check for errors."
+      : (oanda?.errorMessage ?? null),
     tradingMode: oanda?.tradingMode ?? "practice",
   }
 }

@@ -7,28 +7,27 @@ import { HeaderPositions } from "./header-positions"
 import { TradingModeToggle } from "./trading-mode-toggle"
 import { MarketStatus } from "./market-status"
 
-import { KillSwitchButton } from "./kill-switch-button"
-import { AutoTradeButton } from "./auto-trade-button"
+import { AutomationControls } from "./automation-controls"
 import { NotificationBell } from "./notification-bell"
 import { ThemeToggle } from "./theme-toggle"
 
 export function Header() {
   return (
     <header
-      className="sticky top-0 z-40 flex h-[var(--header-height)] shrink-0 items-center border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 flex h-[var(--header-height)] shrink-0 items-center border-b px-3 backdrop-blur"
       role="banner"
     >
       {/* Container query wrapper — children respond to available header width, not viewport */}
-      <div className="@container/header flex flex-1 items-center min-w-0">
+      <div className="@container/header flex min-w-0 flex-1 items-center">
         {/* Mobile: hamburger (hidden when container >= 512px) */}
-        <div className="flex items-center gap-2 @lg/header:hidden">
+        <div className="@lg/header:hidden flex items-center gap-2">
           <MobileSidebarToggle />
         </div>
 
         {/* Left cluster: account info, positions, system health */}
-        <div className="flex items-center gap-1 @xl/header:gap-1.5">
+        <div className="@xl/header:gap-1.5 flex items-center gap-1">
           <HeaderAccountInfo />
-          <div className="hidden @xl/header:flex">
+          <div className="@xl/header:flex hidden">
             <HeaderPositions />
           </div>
           <HeaderSystemHealth />
@@ -37,12 +36,11 @@ export function Header() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Right cluster: mode toggle → market status → TV alerts → bell → theme */}
-        <div className="flex items-center gap-1 @xl/header:gap-2">
+        {/* Right cluster: mode toggle → market status → automation → bell → theme */}
+        <div className="@xl/header:gap-2 flex items-center gap-1">
           <TradingModeToggle />
           <MarketStatus />
-          <KillSwitchButton />
-          <AutoTradeButton />
+          <AutomationControls />
           <NotificationBell />
           <ThemeToggle />
         </div>

@@ -23,6 +23,13 @@ export function useTradeFinderConfig() {
     void fetchConfig()
   }, [fetchConfig])
 
+  // Listen for cross-instance config changes (e.g. header toggle → settings page)
+  useEffect(() => {
+    const handler = () => void fetchConfig()
+    window.addEventListener("trade-finder-config-changed", handler)
+    return () => window.removeEventListener("trade-finder-config-changed", handler)
+  }, [fetchConfig])
+
   const update = useCallback(async (partial: Partial<TradeFinderConfigData>) => {
     const res = await fetch("/api/trade-finder/config", {
       method: "PUT",
@@ -32,6 +39,7 @@ export function useTradeFinderConfig() {
     const json = await res.json()
     if (json.ok) setConfig(json.data)
     else throw new Error(json.error)
+    window.dispatchEvent(new Event("trade-finder-config-changed"))
   }, [])
 
   return { config, isLoading, update, refresh: fetchConfig }

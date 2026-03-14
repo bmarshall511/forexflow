@@ -1,4 +1,14 @@
-import { LayoutDashboard, Crosshair, LineChart, Radio, Settings, Sparkles, Search, type LucideIcon } from "lucide-react"
+import {
+  LayoutDashboard,
+  Crosshair,
+  LineChart,
+  Radio,
+  Settings,
+  Sparkles,
+  Search,
+  Bot,
+  type LucideIcon,
+} from "lucide-react"
 
 // Layout dimensions (px)
 export const HEADER_HEIGHT = 56
@@ -37,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Trade Finder", href: "/trade-finder", icon: Search, badgeKey: "tradeFinder" },
       { label: "TradingView Alerts", href: "/tv-alerts", icon: Radio, badgeKey: "tvAlerts" },
       { label: "AI Analysis", href: "/ai-analysis", icon: Sparkles, badgeKey: "aiAnalysis" },
+      { label: "AI Trader", href: "/ai-trader", icon: Bot, badgeKey: "aiTrader" },
     ],
   },
   {

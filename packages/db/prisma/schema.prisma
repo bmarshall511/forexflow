@@ -408,3 +408,115 @@ model TradeFinderSetup {
   @@index([status, detectedAt])
   @@index([autoPlaced, placedAt])
 }
+
+// ─── AI Trader ──────────────────────────────────────────────────────────────
+
+model AiTraderConfig {
+  id                     Int      @id @default(1)
+  enabled                Boolean  @default(false)
+  operatingMode          String   @default("manual") // "manual" | "semi_auto" | "full_auto"
+  scanIntervalMinutes    Int      @default(30)
+  confidenceThreshold    Int      @default(70) // For semi/full auto execution
+  minimumConfidence      Int      @default(50) // Below this, never suggest
+  maxConcurrentTrades    Int      @default(5)
+  pairWhitelist          String   @default("[]") // JSON: string[]
+  enabledProfiles        String   @default("{}") // JSON: Record<AiTraderProfile, boolean>
+  enabledTechniques      String   @default("{}") // JSON: Record<AiTraderTechnique, boolean>
+  managementConfig       String   @default("{}") // JSON: AiTraderManagementConfig
+  reEvalIntervalMinutes  Int      @default(60)
+  dailyBudgetUsd         Float    @default(5.0)
+  monthlyBudgetUsd       Float    @default(100.0)
+  scanModel              String   @default("claude-haiku-4-5-20251001")
+  decisionModel          String   @default("claude-sonnet-4-6")
+  fredApiKey             String?  // AES-256-GCM encrypted
+  alphaVantageApiKey     String?  // AES-256-GCM encrypted
+  updatedAt              DateTime @updatedAt
+}
+
+model AiTraderOpportunity {
+  id                  String    @id @default(uuid())
+  instrument          String
+  direction           String    // "long" | "short"
+  profile             String    // "scalper" | "intraday" | "swing" | "news"
+  status              String    @default("detected")
+  confidence          Int       @default(0) // 0-100
+  scoresJson          String    @default("{}") // JSON: AiTraderScoreBreakdown
+  entryPrice          Float
+  stopLoss            Float
+  takeProfit          Float
+  riskPips            Float
+  rewardPips          Float
+  riskRewardRatio     Float
+  positionSize        Int       @default(0)
+  regime              String?   // AiTraderMarketRegime
+  session             String?   // AiTraderSession
+  primaryTechnique    String?   // AiTraderTechnique
+  entryRationale      String?   // AI-generated explanation
+  technicalSnapshot   String    @default("{}") // JSON: indicators, zones, structure
+  fundamentalSnapshot String    @default("{}") // JSON: macro, calendar, COT
+  sentimentSnapshot   String    @default("{}") // JSON: news sentiment
+  tier2Response       String?   // Haiku scan response
+  tier2Model          String?   // Claude model used for scan
+  tier2InputTokens    Int       @default(0)
+  tier2OutputTokens   Int       @default(0)
+  tier2Cost           Float     @default(0)
+  tier3Response       String?   // Deep analysis response
+  tier3Model          String?   // Claude model used for decision
+  tier3InputTokens    Int       @default(0)
+  tier3OutputTokens   Int       @default(0)
+  tier3Cost           Float     @default(0)
+  resultTradeId       String?   // FK to Trade.id once placed
+  resultSourceId      String?   // OANDA order/trade ID
+  realizedPL          Float?    // Final P&L once closed
+  outcome             String?   // "win" | "loss" | "breakeven"
+  managementLog       String    @default("[]") // JSON: AiTraderManagementAction[]
+  detectedAt          DateTime  @default(now())
+  suggestedAt         DateTime?
+  placedAt            DateTime?
+  filledAt            DateTime?
+  closedAt            DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([instrument, status])
+  @@index([status, confidence])
+  @@index([profile, status])
+  @@index([detectedAt])
+  @@index([resultTradeId])
+}
+
+model AiTraderMarketData {
+  id        String   @id @default(uuid())
+  dataType  String   // AiTraderMarketDataType
+  dataKey   String   // e.g. "USD", "EUR_USD", "NFP", "global"
+  data      String   // JSON payload
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([dataType, dataKey, expiresAt])
+  @@index([dataType, expiresAt])
+}
+
+model AiTraderStrategyPerformance {
+  id           String   @id @default(uuid())
+  profile      String   // AiTraderProfile
+  instrument   String?  // null = all instruments
+  session      String?  // null = all sessions
+  technique    String?  // Primary technique, null = all
+  periodStart  DateTime
+  periodEnd    DateTime
+  totalTrades  Int      @default(0)
+  wins         Int      @default(0)
+  losses       Int      @default(0)
+  breakevens   Int      @default(0)
+  totalPL      Float    @default(0)
+  avgRR        Float    @default(0)
+  profitFactor Float    @default(0)
+  expectancy   Float    @default(0)
+  maxDrawdown  Float    @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@index([profile, instrument, periodStart])
+  @@index([profile, periodStart])
+}
