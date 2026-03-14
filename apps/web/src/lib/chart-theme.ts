@@ -80,3 +80,49 @@ export const lightTheme: ChartTheme = {
 export function getChartTheme(isDark: boolean): ChartTheme {
   return isDark ? darkTheme : lightTheme
 }
+
+// ─── Recharts Theme ──────────────────────────────────────────────────────────
+
+export interface RechartsTheme {
+  profit: string
+  loss: string
+  neutral: string
+  accent: string
+  grid: string
+  axis: string
+  tooltip: {
+    bg: string
+    border: string
+    text: string
+  }
+  funnel: [string, string, string]
+  sessionColors: [string, string, string]
+}
+
+const rechartsLight: RechartsTheme = {
+  profit: "#16a34a",
+  loss: "#dc2626",
+  neutral: "#6b7280",
+  accent: "#6366f1",
+  grid: "rgba(0,0,0,0.06)",
+  axis: "rgba(0,0,0,0.4)",
+  tooltip: { bg: "#ffffff", border: "#e4e4e7", text: "#18181b" },
+  funnel: ["#6366f1", "#3b82f6", "#22c55e"],
+  sessionColors: ["#f59e0b", "#3b82f6", "#22c55e"],
+}
+
+const rechartsDark: RechartsTheme = {
+  profit: "#22c55e",
+  loss: "#ef4444",
+  neutral: "#6b7280",
+  accent: "#818cf8",
+  grid: "rgba(255,255,255,0.04)",
+  axis: "rgba(255,255,255,0.4)",
+  tooltip: { bg: "#18181b", border: "#27272a", text: "#fafafa" },
+  funnel: ["#818cf8", "#60a5fa", "#34d399"],
+  sessionColors: ["#fbbf24", "#60a5fa", "#34d399"],
+}
+
+export function getRechartsTheme(isDark: boolean): RechartsTheme {
+  return isDark ? rechartsDark : rechartsLight
+}

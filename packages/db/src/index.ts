@@ -180,6 +180,9 @@ export {
   markSignalAsTest,
   getSignalPeriodPnL,
   getAutoTradesSummary,
+  getSignalPnLDistribution,
+  getSignalRecentResults,
+  getSignalsByPair,
   type CreateSignalInput,
   type ListSignalsOptions,
 } from "./tv-alerts-signal-service"

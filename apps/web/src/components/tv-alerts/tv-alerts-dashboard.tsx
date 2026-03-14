@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useCallback } from "react"
 import Link from "next/link"
 import { TVAlertsStatusCards } from "./tv-alerts-status-cards"
 import { TVAlertsPerformance } from "./tv-alerts-performance"
@@ -8,48 +8,34 @@ import { TVAlertsSignalTable } from "./tv-alerts-signal-table"
 import { TabNav, TabNavButton } from "@/components/ui/tab-nav"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
-import { useTVAlertsStats } from "@/hooks/use-tv-alerts-stats"
 import { useTVAlertsConfig } from "@/hooks/use-tv-alerts-config"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { Settings2, Zap, BarChart3, Radio } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
-import type { TVAlertSignal } from "@fxflow/types"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
 type Tab = "overview" | "signals"
 
 export function TVAlertsDashboard() {
-  const { stats, isLoading: statsLoading, refresh: refreshStats } = useTVAlertsStats()
   const { config, isLoading: configLoading } = useTVAlertsConfig()
-  const { lastTVSignal, tvAlertsStatus, setTVAlertsStatus } = useDaemonStatus()
-  const lastSignalRef = useRef<TVAlertSignal | null>(null)
+  const { tvAlertsStatus, setTVAlertsStatus } = useDaemonStatus()
   const [tab, setTab] = useState<Tab>("overview")
 
-  // Refresh stats whenever a new signal arrives via WebSocket
-  useEffect(() => {
-    if (!lastTVSignal || lastTVSignal === lastSignalRef.current) return
-    lastSignalRef.current = lastTVSignal
-    void refreshStats()
-  }, [lastTVSignal, refreshStats])
-
-  // Called by TVAlertsSignalTable after clearing signal history.
   const handleAfterClear = useCallback(() => {
-    void refreshStats()
     if (tvAlertsStatus) {
       setTVAlertsStatus({ ...tvAlertsStatus, signalCountToday: 0, lastSignalAt: null })
     }
     fetch(`${DAEMON_URL}/actions/tv-alerts/reset-signal-history`, { method: "POST" }).catch(() => {
       /* best-effort */
     })
-  }, [refreshStats, tvAlertsStatus, setTVAlertsStatus])
+  }, [tvAlertsStatus, setTVAlertsStatus])
 
   const signalCount = tvAlertsStatus?.signalCountToday ?? 0
   const isUnconfigured = !configLoading && config && !config.cfWorkerUrl && !config.webhookToken
 
   return (
     <div className="min-h-screen">
-      {/* ─── Hero Header ─── */}
       <PageHeader
         title={
           <>
@@ -72,7 +58,6 @@ export function TVAlertsDashboard() {
         {!isUnconfigured && <TVAlertsStatusCards />}
       </PageHeader>
 
-      {/* ─── Unconfigured Empty State ─── */}
       {isUnconfigured && (
         <div className="px-4 py-6 md:px-6">
           <EmptyState
@@ -84,7 +69,6 @@ export function TVAlertsDashboard() {
         </div>
       )}
 
-      {/* ─── Tab Navigation ─── */}
       {!isUnconfigured && (
         <>
           <TabNav label="TV Alerts sections">
@@ -105,9 +89,8 @@ export function TVAlertsDashboard() {
             />
           </TabNav>
 
-          {/* ─── Tab Content ─── */}
           <div className="space-y-4 px-4 py-6 md:px-6">
-            {tab === "overview" && <TVAlertsPerformance stats={stats} isLoading={statsLoading} />}
+            {tab === "overview" && <TVAlertsPerformance />}
             {tab === "signals" && <TVAlertsSignalTable onStatsRefresh={handleAfterClear} />}
           </div>
         </>

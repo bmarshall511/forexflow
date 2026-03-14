@@ -52,6 +52,7 @@ src/
   - `SectionCard` — `components/ui/section-card.tsx`
   - `Select` (Radix-based) — `components/ui/select.tsx`
 - **Toast**: Sonner via `components/ui/sonner.tsx`.
+- **In-app docs**: `components/docs/` — renders `README.md` + `docs/ai/*.md` via `/api/docs` route and `lib/markdown.ts` (zero-dependency markdown-to-HTML). Sidebar nav + card content with `.prose-fxflow` styles in `globals.css`.
 
 ## Page Layout Pattern
 

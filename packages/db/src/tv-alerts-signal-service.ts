@@ -13,11 +13,15 @@ import type {
   TVAlertSignal,
   TVAlertStatus,
   TVExecutionDetails,
+  TVSignalDirection,
   TVWebhookPayload,
   TVSignalPerformanceStats,
   TVSignalListResponse,
   TVSignalPeriodPnL,
   TVSignalPeriodPnLData,
+  TVSignalPnLBucket,
+  TVSignalRecentResult,
+  TVSignalPairStats,
 } from "@fxflow/types"
 
 // ─── Input Types ──────────────────────────────────────────────────────────────
@@ -618,4 +622,160 @@ export async function cleanupOldSignals(days: number): Promise<number> {
 export async function clearAllSignals(): Promise<number> {
   const { count } = await db.tVAlertSignal.deleteMany()
   return count
+}
+
+// ─── Detailed Performance ─────────────────────────────────────────────────────
+
+/** Compute P&L distribution histogram from executed signals with realized P&L. */
+export async function getSignalPnLDistribution(opts?: {
+  from?: Date
+  to?: Date
+}): Promise<TVSignalPnLBucket[]> {
+  const where: Record<string, unknown> = { status: "executed", executionDetails: { not: null } }
+  if (opts?.from || opts?.to) {
+    const receivedAt: Record<string, Date> = {}
+    if (opts?.from) receivedAt.gte = opts.from
+    if (opts?.to) receivedAt.lte = opts.to
+    where.receivedAt = receivedAt
+  }
+
+  const signals = await db.tVAlertSignal.findMany({
+    where,
+    select: { executionDetails: true },
+  })
+
+  const pls: number[] = []
+  for (const sig of signals) {
+    try {
+      const details = JSON.parse(sig.executionDetails!) as TVExecutionDetails
+      if (details.realizedPL !== undefined) pls.push(details.realizedPL)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (pls.length === 0) return []
+
+  const min = Math.min(...pls)
+  const max = Math.max(...pls)
+  const range = max - min
+  if (range === 0) {
+    return [{ min: min - 1, max: max + 1, label: `$${min.toFixed(0)}`, count: pls.length }]
+  }
+
+  const TARGET_BUCKETS = 10
+  const rawStep = range / TARGET_BUCKETS
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)))
+  const step = Math.ceil(rawStep / mag) * mag
+  const start = Math.floor(min / step) * step
+
+  const bucketMap = new Map<number, number>()
+  for (const pl of pls) {
+    const bucketStart = Math.floor((pl - start) / step) * step + start
+    bucketMap.set(bucketStart, (bucketMap.get(bucketStart) ?? 0) + 1)
+  }
+
+  return Array.from(bucketMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([bucketStart, count]) => ({
+      min: bucketStart,
+      max: bucketStart + step,
+      label: `$${bucketStart.toFixed(0)}`,
+      count,
+    }))
+}
+
+/** Get the most recent closed signal trade results. */
+export async function getSignalRecentResults(
+  limit = 10,
+  opts?: { from?: Date; to?: Date },
+): Promise<TVSignalRecentResult[]> {
+  const where: Record<string, unknown> = {
+    status: "executed",
+    executionDetails: { not: null },
+    resultTradeId: { not: null },
+  }
+  if (opts?.from || opts?.to) {
+    const receivedAt: Record<string, Date> = {}
+    if (opts?.from) receivedAt.gte = opts.from
+    if (opts?.to) receivedAt.lte = opts.to
+    where.receivedAt = receivedAt
+  }
+
+  const signals = await db.tVAlertSignal.findMany({
+    where,
+    orderBy: { processedAt: "desc" },
+    take: limit * 2,
+    select: {
+      id: true,
+      instrument: true,
+      direction: true,
+      executionDetails: true,
+      processedAt: true,
+    },
+  })
+
+  const results: TVSignalRecentResult[] = []
+  for (const sig of signals) {
+    if (results.length >= limit) break
+    try {
+      const details = JSON.parse(sig.executionDetails!) as TVExecutionDetails
+      if (details.realizedPL === undefined) continue
+      results.push({
+        signalId: sig.id,
+        instrument: sig.instrument,
+        direction: sig.direction as TVSignalDirection,
+        realizedPL: details.realizedPL,
+        processedAt: sig.processedAt?.toISOString() ?? new Date().toISOString(),
+      })
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return results
+}
+
+/** Get signal volume and outcome breakdown grouped by instrument. */
+export async function getSignalsByPair(opts?: {
+  from?: Date
+  to?: Date
+}): Promise<TVSignalPairStats[]> {
+  const where: Record<string, unknown> = {}
+  if (opts?.from || opts?.to) {
+    const receivedAt: Record<string, Date> = {}
+    if (opts?.from) receivedAt.gte = opts.from
+    if (opts?.to) receivedAt.lte = opts.to
+    where.receivedAt = receivedAt
+  }
+
+  const signals = await db.tVAlertSignal.findMany({
+    where,
+    select: { instrument: true, status: true, direction: true },
+  })
+
+  const map = new Map<string, TVSignalPairStats>()
+  for (const sig of signals) {
+    let entry = map.get(sig.instrument)
+    if (!entry) {
+      entry = {
+        instrument: sig.instrument,
+        total: 0,
+        executed: 0,
+        rejected: 0,
+        failed: 0,
+        buys: 0,
+        sells: 0,
+      }
+      map.set(sig.instrument, entry)
+    }
+    entry.total++
+    if (sig.status === "executed") entry.executed++
+    else if (sig.status === "rejected" || sig.status === "skipped") entry.rejected++
+    else if (sig.status === "failed") entry.failed++
+    if (sig.direction === "buy") entry.buys++
+    else if (sig.direction === "sell") entry.sells++
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.total - a.total)
 }

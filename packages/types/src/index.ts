@@ -1203,6 +1203,60 @@ export interface TVSignalPeriodPnL {
 /** Period-based P&L breakdown for TV alerts, keyed by time period. */
 export type TVSignalPeriodPnLData = Record<PnLPeriod, TVSignalPeriodPnL>
 
+/** A single bucket in a P&L distribution histogram. */
+export interface TVSignalPnLBucket {
+  /** Lower bound of the bucket (inclusive). */
+  min: number
+  /** Upper bound of the bucket (exclusive). */
+  max: number
+  /** Human-readable label (e.g., "$-20 to $-10"). */
+  label: string
+  /** Number of trades in this bucket. */
+  count: number
+}
+
+/** A recent signal trade result for the activity feed. */
+export interface TVSignalRecentResult {
+  /** Signal ID. */
+  signalId: string
+  /** OANDA instrument (e.g., "EUR_USD"). */
+  instrument: string
+  /** Trade direction. */
+  direction: TVSignalDirection
+  /** Realized P&L (net of financing). */
+  realizedPL: number
+  /** When the signal was processed. */
+  processedAt: string
+}
+
+/** Signal volume and outcome breakdown for a single instrument. */
+export interface TVSignalPairStats {
+  /** OANDA instrument (e.g., "EUR_USD"). */
+  instrument: string
+  /** Total signals received for this pair. */
+  total: number
+  /** Signals that were executed. */
+  executed: number
+  /** Signals that were rejected or skipped. */
+  rejected: number
+  /** Signals that failed. */
+  failed: number
+  /** Buy signals count. */
+  buys: number
+  /** Sell signals count. */
+  sells: number
+}
+
+/** Combined detailed stats returned by the /api/tv-alerts/stats/detailed endpoint. */
+export interface TVAlertsDetailedStats {
+  /** P&L distribution histogram buckets. */
+  distribution: TVSignalPnLBucket[]
+  /** Most recent closed signal trade results. */
+  recentResults: TVSignalRecentResult[]
+  /** Signal volume breakdown by instrument. */
+  signalsByPair: TVSignalPairStats[]
+}
+
 // ─── CF Worker ↔ Daemon Messages ───────────────────────────────────────────
 
 /** CF Worker → Daemon message types */
