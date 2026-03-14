@@ -1,0 +1,228 @@
+---
+import Docs from "../../layouts/Docs.astro"
+---
+
+<Docs title="Documentation" description="ForexFlow documentation — setup, configuration, architecture, and feature guides.">
+  <h1>Documentation</h1>
+  <p>
+    ForexFlow is a self-hosted, AI-powered forex trading platform that connects to your
+    <a href="https://www.oanda.com/" target="_blank" rel="noopener noreferrer">OANDA</a> broker account.
+    It gives you a real-time command center for managing positions, automating trades, and
+    analyzing every decision with AI.
+  </p>
+
+  <h2 id="quickstart">Quick Start</h2>
+
+  <h3>Prerequisites</h3>
+  <table>
+    <thead>
+      <tr><th>Requirement</th><th>Version</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Node.js</strong></td><td>&gt;= 22</td><td><a href="https://nodejs.org/" target="_blank" rel="noopener noreferrer">Download</a></td></tr>
+      <tr><td><strong>pnpm</strong></td><td>&gt;= 10</td><td><code>npm install -g pnpm</code></td></tr>
+      <tr><td><strong>OANDA account</strong></td><td>-</td><td><a href="https://www.oanda.com/apply/" target="_blank" rel="noopener noreferrer">Free practice account</a></td></tr>
+      <tr><td>Cloudflare account</td><td>-</td><td><em>Optional</em> — for TradingView alerts</td></tr>
+      <tr><td>Anthropic API key</td><td>-</td><td><em>Optional</em> — for AI features</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1. Clone and install</h3>
+  <pre><code>git clone https://github.com/bmarshall511/forexflow.git
+cd forexflow
+pnpm install</code></pre>
+
+  <h3>2. Generate Prisma client</h3>
+  <pre><code>pnpm --filter @fxflow/db db:generate</code></pre>
+
+  <h3>3. Configure environment</h3>
+  <pre><code># Copy example env files
+cp apps/daemons/.env.example apps/daemons/.env.local
+cp apps/web/.env.example apps/web/.env.local
+
+# Generate an encryption key
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
+  <p>Paste the generated encryption key into <strong>both</strong> <code>.env.local</code> files as the <code>ENCRYPTION_KEY</code> value.</p>
+
+  <h3>4. Initialize and start</h3>
+  <pre><code>mkdir -p data
+pnpm --filter @fxflow/db db:migrate
+pnpm dev</code></pre>
+  <p>
+    This starts the <strong>web app</strong> at <code>http://localhost:3000</code> and the
+    <strong>daemon</strong> at <code>http://localhost:4100</code>.
+  </p>
+
+  <hr />
+
+  <h2 id="configuration">Configuration</h2>
+
+  <h3>Daemon Environment Variables</h3>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>DATABASE_URL</code></td><td>Yes</td><td>-</td><td>Prisma database URL</td></tr>
+      <tr><td><code>ENCRYPTION_KEY</code></td><td>Yes</td><td>-</td><td>64-char hex for AES-256-GCM encryption</td></tr>
+      <tr><td><code>CF_WORKER_WS_URL</code></td><td>No</td><td>-</td><td>Cloudflare Worker WebSocket URL</td></tr>
+      <tr><td><code>CF_WORKER_DAEMON_SECRET</code></td><td>No</td><td>-</td><td>Worker auth secret</td></tr>
+      <tr><td><code>DAEMON_PORT</code></td><td>No</td><td><code>4100</code></td><td>HTTP + WebSocket port</td></tr>
+      <tr><td><code>DAEMON_TRADE_RECONCILE_INTERVAL</code></td><td>No</td><td><code>120000</code></td><td>OANDA sync interval (ms)</td></tr>
+      <tr><td><code>DAEMON_PRICE_THROTTLE</code></td><td>No</td><td><code>500</code></td><td>Price broadcast throttle (ms)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Web App Environment Variables</h3>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>DATABASE_URL</code></td><td>Yes</td><td>-</td><td>Must match daemon's DATABASE_URL</td></tr>
+      <tr><td><code>ENCRYPTION_KEY</code></td><td>Yes</td><td>-</td><td>Must match daemon's ENCRYPTION_KEY</td></tr>
+      <tr><td><code>NEXT_PUBLIC_DAEMON_REST_URL</code></td><td>Yes</td><td><code>http://localhost:4100</code></td><td>Daemon REST API URL</td></tr>
+      <tr><td><code>NEXT_PUBLIC_DAEMON_URL</code></td><td>Yes</td><td><code>ws://localhost:4100</code></td><td>Daemon WebSocket URL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Cloudflare Worker (optional)</h3>
+  <ol>
+    <li>Copy <code>apps/cf-worker/.dev.vars.example</code> to <code>.dev.vars</code></li>
+    <li>Set <code>WEBHOOK_TOKEN</code> and <code>DAEMON_SECRET</code></li>
+    <li>Deploy: <code>pnpm --filter @fxflow/cf-worker deploy</code></li>
+    <li>Set matching values in daemon env</li>
+  </ol>
+
+  <h3>AI Features (optional)</h3>
+  <p>
+    AI features require an Anthropic API key. Configure at <strong>Settings &gt; AI</strong> for
+    per-trade analysis or <strong>Settings &gt; AI Trader</strong> for autonomous scanning.
+    Keys are encrypted at rest using AES-256-GCM.
+  </p>
+
+  <hr />
+
+  <h2 id="monorepo">Monorepo Layout</h2>
+  <pre><code>apps/
+  web/           Next.js 15 App Router — frontend + 50+ API routes
+  daemons/       Node.js daemon — 13+ subsystems, port 4100
+  cf-worker/     Cloudflare Worker + Durable Objects — webhook relay
+  mcp-server/    MCP server — Claude Code integration
+
+packages/
+  types/         Shared TypeScript contracts (DTOs, WebSocket messages)
+  shared/        Pure utilities (market hours, pip math, zone detection)
+  db/            Prisma ORM + SQLite, 22+ models, 24 service files</code></pre>
+
+  <h3>Import Boundaries (strict)</h3>
+  <ul>
+    <li><code>apps/*</code> may import from <code>packages/*</code></li>
+    <li><code>apps/web</code> must NOT import from <code>apps/daemons</code> or <code>apps/cf-worker</code></li>
+    <li><code>packages/*</code> must NOT import from <code>apps/*</code></li>
+    <li>Keep runtime-specific code out of <code>packages/shared</code> and <code>packages/types</code></li>
+  </ul>
+
+  <hr />
+
+  <h2 id="signal-flow">Signal Flow</h2>
+  <h3>TradingView Alerts</h3>
+  <pre><code>TradingView Alert
+  → Cloudflare Worker (IP validation, dedup, queuing)
+    → Daemon WebSocket
+      → SignalProcessor (9 safety checks)
+        → OANDA order execution</code></pre>
+
+  <h3>Trade Finder (Zone Scanner)</h3>
+  <p>
+    Scans all configured pairs across timeframes, detects supply/demand zones, scores them on
+    7 dimensions, and auto-places limit orders when enabled. Dual-path fill detection:
+    event-driven (instant via transaction stream) + periodic fallback polling.
+  </p>
+
+  <h3>AI Trader (Autonomous Scanner)</h3>
+  <pre><code>Tier 1: Local TA (14 techniques) → candidates
+Tier 2: Claude Haiku fast filter → pass/fail
+Tier 3: Claude Sonnet deep decision → execute/hold</code></pre>
+
+  <hr />
+
+  <h2 id="realtime">Real-Time Patterns</h2>
+  <p>
+    The daemon maintains a single WebSocket connection per client. All state updates flow
+    through this connection using typed message envelopes with 50+ discriminated message types.
+  </p>
+  <ul>
+    <li>Price ticks are throttled to 500ms to prevent UI thrashing</li>
+    <li>Optimistic updates for trade actions (close, modify)</li>
+    <li>Exponential backoff reconnection (5s initial, 60s max)</li>
+    <li>REST polling fallback when WebSocket is unavailable</li>
+  </ul>
+
+  <hr />
+
+  <h2 id="dashboard">Dashboard</h2>
+  <p>
+    The trading command center. Live account balance, equity, margin, and P&amp;L updating over
+    WebSocket. Open positions with sub-second price updates, activity feed, automation status,
+    AI insights, market calendar, and source performance breakdown.
+  </p>
+
+  <h2 id="tv-alerts">TradingView Automation</h2>
+  <p>
+    Receive TradingView webhook alerts via a Cloudflare Worker relay. 9 safety checks before
+    execution: kill switch, market hours filter, per-instrument cooldowns, max open positions,
+    daily loss circuit breaker, pair whitelist, duplicate detection, connectivity verification,
+    and conflicting position detection. Full signal audit trail and performance statistics.
+  </p>
+
+  <h2 id="trade-finder">Trade Finder</h2>
+  <p>
+    An automated supply/demand zone scanner. Detects zones across multiple timeframes using
+    candle classification (leg/base/neutral). Scores on 7 "Odds Enhancers": strength, time,
+    freshness, trend alignment, curve position, profit zone, and commodity correlation.
+    Auto-places limit orders with calculated SL/TP and dual-path fill detection.
+  </p>
+
+  <h2 id="ai-analysis">AI Trade Analysis</h2>
+  <p>
+    Every trade analyzed by Claude with rich structured context: candle data across 3
+    timeframes, RSI/ATR/EMA indicators, historical win rate, live news events, correlated pair
+    analysis. Outputs include trade quality score, win probability, risk assessment, and
+    executable conditions that evaluate on every price tick with sub-millisecond latency.
+  </p>
+
+  <h2 id="ai-trader">AI Trader</h2>
+  <p>
+    Autonomous 3-tier analysis pipeline. Tier 1 runs 14 local TA techniques across configured
+    pairs. Tier 2 uses Claude Haiku for fast pass/fail filtering. Tier 3 uses Claude Sonnet
+    for deep multi-timeframe analysis with fundamental data, sentiment, and risk assessment.
+    Operating modes: Manual (review all), Semi-Auto (auto-execute high confidence), and
+    Full Auto (fully autonomous). 4 profiles: Scalper, Intraday, Swing, and News.
+  </p>
+
+  <h2 id="remote-access">Remote Access</h2>
+  <p>
+    Access from any device with zero configuration. <code>pnpm dev</code> auto-starts a
+    Cloudflare Quick Tunnel with a random HTTPS URL. PIN authentication with lockout protection,
+    session management, rate limiting. Installable as a PWA on mobile for a native-like experience.
+  </p>
+
+  <hr />
+
+  <h2>Development Commands</h2>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>pnpm dev</code></td><td>Start all apps in dev mode</td></tr>
+      <tr><td><code>pnpm build</code></td><td>Production build</td></tr>
+      <tr><td><code>pnpm lint</code></td><td>ESLint across workspaces</td></tr>
+      <tr><td><code>pnpm typecheck</code></td><td><code>tsc --noEmit</code> across workspaces</td></tr>
+      <tr><td><code>pnpm test</code></td><td>Vitest with coverage</td></tr>
+      <tr><td><code>pnpm format</code></td><td>Prettier format</td></tr>
+      <tr><td><code>pnpm knip</code></td><td>Find unused exports/dependencies</td></tr>
+    </tbody>
+  </table>
+</Docs>

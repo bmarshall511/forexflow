@@ -20,7 +20,10 @@
     "knip": "knip",
     "docs:api": "typedoc",
     "changelog": "auto-changelog --template keepachangelog --commit-limit false --unreleased",
-    "postinstall": "lefthook install"
+    "postinstall": "lefthook install",
+    "site:dev": "pnpm --filter @fxflow/site dev",
+    "site:build": "pnpm --filter @fxflow/site build",
+    "site:preview": "pnpm --filter @fxflow/site preview"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.4",

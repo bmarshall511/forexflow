@@ -1,0 +1,154 @@
+---
+import SectionHeading from "./SectionHeading.astro"
+import FeatureCard from "./FeatureCard.astro"
+
+// SVG icons inline (Lucide-style, 20x20)
+const icons = {
+  dashboard: `<svg class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>`,
+  zap: `<svg class="h-5 w-5 text-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+  search: `<svg class="h-5 w-5 text-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>`,
+  brain: `<svg class="h-5 w-5 text-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2a6 6 0 0 0-6 6c0 3 2 5 3 7h6c1-2 3-4 3-7a6 6 0 0 0-6-6z"/><path d="M9 15v3a3 3 0 0 0 6 0v-3"/><path d="M9 18h6"/></svg>`,
+  bot: `<svg class="h-5 w-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/></svg>`,
+  chart: `<svg class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 16 4-8 4 4 4-8"/></svg>`,
+  list: `<svg class="h-5 w-5 text-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>`,
+  globe: `<svg class="h-5 w-5 text-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+}
+
+const primaryFeatures = [
+  {
+    title: "Real-Time Dashboard",
+    description: "Your trading command center with live data over WebSocket.",
+    icon: icons.dashboard,
+    color: "accent",
+    bullets: [
+      "Live P&L, equity, margin, and drawdown",
+      "Open positions with sub-second price updates",
+      "Activity feed, AI insights, and automation status",
+      "Market calendar with economic events",
+    ],
+  },
+  {
+    title: "TradingView Automation",
+    description: "Receive webhooks and auto-execute trades through a safety pipeline.",
+    icon: icons.zap,
+    color: "green",
+    bullets: [
+      "Cloudflare Worker relay with IP validation",
+      "9 safety checks before execution",
+      "Per-instrument cooldowns and circuit breaker",
+      "Full signal audit trail and performance stats",
+    ],
+  },
+  {
+    title: "Trade Finder",
+    description: "Automated supply/demand zone scanner with auto-trading.",
+    icon: icons.search,
+    color: "amber",
+    bullets: [
+      "Multi-timeframe zone detection and classification",
+      "7 Odds Enhancer scoring dimensions",
+      "Auto-places limit orders at high-scoring zones",
+      "Dual fill detection: event-driven + fallback",
+    ],
+  },
+  {
+    title: "AI Trade Analysis",
+    description: "Every trade analyzed by Claude with rich structured context.",
+    icon: icons.brain,
+    color: "blue",
+    bullets: [
+      "Candle data, indicators, and historical win rate",
+      "Executable conditions activated with one click",
+      "Auto-analysis on fill, close, or interval",
+      "Weekly/monthly performance digests",
+    ],
+  },
+  {
+    title: "AI Trader",
+    description: "Autonomous 3-tier analysis pipeline for trade discovery.",
+    icon: icons.bot,
+    color: "indigo",
+    bullets: [
+      "Tier 1: Local TA with 14 techniques",
+      "Tier 2: Claude Haiku fast filter",
+      "Tier 3: Claude Sonnet deep decision",
+      "Manual, Semi-Auto, and Full Auto modes",
+    ],
+  },
+]
+
+const secondaryFeatures = [
+  {
+    title: "Multi-Panel Charts",
+    description: "TradingView Lightweight Charts with overlays and order entry.",
+    icon: icons.chart,
+    color: "accent",
+    bullets: [
+      "1x1 through 2x2 grid layouts",
+      "Draggable SL/TP lines on chart",
+      "Supply/demand zone and trend overlays",
+    ],
+  },
+  {
+    title: "Position Management",
+    description: "Full trade lifecycle management with real-time tracking.",
+    icon: icons.list,
+    color: "green",
+    bullets: [
+      "MFE/MAE tracking per trade",
+      "Partial closes, SL/TP modification",
+      "Filter by instrument, direction, source, tags",
+    ],
+  },
+  {
+    title: "Remote Access",
+    description: "Access from any device with zero configuration.",
+    icon: icons.globe,
+    color: "blue",
+    bullets: [
+      "Cloudflare Tunnel auto-starts in dev",
+      "PIN auth with lockout protection",
+      "Installable as a PWA on mobile",
+    ],
+  },
+]
+---
+
+<section id="features" class="py-24" aria-label="Features">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHeading
+      title="Everything you need to trade smarter"
+      subtitle="Five major systems working together — from real-time monitoring to fully autonomous AI trading."
+    />
+
+    <!-- Primary features: 5 cards -->
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {
+        primaryFeatures.map((feature) => (
+          <FeatureCard
+            title={feature.title}
+            description={feature.description}
+            icon={feature.icon}
+            color={feature.color}
+            bullets={feature.bullets}
+          />
+        ))
+      }
+    </div>
+
+    <!-- Secondary features: 3 cards -->
+    <div class="mt-6 grid gap-6 md:grid-cols-3">
+      {
+        secondaryFeatures.map((feature) => (
+          <FeatureCard
+            title={feature.title}
+            description={feature.description}
+            icon={feature.icon}
+            color={feature.color}
+            bullets={feature.bullets}
+          />
+        ))
+      }
+    </div>
+  </div>
+</section>

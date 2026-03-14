@@ -1,0 +1,57 @@
+---
+const base = "/forexflow"
+
+const links = [
+  { label: "GitHub", href: "https://github.com/bmarshall511/forexflow", external: true },
+  { label: "Documentation", href: `${base}/docs/` },
+  { label: "API Reference", href: `${base}/docs/api/` },
+  { label: "Changelog", href: `${base}/changelog/` },
+  { label: "License (AGPL-3.0)", href: "https://github.com/bmarshall511/forexflow/blob/main/LICENSE", external: true },
+  { label: "Security Policy", href: "https://github.com/bmarshall511/forexflow/blob/main/.github/SECURITY.md", external: true },
+  { label: "Contributing", href: "https://github.com/bmarshall511/forexflow/blob/main/CONTRIBUTING.md", external: true },
+]
+---
+
+<footer class="border-t border-border py-12" aria-label="Footer">
+  <div class="mx-auto max-w-6xl px-6">
+    <div class="flex flex-col items-center gap-8 sm:flex-row sm:items-start sm:justify-between">
+      <!-- Logo & tagline -->
+      <div class="text-center sm:text-left">
+        <a href={`${base}/`} aria-label="ForexFlow home">
+          <img src={`${base}/logos/logo-white.png`} alt="ForexFlow" class="mx-auto h-6 sm:mx-0" loading="lazy" />
+        </a>
+        <p class="mt-2 text-sm text-text-muted">Self-hosted, AI-powered forex trading platform.</p>
+      </div>
+
+      <!-- Links -->
+      <nav class="flex flex-wrap justify-center gap-x-6 gap-y-2" aria-label="Footer navigation">
+        {
+          links.map((link) => (
+            <a
+              href={link.href}
+              class="text-sm text-text-muted transition-colors hover:text-text"
+              {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            >
+              {link.label}
+            </a>
+          ))
+        }
+      </nav>
+    </div>
+
+    <!-- Disclaimer & attribution -->
+    <div class="mt-10 border-t border-border pt-6 text-center">
+      <p class="text-xs leading-relaxed text-text-faint">
+        ForexFlow is provided as-is for educational and personal use. It is not financial advice.
+        Trading forex involves significant risk of loss. The authors are not responsible for any
+        trading losses incurred through use of this software. Use at your own risk.
+      </p>
+      <p class="mt-4 text-xs text-text-faint">
+        Built with
+        <a href="https://claude.ai/claude-code" class="text-text-muted hover:text-text" target="_blank" rel="noopener noreferrer">
+          Claude Code
+        </a>
+      </p>
+    </div>
+  </div>
+</footer>

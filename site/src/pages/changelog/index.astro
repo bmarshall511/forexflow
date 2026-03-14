@@ -1,0 +1,54 @@
+---
+import Docs from "../../layouts/Docs.astro"
+import { readFile } from "node:fs/promises"
+import { resolve } from "node:path"
+
+// Read CHANGELOG.md from project root at build time
+let changelogContent = ""
+try {
+  const changelogPath = resolve(process.cwd(), "../CHANGELOG.md")
+  changelogContent = await readFile(changelogPath, "utf-8")
+} catch {
+  changelogContent = "Changelog not yet generated. Run `pnpm changelog` to generate."
+}
+
+// Simple markdown-to-HTML conversion for changelog format
+function parseChangelog(md: string): string {
+  return md
+    // Remove the title line (first # heading)
+    .replace(/^# .+\n+/, "")
+    // H2 (## headings = version sections)
+    .replace(/^## (.+)$/gm, '<h2 id="$1">$1</h2>')
+    // H3 (### headings = change categories)
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    // List items
+    .replace(/^- (.+)$/gm, "<li>$1</li>")
+    // Wrap consecutive <li> in <ul>
+    .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
+    // Inline code
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    // Bold
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    // Links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    // Paragraphs (non-tag lines)
+    .replace(/^(?!<[a-z])((?!^\s*$).+)$/gm, "<p>$1</p>")
+    // Clean up empty lines
+    .replace(/\n{3,}/g, "\n\n")
+}
+
+const changelogHtml = parseChangelog(changelogContent)
+---
+
+<Docs title="Changelog" description="ForexFlow release history and changes." currentPage="changelog">
+  <h1>Changelog</h1>
+  <p>
+    All notable changes to ForexFlow are documented here. This changelog is auto-generated
+    from <a href="https://www.conventionalcommits.org/" target="_blank" rel="noopener noreferrer">Conventional Commits</a>
+    using <code>pnpm changelog</code>.
+  </p>
+
+  <hr />
+
+  <Fragment set:html={changelogHtml} />
+</Docs>

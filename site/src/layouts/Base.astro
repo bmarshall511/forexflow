@@ -1,0 +1,79 @@
+---
+interface Props {
+  title?: string
+  description?: string
+  ogImage?: string
+}
+
+const {
+  title = "ForexFlow — Self-hosted AI-powered Forex Trading Platform",
+  description = "Open-source, self-hosted forex trading platform built with Claude Code. Real-time dashboard, TradingView automation, AI trade analysis, autonomous trading.",
+  ogImage = "/forexflow/og-image.png",
+} = Astro.props
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site)
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- SEO -->
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta
+      name="keywords"
+      content="self-hosted trading platform, AI forex trading, Claude Code project, open source trading, TradingView automation, forex, OANDA"
+    />
+    <link rel="canonical" href={canonicalURL} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:site_name" content="ForexFlow" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/forexflow/logos/small-logo-white.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- JSON-LD -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ForexFlow",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Cross-platform",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "Self-hosted, AI-powered forex trading platform with real-time dashboard, TradingView automation, and autonomous trading.",
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html"
+      }
+    </script>
+  </head>
+  <body class="min-h-screen bg-bg text-text">
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  @import "../styles/global.css";
+</style>

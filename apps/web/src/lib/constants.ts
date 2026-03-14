@@ -10,6 +10,7 @@ import {
   Bell,
   TrendingUp,
   Shield,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react"
 
@@ -58,6 +59,9 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "System",
-    items: [{ label: "Settings", href: "/settings", icon: Settings }],
+    items: [
+      { label: "Documentation", href: "/docs", icon: BookOpen },
+      { label: "Settings", href: "/settings", icon: Settings },
+    ],
   },
 ]

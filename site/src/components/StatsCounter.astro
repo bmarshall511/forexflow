@@ -1,0 +1,24 @@
+---
+const stats = [
+  { value: "~58,000", label: "Lines of TypeScript" },
+  { value: "401", label: "Files" },
+  { value: "~3 weeks", label: "Development time" },
+  { value: "22+", label: "Database models" },
+  { value: "50+", label: "WebSocket events" },
+]
+---
+
+<section class="border-y border-border bg-bg-surface py-12" aria-label="Project statistics">
+  <div class="mx-auto max-w-6xl px-6">
+    <dl class="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-5">
+      {
+        stats.map((stat) => (
+          <div class="text-center">
+            <dt class="text-xs font-medium tracking-wider text-text-muted uppercase">{stat.label}</dt>
+            <dd class="mt-2 text-3xl font-bold tracking-tight font-mono">{stat.value}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>

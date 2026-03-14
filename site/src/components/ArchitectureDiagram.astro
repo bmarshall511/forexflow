@@ -1,0 +1,128 @@
+---
+import SectionHeading from "./SectionHeading.astro"
+---
+
+<section id="architecture" class="border-t border-border bg-bg-surface py-24" aria-label="Architecture">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHeading
+      title="Architecture"
+      subtitle="A TypeScript monorepo with 4 apps and 3 shared packages — the daemon is the central hub."
+    />
+
+    <!-- SVG Diagram -->
+    <div class="mx-auto max-w-4xl">
+      <svg viewBox="0 0 800 520" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full" role="img" aria-label="ForexFlow architecture diagram showing data flow between components">
+        <title>ForexFlow Architecture Diagram</title>
+
+        <!-- Connection lines (drawn first, behind boxes) -->
+        <!-- TradingView to CF Worker -->
+        <line x1="100" y1="80" x2="280" y2="80" stroke="oklch(0.4 0.004 285)" stroke-width="1.5" stroke-dasharray="6 3" />
+        <polygon points="278,76 286,80 278,84" fill="oklch(0.4 0.004 285)" />
+
+        <!-- CF Worker to Daemon -->
+        <line x1="380" y1="110" x2="380" y2="180" stroke="oklch(0.723 0.219 149.579)" stroke-width="1.5" />
+        <polygon points="376,178 380,186 384,178" fill="oklch(0.723 0.219 149.579)" />
+
+        <!-- Daemon to Next.js (WebSocket, bidirectional) -->
+        <line x1="300" y1="240" x2="180" y2="240" stroke="oklch(0.7 0.15 285)" stroke-width="1.5" />
+        <polygon points="182,236 174,240 182,244" fill="oklch(0.7 0.15 285)" />
+        <line x1="180" y1="250" x2="300" y2="250" stroke="oklch(0.7 0.15 285)" stroke-width="1.5" />
+        <polygon points="298,246 306,250 298,254" fill="oklch(0.7 0.15 285)" />
+
+        <!-- Daemon to OANDA -->
+        <line x1="500" y1="245" x2="600" y2="245" stroke="oklch(0.623 0.214 259.815)" stroke-width="1.5" />
+        <polygon points="598,241 606,245 598,249" fill="oklch(0.623 0.214 259.815)" />
+        <line x1="600" y1="255" x2="500" y2="255" stroke="oklch(0.623 0.214 259.815)" stroke-width="1.5" />
+        <polygon points="502,251 494,255 502,259" fill="oklch(0.623 0.214 259.815)" />
+
+        <!-- Both to SQLite -->
+        <line x1="130" y1="290" x2="350" y2="400" stroke="oklch(0.4 0.004 285)" stroke-width="1.5" stroke-dasharray="4 3" />
+        <line x1="400" y1="300" x2="400" y2="390" stroke="oklch(0.4 0.004 285)" stroke-width="1.5" stroke-dasharray="4 3" />
+
+        <!-- Next.js to Tunnel -->
+        <line x1="130" y1="290" x2="130" y2="390" stroke="oklch(0.4 0.004 285)" stroke-width="1.5" stroke-dasharray="4 3" />
+        <polygon points="126,388 130,396 134,388" fill="oklch(0.4 0.004 285)" />
+
+        <!-- Tunnel to Phone -->
+        <line x1="130" y1="440" x2="130" y2="470" stroke="oklch(0.4 0.004 285)" stroke-width="1.5" stroke-dasharray="4 3" />
+        <polygon points="126,468 130,476 134,468" fill="oklch(0.4 0.004 285)" />
+
+        <!-- ===== BOXES ===== -->
+
+        <!-- TradingView -->
+        <rect x="20" y="55" width="160" height="50" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.274 0.006 286.033)" stroke-width="1" />
+        <text x="100" y="77" text-anchor="middle" fill="oklch(0.556 0.005 285.823)" font-size="11" font-family="Inter, sans-serif">TradingView</text>
+        <text x="100" y="93" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">Webhook alerts</text>
+
+        <!-- CF Worker -->
+        <rect x="280" y="55" width="200" height="50" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.768 0.189 80.932)" stroke-width="1" />
+        <text x="380" y="77" text-anchor="middle" fill="oklch(0.768 0.189 80.932)" font-size="11" font-weight="600" font-family="Inter, sans-serif">Cloudflare Worker</text>
+        <text x="380" y="93" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">Durable Object relay</text>
+
+        <!-- Label: webhook -->
+        <text x="190" y="72" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="8" font-family="monospace">POST /webhook</text>
+
+        <!-- Label: WebSocket -->
+        <text x="360" y="155" text-anchor="end" fill="oklch(0.723 0.219 149.579)" font-size="8" font-family="monospace">WebSocket</text>
+
+        <!-- Next.js Web App -->
+        <rect x="30" y="210" width="200" height="80" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.7 0.15 285)" stroke-width="1" />
+        <text x="130" y="237" text-anchor="middle" fill="oklch(0.7 0.15 285)" font-size="12" font-weight="600" font-family="Inter, sans-serif">Next.js Web App</text>
+        <text x="130" y="255" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">Frontend + 50+ API routes</text>
+        <text x="130" y="270" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">React 19 + Tailwind CSS 4</text>
+
+        <!-- Label: WebSocket bidirectional -->
+        <text x="240" y="232" text-anchor="middle" fill="oklch(0.7 0.15 285)" font-size="8" font-family="monospace">WebSocket</text>
+        <text x="240" y="262" text-anchor="middle" fill="oklch(0.7 0.15 285)" font-size="8" font-family="monospace">real-time</text>
+
+        <!-- Daemon -->
+        <rect x="300" y="195" width="200" height="110" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.723 0.219 149.579)" stroke-width="1.5" />
+        <text x="400" y="222" text-anchor="middle" fill="oklch(0.723 0.219 149.579)" font-size="12" font-weight="700" font-family="Inter, sans-serif">Node.js Daemon</text>
+        <text x="400" y="240" text-anchor="middle" fill="oklch(0.556 0.005 285.823)" font-size="9" font-family="Inter, sans-serif">13+ subsystems, port 4100</text>
+        <text x="400" y="258" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">Trade sync, signals, AI,</text>
+        <text x="400" y="271" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">zone scanner, autonomous trader</text>
+        <text x="400" y="290" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">HTTP REST + WebSocket broadcast</text>
+
+        <!-- OANDA -->
+        <rect x="600" y="215" width="170" height="70" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.623 0.214 259.815)" stroke-width="1" />
+        <text x="685" y="242" text-anchor="middle" fill="oklch(0.623 0.214 259.815)" font-size="12" font-weight="600" font-family="Inter, sans-serif">OANDA API</text>
+        <text x="685" y="258" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">REST + SSE streams</text>
+        <text x="685" y="271" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">Prices & transactions</text>
+
+        <!-- Labels: REST + Streams -->
+        <text x="550" y="237" text-anchor="middle" fill="oklch(0.623 0.214 259.815)" font-size="8" font-family="monospace">REST API</text>
+        <text x="550" y="267" text-anchor="middle" fill="oklch(0.623 0.214 259.815)" font-size="8" font-family="monospace">SSE streams</text>
+
+        <!-- SQLite -->
+        <rect x="320" y="390" width="160" height="50" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.274 0.006 286.033)" stroke-width="1" />
+        <text x="400" y="412" text-anchor="middle" fill="oklch(0.556 0.005 285.823)" font-size="11" font-weight="600" font-family="Inter, sans-serif">SQLite</text>
+        <text x="400" y="428" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">Prisma ORM, 22+ models</text>
+
+        <!-- Cloudflare Tunnel -->
+        <rect x="50" y="395" width="160" height="45" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.274 0.006 286.033)" stroke-width="1" stroke-dasharray="4 3" />
+        <text x="130" y="414" text-anchor="middle" fill="oklch(0.556 0.005 285.823)" font-size="10" font-family="Inter, sans-serif">Cloudflare Tunnel</text>
+        <text x="130" y="428" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="8" font-family="Inter, sans-serif">optional, HTTPS</text>
+
+        <!-- Phone -->
+        <rect x="75" y="475" width="110" height="35" rx="8" fill="oklch(0.18 0.006 285.823)" stroke="oklch(0.274 0.006 286.033)" stroke-width="1" stroke-dasharray="4 3" />
+        <text x="130" y="497" text-anchor="middle" fill="oklch(0.4 0.004 285.823)" font-size="9" font-family="Inter, sans-serif">Phone / PWA</text>
+      </svg>
+    </div>
+
+    <!-- Legend -->
+    <div class="mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-6 text-xs text-text-muted">
+      <div class="flex items-center gap-2">
+        <span class="h-0.5 w-5 bg-accent"></span> Apps
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="h-0.5 w-5 bg-green"></span> Daemon (hub)
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="h-0.5 w-5 bg-blue"></span> External APIs
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="h-0.5 w-5 border-t border-dashed border-text-faint"></span> Data / Optional
+      </div>
+    </div>
+  </div>
+</section>
