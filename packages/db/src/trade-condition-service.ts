@@ -1,3 +1,12 @@
+/**
+ * Trade condition service — manages price-triggered conditions attached to trades.
+ *
+ * Supports condition creation, chaining (parent/child), status transitions,
+ * expiration, and crash recovery. Conditions are monitored by the daemon's
+ * ConditionMonitor and can trigger actions like notifications or SL adjustments.
+ *
+ * @module trade-condition-service
+ */
 import { db } from "./client"
 import { safeJsonParse } from "./utils"
 import type {
@@ -9,6 +18,13 @@ import type {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Map a Prisma condition row to the `TradeConditionData` DTO,
+ * deserializing JSON fields for trigger value and action params.
+ *
+ * @param row - Raw condition row from Prisma
+ * @returns Serialized condition data for the API/UI
+ */
 function toConditionData(row: {
   id: string
   tradeId: string
@@ -31,9 +47,17 @@ function toConditionData(row: {
     id: row.id,
     tradeId: row.tradeId,
     triggerType: row.triggerType as TradeConditionTriggerType,
-    triggerValue: safeJsonParse<Record<string, unknown>>(row.triggerValue, {}, `condition ${row.id} triggerValue`),
+    triggerValue: safeJsonParse<Record<string, unknown>>(
+      row.triggerValue,
+      {},
+      `condition ${row.id} triggerValue`,
+    ),
     actionType: row.actionType as TradeConditionActionType,
-    actionParams: safeJsonParse<Record<string, unknown>>(row.actionParams, {}, `condition ${row.id} actionParams`),
+    actionParams: safeJsonParse<Record<string, unknown>>(
+      row.actionParams,
+      {},
+      `condition ${row.id} actionParams`,
+    ),
     status: row.status as TradeConditionStatus,
     label: row.label,
     createdBy: row.createdBy as "user" | "ai",
@@ -49,6 +73,7 @@ function toConditionData(row: {
 
 // ─── Input types ─────────────────────────────────────────────────────────────
 
+/** Fields required to create a new trade condition. */
 export interface CreateConditionInput {
   tradeId: string
   triggerType: TradeConditionTriggerType
@@ -66,6 +91,13 @@ export interface CreateConditionInput {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+/**
+ * Create a new trade condition. Conditions with a parent start in "waiting" status
+ * and are activated when the parent triggers. Standalone conditions start as "active".
+ *
+ * @param input - Condition creation parameters
+ * @returns The created condition data
+ */
 export async function createCondition(input: CreateConditionInput): Promise<TradeConditionData> {
   const row = await db.tradeCondition.create({
     data: {
@@ -86,6 +118,13 @@ export async function createCondition(input: CreateConditionInput): Promise<Trad
   return toConditionData(row)
 }
 
+/**
+ * Partially update a condition's configuration (trigger, action, label, etc.).
+ *
+ * @param id - Condition ID
+ * @param updates - Fields to update
+ * @returns The updated condition data, or null on failure
+ */
 export async function updateCondition(
   id: string,
   updates: Partial<{
@@ -109,7 +148,9 @@ export async function updateCondition(
         ...(updates.actionParams ? { actionParams: JSON.stringify(updates.actionParams) } : {}),
         ...(updates.label !== undefined ? { label: updates.label } : {}),
         ...(updates.priority !== undefined ? { priority: updates.priority } : {}),
-        ...(updates.parentConditionId !== undefined ? { parentConditionId: updates.parentConditionId } : {}),
+        ...(updates.parentConditionId !== undefined
+          ? { parentConditionId: updates.parentConditionId }
+          : {}),
         ...(updates.expiresAt !== undefined
           ? { expiresAt: updates.expiresAt ? new Date(updates.expiresAt) : null }
           : {}),
@@ -122,6 +163,13 @@ export async function updateCondition(
   }
 }
 
+/**
+ * Update a condition's status, optionally recording when it was triggered.
+ *
+ * @param id - Condition ID
+ * @param status - New status to set
+ * @param triggeredAt - Optional timestamp when the condition was triggered
+ */
 export async function updateConditionStatus(
   id: string,
   status: TradeConditionStatus,
@@ -133,6 +181,12 @@ export async function updateConditionStatus(
   })
 }
 
+/**
+ * Delete a condition by ID. Returns false if the condition was not found.
+ *
+ * @param id - Condition ID to delete
+ * @returns True if deleted, false if not found or deletion failed
+ */
 export async function deleteCondition(id: string): Promise<boolean> {
   try {
     await db.tradeCondition.delete({ where: { id } })
@@ -143,6 +197,12 @@ export async function deleteCondition(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * List all conditions attached to a specific trade, ordered by priority then creation date.
+ *
+ * @param tradeId - Trade ID to list conditions for
+ * @returns Array of condition data
+ */
 export async function listConditionsForTrade(tradeId: string): Promise<TradeConditionData[]> {
   const rows = await db.tradeCondition.findMany({
     where: { tradeId },
@@ -172,6 +232,7 @@ export async function expireOldConditions(): Promise<number> {
   return result.count
 }
 
+/** Condition data enriched with the parent trade's instrument and direction. */
 export interface ConditionSummary {
   id: string
   tradeId: string
@@ -204,9 +265,17 @@ export async function getAllConditionSummaries(opts?: {
     instrument: row.trade.instrument,
     direction: row.trade.direction,
     triggerType: row.triggerType as TradeConditionTriggerType,
-    triggerValue: safeJsonParse<Record<string, unknown>>(row.triggerValue, {}, `summary ${row.id} triggerValue`),
+    triggerValue: safeJsonParse<Record<string, unknown>>(
+      row.triggerValue,
+      {},
+      `summary ${row.id} triggerValue`,
+    ),
     actionType: row.actionType as TradeConditionActionType,
-    actionParams: safeJsonParse<Record<string, unknown>>(row.actionParams, {}, `summary ${row.id} actionParams`),
+    actionParams: safeJsonParse<Record<string, unknown>>(
+      row.actionParams,
+      {},
+      `summary ${row.id} actionParams`,
+    ),
     status: row.status as TradeConditionStatus,
     label: row.label,
     createdBy: row.createdBy as "user" | "ai",
@@ -255,7 +324,9 @@ export async function recoverExecutingConditions(): Promise<number> {
   if (rows.length === 0) return 0
 
   for (const row of rows) {
-    console.warn(`[trade-condition-service] Recovering stuck "executing" condition ${row.id} → marking as "triggered" (daemon may have crashed mid-execution)`)
+    console.warn(
+      `[trade-condition-service] Recovering stuck "executing" condition ${row.id} → marking as "triggered" (daemon may have crashed mid-execution)`,
+    )
   }
 
   const result = await db.tradeCondition.updateMany({

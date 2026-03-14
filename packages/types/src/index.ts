@@ -2,6 +2,7 @@
 
 // ─── Trading Mode ────────────────────────────────────────────────────────────
 
+/** OANDA account environment — "live" for real money, "practice" for demo/paper trading. */
 export type TradingMode = "live" | "practice"
 
 // ─── OANDA Settings ──────────────────────────────────────────────────────────
@@ -43,16 +44,29 @@ export interface TestConnectionResponse {
 
 // ─── API Response Wrapper ────────────────────────────────────────────────────
 
+/**
+ * Standard API response wrapper used across all REST endpoints.
+ *
+ * @typeParam T - The shape of the data payload (defaults to void for action-only endpoints).
+ */
 export interface ApiResponse<T = void> {
+  /** Whether the request succeeded. */
   ok: boolean
+  /** Response payload, present only on success. */
   data?: T
+  /** Human-readable error message, present only on failure. */
   error?: string
 }
 
 // ─── Connection Status ──────────────────────────────────────────────────────
 
 /** Extended status state including 'unconfigured' for when no credentials exist */
-export type ConnectionStatus = "connected" | "connecting" | "disconnected" | "warning" | "unconfigured"
+export type ConnectionStatus =
+  | "connected"
+  | "connecting"
+  | "disconnected"
+  | "warning"
+  | "unconfigured"
 
 // ─── Market Status ──────────────────────────────────────────────────────────
 
@@ -63,6 +77,7 @@ export type MarketCloseReason =
   | "holiday" // Inferred: non-tradeable outside normal maintenance hours
   | "paused" // Catch-all: OANDA reports non-tradeable for unknown reason
 
+/** Current forex market status data, broadcast via WebSocket and displayed in the header. */
 export interface MarketStatusData {
   /** Whether the Forex market is currently tradeable */
   isOpen: boolean
@@ -78,6 +93,7 @@ export interface MarketStatusData {
 
 // ─── OANDA Health ───────────────────────────────────────────────────────────
 
+/** OANDA connection and account health data, checked periodically by the daemon. */
 export interface OandaHealthData {
   /** Overall OANDA connection status */
   status: ConnectionStatus
@@ -111,6 +127,7 @@ export interface OandaHealthData {
 
 // ─── Daemon Status (aggregate) ──────────────────────────────────────────────
 
+/** Aggregate daemon status snapshot sent to clients on initial WebSocket connection. */
 export interface DaemonStatusSnapshot {
   /** Daemon uptime in seconds */
   uptimeSeconds: number
@@ -207,10 +224,26 @@ export interface AccountOverviewData {
 
 // ─── Trade / Position Types ─────────────────────────────────────────────────
 
+/** Trade direction — "long" (buy) or "short" (sell). */
 export type TradeDirection = "long" | "short"
-export type TradeStatus = "pending" | "open" | "closed"
-export type TradeSource = "oanda" | "manual" | "automated" | "ut_bot_alerts" | "trade_finder" | "trade_finder_auto"
 
+/** Lifecycle status of a trade within the system. */
+export type TradeStatus = "pending" | "open" | "closed"
+
+/**
+ * Display-enriched source of a trade. The raw DB value is always "oanda";
+ * enrichment via `enrichSource()` maps metadata.placedVia to these labels.
+ */
+export type TradeSource =
+  | "oanda"
+  | "manual"
+  | "automated"
+  | "ut_bot_alerts"
+  | "trade_finder"
+  | "trade_finder_auto"
+  | "ai_trader"
+
+/** OANDA order types, including dependent orders (SL/TP/TSL). */
 export type OrderType =
   | "LIMIT"
   | "STOP"
@@ -220,6 +253,7 @@ export type OrderType =
   | "STOP_LOSS"
   | "TRAILING_STOP_LOSS"
 
+/** Reason an OANDA trade was closed, used for outcome classification and display. */
 export type TradeCloseReason =
   | "MARKET_ORDER"
   | "STOP_LOSS_ORDER"
@@ -230,153 +264,239 @@ export type TradeCloseReason =
   | "REVERSAL"
   | "UNKNOWN"
 
+/** Outcome classification of a closed trade, derived from realizedPL. */
 export type TradeOutcome = "win" | "loss" | "breakeven"
 
-export type Timeframe =
-  | "M1" | "M5" | "M15" | "M30"
-  | "H1" | "H4"
-  | "D" | "W" | "M"
+/** OANDA candlestick granularity identifiers (M = minutes, H = hours, D/W/M = day/week/month). */
+export type Timeframe = "M1" | "M5" | "M15" | "M30" | "H1" | "H4" | "D" | "W" | "M"
 
 // ─── Pending Order Data ────────────────────────────────────────────────────
 
+/** Data transfer object for a pending (unfilled) order, displayed in the Pending Orders table. */
 export interface PendingOrderData {
+  /** Internal DB ID. */
   id: string
+  /** Enriched trade source for display. */
   source: TradeSource
+  /** OANDA order ID (e.g., "12345"). */
   sourceOrderId: string
+  /** OANDA instrument (e.g., "EUR_USD"). */
   instrument: string
   direction: TradeDirection
   orderType: OrderType
+  /** Absolute number of units. */
   units: number
+  /** Target entry price for the pending order. */
   entryPrice: number
+  /** Stop loss price, or null if not set. */
   stopLoss: number | null
+  /** Take profit price, or null if not set. */
   takeProfit: number | null
+  /** Trailing stop distance in price units, or null if not set. */
   trailingStopDistance: number | null
+  /** Time-in-force policy: GTC = Good 'Til Cancelled, GTD = Good 'Til Date, etc. */
   timeInForce: "GTC" | "GTD" | "GFD" | "FOK" | "IOC"
+  /** ISO timestamp for GTD orders; null for other time-in-force types. */
   gtdTime: string | null
+  /** User-assigned chart timeframe context. */
   timeframe: Timeframe | null
+  /** User or AI notes attached to this order. */
   notes: string | null
+  /** Tags assigned to this order. */
   tags: TradeTagData[]
+  /** ISO timestamp when the order was created on OANDA. */
   createdAt: string
 }
 
 // ─── Open Trade Data ───────────────────────────────────────────────────────
 
+/** Data transfer object for a currently open (filled) trade, displayed in the Open Trades table. */
 export interface OpenTradeData {
+  /** Internal DB ID. */
   id: string
+  /** Enriched trade source for display. */
   source: TradeSource
+  /** OANDA trade ID. */
   sourceTradeId: string
+  /** OANDA instrument (e.g., "EUR_USD"). */
   instrument: string
   direction: TradeDirection
+  /** Price at which the trade was filled. */
   entryPrice: number
+  /** Latest bid/ask price from the stream; null before first tick. */
   currentPrice: number | null
+  /** Stop loss price, or null if not set. */
   stopLoss: number | null
+  /** Take profit price, or null if not set. */
   takeProfit: number | null
+  /** Trailing stop distance in price units, or null if not set. */
   trailingStopDistance: number | null
+  /** Units at trade open (before any partial closes). */
   initialUnits: number
+  /** Remaining units after partial closes. */
   currentUnits: number
+  /** Current unrealized P&L in account currency. */
   unrealizedPL: number
+  /** Realized P&L from partial closes. */
   realizedPL: number
+  /** Accumulated financing/swap charges. */
   financing: number
+  /** Margin currently held for this trade. */
   marginUsed: number
   /** Max Favorable Excursion in pips (highest unrealized profit during trade) */
   mfe: number | null
   /** Max Adverse Excursion in pips (deepest unrealized loss during trade) */
   mae: number | null
+  /** User-assigned chart timeframe context. */
   timeframe: Timeframe | null
+  /** User or AI notes attached to this trade. */
   notes: string | null
+  /** Tags assigned to this trade. */
   tags: TradeTagData[]
+  /** ISO timestamp when the trade was opened on OANDA. */
   openedAt: string
 }
 
 // ─── Closed Trade Data ─────────────────────────────────────────────────────
 
+/** Data transfer object for a closed trade, displayed in the Trade History table. */
 export interface ClosedTradeData {
+  /** Internal DB ID. */
   id: string
+  /** Enriched trade source for display. */
   source: TradeSource
+  /** OANDA trade ID. */
   sourceTradeId: string
+  /** OANDA instrument (e.g., "EUR_USD"). */
   instrument: string
   direction: TradeDirection
+  /** Price at which the trade was filled. */
   entryPrice: number
+  /** Average exit price; null if not yet fully closed (partial). */
   exitPrice: number | null
+  /** Stop loss price at time of close. */
   stopLoss: number | null
+  /** Take profit price at time of close. */
   takeProfit: number | null
+  /** Total units traded. */
   units: number
+  /** Final realized P&L in account currency. */
   realizedPL: number
+  /** Total financing/swap charges over the trade's lifetime. */
   financing: number
+  /** What caused the trade to close. */
   closeReason: TradeCloseReason
+  /** Win/loss/breakeven classification. */
   outcome: TradeOutcome
   /** Max Favorable Excursion in pips (null for backfilled trades) */
   mfe: number | null
   /** Max Adverse Excursion in pips (null for backfilled trades) */
   mae: number | null
+  /** User-assigned chart timeframe context. */
   timeframe: Timeframe | null
+  /** User or AI notes attached to this trade. */
   notes: string | null
+  /** Tags assigned to this trade. */
   tags: TradeTagData[]
+  /** ISO timestamp when the trade was opened on OANDA. */
   openedAt: string
+  /** ISO timestamp when the trade was closed on OANDA. */
   closedAt: string
 }
 
 // ─── Aggregate Positions Payload ───────────────────────────────────────────
 
+/** Aggregate positions payload sent from daemon to connected web clients via WebSocket. */
 export interface PositionsData {
+  /** All pending (unfilled) orders. */
   pending: PendingOrderData[]
+  /** All currently open (filled) trades. */
   open: OpenTradeData[]
   /** Today's closed trades only (forex day boundary) */
   closed: ClosedTradeData[]
+  /** ISO timestamp of the last reconciliation cycle. */
   lastUpdated: string
 }
 
 // ─── Live Price Tick ───────────────────────────────────────────────────────
 
+/** A single live price tick from the OANDA streaming API for an instrument with open positions. */
 export interface PositionPriceTick {
+  /** OANDA instrument (e.g., "EUR_USD"). */
   instrument: string
+  /** Current bid price. */
   bid: number
+  /** Current ask price. */
   ask: number
+  /** ISO timestamp from OANDA. */
   time: string
 }
 
+/** Batch of live price ticks broadcast to connected clients via WebSocket. */
 export interface PositionsPriceData {
+  /** Array of price ticks, one per instrument that had a price update. */
   prices: PositionPriceTick[]
 }
 
 // ─── Positions Summary (for header pills) ──────────────────────────────────
 
+/** Compact positions summary displayed in the header navigation pills. */
 export interface PositionsSummary {
+  /** Number of pending (unfilled) orders. */
   pendingCount: number
+  /** Number of currently open trades. */
   openCount: number
+  /** Number of trades closed today (forex day boundary: 5 PM ET). */
   closedTodayCount: number
+  /** Winning trades closed today. */
   todayWins: number
+  /** Losing trades closed today. */
   todayLosses: number
+  /** Net realized P&L from trades closed today, in account currency. */
   todayNetPL: number
 }
 
 // ─── Tags ────────────────────────────────────────────────────────────────────
 
+/** A user-defined tag for categorizing trades (e.g., "News", "Scalp", "Reversal"). */
 export interface TagData {
+  /** Unique tag ID. */
   id: string
+  /** Display name of the tag. */
   name: string
+  /** CSS-compatible color value for the tag badge. */
   color: string
 }
 
+/** A tag assignment on a specific trade, including the full tag data and assignment timestamp. */
 export interface TradeTagData {
+  /** ID of the assigned tag. */
   tagId: string
+  /** Full tag details. */
   tag: TagData
+  /** ISO timestamp when the tag was assigned to the trade. */
   assignedAt: string
 }
 
 // ─── Trade Actions ──────────────────────────────────────────────────────────
 
+/** Request body for cancelling a pending order via the daemon. */
 export interface CancelOrderRequest {
+  /** OANDA order ID to cancel. */
   sourceOrderId: string
 }
 
+/** Request body for closing an open trade (full or partial) via the daemon. */
 export interface CloseTradeRequest {
+  /** OANDA trade ID to close. */
   sourceTradeId: string
   /** Omit or set to undefined for full close; specify units for partial close */
   units?: number
 }
 
+/** Request body for modifying SL/TP on an open trade via the daemon. */
 export interface ModifyTradeRequest {
+  /** OANDA trade ID to modify. */
   sourceTradeId: string
   /** null = remove SL; undefined = leave unchanged */
   stopLoss?: number | null
@@ -384,9 +504,17 @@ export interface ModifyTradeRequest {
   takeProfit?: number | null
 }
 
+/**
+ * Response wrapper for trade action endpoints (close, cancel, modify).
+ *
+ * @typeParam T - Shape of the optional data payload on success.
+ */
 export interface TradeActionResponse<T = unknown> {
+  /** Whether the action succeeded. */
   ok: boolean
+  /** Error message on failure. */
   error?: string
+  /** Optional data payload on success. */
   data?: T
 }
 
@@ -415,7 +543,7 @@ export interface PlaceOrderRequest {
   /** Tag IDs to assign to the trade after placement */
   tagIds?: string[]
   /** Identifies the origin of this order for source tracking metadata */
-  placedVia?: "fxflow" | "ut_bot_alerts" | "trade_finder" | "trade_finder_auto"
+  placedVia?: "fxflow" | "ut_bot_alerts" | "trade_finder" | "trade_finder_auto" | "ai_trader"
 }
 
 /** Response data after successful order placement */
@@ -430,50 +558,86 @@ export interface PlaceOrderResponseData {
 
 // ─── Trade Events (for timeline display) ─────────────────────────────────────
 
+/** A single event in a trade's timeline (e.g., order filled, SL modified, partial close). */
 export interface TradeEventData {
+  /** Event ID. */
   id: string
+  /** Event type identifier (e.g., "ORDER_FILL", "STOP_LOSS_ORDER"). */
   eventType: string
+  /** JSON-serialized event detail from OANDA transaction. */
   detail: string // JSON
+  /** ISO timestamp when the event occurred. */
   createdAt: string
 }
 
 // ─── Trade Detail (for drawer) ───────────────────────────────────────────────
 
+/** Full trade detail for the trade detail drawer, including timeline events and all fields. */
 export interface TradeDetailData {
+  /** Internal DB ID. */
   id: string
+  /** Enriched trade source label. */
   source: string
+  /** OANDA trade/order ID. */
   sourceTradeId: string
+  /** Current lifecycle status ("pending" | "open" | "closed"). */
   status: string
+  /** OANDA instrument (e.g., "EUR_USD"). */
   instrument: string
+  /** Trade direction ("long" | "short"). */
   direction: string
+  /** Order type, present only for pending orders. */
   orderType: string | null
+  /** Entry/fill price. */
   entryPrice: number
+  /** Exit price (null if still open or pending). */
   exitPrice: number | null
+  /** Stop loss price, or null if not set. */
   stopLoss: number | null
+  /** Take profit price, or null if not set. */
   takeProfit: number | null
+  /** Trailing stop distance in price units, or null. */
   trailingStopDistance: number | null
+  /** Units at trade open. */
   initialUnits: number
+  /** Remaining units after partial closes. */
   currentUnits: number
+  /** Realized P&L in account currency. */
   realizedPL: number
+  /** Current unrealized P&L (0 for closed/pending). */
   unrealizedPL: number
+  /** Accumulated financing/swap charges. */
   financing: number
+  /** Close reason (null if not yet closed). */
   closeReason: string | null
+  /** Time-in-force for pending orders. */
   timeInForce: string | null
+  /** GTD expiry time for pending orders. */
   gtdTime: string | null
+  /** Max Favorable Excursion in pips. */
   mfe: number | null
+  /** Max Adverse Excursion in pips. */
   mae: number | null
+  /** User or AI notes. */
   notes: string | null
+  /** User-assigned chart timeframe context. */
   timeframe: Timeframe | null
+  /** ISO timestamp when opened on OANDA. */
   openedAt: string
+  /** ISO timestamp when closed on OANDA, or null if still active. */
   closedAt: string | null
+  /** Tags assigned to this trade. */
   tags: TradeTagData[]
+  /** Chronological event timeline for this trade. */
   events: TradeEventData[]
 }
 
 // ─── Notifications ──────────────────────────────────────────────────────────
 
+/** Notification urgency level, determines visual styling and sort priority. */
 export type NotificationSeverity = "critical" | "warning" | "info"
 
+/** Subsystem that generated the notification, used for filtering and deep-link routing. */
 export type NotificationSource =
   | "internet"
   | "oanda_api"
@@ -484,22 +648,35 @@ export type NotificationSource =
   | "ai_analysis"
   | "trade_condition"
   | "trade_finder"
+  | "ai_trader"
 
+/** A notification displayed in the header notification panel. */
 export interface NotificationData {
+  /** Unique notification ID. */
   id: string
+  /** Urgency level. */
   severity: NotificationSeverity
+  /** Subsystem that generated this notification. */
   source: NotificationSource
+  /** Short notification title. */
   title: string
+  /** Detailed notification message. */
   message: string
   /** Optional JSON metadata for deep links (e.g. { analysisId, tradeId }) */
   metadata: string | null
+  /** Whether the user has dismissed this notification. */
   dismissed: boolean
+  /** ISO timestamp when the notification was created. */
   createdAt: string
 }
 
+/** Paginated notification list response from the notifications API. */
 export interface NotificationListResponse {
+  /** Notifications for the current page. */
   notifications: NotificationData[]
+  /** Total notifications matching the query. */
   totalCount: number
+  /** Count of undismissed notifications (for badge display). */
   undismissedCount: number
 }
 
@@ -532,6 +709,7 @@ export interface ChartLayoutData {
 
 // ─── WebSocket Messages (Daemon → Client) ───────────────────────────────────
 
+/** Discriminator values for all WebSocket messages sent from the daemon to connected clients. */
 export type DaemonMessageType =
   | "status_snapshot"
   | "oanda_update"
@@ -557,93 +735,169 @@ export type DaemonMessageType =
   | "trade_finder_auto_trade_filled"
   | "trade_finder_auto_trade_cancelled"
   | "trade_finder_auto_trade_skipped"
+  // AI Trader
+  | "ai_trader_opportunity_found"
+  | "ai_trader_opportunity_updated"
+  | "ai_trader_opportunity_removed"
+  | "ai_trader_scan_status"
+  | "ai_trader_scan_progress"
+  | "ai_trader_scan_log_entry"
+  | "ai_trader_trade_placed"
+  | "ai_trader_trade_managed"
+  | "ai_trader_trade_closed"
 
+/**
+ * Base WebSocket message envelope sent from daemon to clients.
+ * All messages include a type discriminator, ISO timestamp, and typed data payload.
+ *
+ * @typeParam T - Shape of the data payload.
+ */
 export interface DaemonMessage<T = unknown> {
+  /** Message type discriminator for client-side routing. */
   type: DaemonMessageType
+  /** ISO timestamp when the message was created. */
   timestamp: string
+  /** Typed data payload. */
   data: T
 }
 
+/** Sent on initial WebSocket connection with a full daemon state snapshot. */
 export interface StatusSnapshotMessage extends DaemonMessage<DaemonStatusSnapshot> {
   type: "status_snapshot"
 }
 
+/** Broadcast when OANDA health status changes (connection, margin, etc.). */
 export interface OandaUpdateMessage extends DaemonMessage<OandaHealthData> {
   type: "oanda_update"
 }
 
+/** Broadcast when market open/close status changes. */
 export interface MarketUpdateMessage extends DaemonMessage<MarketStatusData> {
   type: "market_update"
 }
 
+/** Sent when the daemon encounters an error that should be surfaced to clients. */
 export interface DaemonErrorMessage extends DaemonMessage<{ message: string; code?: string }> {
   type: "error"
 }
 
+/** Broadcast when a new notification is created (triggers toast + badge update). */
 export interface NotificationCreatedMessage extends DaemonMessage<NotificationData> {
   type: "notification_created"
 }
 
+/** Broadcast when account overview data is refreshed from OANDA. */
 export interface AccountOverviewUpdateMessage extends DaemonMessage<AccountOverviewData> {
   type: "account_overview_update"
 }
 
+/** Broadcast after each reconciliation cycle with updated positions. */
 export interface PositionsUpdateMessage extends DaemonMessage<PositionsData> {
   type: "positions_update"
 }
 
+/** High-frequency price tick updates for instruments with open positions. */
 export interface PositionsPriceUpdateMessage extends DaemonMessage<PositionsPriceData> {
   type: "positions_price_update"
 }
 
+/** Price tick updates for instruments displayed on chart pages (subscribed per-panel). */
 export interface ChartPriceUpdateMessage extends DaemonMessage<PositionsPriceData> {
   type: "chart_price_update"
 }
 
+/** Broadcast when a TradingView alert signal is received and processed. */
 export interface TVAlertSignalMessage extends DaemonMessage<TVAlertSignal> {
   type: "tv_alert_signal"
 }
 
+/** Broadcast when TV Alerts module status changes (enable/disable, circuit breaker, etc.). */
 export interface TVAlertsStatusMessage extends DaemonMessage<TVAlertsStatusData> {
   type: "tv_alerts_status"
 }
 
-export interface AiAnalysisStartedMessage extends DaemonMessage<{ analysisId: string; tradeId: string; model: string; depth: string }> {
+/** Broadcast when an AI analysis begins execution. */
+export interface AiAnalysisStartedMessage extends DaemonMessage<{
+  analysisId: string
+  tradeId: string
+  model: string
+  depth: string
+}> {
   type: "ai_analysis_started"
 }
 
-export interface AiAnalysisUpdateMessage extends DaemonMessage<{ analysisId: string; tradeId: string; stage?: string; progress?: number; chunk?: string }> {
+/** Streamed progress updates during AI analysis (stage changes, token chunks). */
+export interface AiAnalysisUpdateMessage extends DaemonMessage<{
+  analysisId: string
+  tradeId: string
+  stage?: string
+  progress?: number
+  chunk?: string
+}> {
   type: "ai_analysis_update"
 }
 
-export interface AiAnalysisCompletedMessage extends DaemonMessage<{ analysisId: string; tradeId: string; sections: AiAnalysisSections | null; inputTokens: number; outputTokens: number; costUsd: number; durationMs: number; error?: string }> {
+/** Broadcast when an AI analysis finishes (success or failure). */
+export interface AiAnalysisCompletedMessage extends DaemonMessage<{
+  analysisId: string
+  tradeId: string
+  sections: AiAnalysisSections | null
+  inputTokens: number
+  outputTokens: number
+  costUsd: number
+  durationMs: number
+  error?: string
+}> {
   type: "ai_analysis_completed"
 }
 
-export interface AiAutoAnalysisDisabledMessage extends DaemonMessage<{ reason: string; disabledAt: string; lastFailureMessage: string }> {
+/** Broadcast when auto-analysis is disabled due to repeated failures. */
+export interface AiAutoAnalysisDisabledMessage extends DaemonMessage<{
+  reason: string
+  disabledAt: string
+  lastFailureMessage: string
+}> {
   type: "ai_auto_analysis_disabled"
 }
 
-export interface ConditionTriggeredMessage extends DaemonMessage<{ conditionId: string; tradeId: string; instrument: string; label: string | null; actionType: string; success: boolean; error?: string }> {
+/** Broadcast when a trade condition triggers (SL move, close, notification, etc.). */
+export interface ConditionTriggeredMessage extends DaemonMessage<{
+  conditionId: string
+  tradeId: string
+  instrument: string
+  label: string | null
+  actionType: string
+  success: boolean
+  error?: string
+}> {
   type: "condition_triggered"
 }
 
+/** Broadcast when Trade Finder detects a new setup. */
 export interface TradeFinderSetupFoundMessage extends DaemonMessage<TradeFinderSetupData> {
   type: "trade_finder_setup_found"
 }
 
+/** Broadcast when a Trade Finder setup's scores or status change. */
 export interface TradeFinderSetupUpdatedMessage extends DaemonMessage<TradeFinderSetupData> {
   type: "trade_finder_setup_updated"
 }
 
-export interface TradeFinderSetupRemovedMessage extends DaemonMessage<{ setupId: string; instrument: string; reason: string }> {
+/** Broadcast when a Trade Finder setup is removed (expired, invalidated). */
+export interface TradeFinderSetupRemovedMessage extends DaemonMessage<{
+  setupId: string
+  instrument: string
+  reason: string
+}> {
   type: "trade_finder_setup_removed"
 }
 
+/** Broadcast with scanner progress after each Trade Finder scan cycle. */
 export interface TradeFinderScanStatusMessage extends DaemonMessage<TradeFinderScanStatus> {
   type: "trade_finder_scan_status"
 }
 
+/** Broadcast when Trade Finder auto-trade places a limit order on OANDA. */
 export interface TradeFinderAutoTradePlacedMessage extends DaemonMessage<{
   setupId: string
   instrument: string
@@ -659,6 +913,7 @@ export interface TradeFinderAutoTradePlacedMessage extends DaemonMessage<{
   type: "trade_finder_auto_trade_placed"
 }
 
+/** Broadcast when a Trade Finder auto-placed order is cancelled (zone invalidation, external cancel). */
 export interface TradeFinderAutoTradeCancelledMessage extends DaemonMessage<{
   setupId: string
   instrument: string
@@ -668,6 +923,7 @@ export interface TradeFinderAutoTradeCancelledMessage extends DaemonMessage<{
   type: "trade_finder_auto_trade_cancelled"
 }
 
+/** Broadcast when a Trade Finder auto-placed order is filled on OANDA. */
 export interface TradeFinderAutoTradeFilledMessage extends DaemonMessage<{
   setupId: string
   instrument: string
@@ -678,6 +934,7 @@ export interface TradeFinderAutoTradeFilledMessage extends DaemonMessage<{
   type: "trade_finder_auto_trade_filled"
 }
 
+/** Broadcast when a Trade Finder setup is skipped for auto-trade (risk gate, score too low). */
 export interface TradeFinderAutoTradeSkippedMessage extends DaemonMessage<{
   setupId: string
   instrument: string
@@ -700,6 +957,7 @@ export interface TradeFinderAutoTradeEvent {
   timestamp: string
 }
 
+/** Discriminated union of all possible WebSocket messages from the daemon. Used for type-safe message handling. */
 export type AnyDaemonMessage =
   | StatusSnapshotMessage
   | OandaUpdateMessage
@@ -725,6 +983,15 @@ export type AnyDaemonMessage =
   | TradeFinderAutoTradeFilledMessage
   | TradeFinderAutoTradeCancelledMessage
   | TradeFinderAutoTradeSkippedMessage
+  | AiTraderOpportunityFoundMessage
+  | AiTraderOpportunityUpdatedMessage
+  | AiTraderOpportunityRemovedMessage
+  | AiTraderScanStatusMessage
+  | AiTraderScanProgressMessage
+  | AiTraderScanLogEntryMessage
+  | AiTraderTradePlacedMessage
+  | AiTraderTradeManagedMessage
+  | AiTraderTradeClosedMessage
 
 // ─── TradingView Alerts ────────────────────────────────────────────────────
 
@@ -888,18 +1155,31 @@ export interface TVAlertsStatusData {
 }
 
 /** Performance stats for signal tracking */
+/** Aggregate performance statistics for TradingView alert signals. */
 export interface TVSignalPerformanceStats {
+  /** Total signals received. */
   totalSignals: number
+  /** Signals that were successfully executed as trades. */
   executedSignals: number
+  /** Signals that were rejected (duplicate, cooldown, risk limit, etc.). */
   rejectedSignals: number
+  /** Signals that failed during execution. */
   failedSignals: number
+  /** Winning trades from signals. */
   wins: number
+  /** Losing trades from signals. */
   losses: number
+  /** Breakeven trades from signals. */
   breakeven: number
+  /** Win rate percentage (0-100). */
   winRate: number
+  /** Total realized P&L from signal-originated trades. */
   totalPL: number
+  /** Average P&L of winning trades. */
   averageWin: number
+  /** Average P&L of losing trades (negative). */
   averageLoss: number
+  /** Profit factor (gross wins / gross losses). */
   profitFactor: number
 }
 
@@ -914,7 +1194,7 @@ export interface TVSignalPeriodPnL {
   losses: number
 }
 
-/** Period-based P&L breakdown for TV alerts */
+/** Period-based P&L breakdown for TV alerts, keyed by time period. */
 export type TVSignalPeriodPnLData = Record<PnLPeriod, TVSignalPeriodPnL>
 
 // ─── CF Worker ↔ Daemon Messages ───────────────────────────────────────────
@@ -922,18 +1202,34 @@ export type TVSignalPeriodPnLData = Record<PnLPeriod, TVSignalPeriodPnL>
 /** CF Worker → Daemon message types */
 export type CFWorkerMessageType = "signal" | "heartbeat" | "queued_signals"
 
+/**
+ * WebSocket message envelope from the Cloudflare Worker to the daemon.
+ *
+ * @typeParam T - Shape of the data payload.
+ */
 export interface CFWorkerMessage<T = unknown> {
+  /** Message type discriminator. */
   type: CFWorkerMessageType
+  /** ISO timestamp. */
   timestamp: string
+  /** Typed data payload. */
   data: T
 }
 
 /** Daemon → CF Worker message types */
 export type DaemonToCFMessageType = "authenticate" | "signal_ack" | "status"
 
+/**
+ * WebSocket message envelope from the daemon to the Cloudflare Worker.
+ *
+ * @typeParam T - Shape of the data payload.
+ */
 export interface DaemonToCFMessage<T = unknown> {
+  /** Message type discriminator. */
   type: DaemonToCFMessageType
+  /** ISO timestamp. */
   timestamp: string
+  /** Typed data payload. */
   data: T
 }
 
@@ -953,24 +1249,40 @@ export const ANALYSIS_STUCK_THRESHOLD_MS = 2 * 60 * 1000 // 2 minutes
 /** Threshold for ignoring old running analyses on page load (too old to restore spinner) */
 export const ANALYSIS_STALE_THRESHOLD_MS = 10 * 60 * 1000 // 10 minutes
 
+/** Lifecycle status of an AI analysis request. */
 export type AiAnalysisStatus = "pending" | "running" | "completed" | "failed" | "cancelled"
+
+/** Analysis depth preset — controls prompt complexity and context window usage. */
 export type AiAnalysisDepth = "quick" | "standard" | "deep"
-export type AiAnalysisTriggeredBy = "user" | "auto_pending" | "auto_fill" | "auto_close" | "auto_interval"
 
-export type AiClaudeModel =
-  | "claude-haiku-4-5-20251001"
-  | "claude-sonnet-4-6"
-  | "claude-opus-4-6"
+/** What triggered the analysis — manual user request or one of the auto-analysis triggers. */
+export type AiAnalysisTriggeredBy =
+  | "user"
+  | "auto_pending"
+  | "auto_fill"
+  | "auto_close"
+  | "auto_interval"
 
+/** Supported Claude model identifiers for AI analysis. */
+export type AiClaudeModel = "claude-haiku-4-5-20251001" | "claude-sonnet-4-6" | "claude-opus-4-6"
+
+/** Model option metadata for the model selector UI and cost estimation. */
 export interface AiModelOption {
+  /** Claude model identifier. */
   id: AiClaudeModel
+  /** Human-readable model name (e.g., "Haiku -- Quick"). */
   name: string
+  /** Brief description of the model's analysis style. */
   description: string
+  /** Cost per 1M input tokens in USD. */
   inputCostPer1M: number
+  /** Cost per 1M output tokens in USD. */
   outputCostPer1M: number
+  /** Typical analysis duration in seconds for UI progress indicators. */
   estimatedDurationSec: number
 }
 
+/** Available Claude model options with pricing and estimated durations. Used by settings UI, model selector, and cost calculation. */
 export const AI_MODEL_OPTIONS: AiModelOption[] = [
   {
     id: "claude-haiku-4-5-20251001",
@@ -998,6 +1310,7 @@ export const AI_MODEL_OPTIONS: AiModelOption[] = [
   },
 ]
 
+/** Types of immediate actions the AI can recommend after analysis. */
 export type AiActionButtonType =
   | "adjust_sl"
   | "adjust_tp"
@@ -1010,17 +1323,25 @@ export type AiActionButtonType =
   | "update_expiry" // pending orders only: sets GTD expiry
   | "move_to_breakeven"
 
+/** An actionable recommendation from the AI, rendered as a button in the analysis results. */
 export interface AiActionButton {
+  /** Unique action ID (used for auto-apply tracking). */
   id: string
+  /** Action type determining which dialog/operation to invoke. */
   type: AiActionButtonType
+  /** Short button label (e.g., "Move SL to 1.0850"). */
   label: string
+  /** Longer description of the action and its rationale. */
   description: string
   /** Pre-computed params for pre-filling existing dialogs */
   params: Record<string, unknown>
+  /** AI confidence level for this recommendation. */
   confidence: "high" | "medium" | "low"
+  /** Detailed reasoning for the recommendation. */
   rationale: string
 }
 
+/** AI-suggested trade condition (converted to TradeCondition if accepted or auto-applied). */
 export interface AiConditionSuggestion {
   label: string
   triggerType: string
@@ -1032,24 +1353,39 @@ export interface AiConditionSuggestion {
   confidence?: "high" | "medium" | "low"
 }
 
+/** A key price level identified by the AI during analysis. */
 export interface AiKeyLevel {
+  /** Price level value. */
   price: number
+  /** Descriptive label (e.g., "Daily R1", "Previous week high"). */
   label: string
+  /** Level classification. */
   type: "support" | "resistance" | "pivot"
 }
 
+/** An upcoming or recent economic news event relevant to the analyzed trade. */
 export interface AiNewsEvent {
+  /** Event title (e.g., "US Non-Farm Payrolls"). */
   title: string
+  /** ISO timestamp of the event. */
   time: string
+  /** Affected currency code (e.g., "USD"). */
   currency: string
+  /** Expected market impact level. */
   impact: "low" | "medium" | "high"
+  /** Consensus forecast value. */
   forecast?: string
+  /** Previous release value. */
   previous?: string
 }
 
+/** Structured sections of an AI analysis result. Produced by the analysis executor and displayed in the AI sheet. */
 export interface AiAnalysisSections {
+  /** One-paragraph executive summary of the trade assessment. */
   summary: string
+  /** Estimated probability of the trade being profitable (0-100). */
   winProbability: number
+  /** Overall trade quality score (0-100). */
   tradeQualityScore: number
   /** TL;DR action card — the single most important recommendation */
   tldr?: {
@@ -1074,20 +1410,32 @@ export interface AiAnalysisSections {
     timingNote: string
     improvements: string
   }
+  /** Technical analysis section. */
   technical: {
+    /** Current trend assessment. */
     trend: string
+    /** Key support/resistance/pivot levels near current price. */
     keyLevels: AiKeyLevel[]
+    /** Summary of indicator readings (RSI, MACD, etc.). */
     indicators: string
+    /** Identified candlestick patterns. */
     candlePatterns: string
+    /** Momentum assessment. */
     momentum: string
     /** Educational explanation (only when learning mode enabled) */
     educational?: string
   }
+  /** Risk assessment section. */
   risk: {
+    /** Overall risk level classification. */
     assessment: "low" | "medium" | "high" | "very_high"
+    /** Individual risk factors identified. */
     factors: string[]
+    /** Analysis of the trade's risk/reward profile. */
     riskRewardAnalysis: string
+    /** Comment on position sizing appropriateness. */
     positionSizingComment: string
+    /** Educational explanation (only when learning mode enabled). */
     educational?: string
   }
   /** Portfolio-level risk assessment */
@@ -1096,56 +1444,99 @@ export interface AiAnalysisSections {
     totalRiskPercent: string
     concentrationWarning: string | null
   }
+  /** Market context and session analysis section. */
   marketContext: {
+    /** Current trading session (e.g., "London/NY Overlap"). */
     currentSession: string
+    /** Volatility assessment. */
     volatility: string
+    /** Upcoming or recent high-impact news events. */
     newsEvents: AiNewsEvent[]
+    /** Correlation analysis with related pairs/assets. */
     correlations: string
+    /** Market sentiment note. */
     sentimentNote: string
+    /** Educational explanation (only when learning mode enabled). */
     educational?: string
   }
+  /** Historical trade performance analysis for this instrument. */
   tradeHistory: {
+    /** Win rate for this currency pair. */
     pairWinRate: string
+    /** Average risk/reward ratio for this pair. */
     averageRR: string
+    /** Commonly observed patterns. */
     commonPatterns: string
+    /** Recent performance summary. */
     recentPerformance: string
+    /** Educational explanation (only when learning mode enabled). */
     educational?: string
   }
+  /** Bullet-point recommendations for managing this trade. */
   recommendations: string[]
+  /** Actionable buttons for immediate trade modifications. */
   immediateActions: AiActionButton[]
+  /** Suggested trade conditions for automated management. */
   conditionSuggestions: AiConditionSuggestion[]
+  /** Post-mortem analysis for closed trades (lessons learned). */
   postMortem?: string
   /** Action IDs that were auto-executed by the daemon (set post-analysis, not by AI) */
   autoAppliedActionIds?: string[]
 }
 
+/** Complete AI analysis record, persisted in the database and returned by the analysis API. */
 export interface AiAnalysisData {
+  /** Analysis ID. */
   id: string
+  /** ID of the trade that was analyzed. */
   tradeId: string
+  /** Current analysis lifecycle status. */
   status: AiAnalysisStatus
+  /** Depth preset used for this analysis. */
   depth: AiAnalysisDepth
+  /** Claude model used. */
   model: AiClaudeModel
+  /** Trade status at the time of analysis ("pending" | "open" | "closed"). */
   tradeStatus: string
+  /** What triggered this analysis. */
   triggeredBy: AiAnalysisTriggeredBy
+  /** Structured analysis sections; null if not yet completed or failed. */
   sections: AiAnalysisSections | null
+  /** Total input tokens consumed. */
   inputTokens: number
+  /** Total output tokens generated. */
   outputTokens: number
+  /** Total cost in USD. */
   costUsd: number
+  /** Execution duration in milliseconds. */
   durationMs: number
+  /** Error message if the analysis failed. */
   errorMessage: string | null
+  /** ISO timestamp when the analysis was created. */
   createdAt: string
+  /** ISO timestamp of the last status update. */
   updatedAt: string
 }
 
+/** Aggregate AI usage statistics displayed on the AI settings page. */
 export interface AiUsageStats {
+  /** Total number of analyses run (all statuses). */
   totalAnalyses: number
+  /** Cumulative input tokens across all analyses. */
   totalInputTokens: number
+  /** Cumulative output tokens across all analyses. */
   totalOutputTokens: number
+  /** Cumulative cost in USD. */
   totalCostUsd: number
+  /** Average win probability across completed analyses; null if none. */
   avgWinProbability: number | null
+  /** Average quality score across completed analyses; null if none. */
   avgQualityScore: number | null
+  /** Number of auto-triggered analyses. */
   autoCount: number
+  /** Number of manually triggered analyses. */
   manualCount: number
+  /** Usage breakdown by Claude model. */
   byModel: Array<{
     model: string
     count: number
@@ -1153,6 +1544,7 @@ export interface AiUsageStats {
     outputTokens: number
     costUsd: number
   }>
+  /** Usage breakdown by time period. */
   byPeriod: {
     today: { count: number; costUsd: number }
     thisWeek: { count: number; costUsd: number }
@@ -1160,6 +1552,7 @@ export interface AiUsageStats {
     thisYear: { count: number; costUsd: number }
     allTime: { count: number; costUsd: number }
   }
+  /** Count of analyses by status. */
   statusCounts: {
     completed: number
     failed: number
@@ -1169,16 +1562,27 @@ export interface AiUsageStats {
   }
 }
 
+/** Configuration for automated AI analysis triggers and behavior. */
 export interface AiAutoAnalysisSettings {
+  /** Master auto-analysis toggle. */
   enabled: boolean
+  /** Trigger analysis when a new pending order is created. */
   onPendingCreate: boolean
+  /** Trigger analysis when a pending order fills. */
   onOrderFill: boolean
+  /** Trigger analysis when a trade closes (post-mortem). */
   onTradeClose: boolean
+  /** Enable periodic re-analysis of open trades. */
   intervalEnabled: boolean
+  /** Hours between periodic re-analyses. */
   intervalHours: number
+  /** Default analysis depth for auto-triggered analyses. */
   defaultDepth: AiAnalysisDepth
+  /** Default Claude model for auto-triggered analyses. */
   defaultModel: AiClaudeModel
+  /** Whether to auto-apply AI recommendations on live accounts. */
   liveAutoApplyEnabled: boolean
+  /** Whether to auto-apply AI recommendations on practice accounts. */
   practiceAutoApplyEnabled: boolean
   /** Minimum confidence level for auto-applying actions */
   autoApplyMinConfidence: "high" | "medium" | "low"
@@ -1186,6 +1590,7 @@ export interface AiAutoAnalysisSettings {
   autoApplyConditions: boolean
   /** Minimum confidence level for auto-applying condition suggestions */
   autoApplyMinConditionConfidence: "high" | "medium" | "low"
+  /** Send a notification when auto-analysis completes. */
   notifyOnComplete: boolean
   /** Learning mode: AI includes educational explanations in each section */
   learningMode: boolean
@@ -1198,6 +1603,7 @@ export interface AiAutoAnalysisSettings {
   autoDisabledAt?: string | null
 }
 
+/** Default auto-analysis settings applied when no user configuration exists. */
 export const AI_AUTO_ANALYSIS_DEFAULTS: AiAutoAnalysisSettings = {
   enabled: false,
   onPendingCreate: false,
@@ -1218,64 +1624,110 @@ export const AI_AUTO_ANALYSIS_DEFAULTS: AiAutoAnalysisSettings = {
   digestFrequency: "weekly",
 }
 
+/** AI settings response from GET /api/ai/settings. Contains API key status (never raw keys) and auto-analysis config. */
 export interface AiSettingsData {
+  /** Whether a Claude API key is configured. */
   hasClaudeKey: boolean
+  /** Last 4 characters of the Claude API key for display. */
   claudeKeyLastFour: string
+  /** Whether a Finnhub API key is configured (for news data). */
   hasFinnhubKey: boolean
+  /** Last 4 characters of the Finnhub API key for display. */
   finnhubKeyLastFour: string
+  /** Default Claude model for manual analyses. */
   defaultModel: AiClaudeModel
+  /** Auto-analysis configuration. */
   autoAnalysis: AiAutoAnalysisSettings
 }
 
 // ─── AI Accuracy & Digest ────────────────────────────────────────────────────
 
+/** AI prediction accuracy statistics comparing predicted vs actual outcomes. */
 export interface AiAccuracyStats {
+  /** Total AI recommendations tracked. */
   totalRecommendations: number
+  /** Recommendations that the user followed. */
   followedCount: number
+  /** Recommendations that the user ignored. */
   ignoredCount: number
+  /** Win rate of followed recommendations; null if insufficient data. */
   followedWinRate: number | null
+  /** Win rate of ignored recommendations; null if insufficient data. */
   ignoredWinRate: number | null
+  /** Average AI-predicted win probability across all recommendations. */
   overallPredictedWinRate: number | null
+  /** Actual win rate across all recommendations. */
   overallActualWinRate: number | null
+  /** Calibration buckets comparing predicted vs actual win rates. */
   calibration: Array<{
+    /** Bucket label (e.g., "60-70%"). */
     bucket: string
+    /** Average predicted win rate in this bucket. */
     predictedAvg: number
+    /** Actual win rate for trades in this bucket; null if insufficient data. */
     actualWinRate: number | null
+    /** Number of trades in this bucket. */
     count: number
   }>
 }
 
+/** Structured sections of a periodic trading performance digest generated by AI. */
 export interface AiDigestSections {
+  /** Executive summary of the period's trading performance. */
   periodSummary: string
+  /** Total trades closed during the period. */
   totalTrades: number
+  /** Win rate for the period (0-100). */
   winRate: number
+  /** Total net P&L for the period in account currency. */
   totalPnl: number
+  /** Best performing currency pair during the period; null if no trades. */
   bestPair: { instrument: string; pnl: number; trades: number } | null
+  /** Worst performing currency pair during the period; null if no trades. */
   worstPair: { instrument: string; pnl: number; trades: number } | null
+  /** Best performing trading session; null if insufficient data. */
   bestSession: string | null
+  /** Worst performing trading session; null if insufficient data. */
   worstSession: string | null
+  /** Recurring positive patterns observed. */
   patterns: string[]
+  /** Common mistakes identified. */
   mistakes: string[]
+  /** Suggested improvements for the next period. */
   improvements: string[]
+  /** Assessment of risk management practices. */
   riskManagement: string
+  /** Observed emotional trading patterns; null if not detectable. */
   emotionalPatterns: string | null
+  /** Suggested goal for the next trading period. */
   goalSuggestion: string
 }
 
+/** Complete periodic trading digest record, persisted in the database. */
 export interface AiDigestData {
+  /** Digest ID. */
   id: string
+  /** Digest period type. */
   period: "weekly" | "monthly"
+  /** ISO timestamp of the period start. */
   periodStart: string
+  /** ISO timestamp of the period end. */
   periodEnd: string
+  /** Digest generation status. */
   status: string
+  /** Structured digest sections; null if not yet completed or failed. */
   sections: AiDigestSections | null
+  /** Cost of generating this digest in USD. */
   costUsd: number
+  /** Generation duration in milliseconds. */
   durationMs: number
+  /** ISO timestamp when the digest was created. */
   createdAt: string
 }
 
 // ─── Trade Conditions ─────────────────────────────────────────────────────────
 
+/** What event triggers a trade condition (price, P&L, time-based). */
 export type TradeConditionTriggerType =
   | "price_reaches"
   | "price_breaks_above"
@@ -1286,6 +1738,7 @@ export type TradeConditionTriggerType =
   | "duration_hours"
   | "trailing_stop"
 
+/** What action to take when a trade condition triggers. */
 export type TradeConditionActionType =
   | "close_trade"
   | "partial_close"
@@ -1294,24 +1747,48 @@ export type TradeConditionActionType =
   | "cancel_order"
   | "notify"
 
-export type TradeConditionStatus = "active" | "waiting" | "executing" | "triggered" | "expired" | "cancelled"
+/** Lifecycle status of a trade condition. */
+export type TradeConditionStatus =
+  | "active"
+  | "waiting"
+  | "executing"
+  | "triggered"
+  | "expired"
+  | "cancelled"
 
+/** A conditional rule attached to a trade, monitored by the daemon's ConditionMonitor. */
 export interface TradeConditionData {
+  /** Condition ID. */
   id: string
+  /** ID of the trade this condition is attached to. */
   tradeId: string
+  /** What triggers this condition. */
   triggerType: TradeConditionTriggerType
+  /** Trigger parameters (e.g., { price: 1.0850 } or { pips: 50 }). */
   triggerValue: Record<string, unknown>
+  /** Action to execute when triggered. */
   actionType: TradeConditionActionType
+  /** Action parameters (e.g., { units: 5000 } for partial close). */
   actionParams: Record<string, unknown>
+  /** Current condition lifecycle status. */
   status: TradeConditionStatus
+  /** Optional human-readable label (e.g., "Move SL to breakeven at +50 pips"). */
   label: string | null
+  /** Who created this condition. */
   createdBy: "user" | "ai"
+  /** AI analysis ID that suggested this condition; null if user-created. */
   analysisId: string | null
+  /** Execution priority (lower = higher priority when multiple conditions trigger). */
   priority: number
+  /** Parent condition ID for chained conditions; null if standalone. */
   parentConditionId: string | null
+  /** ISO timestamp when this condition expires; null for no expiry. */
   expiresAt: string | null
+  /** ISO timestamp when this condition was triggered; null if not yet triggered. */
   triggeredAt: string | null
+  /** ISO timestamp when the condition was created. */
   createdAt: string
+  /** ISO timestamp of the last status update. */
   updatedAt: string
 }
 
@@ -1672,7 +2149,10 @@ export interface TrendSettingsResponse {
 export type TradeFinderTimeframeSet = "hourly" | "daily" | "weekly" | "monthly"
 
 /** Mapping of TF set → HTF/MTF/LTF */
-export const TIMEFRAME_SET_MAP: Record<TradeFinderTimeframeSet, { htf: string; mtf: string; ltf: string }> = {
+export const TIMEFRAME_SET_MAP: Record<
+  TradeFinderTimeframeSet,
+  { htf: string; mtf: string; ltf: string }
+> = {
   hourly: { htf: "H1", mtf: "M15", ltf: "M5" },
   daily: { htf: "D", mtf: "H1", ltf: "M15" },
   weekly: { htf: "W", mtf: "D", ltf: "H1" },
@@ -1689,12 +2169,12 @@ export const SCAN_INTERVAL_MAP: Record<TradeFinderTimeframeSet, number> = {
 
 /** Setup lifecycle status */
 export type TradeFinderSetupStatus =
-  | "active"      // Valid setup, price not yet near entry
+  | "active" // Valid setup, price not yet near entry
   | "approaching" // Price within configurable distance of entry
-  | "placed"      // Order placed from this setup (pending on OANDA)
-  | "filled"      // Placed order has been filled on OANDA
+  | "placed" // Order placed from this setup (pending on OANDA)
+  | "filled" // Placed order has been filled on OANDA
   | "invalidated" // Zone broken or conditions no longer met
-  | "expired"     // Removed after timeout or scan cycle
+  | "expired" // Removed after timeout or scan cycle
 
 /** Trade Finder configuration per instrument */
 export interface TradeFinderPairConfig {
@@ -1802,4 +2282,435 @@ export interface TradeFinderScanStatus {
 export interface TradeFinderConfigResponse {
   config: TradeFinderConfigData
   scanStatus: TradeFinderScanStatus
+}
+
+// ─── AI Trader ────────────────────────────────────────────────────────────────
+
+/** AI Trader operating mode — controls how opportunities are handled after detection. */
+export type AiTraderOperatingMode = "manual" | "semi_auto" | "full_auto"
+
+/** AI Trader strategy profile — each has different timeframe, hold time, and risk characteristics. */
+export type AiTraderProfile = "scalper" | "intraday" | "swing" | "news"
+
+/** Lifecycle status of an AI Trader opportunity from detection through closure. */
+export type AiTraderOpportunityStatus =
+  | "detected" // Tier 1 found candidate
+  | "suggested" // Tier 2/3 analyzed, awaiting approval
+  | "approved" // User approved in Manual mode
+  | "placed" // Order placed on OANDA
+  | "filled" // Order filled, now an open trade
+  | "managed" // Being actively managed (SL/TP adjustments)
+  | "closed" // Trade closed (win/loss/breakeven)
+  | "expired" // Opportunity expired before action
+  | "rejected" // User rejected or AI below threshold
+  | "skipped" // Skipped by risk gate (budget, correlation, max trades)
+
+/** Technical analysis techniques used by the AI Trader's Tier 1 local analysis. */
+export type AiTraderTechnique =
+  | "smc_structure" // BOS/CHoCH market structure
+  | "fair_value_gap" // FVG detection
+  | "order_block" // Order block zones
+  | "liquidity_sweep" // Equal H/L + session liquidity
+  | "supply_demand_zone" // S/D zones (reuse zone-detector)
+  | "fibonacci_ote" // Fibonacci OTE (62-79%)
+  | "rsi" // RSI overbought/oversold
+  | "macd" // MACD crossover + histogram
+  | "ema_alignment" // 20/50/200 EMA trend alignment
+  | "bollinger_bands" // Mean reversion extremes
+  | "williams_r" // Williams %R momentum
+  | "adx_regime" // ADX trend strength / regime
+  | "divergence" // RSI/MACD divergence
+  | "trend_detection" // Reuse existing trend-detector
+
+/** Market regime classification detected by the ADX/ATR regime detector. */
+export type AiTraderMarketRegime = "trending" | "ranging" | "volatile" | "low_volatility"
+
+/** Forex trading session identifiers used for session-aware analysis and filtering. */
+export type AiTraderSession =
+  | "asian"
+  | "london"
+  | "ny"
+  | "london_ny_overlap"
+  | "london_close"
+  | "off_session"
+
+/** Types of external market data the AI Trader can fetch and cache. */
+export type AiTraderMarketDataType =
+  | "economic_calendar"
+  | "news_sentiment"
+  | "fred_macro"
+  | "cot_positioning"
+  | "correlation_matrix"
+
+/** AI Trader configuration (singleton) */
+export interface AiTraderConfigData {
+  enabled: boolean
+  operatingMode: AiTraderOperatingMode
+  scanIntervalMinutes: number
+  confidenceThreshold: number // For semi-auto/full-auto execution
+  minimumConfidence: number // Below this, never suggest
+  maxConcurrentTrades: number
+  pairWhitelist: string[] // Empty = all pairs
+  enabledProfiles: Record<AiTraderProfile, boolean>
+  enabledTechniques: Record<AiTraderTechnique, boolean>
+  managementConfig: AiTraderManagementConfig
+  reEvalIntervalMinutes: number
+  dailyBudgetUsd: number
+  monthlyBudgetUsd: number
+  scanModel: string // Claude model for Tier 2 scans
+  decisionModel: string // Claude model for Tier 3 decisions
+  fredApiKey: boolean // Has key (never expose raw)
+  alphaVantageApiKey: boolean // Has key
+}
+
+/** Trade management rules applied after entry */
+export interface AiTraderManagementConfig {
+  breakevenEnabled: boolean
+  breakevenTriggerRR: number // Move to BE when trade moves this many R in favor (e.g., 1.0)
+  trailingStopEnabled: boolean
+  trailingStopAtrMultiplier: number // Trail by N x ATR
+  partialCloseEnabled: boolean
+  partialClosePercent: number // % to close at first target
+  partialCloseTargetRR: number // R:R level for first partial
+  timeExitEnabled: boolean
+  timeExitHours: number // Close if no movement after N hours
+  newsProtectionEnabled: boolean // Tighten/close before high-impact events
+  reEvaluationEnabled: boolean // Periodic AI re-evaluation of open trades
+  scaleInEnabled: boolean // Allow adding to winning positions
+}
+
+/** Score breakdown for an AI Trader opportunity */
+export interface AiTraderScoreBreakdown {
+  technical: number // 0-100: indicator/pattern confluence
+  fundamental: number // 0-100: macro/calendar/COT alignment
+  sentiment: number // 0-100: news sentiment
+  session: number // 0-100: session appropriateness
+  historical: number // 0-100: past performance for this setup type
+  confluence: number // 0-100: overall multi-technique alignment
+}
+
+/** Full opportunity data for an AI-discovered trade setup */
+export interface AiTraderOpportunityData {
+  id: string
+  instrument: string
+  direction: TradeDirection
+  profile: AiTraderProfile
+  status: AiTraderOpportunityStatus
+  confidence: number // 0-100 overall confidence
+  scores: AiTraderScoreBreakdown
+  entryPrice: number
+  stopLoss: number
+  takeProfit: number
+  riskPips: number
+  rewardPips: number
+  riskRewardRatio: number
+  positionSize: number // Units
+  regime: AiTraderMarketRegime | null
+  session: AiTraderSession | null
+  primaryTechnique: AiTraderTechnique | null
+  entryRationale: string | null // Human-readable explanation
+  technicalSnapshot: unknown // Indicators, zones, structure at detection time
+  fundamentalSnapshot: unknown // Macro, calendar, COT data
+  sentimentSnapshot: unknown // News sentiment data
+  tier2Response: string | null // Haiku quick scan response
+  tier2Model: string | null // Claude model used for scan
+  tier2InputTokens: number // Input tokens for quick scan
+  tier2OutputTokens: number // Output tokens for quick scan
+  tier2Cost: number // Cost of the quick scan
+  tier3Response: string | null // Deep analysis response
+  tier3Model: string | null // Claude model used for decision
+  tier3InputTokens: number // Input tokens for deep analysis
+  tier3OutputTokens: number // Output tokens for deep analysis
+  tier3Cost: number // Cost of the deep analysis
+  resultTradeId: string | null // DB trade ID once placed
+  resultSourceId: string | null // OANDA order/trade ID
+  realizedPL: number | null // Final P&L once closed
+  outcome: TradeOutcome | null // Win/loss/breakeven
+  managementLog: AiTraderManagementAction[]
+  detectedAt: string // ISO timestamp
+  suggestedAt: string | null
+  placedAt: string | null
+  filledAt: string | null
+  closedAt: string | null
+  expiresAt: string | null
+}
+
+/** A management action taken on an AI trade */
+export interface AiTraderManagementAction {
+  action:
+    | "adjust_sl"
+    | "adjust_tp"
+    | "breakeven"
+    | "trailing_update"
+    | "partial_close"
+    | "scale_in"
+    | "close"
+    | "re_evaluate"
+    | "news_protection"
+  detail: string
+  previousValue?: number
+  newValue?: number
+  timestamp: string
+}
+
+/** Scanner status for the AI Trader */
+export interface AiTraderScanStatus {
+  scanning: boolean
+  enabled: boolean
+  lastScanAt: string | null
+  nextScanAt: string | null
+  candidateCount: number
+  activePairCount: number
+  openAiTradeCount: number
+  todayBudgetUsed: number
+  monthlyBudgetUsed: number
+  error: string | null
+}
+
+/** Scan progress phase for real-time updates */
+export type AiTraderScanPhase =
+  | "starting"
+  | "checking_config"
+  | "checking_market"
+  | "checking_budget"
+  | "scanning_pairs"
+  | "analyzing_candidates"
+  | "complete"
+  | "skipped"
+  | "error"
+
+/** Real-time scan progress broadcast */
+export interface AiTraderScanProgressData {
+  phase: AiTraderScanPhase
+  message: string
+  pairsTotal: number
+  pairsScanned: number
+  candidatesFound: number
+  candidatesAnalyzed: number
+  candidatesTotal: number
+  startedAt: string
+  elapsedMs: number
+}
+
+/** A single entry in the scan activity log */
+export interface AiTraderScanLogEntry {
+  id: string
+  timestamp: string
+  type:
+    | "scan_start"
+    | "scan_skip"
+    | "scan_complete"
+    | "scan_error"
+    | "pair_scanned"
+    | "candidate_found"
+    | "tier2_pass"
+    | "tier2_fail"
+    | "tier3_pass"
+    | "tier3_fail"
+    | "trade_placed"
+    | "trade_rejected"
+    | "gate_blocked"
+  message: string
+  detail?: string
+  /** Structured metadata for rich UI display */
+  metadata?: {
+    instrument?: string
+    direction?: "long" | "short"
+    profile?: string
+    confidence?: number
+    entryPrice?: number
+    stopLoss?: number
+    takeProfit?: number
+    riskRewardRatio?: number
+    signalCount?: number
+    pairsScanned?: number
+    candidatesFound?: number
+    candidatesAnalyzed?: number
+    elapsedMs?: number
+    reason?: string
+    tier?: 1 | 2 | 3
+    /** Primary technique that triggered the signal */
+    primaryTechnique?: string
+    /** Confluence techniques that contributed to the signal */
+    techniques?: string[]
+    /** Human-readable reasons from technical analysis */
+    reasons?: string[]
+  }
+}
+
+/** Strategy performance stats for a profile/pair/session combination */
+export interface AiTraderStrategyPerformanceData {
+  profile: AiTraderProfile
+  instrument: string | null // null = all instruments
+  session: AiTraderSession | null // null = all sessions
+  technique: AiTraderTechnique | null
+  totalTrades: number
+  wins: number
+  losses: number
+  breakevens: number
+  winRate: number
+  totalPL: number
+  avgRR: number
+  profitFactor: number
+  expectancy: number
+  maxDrawdown: number
+  periodStart: string
+  periodEnd: string
+}
+
+/** Cached external market data entry */
+export interface AiTraderMarketDataEntry {
+  dataType: AiTraderMarketDataType
+  dataKey: string
+  data: unknown
+  fetchedAt: string
+  expiresAt: string
+}
+
+/** Economic calendar event */
+export interface EconomicCalendarEvent {
+  title: string
+  country: string
+  currency: string
+  impact: "high" | "medium" | "low"
+  actual: string | null
+  forecast: string | null
+  previous: string | null
+  timestamp: string
+}
+
+/** COT positioning data */
+export interface CotPositioningData {
+  currency: string
+  netLong: number
+  weeklyChange: number
+  percentLong: number
+  reportDate: string
+}
+
+/** News sentiment summary for a currency or pair */
+export interface NewsSentimentData {
+  subject: string // Currency or pair
+  sentiment: "bullish" | "bearish" | "neutral"
+  score: number // -100 to 100
+  articleCount: number
+  topHeadlines: string[]
+  fetchedAt: string
+}
+
+// ─── AI Trader WebSocket Messages ─────────────────────────────────────────────
+
+/** Broadcast when the AI Trader detects a new trading opportunity. */
+export interface AiTraderOpportunityFoundMessage extends DaemonMessage<AiTraderOpportunityData> {
+  type: "ai_trader_opportunity_found"
+}
+
+/** Broadcast when an AI Trader opportunity's status, scores, or management data changes. */
+export interface AiTraderOpportunityUpdatedMessage extends DaemonMessage<AiTraderOpportunityData> {
+  type: "ai_trader_opportunity_updated"
+}
+
+/** Broadcast when an AI Trader opportunity is removed (expired, rejected). */
+export interface AiTraderOpportunityRemovedMessage extends DaemonMessage<{
+  id: string
+  reason: string
+}> {
+  type: "ai_trader_opportunity_removed"
+}
+
+/** Broadcast with updated AI Trader scanner status after each scan cycle. */
+export interface AiTraderScanStatusMessage extends DaemonMessage<AiTraderScanStatus> {
+  type: "ai_trader_scan_status"
+}
+
+/** Real-time scan progress updates during an AI Trader scan (per-pair, per-phase). */
+export interface AiTraderScanProgressMessage extends DaemonMessage<AiTraderScanProgressData> {
+  type: "ai_trader_scan_progress"
+}
+
+/** Individual activity log entry from an AI Trader scan (for the scan log UI). */
+export interface AiTraderScanLogEntryMessage extends DaemonMessage<AiTraderScanLogEntry> {
+  type: "ai_trader_scan_log_entry"
+}
+
+/** Broadcast when the AI Trader places a trade on OANDA. */
+export interface AiTraderTradePlacedMessage extends DaemonMessage<{
+  opportunityId: string
+  tradeId: string
+  instrument: string
+  direction: TradeDirection
+  confidence: number
+  entryPrice: number
+}> {
+  type: "ai_trader_trade_placed"
+}
+
+/** Broadcast when the AI Trader takes a management action on an open trade (SL move, partial close, etc.). */
+export interface AiTraderTradeManagedMessage extends DaemonMessage<{
+  opportunityId: string
+  tradeId: string
+  action: AiTraderManagementAction
+}> {
+  type: "ai_trader_trade_managed"
+}
+
+/** Broadcast when an AI Trader trade is closed (by SL, TP, management, or manual action). */
+export interface AiTraderTradeClosedMessage extends DaemonMessage<{
+  opportunityId: string
+  tradeId: string
+  instrument: string
+  direction: TradeDirection
+  outcome: TradeOutcome
+  realizedPL: number
+  confidence: number
+}> {
+  type: "ai_trader_trade_closed"
+}
+
+/** AI Trader settings API response */
+export interface AiTraderConfigResponse {
+  config: AiTraderConfigData
+  scanStatus: AiTraderScanStatus
+}
+
+/** Default management config */
+export const AI_TRADER_DEFAULT_MANAGEMENT: AiTraderManagementConfig = {
+  breakevenEnabled: true,
+  breakevenTriggerRR: 1.0,
+  trailingStopEnabled: true,
+  trailingStopAtrMultiplier: 2.0,
+  partialCloseEnabled: true,
+  partialClosePercent: 50,
+  partialCloseTargetRR: 1.5,
+  timeExitEnabled: true,
+  timeExitHours: 24,
+  newsProtectionEnabled: true,
+  reEvaluationEnabled: true,
+  scaleInEnabled: false,
+}
+
+/** Default enabled techniques */
+export const AI_TRADER_DEFAULT_TECHNIQUES: Record<AiTraderTechnique, boolean> = {
+  smc_structure: true,
+  fair_value_gap: true,
+  order_block: true,
+  liquidity_sweep: true,
+  supply_demand_zone: true,
+  fibonacci_ote: true,
+  rsi: true,
+  macd: true,
+  ema_alignment: true,
+  bollinger_bands: true,
+  williams_r: true,
+  adx_regime: true,
+  divergence: true,
+  trend_detection: true,
+}
+
+/** Default enabled profiles */
+export const AI_TRADER_DEFAULT_PROFILES: Record<AiTraderProfile, boolean> = {
+  scalper: false,
+  intraday: true,
+  swing: true,
+  news: false,
 }

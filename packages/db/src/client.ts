@@ -1,8 +1,25 @@
+/**
+ * Database client — lazy-initialized Prisma singleton with SQLite WAL mode.
+ *
+ * Provides a lazy proxy (`db`) that defers Prisma client creation until first
+ * property access, ensuring environment variables from Next.js (.env.local)
+ * are available. Configures WAL mode and busy_timeout for concurrent access
+ * between the daemon and web processes.
+ *
+ * @module client
+ */
 import { PrismaLibSql } from "@prisma/adapter-libsql"
 import { PrismaClient } from "./generated/prisma/client"
 
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient }
 
+/**
+ * Create a new Prisma client with LibSQL adapter and configure SQLite pragmas
+ * for WAL mode and busy_timeout.
+ *
+ * @returns Configured PrismaClient instance
+ * @throws Error if DATABASE_URL is not set
+ */
 function createPrismaClient(): PrismaClient {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error("DATABASE_URL environment variable is required")

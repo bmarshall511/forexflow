@@ -1,8 +1,24 @@
+/**
+ * Supply/Demand zone service — persists and queries zone detection results.
+ *
+ * Handles soft-update upsert strategy (matched zones update, new zones insert,
+ * missing zones invalidate), zone querying with score/status filters,
+ * and cleanup of old invalidated zones.
+ *
+ * @module zone-service
+ */
 import { db } from "./client"
 import type { ZoneData, ZoneStatus, PersistedZoneData } from "@fxflow/types"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * Map a Prisma zone row to the `PersistedZoneData` DTO, deserializing
+ * JSON fields for scores and risk/reward data.
+ *
+ * @param row - Raw zone row from Prisma
+ * @returns Serialized zone data (ageInCandles and distanceFromPricePips are zeroed; computed by caller)
+ */
 function toPersistedZone(row: {
   id: string
   instrument: string
@@ -47,7 +63,14 @@ function toPersistedZone(row: {
   try {
     riskReward = JSON.parse(row.riskRewardJson)
   } catch {
-    riskReward = { entryPrice: row.proximalLine, stopLossPrice: row.distalLine, takeProfitPrice: null, riskPips: row.widthPips, rewardPips: null, ratio: null }
+    riskReward = {
+      entryPrice: row.proximalLine,
+      stopLossPrice: row.distalLine,
+      takeProfitPrice: null,
+      riskPips: row.widthPips,
+      rewardPips: null,
+      ratio: null,
+    }
   }
 
   return {
@@ -95,9 +118,7 @@ export async function upsertZones(
   const now = new Date()
 
   // Build a set of unique keys from incoming zones
-  const incomingKeys = new Set(
-    zones.map((z) => `${z.baseStartTime}_${z.baseEndTime}_${z.type}`),
-  )
+  const incomingKeys = new Set(zones.map((z) => `${z.baseStartTime}_${z.baseEndTime}_${z.type}`))
 
   // Fetch existing zones for this instrument+timeframe
   const existing = await db.supplyDemandZone.findMany({
@@ -167,6 +188,7 @@ export async function upsertZones(
 
 // ─── Query Zones ────────────────────────────────────────────────────────────
 
+/** Filtering options for zone queries. */
 export interface GetZonesOptions {
   status?: ZoneStatus[]
   minScore?: number

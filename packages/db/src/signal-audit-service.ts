@@ -1,5 +1,15 @@
+/**
+ * Signal audit service — records and queries audit trail events for the TV alert signal pipeline.
+ *
+ * Each signal can have multiple audit events tracking its journey through
+ * receive, validate, execute, and complete stages. Best-effort logging
+ * ensures audit failures never break signal processing.
+ *
+ * @module signal-audit-service
+ */
 import { db } from "./client"
 
+/** Serialized audit event data for the API/UI. */
 export interface SignalAuditEventData {
   id: string
   signalId: string

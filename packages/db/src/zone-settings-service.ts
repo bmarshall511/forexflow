@@ -1,3 +1,11 @@
+/**
+ * Zone display settings service — manages user preferences for zone visualization.
+ *
+ * Uses a singleton row (id=1) for app-wide zone display settings,
+ * falling back to defaults when no settings are stored.
+ *
+ * @module zone-settings-service
+ */
 import { db } from "./client"
 import type { ZoneDisplaySettings } from "@fxflow/types"
 import { DEFAULT_ZONE_DISPLAY_SETTINGS } from "@fxflow/shared"

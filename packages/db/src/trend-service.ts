@@ -1,3 +1,11 @@
+/**
+ * Trend detection service — persists and queries market trend analysis results.
+ *
+ * Stores one row per instrument+timeframe (latest wins) with swing points,
+ * trend segments, and controlling swing data. Supports history queries and cleanup.
+ *
+ * @module trend-service
+ */
 import { db } from "./client"
 import type { TrendData } from "@fxflow/types"
 
@@ -94,6 +102,13 @@ export async function cleanupOldTrends(olderThanDays = 30): Promise<number> {
   return result.count
 }
 
+/**
+ * Safely parse a JSON string with a fallback value.
+ *
+ * @param json - JSON string to parse
+ * @param fallback - Value to return on parse failure
+ * @returns Parsed value or fallback
+ */
 function safeJsonParse<T>(json: string, fallback: T): T {
   try {
     return JSON.parse(json) as T

@@ -107,9 +107,52 @@ packages/
 
 ### Commit messages
 
-- Use present tense ("Add feature" not "Added feature")
-- Keep the first line under 72 characters
-- Reference issues where applicable (`Fixes #123`)
+This project enforces [Conventional Commits](https://www.conventionalcommits.org/) via commitlint. Every commit message must follow this format:
+
+```
+type(scope): description
+```
+
+**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+**Scopes:** `web`, `daemons`, `cf-worker`, `mcp-server`, `types`, `shared`, `db`, `ci`, `docs`, `deps`
+
+**Examples:**
+
+```bash
+git commit -m "feat(web): add dark mode toggle to settings"
+git commit -m "fix(daemons): prevent duplicate signal processing"
+git commit -m "docs: update API documentation"
+```
+
+Invalid commit messages will be rejected by the pre-commit hook.
+
+### Pre-commit hooks
+
+[Lefthook](https://github.com/evilmartians/lefthook) runs automatically on git operations:
+
+- **On commit:** Prettier auto-formats staged files, ESLint auto-fixes staged files
+- **On commit message:** commitlint validates conventional commit format
+- **On push:** TypeScript type checking + full test suite must pass
+
+Hooks are installed automatically via `pnpm install` (postinstall script). If hooks are missing, run `pnpm lefthook install`.
+
+### CI checks
+
+Every pull request runs the following checks via GitHub Actions:
+
+| Check            | What it does                                               |
+| ---------------- | ---------------------------------------------------------- |
+| **lint-format**  | ESLint + Prettier across all workspaces                    |
+| **typecheck**    | `tsc --noEmit` across all workspaces                       |
+| **test**         | Vitest test suites with coverage                           |
+| **build**        | Full production build                                      |
+| **audit**        | `pnpm audit` for known vulnerabilities                     |
+| **knip**         | Detects unused exports and dependencies                    |
+| **prisma-drift** | Ensures migrations match the schema                        |
+| **danger**       | Automated PR review (size, description, import boundaries) |
+
+All checks must pass before merging. PRs are squash-merged to `main`.
 
 ## Areas Welcoming Contributions
 

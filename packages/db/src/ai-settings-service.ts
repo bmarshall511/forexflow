@@ -1,14 +1,25 @@
+/**
+ * AI Settings service — manages Claude API keys, model preferences, and auto-analysis configuration.
+ *
+ * Handles encrypted API key storage for Claude and Finnhub, default model selection,
+ * auto-analysis trigger settings, and auto-disable/recovery logic. Uses a singleton
+ * row (id=1) for app-wide AI settings.
+ *
+ * @module ai-settings-service
+ */
 import { db } from "./client"
 import { encrypt, decrypt } from "./encryption"
-import type {
-  AiSettingsData,
-  AiAutoAnalysisSettings,
-  AiClaudeModel,
-} from "@fxflow/types"
+import type { AiSettingsData, AiAutoAnalysisSettings, AiClaudeModel } from "@fxflow/types"
 import { AI_AUTO_ANALYSIS_DEFAULTS as DEFAULTS } from "@fxflow/types"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Extract the last 4 characters of a decrypted API key for display purposes.
+ *
+ * @param encrypted - The encrypted key string, or null
+ * @returns Last 4 characters of the decrypted key, or empty string
+ */
 function keyLastFour(encrypted: string | null): string {
   if (!encrypted) return ""
   try {
@@ -19,6 +30,12 @@ function keyLastFour(encrypted: string | null): string {
   }
 }
 
+/**
+ * Parse auto-analysis settings JSON, merging with defaults for missing fields.
+ *
+ * @param json - JSON string of auto-analysis settings
+ * @returns Fully populated auto-analysis settings
+ */
 function parseAutoAnalysis(json: string): AiAutoAnalysisSettings {
   try {
     return { ...DEFAULTS, ...(JSON.parse(json) as Partial<AiAutoAnalysisSettings>) }
@@ -27,6 +44,7 @@ function parseAutoAnalysis(json: string): AiAutoAnalysisSettings {
   }
 }
 
+/** Get the singleton AI settings row, creating it with defaults if it does not exist. */
 async function getOrCreate() {
   const existing = await db.aiSettings.findUnique({ where: { id: 1 } })
   if (existing) return existing
@@ -35,6 +53,12 @@ async function getOrCreate() {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+/**
+ * Get the current AI settings including key presence flags, default model,
+ * and auto-analysis configuration.
+ *
+ * @returns AI settings data with masked key info
+ */
 export async function getAiSettings(): Promise<AiSettingsData> {
   const row = await getOrCreate()
   return {
@@ -47,6 +71,11 @@ export async function getAiSettings(): Promise<AiSettingsData> {
   }
 }
 
+/**
+ * Encrypt and store a Claude API key.
+ *
+ * @param key - The plaintext API key to store
+ */
 export async function saveClaudeApiKey(key: string): Promise<void> {
   await getOrCreate()
   await db.aiSettings.update({
@@ -55,6 +84,11 @@ export async function saveClaudeApiKey(key: string): Promise<void> {
   })
 }
 
+/**
+ * Encrypt and store a Finnhub API key.
+ *
+ * @param key - The plaintext API key to store
+ */
 export async function saveFinnhubApiKey(key: string): Promise<void> {
   await getOrCreate()
   await db.aiSettings.update({
@@ -63,16 +97,24 @@ export async function saveFinnhubApiKey(key: string): Promise<void> {
   })
 }
 
+/** Remove the stored Claude API key. */
 export async function deleteClaudeApiKey(): Promise<void> {
   await getOrCreate()
   await db.aiSettings.update({ where: { id: 1 }, data: { claudeApiKey: null } })
 }
 
+/** Remove the stored Finnhub API key. */
 export async function deleteFinnhubApiKey(): Promise<void> {
   await getOrCreate()
   await db.aiSettings.update({ where: { id: 1 }, data: { finnhubApiKey: null } })
 }
 
+/**
+ * Update AI preferences (default model and/or auto-analysis settings).
+ * Auto-analysis settings are merged with existing values.
+ *
+ * @param opts - Preferences to update
+ */
 export async function saveAiPreferences(opts: {
   defaultModel?: AiClaudeModel
   autoAnalysis?: Partial<AiAutoAnalysisSettings>

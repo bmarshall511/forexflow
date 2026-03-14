@@ -1,9 +1,27 @@
+/**
+ * Encryption utilities — AES-256-GCM encryption/decryption for sensitive data.
+ *
+ * Used to encrypt API tokens, keys, and other secrets before storing in SQLite.
+ * Format: `iv:tag:ciphertext` (all hex-encoded). Requires a 32-byte (64 hex char)
+ * ENCRYPTION_KEY environment variable.
+ *
+ * @module encryption
+ */
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto"
 
+/** AES-256-GCM algorithm identifier. */
 const ALGORITHM = "aes-256-gcm"
+/** Initialization vector length in bytes. */
 const IV_LENGTH = 12
+/** Authentication tag length in bytes. */
 const TAG_LENGTH = 16
 
+/**
+ * Load and validate the encryption key from the ENCRYPTION_KEY environment variable.
+ *
+ * @returns 32-byte Buffer encryption key
+ * @throws Error if ENCRYPTION_KEY is not set or is not 64 hex characters
+ */
 function getKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY
   if (!key) {

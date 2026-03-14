@@ -1,3 +1,12 @@
+/**
+ * Trade Finder config service — manages scanner and auto-trade configuration.
+ *
+ * Handles enabled pairs, score thresholds, approaching ATR multiples,
+ * and auto-trade settings (concurrent limits, daily caps, risk caps, min R:R).
+ * Uses a singleton row (id=1) for app-wide config.
+ *
+ * @module trade-finder-config-service
+ */
 import { db } from "./client"
 import type { TradeFinderConfigData, TradeFinderPairConfig } from "@fxflow/types"
 import { getRiskPercent } from "./settings-service"
@@ -13,6 +22,7 @@ function safeIso(val: unknown): string {
   return new Date().toISOString()
 }
 
+/** Get the singleton config row, creating it with defaults if it does not exist. */
 async function getOrCreateConfig() {
   const existing = await db.tradeFinderConfig.findUnique({ where: { id: 1 } })
   if (existing) return existing
@@ -20,6 +30,11 @@ async function getOrCreateConfig() {
   return db.tradeFinderConfig.create({ data: { id: 1 } })
 }
 
+/**
+ * Get the current Trade Finder configuration including risk percent from global settings.
+ *
+ * @returns Full Trade Finder config data
+ */
 export async function getTradeFinderConfig(): Promise<TradeFinderConfigData> {
   const config = await getOrCreateConfig()
   const riskPercent = await getRiskPercent()
@@ -49,6 +64,7 @@ export async function getTradeFinderConfig(): Promise<TradeFinderConfigData> {
   }
 }
 
+/** Subset of Trade Finder config fields that can be updated via the API. */
 type UpdatableConfigFields = Pick<
   TradeFinderConfigData,
   | "enabled"
@@ -64,6 +80,12 @@ type UpdatableConfigFields = Pick<
   | "autoTradeCancelOnInvalidation"
 >
 
+/**
+ * Partially update the Trade Finder configuration. Only provided fields are updated.
+ *
+ * @param data - Fields to update, including optional pairs array
+ * @returns The full updated config data
+ */
 export async function updateTradeFinderConfig(
   data: Partial<UpdatableConfigFields> & { pairs?: TradeFinderPairConfig[] },
 ): Promise<TradeFinderConfigData> {
@@ -73,14 +95,18 @@ export async function updateTradeFinderConfig(
   if (data.enabled !== undefined) updateData.enabled = data.enabled
   if (data.minScore !== undefined) updateData.minScore = data.minScore
   if (data.maxEnabledPairs !== undefined) updateData.maxEnabledPairs = data.maxEnabledPairs
-  if (data.approachingAtrMultiple !== undefined) updateData.approachingAtrMultiple = data.approachingAtrMultiple
+  if (data.approachingAtrMultiple !== undefined)
+    updateData.approachingAtrMultiple = data.approachingAtrMultiple
   if (data.autoTradeEnabled !== undefined) updateData.autoTradeEnabled = data.autoTradeEnabled
   if (data.autoTradeMinScore !== undefined) updateData.autoTradeMinScore = data.autoTradeMinScore
-  if (data.autoTradeMaxConcurrent !== undefined) updateData.autoTradeMaxConcurrent = data.autoTradeMaxConcurrent
+  if (data.autoTradeMaxConcurrent !== undefined)
+    updateData.autoTradeMaxConcurrent = data.autoTradeMaxConcurrent
   if (data.autoTradeMaxDaily !== undefined) updateData.autoTradeMaxDaily = data.autoTradeMaxDaily
-  if (data.autoTradeMaxRiskPercent !== undefined) updateData.autoTradeMaxRiskPercent = data.autoTradeMaxRiskPercent
+  if (data.autoTradeMaxRiskPercent !== undefined)
+    updateData.autoTradeMaxRiskPercent = data.autoTradeMaxRiskPercent
   if (data.autoTradeMinRR !== undefined) updateData.autoTradeMinRR = data.autoTradeMinRR
-  if (data.autoTradeCancelOnInvalidation !== undefined) updateData.autoTradeCancelOnInvalidation = data.autoTradeCancelOnInvalidation
+  if (data.autoTradeCancelOnInvalidation !== undefined)
+    updateData.autoTradeCancelOnInvalidation = data.autoTradeCancelOnInvalidation
   if (data.pairs !== undefined) updateData.pairsJson = JSON.stringify(data.pairs)
 
   await db.tradeFinderConfig.update({

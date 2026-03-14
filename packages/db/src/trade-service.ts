@@ -1,3 +1,12 @@
+/**
+ * Trade service — CRUD operations for OANDA-sourced trades.
+ *
+ * Handles upsert, close, partial close, MFE/MAE tracking, metadata enrichment,
+ * and listing with pagination/filtering. OANDA is the canonical trade repository;
+ * the `enrichSource()` helper resolves display-friendly source labels from metadata.
+ *
+ * @module trade-service
+ */
 import { db } from "./client"
 import type {
   TradeSource,
@@ -8,11 +17,11 @@ import type {
   Timeframe,
   ClosedTradeData,
   TradeDetailData,
-  TradeTagData,
 } from "@fxflow/types"
 
 // ─── Input types ─────────────────────────────────────────────────────────────
 
+/** Fields required to create or update a trade record via upsert. */
 export interface UpsertTradeInput {
   source: TradeSource
   sourceTradeId: string
@@ -40,6 +49,7 @@ export interface UpsertTradeInput {
   closedAt?: Date | null
 }
 
+/** Fields required to close an existing trade. */
 export interface CloseTradeInput {
   exitPrice: number | null
   closeReason: TradeCloseReason
@@ -50,6 +60,7 @@ export interface CloseTradeInput {
   closedAt: Date
 }
 
+/** Filtering, sorting, and pagination options for listing trades. */
 export interface ListTradesOptions {
   status?: TradeStatus
   instrument?: string
@@ -64,6 +75,7 @@ export interface ListTradesOptions {
   tagIds?: string[]
 }
 
+/** Paginated response containing trades and metadata. */
 export interface TradeListResponse {
   trades: ClosedTradeData[]
   totalCount: number
@@ -71,6 +83,7 @@ export interface TradeListResponse {
   pageSize: number
 }
 
+/** Fields required to create a trade audit event. */
 export interface CreateTradeEventInput {
   tradeId: string
   eventType: string
@@ -79,12 +92,19 @@ export interface CreateTradeEventInput {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Derive trade outcome from realized P&L.
+ *
+ * @param realizedPL - The realized profit/loss value
+ * @returns The trade outcome: "win", "loss", or "breakeven"
+ */
 function getOutcome(realizedPL: number): TradeOutcome {
   if (realizedPL > 0) return "win"
   if (realizedPL < 0) return "loss"
   return "breakeven"
 }
 
+/** Internal row shape returned by Prisma for trade queries with optional tag includes. */
 interface TradeRow {
   id: string
   source: string
@@ -120,12 +140,22 @@ function enrichSource(source: string, metadata?: string | null): TradeSource {
       if (meta.placedVia === "ut_bot_alerts") return "ut_bot_alerts"
       if (meta.placedVia === "trade_finder") return "trade_finder"
       if (meta.placedVia === "trade_finder_auto") return "trade_finder_auto"
+      if (meta.placedVia === "ai_trader") return "ai_trader"
       if (meta.placedVia === "fxflow") return "manual"
-    } catch { /* ignore malformed metadata */ }
+    } catch {
+      /* ignore malformed metadata */
+    }
   }
   return source as TradeSource
 }
 
+/**
+ * Map a Prisma trade row to the `ClosedTradeData` DTO, enriching the source
+ * from metadata and computing the outcome from realized P&L.
+ *
+ * @param row - Raw trade row from Prisma
+ * @returns Serialized closed trade data for the API/UI
+ */
 function toClosedTradeData(row: TradeRow): ClosedTradeData {
   return {
     id: row.id,
@@ -169,7 +199,9 @@ function toClosedTradeData(row: TradeRow): ClosedTradeData {
  * Fields left `undefined` (not present) are omitted from the update entirely.
  */
 export async function upsertTrade(input: UpsertTradeInput) {
-  const where = { source_sourceTradeId: { source: input.source, sourceTradeId: input.sourceTradeId } }
+  const where = {
+    source_sourceTradeId: { source: input.source, sourceTradeId: input.sourceTradeId },
+  }
 
   // Build update object — ONLY include fields that are explicitly provided.
   // `undefined` means "caller didn't provide this" → omit entirely.
@@ -187,7 +219,8 @@ export async function upsertTrade(input: UpsertTradeInput) {
   if (input.exitPrice !== undefined) update.exitPrice = input.exitPrice
   if (input.stopLoss !== undefined) update.stopLoss = input.stopLoss
   if (input.takeProfit !== undefined) update.takeProfit = input.takeProfit
-  if (input.trailingStopDistance !== undefined) update.trailingStopDistance = input.trailingStopDistance
+  if (input.trailingStopDistance !== undefined)
+    update.trailingStopDistance = input.trailingStopDistance
   if (input.realizedPL !== undefined) update.realizedPL = input.realizedPL
   if (input.unrealizedPL !== undefined) update.unrealizedPL = input.unrealizedPL
   if (input.financing !== undefined) update.financing = input.financing

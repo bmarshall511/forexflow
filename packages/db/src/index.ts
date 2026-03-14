@@ -180,22 +180,11 @@ export {
   type GetZonesOptions,
 } from "./zone-service"
 
-export {
-  getZoneSettings,
-  saveZoneSettings,
-} from "./zone-settings-service"
+export { getZoneSettings, saveZoneSettings } from "./zone-settings-service"
 
-export {
-  upsertTrend,
-  getTrend,
-  getTrendHistory,
-  cleanupOldTrends,
-} from "./trend-service"
+export { upsertTrend, getTrend, getTrendHistory, cleanupOldTrends } from "./trend-service"
 
-export {
-  getTrendSettings,
-  saveTrendSettings,
-} from "./trend-settings-service"
+export { getTrendSettings, saveTrendSettings } from "./trend-settings-service"
 
 export {
   upsertCurveSnapshot,
@@ -203,10 +192,7 @@ export {
   cleanupOldCurveSnapshots,
 } from "./curve-snapshot-service"
 
-export {
-  getTradeFinderConfig,
-  updateTradeFinderConfig,
-} from "./trade-finder-config-service"
+export { getTradeFinderConfig, updateTradeFinderConfig } from "./trade-finder-config-service"
 
 export {
   getActiveSetups,
@@ -228,3 +214,47 @@ export {
   clearSetupHistory,
   type CreateSetupInput,
 } from "./trade-finder-service"
+
+export {
+  getAiTraderConfig,
+  updateAiTraderConfig,
+  saveAiTraderApiKey,
+  deleteAiTraderApiKey,
+  getDecryptedAiTraderKey,
+} from "./ai-trader-config-service"
+
+export {
+  createOpportunity,
+  updateOpportunityStatus,
+  getActiveOpportunities,
+  getOpportunityHistory,
+  getOpportunity,
+  findOpportunityByResultTradeId,
+  findOpportunityByResultSourceId,
+  countOpenAiTrades,
+  appendManagementAction,
+  getTodayAiCost,
+  getMonthlyAiCost,
+  expireOldOpportunities,
+  cleanupOldOpportunities,
+  getOpportunitiesByProfile,
+  type CreateOpportunityInput,
+} from "./ai-trader-opportunity-service"
+
+export {
+  getCachedMarketData,
+  setCachedMarketData,
+  getAllCachedByType,
+  cleanupExpiredData,
+  clearAllMarketData,
+} from "./ai-trader-market-data-service"
+
+export {
+  getPerformanceStats,
+  upsertPerformanceStats,
+  recalculatePerformance,
+  getOverallStats,
+  cleanupOldPerformance,
+  type UpsertPerformanceInput,
+  type TradeStatsInput,
+} from "./ai-trader-performance-service"

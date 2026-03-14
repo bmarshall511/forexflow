@@ -1,3 +1,12 @@
+/**
+ * Curve snapshot service — persists supply/demand curve computation results.
+ *
+ * Stores one row per instrument+timeframe (latest wins) with distal levels,
+ * thresholds, and price position data. Used by the Trade Finder for
+ * curve-based scoring.
+ *
+ * @module curve-snapshot-service
+ */
 import { db } from "./client"
 import type { CurveData } from "@fxflow/types"
 

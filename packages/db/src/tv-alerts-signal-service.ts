@@ -1,3 +1,12 @@
+/**
+ * TradingView Alerts signal service — manages the lifecycle of TV alert signals.
+ *
+ * Handles signal creation, status updates, deduplication, performance stats,
+ * period-based P&L bucketing, auto-trade tracking, and result synchronization
+ * from closed OANDA trades back into signal records.
+ *
+ * @module tv-alerts-signal-service
+ */
 import { db } from "./client"
 import { getForexDayStart, getForexPeriodBoundaries } from "@fxflow/shared"
 import type {
@@ -9,11 +18,11 @@ import type {
   TVSignalListResponse,
   TVSignalPeriodPnL,
   TVSignalPeriodPnLData,
-  PnLPeriod,
 } from "@fxflow/types"
 
 // ─── Input Types ──────────────────────────────────────────────────────────────
 
+/** Fields required to create a new TV alert signal record. */
 export interface CreateSignalInput {
   source?: string
   instrument: string
@@ -28,6 +37,7 @@ export interface CreateSignalInput {
   processedAt?: Date | null
 }
 
+/** Filtering and pagination options for listing signals. */
 export interface ListSignalsOptions {
   page?: number
   pageSize?: number
@@ -40,6 +50,13 @@ export interface ListSignalsOptions {
 
 // ─── Row Mapper ───────────────────────────────────────────────────────────────
 
+/**
+ * Map a Prisma signal row to the `TVAlertSignal` DTO, deserializing
+ * JSON fields for rawPayload and executionDetails.
+ *
+ * @param row - Raw signal row from Prisma
+ * @returns Serialized signal data for the API/UI
+ */
 function rowToSignal(row: {
   id: string
   source: string
@@ -136,7 +153,9 @@ export async function updateSignalStatus(
   if (details?.rejectionReason !== undefined) updateData.rejectionReason = details.rejectionReason
   if (details?.resultTradeId !== undefined) updateData.resultTradeId = details.resultTradeId
   if (details?.executionDetails !== undefined) {
-    updateData.executionDetails = details.executionDetails ? JSON.stringify(details.executionDetails) : null
+    updateData.executionDetails = details.executionDetails
+      ? JSON.stringify(details.executionDetails)
+      : null
   }
   if (details?.processedAt !== undefined) updateData.processedAt = details.processedAt
 
@@ -415,6 +434,7 @@ export async function getAutoTradesSummary(): Promise<{
 
 // ─── Period P&L ───────────────────────────────────────────────────────────────
 
+/** Create an empty period P&L bucket with zeroed counters. */
 function emptyPeriodPnL(): TVSignalPeriodPnL {
   return { net: 0, signalCount: 0, wins: 0, losses: 0 }
 }
@@ -478,6 +498,14 @@ export async function getSignalPeriodPnL(): Promise<TVSignalPeriodPnLData> {
   return periods
 }
 
+/**
+ * Accumulate a single signal's P&L into a period bucket.
+ *
+ * @param period - The period bucket to update
+ * @param pl - Realized P&L for this signal
+ * @param isWin - Whether this signal was a win
+ * @param isLoss - Whether this signal was a loss
+ */
 function addToPeriod(period: TVSignalPeriodPnL, pl: number, isWin: boolean, isLoss: boolean) {
   period.net += pl
   period.signalCount++
@@ -504,7 +532,9 @@ export async function syncClosedSignalResults(): Promise<number> {
     try {
       const details = JSON.parse(sig.executionDetails) as Record<string, unknown>
       return details.realizedPL === undefined
-    } catch { return false }
+    } catch {
+      return false
+    }
   })
 
   if (needsSync.length === 0) return 0
@@ -589,4 +619,3 @@ export async function clearAllSignals(): Promise<number> {
   const { count } = await db.tVAlertSignal.deleteMany()
   return count
 }
-

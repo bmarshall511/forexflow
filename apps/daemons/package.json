@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@types/ws": "^8",
+    "eslint": "^9.39.3",
     "tsx": "^4",
     "typescript": "^5.7",
     "vitest": "^3"

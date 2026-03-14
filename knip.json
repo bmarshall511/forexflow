@@ -1,0 +1,44 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "workspaces": {
+    "apps/web": {
+      "entry": [
+        "src/app/**/page.tsx",
+        "src/app/**/layout.tsx",
+        "src/app/**/route.ts",
+        "src/app/api/**/route.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/components/ui/**"],
+      "ignoreDependencies": ["@tailwindcss/postcss", "tailwindcss", "sharp"]
+    },
+    "apps/daemons": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "apps/cf-worker": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@cloudflare/workers-types"]
+    },
+    "apps/mcp-server": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/types": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/shared": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/db": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["prisma"]
+    }
+  },
+  "ignore": ["**/*.test.ts", "**/*.d.ts"],
+  "ignoreDependencies": ["prettier-plugin-tailwindcss"]
+}

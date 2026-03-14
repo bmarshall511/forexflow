@@ -66,6 +66,9 @@ tsconfig.tsbuildinfo
 # dev orchestrator state
 .dev/
 
+# generated docs
+docs/api/
+
 # personal / private docs
 docs/lightning-talk-script.md
 docs/blog-post-personal.md

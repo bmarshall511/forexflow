@@ -1,6 +1,21 @@
+/**
+ * AI Recommendation outcome service — tracks whether AI recommendations were followed
+ * and measures prediction accuracy against actual trade outcomes.
+ *
+ * Supports calibration analysis by bucketing predicted win probabilities against
+ * actual win rates, enabling assessment of AI model quality.
+ *
+ * @module ai-recommendation-service
+ */
 import { db } from "./client"
 import type { AiAccuracyStats } from "@fxflow/types"
 
+/**
+ * Record a new recommendation outcome linking an analysis to a trade.
+ *
+ * @param input - Recommendation data including analysis ID, trade ID, and predicted metrics
+ * @returns The created outcome record ID
+ */
 export async function createRecommendationOutcome(input: {
   analysisId: string
   tradeId: string
@@ -20,6 +35,11 @@ export async function createRecommendationOutcome(input: {
   return record.id
 }
 
+/**
+ * Mark that the user followed the AI's recommendation for a given analysis.
+ *
+ * @param analysisId - The analysis ID whose recommendation was followed
+ */
 export async function markActionFollowed(analysisId: string): Promise<void> {
   await db.aiRecommendationOutcome.updateMany({
     where: { analysisId },
@@ -27,6 +47,14 @@ export async function markActionFollowed(analysisId: string): Promise<void> {
   })
 }
 
+/**
+ * Resolve all pending recommendation outcomes for a trade with the actual result.
+ * Called when a trade closes to record whether the AI's prediction was correct.
+ *
+ * @param tradeId - The trade ID to resolve outcomes for
+ * @param outcome - The actual trade outcome
+ * @param pnl - The actual realized P&L
+ */
 export async function resolveOutcomes(
   tradeId: string,
   outcome: "win" | "loss" | "breakeven",
@@ -42,6 +70,13 @@ export async function resolveOutcomes(
   })
 }
 
+/**
+ * Compute AI recommendation accuracy statistics including follow rates,
+ * win rates (followed vs ignored), and calibration buckets comparing
+ * predicted win probability against actual outcomes.
+ *
+ * @returns Comprehensive accuracy stats for AI recommendations
+ */
 export async function getAccuracyStats(): Promise<AiAccuracyStats> {
   const all = await db.aiRecommendationOutcome.findMany({
     where: { resolvedAt: { not: null } },
@@ -71,9 +106,7 @@ export async function getAccuracyStats(): Promise<AiAccuracyStats> {
   const ignoredWinRate = winRate(ignored)
   const overallActualWinRate = winRate(all)
   const overallPredictedWinRate =
-    all.length > 0
-      ? all.reduce((sum, r) => sum + r.winProbability, 0) / all.length
-      : null
+    all.length > 0 ? all.reduce((sum, r) => sum + r.winProbability, 0) / all.length : null
 
   // Calibration buckets: 0-20%, 20-40%, ..., 80-100%
   const buckets = [

@@ -44,7 +44,12 @@ export interface TradeContextSnapshot {
   previousAnalyses: PreviousAnalysisSummary[]
   marketSession: string
   correlatedPairs: Array<{ instrument: string; h1Trend: string; lastClose: number }>
-  openPositions: Array<{ instrument: string; direction: string; units: number; unrealizedPL: number }>
+  openPositions: Array<{
+    instrument: string
+    direction: string
+    units: number
+    unrealizedPL: number
+  }>
   gatheringErrors: string[]
 }
 
@@ -189,7 +194,7 @@ function calcRSI(closes: number[], period = 14): number | null {
   let avgGain = 0
   let avgLoss = 0
   for (let i = 1; i <= period; i++) {
-    const change = (slice[i]! - slice[i - 1]!)
+    const change = slice[i]! - slice[i - 1]!
     if (change > 0) avgGain += change
     else avgLoss += Math.abs(change)
   }
@@ -206,11 +211,13 @@ function calcATR(candles: Candle[], period = 14): number | null {
   for (let i = 1; i < candles.length; i++) {
     const prev = candles[i - 1]!
     const curr = candles[i]!
-    trs.push(Math.max(
-      curr.high - curr.low,
-      Math.abs(curr.high - prev.close),
-      Math.abs(curr.low - prev.close),
-    ))
+    trs.push(
+      Math.max(
+        curr.high - curr.low,
+        Math.abs(curr.high - prev.close),
+        Math.abs(curr.low - prev.close),
+      ),
+    )
   }
   const slice = trs.slice(-period)
   return slice.reduce((a, b) => a + b, 0) / slice.length
@@ -243,7 +250,7 @@ async function fetchCandles(
   count: number,
   apiUrl: string,
   token: string,
-  accountId: string,
+  _accountId: string,
 ): Promise<Candle[]> {
   try {
     const url = `${apiUrl}/v3/instruments/${instrument}/candles?granularity=${granularity}&count=${count}&price=M`
@@ -252,7 +259,9 @@ async function fetchCandles(
       signal: AbortSignal.timeout(10_000),
     })
     if (!response.ok) {
-      console.warn(`[context-gatherer] Candle fetch failed for ${instrument} ${granularity}: HTTP ${response.status}`)
+      console.warn(
+        `[context-gatherer] Candle fetch failed for ${instrument} ${granularity}: HTTP ${response.status}`,
+      )
       return []
     }
     const data = (await response.json()) as {
@@ -274,7 +283,10 @@ async function fetchCandles(
         volume: c.volume,
       }))
   } catch (err) {
-    console.warn(`[context-gatherer] Candle fetch error for ${instrument} ${granularity}:`, (err as Error).message)
+    console.warn(
+      `[context-gatherer] Candle fetch error for ${instrument} ${granularity}:`,
+      (err as Error).message,
+    )
     return []
   }
 }
@@ -317,7 +329,9 @@ async function fetchEconomicCalendar(
       NZD: "NZ",
     }
 
-    const relevantCountries = currencies.map((c) => currencyCountryMap[c]).filter(Boolean) as string[]
+    const relevantCountries = currencies
+      .map((c) => currencyCountryMap[c])
+      .filter(Boolean) as string[]
 
     return (data.economicCalendar ?? [])
       .filter((e) => relevantCountries.includes(e.country) && e.impact !== "low")
@@ -325,7 +339,8 @@ async function fetchEconomicCalendar(
       .map((e) => ({
         title: e.event,
         country: e.country,
-        currency: Object.entries(currencyCountryMap).find(([, v]) => v === e.country)?.[0] ?? e.country,
+        currency:
+          Object.entries(currencyCountryMap).find(([, v]) => v === e.country)?.[0] ?? e.country,
         impact: (e.impact as "low" | "medium" | "high") ?? "low",
         time: e.time,
         forecast: e.estimate,
@@ -339,10 +354,7 @@ async function fetchEconomicCalendar(
 
 // ─── FinnHub Forex News ────────────────────────────────────────────────────────
 
-async function fetchForexNews(
-  currencies: string[],
-  finnhubKey: string,
-): Promise<NewsHeadline[]> {
+async function fetchForexNews(currencies: string[], finnhubKey: string): Promise<NewsHeadline[]> {
   try {
     const url = `https://finnhub.io/api/v1/news?category=forex&token=${finnhubKey}`
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
@@ -401,7 +413,8 @@ async function gatherTradeContextInner(opts: {
   const { tradeId, depth, stateManager } = opts
   const errors: string[] = []
 
-  const { db, getTradeWithDetails, getAnalysisHistory, listConditionsForTrade } = await import("@fxflow/db")
+  const { db, getTradeWithDetails, getAnalysisHistory, listConditionsForTrade } =
+    await import("@fxflow/db")
   const { getDecryptedFinnhubKey, getSettings } = await import("@fxflow/db")
 
   // ─── 1. Trade Details ───────────────────────────────────────────────────
@@ -461,19 +474,17 @@ async function gatherTradeContextInner(opts: {
   let livePrice: LivePrice | null = null
   const positions = stateManager.getPositions()
   if (!positions) {
-    console.warn(`[context-gatherer] No positions data available for live price lookup (trade ${tradeId})`)
+    console.warn(
+      `[context-gatherer] No positions data available for live price lookup (trade ${tradeId})`,
+    )
   }
   if (positions) {
     const openTrade = positions.open.find((t) => t.id === tradeId)
     if (openTrade?.currentPrice) {
       const pip = getPipSize(tradeInfo.instrument)
       const mid = openTrade.currentPrice
-      const slDist = tradeInfo.stopLoss
-        ? Math.abs(mid - tradeInfo.stopLoss) / pip
-        : null
-      const tpDist = tradeInfo.takeProfit
-        ? Math.abs(mid - tradeInfo.takeProfit) / pip
-        : null
+      const slDist = tradeInfo.stopLoss ? Math.abs(mid - tradeInfo.stopLoss) / pip : null
+      const tpDist = tradeInfo.takeProfit ? Math.abs(mid - tradeInfo.takeProfit) / pip : null
       livePrice = {
         bid: mid - pip / 2,
         ask: mid + pip / 2,
@@ -487,7 +498,7 @@ async function gatherTradeContextInner(opts: {
   }
 
   // ─── 4. Candles + Indicators ───────────────────────────────────────────
-  const settings = await getSettings()
+  const _settings = await getSettings()
   const mode = snapshot.tradingMode ?? "practice"
   const apiUrl =
     mode === "live" ? "https://api-fxtrade.oanda.com" : "https://api-fxpractice.oanda.com"
@@ -502,9 +513,15 @@ async function gatherTradeContextInner(opts: {
 
   const counts = CANDLE_COUNTS[depth]
   const [m15Candles, h1Candles, h4Candles] = await Promise.all([
-    token ? fetchCandles(tradeInfo.instrument, "M15", counts.M15, apiUrl, token, "") : Promise.resolve([]),
-    token ? fetchCandles(tradeInfo.instrument, "H1", counts.H1, apiUrl, token, "") : Promise.resolve([]),
-    token ? fetchCandles(tradeInfo.instrument, "H4", counts.H4, apiUrl, token, "") : Promise.resolve([]),
+    token
+      ? fetchCandles(tradeInfo.instrument, "M15", counts.M15, apiUrl, token, "")
+      : Promise.resolve([]),
+    token
+      ? fetchCandles(tradeInfo.instrument, "H1", counts.H1, apiUrl, token, "")
+      : Promise.resolve([]),
+    token
+      ? fetchCandles(tradeInfo.instrument, "H4", counts.H4, apiUrl, token, "")
+      : Promise.resolve([]),
   ])
 
   if (!m15Candles.length) errors.push("Could not fetch M15 candle data")
@@ -523,8 +540,14 @@ async function gatherTradeContextInner(opts: {
   const ema50 = calcEMA(h1Closes, 50)
 
   // Detect S/R levels from recent H1 highs/lows
-  const recentHighs = h1Highs.slice(-20).sort((a, b) => b - a).slice(0, 3)
-  const recentLows = h1Lows.slice(-20).sort((a, b) => a - b).slice(0, 3)
+  const recentHighs = h1Highs
+    .slice(-20)
+    .sort((a, b) => b - a)
+    .slice(0, 3)
+  const recentLows = h1Lows
+    .slice(-20)
+    .sort((a, b) => a - b)
+    .slice(0, 3)
 
   // Trend determination
   let trend: "bullish" | "bearish" | "sideways" = "sideways"
@@ -559,7 +582,7 @@ async function gatherTradeContextInner(opts: {
         const ema20 = calculateEMA(closes, 20)
         const trend = ema10 > ema20 ? "bullish" : ema10 < ema20 ? "bearish" : "sideways"
         return { instrument: inst, h1Trend: trend, lastClose }
-      })
+      }),
     )
     for (const result of correlatedResults) {
       if (result.status === "fulfilled" && result.value) {
@@ -569,7 +592,12 @@ async function gatherTradeContextInner(opts: {
   }
 
   // ─── 4c. Portfolio Context ────────────────────────────────────────────
-  const openPositions: Array<{ instrument: string; direction: string; units: number; unrealizedPL: number }> = []
+  const openPositions: Array<{
+    instrument: string
+    direction: string
+    units: number
+    unrealizedPL: number
+  }> = []
   if (positions) {
     for (const pos of positions.open) {
       if (pos.instrument !== tradeInfo.instrument) {
@@ -610,8 +638,12 @@ async function gatherTradeContextInner(opts: {
   const breakeven = historicalTrades.length - wins - losses
   const pip = getPipSize(tradeInfo.instrument)
 
-  const winPLs = historicalTrades.filter((t) => t.realizedPL > 0).map((t) => Math.abs(t.realizedPL) / pip)
-  const lossPLs = historicalTrades.filter((t) => t.realizedPL < 0).map((t) => Math.abs(t.realizedPL) / pip)
+  const winPLs = historicalTrades
+    .filter((t) => t.realizedPL > 0)
+    .map((t) => Math.abs(t.realizedPL) / pip)
+  const lossPLs = historicalTrades
+    .filter((t) => t.realizedPL < 0)
+    .map((t) => Math.abs(t.realizedPL) / pip)
 
   const tradeHistorySummary: TradeHistorySummary = {
     totalTrades: historicalTrades.length,
@@ -620,13 +652,22 @@ async function gatherTradeContextInner(opts: {
     breakeven,
     winRate: historicalTrades.length > 0 ? Math.round((wins / historicalTrades.length) * 100) : 0,
     avgWinPips: winPLs.length ? Math.round(winPLs.reduce((a, b) => a + b, 0) / winPLs.length) : 0,
-    avgLossPips: lossPLs.length ? Math.round(lossPLs.reduce((a, b) => a + b, 0) / lossPLs.length) : 0,
-    avgDurationHours: historicalTrades.length > 0
-      ? Math.round(historicalTrades
-          .filter((t) => t.closedAt)
-          .reduce((sum, t) => sum + (new Date(t.closedAt!).getTime() - new Date(t.openedAt).getTime()) / 3600000, 0)
-          / historicalTrades.filter((t) => t.closedAt).length)
+    avgLossPips: lossPLs.length
+      ? Math.round(lossPLs.reduce((a, b) => a + b, 0) / lossPLs.length)
       : 0,
+    avgDurationHours:
+      historicalTrades.length > 0
+        ? Math.round(
+            historicalTrades
+              .filter((t) => t.closedAt)
+              .reduce(
+                (sum, t) =>
+                  sum +
+                  (new Date(t.closedAt!).getTime() - new Date(t.openedAt).getTime()) / 3600000,
+                0,
+              ) / historicalTrades.filter((t) => t.closedAt).length,
+          )
+        : 0,
     recentTrades: historicalTrades.slice(0, 10).map((t) => ({
       direction: t.direction,
       entryPrice: t.entryPrice,
@@ -676,7 +717,8 @@ async function gatherTradeContextInner(opts: {
   let marketSession = "Unknown"
   if (currentSessionHour >= 22 || currentSessionHour < 8) marketSession = "Asian Session"
   else if (currentSessionHour >= 8 && currentSessionHour < 12) marketSession = "London Open"
-  else if (currentSessionHour >= 12 && currentSessionHour < 17) marketSession = "London/New York Overlap"
+  else if (currentSessionHour >= 12 && currentSessionHour < 17)
+    marketSession = "London/New York Overlap"
   else if (currentSessionHour >= 17 && currentSessionHour < 22) marketSession = "New York Session"
   if (!market.isOpen) marketSession = `Market Closed (${market.closeReason ?? "unknown reason"})`
 

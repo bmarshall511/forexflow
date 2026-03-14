@@ -1,3 +1,12 @@
+/**
+ * TradingView Alerts config service — manages webhook configuration and trading parameters.
+ *
+ * Handles the webhook token, position sizing, cooldown, pair whitelist,
+ * market hours filter, and Cloudflare Worker connection settings.
+ * Uses a singleton row (id=1) for app-wide TV alert config.
+ *
+ * @module tv-alerts-config-service
+ */
 import { randomBytes } from "node:crypto"
 import { db } from "./client"
 import type { TVAlertsConfig } from "@fxflow/types"
@@ -58,13 +67,16 @@ export async function updateTVAlertsConfig(
 
   if (input.enabled !== undefined) updateData.enabled = input.enabled
   if (input.webhookToken !== undefined) updateData.webhookToken = input.webhookToken
-  if (input.positionSizePercent !== undefined) updateData.positionSizePercent = input.positionSizePercent
+  if (input.positionSizePercent !== undefined)
+    updateData.positionSizePercent = input.positionSizePercent
   if (input.cooldownSeconds !== undefined) updateData.cooldownSeconds = input.cooldownSeconds
   if (input.maxOpenPositions !== undefined) updateData.maxOpenPositions = input.maxOpenPositions
   if (input.dailyLossLimit !== undefined) updateData.dailyLossLimit = input.dailyLossLimit
-  if (input.pairWhitelist !== undefined) updateData.pairWhitelist = JSON.stringify(input.pairWhitelist)
+  if (input.pairWhitelist !== undefined)
+    updateData.pairWhitelist = JSON.stringify(input.pairWhitelist)
   if (input.marketHoursFilter !== undefined) updateData.marketHoursFilter = input.marketHoursFilter
-  if (input.dedupWindowSeconds !== undefined) updateData.dedupWindowSeconds = input.dedupWindowSeconds
+  if (input.dedupWindowSeconds !== undefined)
+    updateData.dedupWindowSeconds = input.dedupWindowSeconds
   if (input.showChartMarkers !== undefined) updateData.showChartMarkers = input.showChartMarkers
   if (input.soundEnabled !== undefined) updateData.soundEnabled = input.soundEnabled
   if (input.cfWorkerUrl !== undefined) updateData.cfWorkerUrl = input.cfWorkerUrl
@@ -75,7 +87,9 @@ export async function updateTVAlertsConfig(
     create: {
       id: 1,
       ...updateData,
-      pairWhitelist: (updateData.pairWhitelist as string) ?? JSON.stringify(TV_ALERTS_DEFAULT_CONFIG.pairWhitelist),
+      pairWhitelist:
+        (updateData.pairWhitelist as string) ??
+        JSON.stringify(TV_ALERTS_DEFAULT_CONFIG.pairWhitelist),
     },
     update: updateData,
   })

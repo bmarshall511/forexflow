@@ -5,6 +5,8 @@ import type {
   AiAnalysisSections,
   AiAnalysisTriggeredBy,
   AnyDaemonMessage,
+  TradeConditionTriggerType,
+  TradeConditionActionType,
 } from "@fxflow/types"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
@@ -228,9 +230,18 @@ function extractJsonFromResponse<T>(raw: string): T {
     let inString = false
     let escaped = false
     for (const ch of candidate) {
-      if (escaped) { escaped = false; continue }
-      if (ch === "\\") { escaped = true; continue }
-      if (ch === '"') { inString = !inString; continue }
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (ch === "\\") {
+        escaped = true
+        continue
+      }
+      if (ch === '"') {
+        inString = !inString
+        continue
+      }
       if (inString) continue
       if (ch === "{") openBraces++
       else if (ch === "}") openBraces--
@@ -277,12 +288,8 @@ export async function executeAnalysis(opts: {
     conditionMonitor,
   } = opts
 
-  const {
-    updateAnalysisStatus,
-    saveAnalysisResult,
-    getDecryptedClaudeKey,
-    createNotification,
-  } = await import("@fxflow/db")
+  const { updateAnalysisStatus, saveAnalysisResult, getDecryptedClaudeKey, createNotification } =
+    await import("@fxflow/db")
 
   const startTime = Date.now()
   const controller = new AbortController()
@@ -331,7 +338,8 @@ export async function executeAnalysis(opts: {
 
     // ─── Get Claude API key ────────────────────────────────────────────
     const apiKey = await getDecryptedClaudeKey()
-    if (!apiKey) throw new Error("Claude API key not configured. Please add it in Settings > AI & Claude.")
+    if (!apiKey)
+      throw new Error("Claude API key not configured. Please add it in Settings > AI & Claude.")
 
     const anthropic = new Anthropic({ apiKey })
 
@@ -379,7 +387,9 @@ export async function executeAnalysis(opts: {
     // Set a timeout that aborts the stream if it takes too long
     const streamTimeout = setTimeout(() => {
       if (!controller.signal.aborted) {
-        console.warn(`[ai-executor] Analysis ${analysisId} timed out after ${STREAM_TIMEOUT_MS / 1000}s`)
+        console.warn(
+          `[ai-executor] Analysis ${analysisId} timed out after ${STREAM_TIMEOUT_MS / 1000}s`,
+        )
         controller.abort()
       }
     }, STREAM_TIMEOUT_MS)
@@ -400,10 +410,16 @@ export async function executeAnalysis(opts: {
         }
 
         // Skip thinking content blocks — they improve analysis quality but aren't part of the output
-        if (event.type === "content_block_start" && (event.content_block as { type: string }).type === "thinking") {
+        if (
+          event.type === "content_block_start" &&
+          (event.content_block as { type: string }).type === "thinking"
+        ) {
           continue
         }
-        if (event.type === "content_block_delta" && (event.delta as { type: string }).type === "thinking_delta") {
+        if (
+          event.type === "content_block_delta" &&
+          (event.delta as { type: string }).type === "thinking_delta"
+        ) {
           continue
         }
 
@@ -489,14 +505,18 @@ export async function executeAnalysis(opts: {
           qualityScore: sections.tradeQualityScore ?? 5,
         })
       } catch (recErr) {
-        console.warn("[ai-executor] Failed to create recommendation outcome:", (recErr as Error).message)
+        console.warn(
+          "[ai-executor] Failed to create recommendation outcome:",
+          (recErr as Error).message,
+        )
       }
     }
 
     // ─── Auto-apply condition suggestions ─────────────────────────────
     if (sections.conditionSuggestions?.length && tradeStatus !== "closed") {
       try {
-        const { getAiSettings, createCondition, listConditionsForTrade } = await import("@fxflow/db")
+        const { getAiSettings, createCondition, listConditionsForTrade } =
+          await import("@fxflow/db")
         const aiSettings = await getAiSettings()
         if (aiSettings.autoAnalysis.autoApplyConditions) {
           const minCondConf = aiSettings.autoAnalysis.autoApplyMinConditionConfidence ?? "medium"
@@ -507,21 +527,26 @@ export async function executeAnalysis(opts: {
           const existing = await listConditionsForTrade(tradeId)
           const activeConditions = existing.filter((c) => c.status === "active")
 
-          console.log(`[ai-executor] Auto-applying conditions for trade ${tradeId} (${sections.conditionSuggestions.length} suggested, ${activeConditions.length} already active, minConfidence: ${minCondConf})`)
+          console.log(
+            `[ai-executor] Auto-applying conditions for trade ${tradeId} (${sections.conditionSuggestions.length} suggested, ${activeConditions.length} already active, minConfidence: ${minCondConf})`,
+          )
           for (const suggestion of sections.conditionSuggestions) {
             // Filter by confidence threshold
             const suggestionConf = suggestion.confidence ?? "medium" // default to medium if AI omits
             const suggestionRank = condConfRank[suggestionConf] ?? 2
             if (suggestionRank < minCondRank) {
-              console.log(`[ai-executor] Skipping low-confidence condition: ${suggestion.label} (${suggestionConf} < ${minCondConf})`)
+              console.log(
+                `[ai-executor] Skipping low-confidence condition: ${suggestion.label} (${suggestionConf} < ${minCondConf})`,
+              )
               continue
             }
 
             // Dedup: skip if an active condition with same trigger+action+label already exists
-            const isDuplicate = activeConditions.some((c) =>
-              c.triggerType === suggestion.triggerType &&
-              c.actionType === suggestion.actionType &&
-              c.label === suggestion.label
+            const isDuplicate = activeConditions.some(
+              (c) =>
+                c.triggerType === suggestion.triggerType &&
+                c.actionType === suggestion.actionType &&
+                c.label === suggestion.label,
             )
             if (isDuplicate) {
               console.log(`[ai-executor] Skipping duplicate condition: ${suggestion.label}`)
@@ -530,9 +555,9 @@ export async function executeAnalysis(opts: {
             try {
               const condition = await createCondition({
                 tradeId,
-                triggerType: suggestion.triggerType as import("@fxflow/types").TradeConditionTriggerType,
+                triggerType: suggestion.triggerType as TradeConditionTriggerType,
                 triggerValue: suggestion.triggerValue,
-                actionType: suggestion.actionType as import("@fxflow/types").TradeConditionActionType,
+                actionType: suggestion.actionType as TradeConditionActionType,
                 actionParams: suggestion.actionParams,
                 label: suggestion.label,
                 createdBy: "ai",
@@ -541,14 +566,22 @@ export async function executeAnalysis(opts: {
               if (conditionMonitor) {
                 await conditionMonitor.reloadCondition(condition.id)
               }
-              console.log(`[ai-executor] Auto-applied condition: ${suggestion.label} (${condition.id})`)
+              console.log(
+                `[ai-executor] Auto-applied condition: ${suggestion.label} (${condition.id})`,
+              )
             } catch (condErr) {
-              console.warn(`[ai-executor] Failed to auto-apply condition "${suggestion.label}":`, (condErr as Error).message)
+              console.warn(
+                `[ai-executor] Failed to auto-apply condition "${suggestion.label}":`,
+                (condErr as Error).message,
+              )
             }
           }
         }
       } catch (settingsErr) {
-        console.warn("[ai-executor] Failed to check auto-apply settings:", (settingsErr as Error).message)
+        console.warn(
+          "[ai-executor] Failed to check auto-apply settings:",
+          (settingsErr as Error).message,
+        )
       }
     }
 
@@ -558,9 +591,10 @@ export async function executeAnalysis(opts: {
         const { getAiSettings, db } = await import("@fxflow/db")
         const aiSettings = await getAiSettings()
         const tradingMode = stateManager.getSnapshot().tradingMode ?? "practice"
-        const autoApplyEnabled = tradingMode === "live"
-          ? aiSettings.autoAnalysis.liveAutoApplyEnabled
-          : aiSettings.autoAnalysis.practiceAutoApplyEnabled
+        const autoApplyEnabled =
+          tradingMode === "live"
+            ? aiSettings.autoAnalysis.liveAutoApplyEnabled
+            : aiSettings.autoAnalysis.practiceAutoApplyEnabled
 
         if (autoApplyEnabled) {
           const minConf = aiSettings.autoAnalysis.autoApplyMinConfidence ?? "high"
@@ -570,7 +604,13 @@ export async function executeAnalysis(opts: {
           // Get sourceTradeId for OANDA API calls
           const trade = await db.trade.findUnique({
             where: { id: tradeId },
-            select: { sourceTradeId: true, entryPrice: true, status: true, direction: true, currentUnits: true },
+            select: {
+              sourceTradeId: true,
+              entryPrice: true,
+              status: true,
+              direction: true,
+              currentUnits: true,
+            },
           })
 
           if (trade) {
@@ -587,33 +627,51 @@ export async function executeAnalysis(opts: {
                   case "adjust_sl": {
                     const sl = (action.params.stopLoss ?? action.params.price) as number | undefined
                     if (sl) {
-                      if (trade.status === "open") await tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, sl, undefined)
-                      else if (trade.status === "pending") await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, sl, undefined)
+                      if (trade.status === "open")
+                        await tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, sl, undefined)
+                      else if (trade.status === "pending")
+                        await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, sl, undefined)
                       appliedIds.push(action.id)
-                      console.log(`[ai-executor] Auto-applied action: ${action.label} (adjust_sl → ${sl})`)
+                      console.log(
+                        `[ai-executor] Auto-applied action: ${action.label} (adjust_sl → ${sl})`,
+                      )
                     }
                     break
                   }
                   case "move_to_breakeven": {
                     const sl = trade.entryPrice
-                    if (trade.status === "open") await tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, sl, undefined)
-                    else if (trade.status === "pending") await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, sl, undefined)
+                    if (trade.status === "open")
+                      await tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, sl, undefined)
+                    else if (trade.status === "pending")
+                      await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, sl, undefined)
                     appliedIds.push(action.id)
-                    console.log(`[ai-executor] Auto-applied action: ${action.label} (move_to_breakeven → ${sl})`)
+                    console.log(
+                      `[ai-executor] Auto-applied action: ${action.label} (move_to_breakeven → ${sl})`,
+                    )
                     break
                   }
                   case "adjust_tp": {
-                    const tp = (action.params.takeProfit ?? action.params.price) as number | undefined
+                    const tp = (action.params.takeProfit ?? action.params.price) as
+                      | number
+                      | undefined
                     if (tp) {
-                      if (trade.status === "open") await tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, undefined, tp)
-                      else if (trade.status === "pending") await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, undefined, tp)
+                      if (trade.status === "open")
+                        await tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, undefined, tp)
+                      else if (trade.status === "pending")
+                        await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, undefined, tp)
                       appliedIds.push(action.id)
-                      console.log(`[ai-executor] Auto-applied action: ${action.label} (adjust_tp → ${tp})`)
+                      console.log(
+                        `[ai-executor] Auto-applied action: ${action.label} (adjust_tp → ${tp})`,
+                      )
                     }
                     break
                   }
                   case "close_trade": {
-                    await tradeSyncer.closeTrade(trade.sourceTradeId, undefined, `AI auto-applied: ${action.label}`)
+                    await tradeSyncer.closeTrade(
+                      trade.sourceTradeId,
+                      undefined,
+                      `AI auto-applied: ${action.label}`,
+                    )
                     appliedIds.push(action.id)
                     tradeClosed = true
                     console.log(`[ai-executor] Auto-applied action: ${action.label} (close_trade)`)
@@ -622,64 +680,111 @@ export async function executeAnalysis(opts: {
                   case "partial_close": {
                     const units = action.params.units as number | undefined
                     if (units) {
-                      await tradeSyncer.closeTrade(trade.sourceTradeId, units, `AI auto-applied: ${action.label}`)
+                      await tradeSyncer.closeTrade(
+                        trade.sourceTradeId,
+                        units,
+                        `AI auto-applied: ${action.label}`,
+                      )
                       appliedIds.push(action.id)
-                      console.log(`[ai-executor] Auto-applied action: ${action.label} (partial_close ${units} units)`)
+                      console.log(
+                        `[ai-executor] Auto-applied action: ${action.label} (partial_close ${units} units)`,
+                      )
                     }
                     break
                   }
                   case "cancel_order": {
                     if (trade.status === "pending") {
-                      await tradeSyncer.cancelOrder(trade.sourceTradeId, `AI auto-applied: ${action.label}`)
+                      await tradeSyncer.cancelOrder(
+                        trade.sourceTradeId,
+                        `AI auto-applied: ${action.label}`,
+                      )
                       appliedIds.push(action.id)
                       tradeClosed = true
-                      console.log(`[ai-executor] Auto-applied action: ${action.label} (cancel_order)`)
+                      console.log(
+                        `[ai-executor] Auto-applied action: ${action.label} (cancel_order)`,
+                      )
                     }
                     break
                   }
                   case "adjust_entry": {
-                    const entryPrice = (action.params.entryPrice ?? action.params.price) as number | undefined
+                    const entryPrice = (action.params.entryPrice ?? action.params.price) as
+                      | number
+                      | undefined
                     if (entryPrice && trade.status === "pending") {
-                      await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, undefined, undefined, entryPrice)
+                      await tradeSyncer.modifyPendingOrderSLTP(
+                        trade.sourceTradeId,
+                        undefined,
+                        undefined,
+                        entryPrice,
+                      )
                       appliedIds.push(action.id)
-                      console.log(`[ai-executor] Auto-applied action: ${action.label} (adjust_entry → ${entryPrice})`)
+                      console.log(
+                        `[ai-executor] Auto-applied action: ${action.label} (adjust_entry → ${entryPrice})`,
+                      )
                     }
                     break
                   }
                   case "update_expiry": {
-                    const expiryRaw = (action.params.expiry ?? action.params.gtdTime ?? action.params.expiryTime) as string | undefined
-                    const expiryHours = (action.params.hours ?? action.params.durationHours) as number | undefined
+                    const expiryRaw = (action.params.expiry ??
+                      action.params.gtdTime ??
+                      action.params.expiryTime) as string | undefined
+                    const expiryHours = (action.params.hours ?? action.params.durationHours) as
+                      | number
+                      | undefined
                     let gtdTime: string | null = null
                     if (expiryRaw) gtdTime = new Date(expiryRaw).toISOString()
-                    else if (expiryHours && expiryHours > 0) gtdTime = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString()
+                    else if (expiryHours && expiryHours > 0)
+                      gtdTime = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString()
                     if (gtdTime && trade.status === "pending") {
-                      await tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, undefined, undefined, undefined, gtdTime)
+                      await tradeSyncer.modifyPendingOrderSLTP(
+                        trade.sourceTradeId,
+                        undefined,
+                        undefined,
+                        undefined,
+                        gtdTime,
+                      )
                       appliedIds.push(action.id)
-                      console.log(`[ai-executor] Auto-applied action: ${action.label} (update_expiry → ${gtdTime})`)
+                      console.log(
+                        `[ai-executor] Auto-applied action: ${action.label} (update_expiry → ${gtdTime})`,
+                      )
                     }
                     break
                   }
                   case "adjust_tp_partial": {
                     // Legacy: older analyses may have this as an action. Create a condition instead.
-                    const tpPrice = (action.params.price ?? action.params.takeProfit ?? action.params.targetPrice ?? action.params.target ?? action.params.partialTakeProfit) as number | undefined
+                    const tpPrice = (action.params.price ??
+                      action.params.takeProfit ??
+                      action.params.targetPrice ??
+                      action.params.target ??
+                      action.params.partialTakeProfit) as number | undefined
                     if (tpPrice && trade.status === "open") {
                       const { createCondition: createCond } = await import("@fxflow/db")
-                      const direction = trade.direction === "long" ? "price_breaks_above" : "price_breaks_below"
-                      const units = (action.params.units ?? action.params.unitsToClose) as number | undefined
-                        ?? (action.params.percentage ? Math.round(trade.currentUnits * ((action.params.percentage as number) / 100)) : undefined)
-                        ?? Math.round(trade.currentUnits / 2)
+                      const direction =
+                        trade.direction === "long" ? "price_breaks_above" : "price_breaks_below"
+                      const units =
+                        ((action.params.units ?? action.params.unitsToClose) as
+                          | number
+                          | undefined) ??
+                        (action.params.percentage
+                          ? Math.round(
+                              trade.currentUnits * ((action.params.percentage as number) / 100),
+                            )
+                          : undefined) ??
+                        Math.round(trade.currentUnits / 2)
                       await createCond({
                         tradeId,
-                        triggerType: direction as import("@fxflow/types").TradeConditionTriggerType,
+                        triggerType: direction as TradeConditionTriggerType,
                         triggerValue: { price: tpPrice },
-                        actionType: "partial_close" as import("@fxflow/types").TradeConditionActionType,
+                        actionType: "partial_close" as TradeConditionActionType,
                         actionParams: { units },
                         label: action.label,
                         analysisId,
                         createdBy: "ai",
                       })
                       appliedIds.push(action.id)
-                      console.log(`[ai-executor] Auto-applied action: ${action.label} (adjust_tp_partial → condition: partial close ${units} units at ${tpPrice})`)
+                      console.log(
+                        `[ai-executor] Auto-applied action: ${action.label} (adjust_tp_partial → condition: partial close ${units} units at ${tpPrice})`,
+                      )
                     }
                     break
                   }
@@ -688,18 +793,26 @@ export async function executeAnalysis(opts: {
                     break
                 }
               } catch (actionErr) {
-                console.warn(`[ai-executor] Failed to auto-apply action "${action.label}":`, (actionErr as Error).message)
+                console.warn(
+                  `[ai-executor] Failed to auto-apply action "${action.label}":`,
+                  (actionErr as Error).message,
+                )
               }
             }
 
             if (appliedIds.length > 0) {
               sections.autoAppliedActionIds = appliedIds
-              console.log(`[ai-executor] Auto-applied ${appliedIds.length} action(s) for trade ${tradeId}`)
+              console.log(
+                `[ai-executor] Auto-applied ${appliedIds.length} action(s) for trade ${tradeId}`,
+              )
             }
           }
         }
       } catch (settingsErr) {
-        console.warn("[ai-executor] Failed to check auto-apply action settings:", (settingsErr as Error).message)
+        console.warn(
+          "[ai-executor] Failed to check auto-apply action settings:",
+          (settingsErr as Error).message,
+        )
       }
     }
 
@@ -764,7 +877,9 @@ export async function executeAnalysis(opts: {
         message: errorMessage,
         metadata: { analysisId, tradeId },
       })
-    } catch { /* ignore notification failure */ }
+    } catch {
+      /* ignore notification failure */
+    }
   } finally {
     activeControllers.delete(analysisId)
   }
@@ -791,7 +906,21 @@ function getSessionGuidance(hour: number): string {
 // ─── User Message Builder ─────────────────────────────────────────────────────
 
 function buildUserMessage(context: TradeContextSnapshot, depth: AiAnalysisDepth): string {
-  const { trade, account, livePrice, indicators, history, conditions, newsEvents, forexNews, previousAnalyses, marketSession, correlatedPairs, openPositions, gatheringErrors } = context
+  const {
+    trade,
+    account,
+    livePrice,
+    indicators,
+    history,
+    conditions,
+    newsEvents,
+    forexNews,
+    previousAnalyses,
+    marketSession,
+    correlatedPairs,
+    openPositions,
+    gatheringErrors,
+  } = context
   const pair = trade.instrument.replace("_", "/")
   const isOpen = trade.status === "open"
   const isPending = trade.status === "pending"
@@ -909,9 +1038,13 @@ ${openPositions.map((p) => `- ${p.instrument.replace("_", "/")}: ${p.direction.t
 - Average Duration: ${history.avgDurationHours}h
 
 ### Recent Trades
-${history.recentTrades.slice(0, 8).map((t) =>
-  `- ${t.direction.toUpperCase()} | Entry: ${t.entryPrice} | Exit: ${t.exitPrice ?? "N/A"} | P&L: ${t.realizedPL} | ${t.outcome.toUpperCase()} | Duration: ${t.duration}`
-).join("\n")}`)
+${history.recentTrades
+  .slice(0, 8)
+  .map(
+    (t) =>
+      `- ${t.direction.toUpperCase()} | Entry: ${t.entryPrice} | Exit: ${t.exitPrice ?? "N/A"} | P&L: ${t.realizedPL} | ${t.outcome.toUpperCase()} | Duration: ${t.duration}`,
+  )
+  .join("\n")}`)
 
   if (conditions.length > 0) {
     sections.push(`## Active Trade Conditions
@@ -928,7 +1061,10 @@ ${newsEvents.map((e) => `- [${e.impact.toUpperCase()}] ${e.currency}: ${e.title}
   if (forexNews.length > 0) {
     sections.push(`## Recent Market News
 
-${forexNews.slice(0, 5).map((n) => `- ${n.headline} (${n.source}): ${n.summary}`).join("\n")}`)
+${forexNews
+  .slice(0, 5)
+  .map((n) => `- ${n.headline} (${n.source}): ${n.summary}`)
+  .join("\n")}`)
   }
 
   if (previousAnalyses.length > 0) {
@@ -938,7 +1074,9 @@ ${previousAnalyses.map((a) => `- [${a.depth} | ${a.model} | ${a.createdAt}] Win 
   }
 
   const utcHour = new Date().getUTCHours() + new Date().getUTCMinutes() / 60
-  sections.push(`## Market Session\n\n${marketSession}\n\n### Session Trading Context\n\n${getSessionGuidance(utcHour)}`)
+  sections.push(
+    `## Market Session\n\n${marketSession}\n\n### Session Trading Context\n\n${getSessionGuidance(utcHour)}`,
+  )
 
   if (trade.events.length > 0) {
     sections.push(`## Trade Modification History
@@ -947,7 +1085,9 @@ ${trade.events.map((e) => `- [${e.createdAt}] ${e.eventType}: ${JSON.stringify(e
   }
 
   if (gatheringErrors.length > 0) {
-    sections.push(`## Data Gathering Notes\n\nSome data could not be retrieved:\n${gatheringErrors.map((e) => `- ${e}`).join("\n")}`)
+    sections.push(
+      `## Data Gathering Notes\n\nSome data could not be retrieved:\n${gatheringErrors.map((e) => `- ${e}`).join("\n")}`,
+    )
   }
 
   sections.push(`---

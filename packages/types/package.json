@@ -10,9 +10,11 @@
     }
   },
   "scripts": {
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "eslint": "^10.0.3",
     "typescript": "^5.7"
   }
 }

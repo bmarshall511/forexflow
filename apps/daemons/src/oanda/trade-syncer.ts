@@ -35,7 +35,6 @@ import {
   getClosedTradesToday,
   updateTradePartialClose,
   updateTradeTimeframe,
-  updateTradeMetadata,
   updateTradeSourceId,
   updateTradeNotes,
   appendTradeNotes,
@@ -43,7 +42,6 @@ import {
   getTagsForTradeIds,
   createTradeEvent,
   getTradeBySourceId,
-  type UpsertTradeInput,
 } from "@fxflow/db"
 
 export class OandaTradeSyncer {
@@ -131,9 +129,9 @@ export class OandaTradeSyncer {
     if (!creds) throw new Error("No credentials configured")
 
     // Look up order info for notification
-    const order = this.positionManager.getPositions().pending.find(
-      (o) => o.sourceOrderId === sourceOrderId,
-    )
+    const order = this.positionManager
+      .getPositions()
+      .pending.find((o) => o.sourceOrderId === sourceOrderId)
 
     let alreadyCancelled = false
     try {
@@ -148,7 +146,9 @@ export class OandaTradeSyncer {
       // Treat as success and force a reconcile to remove the stale local state.
       if (msg.includes("ORDER_DOESNT_EXIST") || (msg.includes("404") && msg.includes("order"))) {
         alreadyCancelled = true
-        console.warn(`[cancelOrder] Order ${sourceOrderId} not found in OANDA (already cancelled/filled). Reconciling.`)
+        console.warn(
+          `[cancelOrder] Order ${sourceOrderId} not found in OANDA (already cancelled/filled). Reconciling.`,
+        )
       } else {
         throw err
       }
@@ -180,7 +180,10 @@ export class OandaTradeSyncer {
           if (reason) await appendTradeNotes(dbTrade.id, `Cancelled Reason: ${reason}`)
         }
       } catch (dbErr) {
-        console.warn("[cancelOrder] DB audit trail failed (non-critical):", (dbErr as Error).message)
+        console.warn(
+          "[cancelOrder] DB audit trail failed (non-critical):",
+          (dbErr as Error).message,
+        )
       }
     }
 
@@ -216,7 +219,10 @@ export class OandaTradeSyncer {
           })
         } catch (err) {
           const msg = (err as Error).message
-          if (msg.includes("ORDER_DOESNT_EXIST") || (msg.includes("404") && msg.includes("order"))) {
+          if (
+            msg.includes("ORDER_DOESNT_EXIST") ||
+            (msg.includes("404") && msg.includes("order"))
+          ) {
             alreadyCancelled = true
           } else {
             throw err
@@ -240,7 +246,10 @@ export class OandaTradeSyncer {
             if (reason) await appendTradeNotes(dbTrade.id, `Bulk Cancel Reason: ${reason}`)
           }
         } catch (dbErr) {
-          console.warn(`[cancelAllOrders] DB audit for ${order.sourceOrderId} failed (non-critical):`, (dbErr as Error).message)
+          console.warn(
+            `[cancelAllOrders] DB audit for ${order.sourceOrderId} failed (non-critical):`,
+            (dbErr as Error).message,
+          )
         }
 
         succeeded++
@@ -250,9 +259,10 @@ export class OandaTradeSyncer {
       }
     }
 
-    const summary = failed === 0
-      ? `${succeeded} ${succeeded === 1 ? "order" : "orders"} cancelled`
-      : `${succeeded} cancelled, ${failed} failed`
+    const summary =
+      failed === 0
+        ? `${succeeded} ${succeeded === 1 ? "order" : "orders"} cancelled`
+        : `${succeeded} cancelled, ${failed} failed`
     this.onActionNotification?.("Bulk Cancel", summary)
 
     if (targets.length > 0) await this.reconcile()
@@ -314,7 +324,9 @@ export class OandaTradeSyncer {
                 financing: parseFloat(closed.financing ?? "0") || 0,
                 closedAt: new Date(fillTxn.time),
               })
-            } catch { /* may not be in DB yet */ }
+            } catch {
+              /* may not be in DB yet */
+            }
           }
         }
 
@@ -337,7 +349,10 @@ export class OandaTradeSyncer {
             this.onTradeClosed?.(dbTrade.id)
           }
         } catch (dbErr) {
-          console.warn(`[closeAllTrades] DB audit for ${trade.sourceTradeId} failed (non-critical):`, (dbErr as Error).message)
+          console.warn(
+            `[closeAllTrades] DB audit for ${trade.sourceTradeId} failed (non-critical):`,
+            (dbErr as Error).message,
+          )
         }
 
         succeeded++
@@ -347,9 +362,10 @@ export class OandaTradeSyncer {
       }
     }
 
-    const summary = failed === 0
-      ? `${succeeded} ${succeeded === 1 ? "trade" : "trades"} closed`
-      : `${succeeded} closed, ${failed} failed`
+    const summary =
+      failed === 0
+        ? `${succeeded} ${succeeded === 1 ? "trade" : "trades"} closed`
+        : `${succeeded} closed, ${failed} failed`
     this.onActionNotification?.("Bulk Close", summary)
 
     if (targets.length > 0) await this.reconcile()
@@ -364,13 +380,18 @@ export class OandaTradeSyncer {
     takeProfit?: number | null,
     entryPrice?: number,
     gtdTime?: string | null,
-  ): Promise<{ stopLoss: number | null; takeProfit: number | null; entryPrice: number; gtdTime: string | null }> {
+  ): Promise<{
+    stopLoss: number | null
+    takeProfit: number | null
+    entryPrice: number
+    gtdTime: string | null
+  }> {
     const creds = this.stateManager.getCredentials()
     if (!creds) throw new Error("No credentials configured")
 
-    const order = this.positionManager.getPositions().pending.find(
-      (o) => o.sourceOrderId === sourceOrderId,
-    )
+    const order = this.positionManager
+      .getPositions()
+      .pending.find((o) => o.sourceOrderId === sourceOrderId)
     if (!order) throw new Error("Pending order not found")
 
     const decimals = getDecimalPlaces(order.instrument)
@@ -379,7 +400,7 @@ export class OandaTradeSyncer {
     // Build replacement order body
     const newEntryPrice = entryPrice ?? order.entryPrice
     const newGtdTime = gtdTime !== undefined ? gtdTime : order.gtdTime
-    const newTimeInForce = newGtdTime ? "GTD" : (gtdTime === null ? "GTC" : order.timeInForce)
+    const newTimeInForce = newGtdTime ? "GTD" : gtdTime === null ? "GTC" : order.timeInForce
 
     const orderBody: Record<string, unknown> = {
       type: order.orderType,
@@ -405,7 +426,10 @@ export class OandaTradeSyncer {
     }
 
     if (order.trailingStopDistance !== null) {
-      orderBody.trailingStopLossOnFill = { distance: order.trailingStopDistance.toString(), timeInForce: "GTC" }
+      orderBody.trailingStopLossOnFill = {
+        distance: order.trailingStopDistance.toString(),
+        timeInForce: "GTC",
+      }
     }
 
     // Replace order on OANDA — capture response to get the new order ID
@@ -426,7 +450,9 @@ export class OandaTradeSyncer {
     if (newOrderId && newOrderId !== sourceOrderId) {
       const updated = await updateTradeSourceId("oanda", sourceOrderId, newOrderId)
       if (updated) {
-        console.log(`[trade-syncer] Order replaced: ${sourceOrderId} → ${newOrderId} (DB record preserved)`)
+        console.log(
+          `[trade-syncer] Order replaced: ${sourceOrderId} → ${newOrderId} (DB record preserved)`,
+        )
       }
     }
 
@@ -438,9 +464,10 @@ export class OandaTradeSyncer {
     const replacement = newOrderId
       ? positions.pending.find((o) => o.sourceOrderId === newOrderId)
       : positions.pending.find(
-          (o) => o.instrument === order.instrument
-            && o.direction === order.direction
-            && o.entryPrice.toFixed(decimals) === newEntryPrice.toFixed(decimals),
+          (o) =>
+            o.instrument === order.instrument &&
+            o.direction === order.direction &&
+            o.entryPrice.toFixed(decimals) === newEntryPrice.toFixed(decimals),
         )
 
     const verifiedSL = replacement?.stopLoss ?? newSL
@@ -455,14 +482,27 @@ export class OandaTradeSyncer {
         modifiedBy: "user",
         time: new Date().toISOString(),
       }
-      if (stopLoss !== undefined) { detail.oldSL = order.stopLoss; detail.newSL = verifiedSL }
-      if (takeProfit !== undefined) { detail.oldTP = order.takeProfit; detail.newTP = verifiedTP }
-      if (entryPrice !== undefined) { detail.oldEntry = order.entryPrice; detail.newEntry = verifiedEntry }
-      if (gtdTime !== undefined) { detail.oldGtd = order.gtdTime; detail.newGtd = verifiedGtd }
+      if (stopLoss !== undefined) {
+        detail.oldSL = order.stopLoss
+        detail.newSL = verifiedSL
+      }
+      if (takeProfit !== undefined) {
+        detail.oldTP = order.takeProfit
+        detail.newTP = verifiedTP
+      }
+      if (entryPrice !== undefined) {
+        detail.oldEntry = order.entryPrice
+        detail.newEntry = verifiedEntry
+      }
+      if (gtdTime !== undefined) {
+        detail.oldGtd = order.gtdTime
+        detail.newGtd = verifiedGtd
+      }
 
       await createTradeEvent({
         tradeId: dbTrade.id,
-        eventType: entryPrice !== undefined || gtdTime !== undefined ? "ORDER_MODIFIED" : "SL_TP_MODIFIED",
+        eventType:
+          entryPrice !== undefined || gtdTime !== undefined ? "ORDER_MODIFIED" : "SL_TP_MODIFIED",
         detail: JSON.stringify(detail),
       })
     }
@@ -470,10 +510,14 @@ export class OandaTradeSyncer {
     const pair = order.instrument.replace("_", "/")
     const changes: string[] = []
     if (stopLoss !== undefined) {
-      changes.push(stopLoss !== null ? `SL: ${order.stopLoss ?? "none"} → ${verifiedSL}` : "SL removed")
+      changes.push(
+        stopLoss !== null ? `SL: ${order.stopLoss ?? "none"} → ${verifiedSL}` : "SL removed",
+      )
     }
     if (takeProfit !== undefined) {
-      changes.push(takeProfit !== null ? `TP: ${order.takeProfit ?? "none"} → ${verifiedTP}` : "TP removed")
+      changes.push(
+        takeProfit !== null ? `TP: ${order.takeProfit ?? "none"} → ${verifiedTP}` : "TP removed",
+      )
     }
     if (entryPrice !== undefined) {
       changes.push(`Entry: ${order.entryPrice} → ${verifiedEntry}`)
@@ -483,7 +527,12 @@ export class OandaTradeSyncer {
     }
     this.onActionNotification?.("Order Modified", `${pair} — ${changes.join(", ")}`)
 
-    return { stopLoss: verifiedSL, takeProfit: verifiedTP, entryPrice: verifiedEntry, gtdTime: verifiedGtd }
+    return {
+      stopLoss: verifiedSL,
+      takeProfit: verifiedTP,
+      entryPrice: verifiedEntry,
+      gtdTime: verifiedGtd,
+    }
   }
 
   /** Close a trade on OANDA (full or partial). */
@@ -492,9 +541,9 @@ export class OandaTradeSyncer {
     if (!creds) throw new Error("No credentials configured")
 
     // Look up trade info for notification
-    const trade = this.positionManager.getPositions().open.find(
-      (t) => t.sourceTradeId === sourceTradeId,
-    )
+    const trade = this.positionManager
+      .getPositions()
+      .open.find((t) => t.sourceTradeId === sourceTradeId)
 
     const body: Record<string, string> = {}
     if (units !== undefined) {
@@ -520,7 +569,7 @@ export class OandaTradeSyncer {
           try {
             await closeTrade("oanda", closed.tradeID, {
               exitPrice: parseFloat(closed.price ?? "0") || null,
-              closeReason: (reason ?? "MARKET_ORDER") as import("@fxflow/types").TradeCloseReason,
+              closeReason: (reason ?? "MARKET_ORDER") as TradeCloseReason,
               realizedPL: parseFloat(closed.realizedPL) || 0,
               financing: parseFloat(closed.financing ?? "0") || 0,
               closedAt: new Date(fillTxn.time),
@@ -586,7 +635,19 @@ export class OandaTradeSyncer {
     const creds = this.stateManager.getCredentials()
     if (!creds) throw new Error("No credentials configured")
 
-    const { instrument, direction, orderType, units, entryPrice, stopLoss, takeProfit, timeframe, notes, tagIds, placedVia = "fxflow" } = request
+    const {
+      instrument,
+      direction,
+      orderType,
+      units,
+      entryPrice,
+      stopLoss,
+      takeProfit,
+      timeframe,
+      notes,
+      tagIds,
+      placedVia = "fxflow",
+    } = request
     const decimals = getDecimalPlaces(instrument)
 
     // OANDA expects negative units for short
@@ -633,17 +694,21 @@ export class OandaTradeSyncer {
     const sourceId = filled
       ? (response.orderFillTransaction!.tradeOpened?.tradeID ?? response.orderFillTransaction!.id)
       : (response.orderCreateTransaction?.id ?? "")
-    const fillPrice = filled
-      ? parseFloat(response.orderFillTransaction!.price)
-      : undefined
+    const fillPrice = filled ? parseFloat(response.orderFillTransaction!.price) : undefined
 
     // Notification
     const pair = instrument.replace("_", "/")
     const dir = direction === "long" ? "Long" : "Short"
     if (filled) {
-      this.onActionNotification?.("Order Filled", `${pair} ${dir} Market — ${units} units @ ${fillPrice}`)
+      this.onActionNotification?.(
+        "Order Filled",
+        `${pair} ${dir} Market — ${units} units @ ${fillPrice}`,
+      )
     } else {
-      this.onActionNotification?.("Order Placed", `${pair} ${dir} Limit — ${units} units @ ${entryPrice}`)
+      this.onActionNotification?.(
+        "Order Placed",
+        `${pair} ${dir} Limit — ${units} units @ ${entryPrice}`,
+      )
     }
 
     // Pre-seed the DB record with source metadata BEFORE the first reconcile so the
@@ -726,9 +791,9 @@ export class OandaTradeSyncer {
     const creds = this.stateManager.getCredentials()
     if (!creds) throw new Error("No credentials configured")
 
-    const trade = this.positionManager.getPositions().open.find(
-      (t) => t.sourceTradeId === sourceTradeId,
-    )
+    const trade = this.positionManager
+      .getPositions()
+      .open.find((t) => t.sourceTradeId === sourceTradeId)
 
     const instrument = trade?.instrument ?? "EUR_USD"
     const decimals = getDecimalPlaces(instrument)
@@ -736,14 +801,12 @@ export class OandaTradeSyncer {
     // Build request body — null cancels the order, undefined leaves unchanged
     const body: Record<string, unknown> = {}
     if (stopLoss !== undefined) {
-      body.stopLoss = stopLoss !== null
-        ? { price: stopLoss.toFixed(decimals), timeInForce: "GTC" }
-        : null // null cancels the existing SL order
+      body.stopLoss =
+        stopLoss !== null ? { price: stopLoss.toFixed(decimals), timeInForce: "GTC" } : null // null cancels the existing SL order
     }
     if (takeProfit !== undefined) {
-      body.takeProfit = takeProfit !== null
-        ? { price: takeProfit.toFixed(decimals), timeInForce: "GTC" }
-        : null // null cancels the existing TP order
+      body.takeProfit =
+        takeProfit !== null ? { price: takeProfit.toFixed(decimals), timeInForce: "GTC" } : null // null cancels the existing TP order
     }
 
     // Send modification request to OANDA
@@ -794,10 +857,14 @@ export class OandaTradeSyncer {
       const pair = trade.instrument.replace("_", "/")
       const changes: string[] = []
       if (stopLoss !== undefined) {
-        changes.push(stopLoss !== null ? `SL: ${trade.stopLoss ?? "none"} → ${verifiedSL}` : "SL removed")
+        changes.push(
+          stopLoss !== null ? `SL: ${trade.stopLoss ?? "none"} → ${verifiedSL}` : "SL removed",
+        )
       }
       if (takeProfit !== undefined) {
-        changes.push(takeProfit !== null ? `TP: ${trade.takeProfit ?? "none"} → ${verifiedTP}` : "TP removed")
+        changes.push(
+          takeProfit !== null ? `TP: ${trade.takeProfit ?? "none"} → ${verifiedTP}` : "TP removed",
+        )
       }
       this.onActionNotification?.("Trade Modified", `${pair} — ${changes.join(", ")}`)
 
@@ -831,10 +898,7 @@ export class OandaTradeSyncer {
       this.hasBackfilled = true
     }
     await this.reconcile()
-    this.reconcileTimer = setInterval(
-      () => void this.reconcile(),
-      this.config.reconcileIntervalMs,
-    )
+    this.reconcileTimer = setInterval(() => void this.reconcile(), this.config.reconcileIntervalMs)
   }
 
   // ─── Backfill ─────────────────────────────────────────────────────────────
@@ -1007,9 +1071,7 @@ export class OandaTradeSyncer {
         .filter((o) => o.state === "PENDING" && ENTRY_ORDER_TYPES.has(o.type))
         .map(mapOandaOrderToPending)
 
-      openTrades = tradesResp.trades
-        .filter((t) => t.state === "OPEN")
-        .map(mapOandaTradeToOpen)
+      openTrades = tradesResp.trades.filter((t) => t.state === "OPEN").map(mapOandaTradeToOpen)
     } catch (error) {
       if ((error as Error).name === "AbortError") return
       console.error("[trade-syncer] OANDA fetch error:", (error as Error).message)
@@ -1035,10 +1097,15 @@ export class OandaTradeSyncer {
           })),
         )
         if (migrated > 0) {
-          console.log(`[trade-syncer] Migrated ${migrated} filled order(s) — preserved tags, notes, metadata`)
+          console.log(
+            `[trade-syncer] Migrated ${migrated} filled order(s) — preserved tags, notes, metadata`,
+          )
         }
       } catch (migrationErr) {
-        console.warn("[trade-syncer] Failed to migrate filled orders:", (migrationErr as Error).message)
+        console.warn(
+          "[trade-syncer] Failed to migrate filled orders:",
+          (migrationErr as Error).message,
+        )
       }
 
       await removeStalePendingOrders(activeOrderIds, "oanda")
@@ -1072,7 +1139,9 @@ export class OandaTradeSyncer {
             else if (meta.placedVia === "ut_bot_alerts") order.source = "ut_bot_alerts"
             else if (meta.placedVia === "trade_finder") order.source = "trade_finder"
             else if (meta.placedVia === "trade_finder_auto") order.source = "trade_finder_auto"
-          } catch { /* ignore malformed metadata */ }
+          } catch {
+            /* ignore malformed metadata */
+          }
         }
         // Fire onPendingCreated for new pending orders (not seen before)
         if (!this.knownPendingSourceIds.has(order.sourceOrderId) && this.hasBackfilled) {
@@ -1118,7 +1187,9 @@ export class OandaTradeSyncer {
             else if (meta.placedVia === "ut_bot_alerts") trade.source = "ut_bot_alerts"
             else if (meta.placedVia === "trade_finder") trade.source = "trade_finder"
             else if (meta.placedVia === "trade_finder_auto") trade.source = "trade_finder_auto"
-          } catch { /* ignore malformed metadata */ }
+          } catch {
+            /* ignore malformed metadata */
+          }
         }
         // Fire onOrderFilled for trades that just filled OR new open trades
         if (!this.knownOpenSourceIds.has(trade.sourceTradeId) && this.hasBackfilled) {
@@ -1140,15 +1211,15 @@ export class OandaTradeSyncer {
         console.log(`[trade-syncer] Closed ${orphaned} orphaned trade(s) in DB`)
       }
     } catch (error) {
-      console.error("[trade-syncer] DB sync error (positions still displayed):", (error as Error).message)
+      console.error(
+        "[trade-syncer] DB sync error (positions still displayed):",
+        (error as Error).message,
+      )
     }
 
     // Step 2b: Enrich live positions with tags from DB (best-effort)
     try {
-      const allPositionIds = [
-        ...pendingOrders.map((o) => o.id),
-        ...openTrades.map((t) => t.id),
-      ]
+      const allPositionIds = [...pendingOrders.map((o) => o.id), ...openTrades.map((t) => t.id)]
       if (allPositionIds.length > 0) {
         const tagsByTradeId = await getTagsForTradeIds(allPositionIds)
         for (const order of pendingOrders) order.tags = tagsByTradeId[order.id] ?? []

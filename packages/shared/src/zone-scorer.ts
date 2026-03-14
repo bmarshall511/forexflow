@@ -11,7 +11,7 @@ import type {
   ZoneData,
 } from "@fxflow/types"
 import { computeFreshness } from "./zone-utils"
-import { getPipSize, priceToPips } from "./pip-utils"
+import { getPipSize } from "./pip-utils"
 import { scoreCommodityCorrelation } from "./commodity-correlation"
 
 // ─── Internal Types ─────────────────────────────────────────────────────────
@@ -72,9 +72,8 @@ function scoreStrength(
     }
   }
 
-  const moveOutDistance = zone.type === "demand"
-    ? moveOutExtreme - zone.proximalLine
-    : zone.proximalLine - moveOutExtreme
+  const moveOutDistance =
+    zone.type === "demand" ? moveOutExtreme - zone.proximalLine : zone.proximalLine - moveOutExtreme
   const moveOutMultiple = zoneWidth > 0 ? moveOutDistance / zoneWidth : 0
   const moveOutPips = moveOutDistance / pipSize
   const moveOutScore = moveOutMultiple >= config.minMoveOutMultiple ? 1 : 0
@@ -105,9 +104,10 @@ function scoreStrength(
   }
 
   const total = moveOutScore + breakoutScore
-  const moveLabel = moveOutScore > 0
-    ? `Strong move out (${moveOutPips.toFixed(1)} pips, ${moveOutMultiple.toFixed(1)}x zone width)`
-    : `Weak move out (${moveOutPips.toFixed(1)} pips, ${moveOutMultiple.toFixed(1)}x zone width)`
+  const moveLabel =
+    moveOutScore > 0
+      ? `Strong move out (${moveOutPips.toFixed(1)} pips, ${moveOutMultiple.toFixed(1)}x zone width)`
+      : `Weak move out (${moveOutPips.toFixed(1)} pips, ${moveOutMultiple.toFixed(1)}x zone width)`
 
   const labels: Record<number, string> = { 0: "Poor", 1: "Good", 2: "Best" }
 
@@ -115,11 +115,14 @@ function scoreStrength(
     value: total,
     max: 2,
     label: labels[total] ?? "Poor",
-    explanation: total === 2
-      ? `${moveLabel} + ${breakoutExplanation}`
-      : total === 1
-        ? moveOutScore > 0 ? `${moveLabel}, ${breakoutExplanation}` : `Moderate move out, ${breakoutExplanation}`
-        : `${moveLabel}, ${breakoutExplanation}`,
+    explanation:
+      total === 2
+        ? `${moveLabel} + ${breakoutExplanation}`
+        : total === 1
+          ? moveOutScore > 0
+            ? `${moveLabel}, ${breakoutExplanation}`
+            : `Moderate move out, ${breakoutExplanation}`
+          : `${moveLabel}, ${breakoutExplanation}`,
   }
 }
 
@@ -218,7 +221,11 @@ export function scoreZone(
 ): { scores: ZoneScores; testCount: number; penetrationPercent: number } {
   const strength = scoreStrength(zone, allCandles, opposingZones, config)
   const time = scoreTime(zone.baseCandles)
-  const { score: freshness, testCount, penetrationPercent } = scoreFreshness(zone, allCandles, config)
+  const {
+    score: freshness,
+    testCount,
+    penetrationPercent,
+  } = scoreFreshness(zone, allCandles, config)
 
   const total = strength.value + time.value + freshness.value
 
@@ -239,10 +246,7 @@ export function scoreZone(
  * - 1 (Good): Forming trend in same direction
  * - 0 (Poor): No trend, opposite trend, or terminated trend
  */
-function scoreTrend(
-  zoneType: ZoneType,
-  trendData: TrendData | null,
-): OddsEnhancerScore {
+function scoreTrend(zoneType: ZoneType, trendData: TrendData | null): OddsEnhancerScore {
   if (!trendData || !trendData.direction) {
     return { value: 0, max: 2, label: "Poor", explanation: "No trend detected" }
   }
@@ -290,10 +294,7 @@ function scoreTrend(
  *   (demand + price in lower third or below, supply + price in upper third or above)
  * - 0 (Poor): Price is not in the favorable curve position
  */
-function scoreCurve(
-  zoneType: ZoneType,
-  curveData: CurveData | null,
-): OddsEnhancerScore {
+function scoreCurve(zoneType: ZoneType, curveData: CurveData | null): OddsEnhancerScore {
   if (!curveData) {
     return { value: 0, max: 1, label: "Poor", explanation: "No curve data available" }
   }
@@ -336,7 +337,7 @@ function scoreProfitZone(
   distalLine: number,
   instrument: string,
   opposingFreshZones: ZoneData[],
-  currentPrice: number,
+  _currentPrice: number,
 ): OddsEnhancerScore {
   const pipSize = getPipSize(instrument)
 

@@ -1,3 +1,12 @@
+/**
+ * AI Analysis service — manages Claude-powered trade analysis records.
+ *
+ * Handles creation, result persistence, cost calculation, usage statistics,
+ * pagination, and cleanup of AI analysis records. Supports both user-triggered
+ * and automated analyses with per-model cost tracking.
+ *
+ * @module ai-analysis-service
+ */
 import { db } from "./client"
 import { safeJsonParse } from "./utils"
 import type {
@@ -13,13 +22,34 @@ import { AI_MODEL_OPTIONS } from "@fxflow/types"
 
 // ─── Cost (derived from canonical AI_MODEL_OPTIONS in @fxflow/types) ─────────
 
+/**
+ * Calculate the USD cost for an AI analysis based on token usage and model pricing.
+ * Falls back to Sonnet pricing if the model is not found in `AI_MODEL_OPTIONS`.
+ *
+ * @param model - The Claude model ID used for the analysis
+ * @param inputTokens - Number of input tokens consumed
+ * @param outputTokens - Number of output tokens generated
+ * @returns The estimated cost in USD
+ */
 export function calculateCost(model: string, inputTokens: number, outputTokens: number): number {
-  const option = AI_MODEL_OPTIONS.find((o) => o.id === model) ?? AI_MODEL_OPTIONS.find((o) => o.id === "claude-sonnet-4-6")!
-  return (inputTokens / 1_000_000) * option.inputCostPer1M + (outputTokens / 1_000_000) * option.outputCostPer1M
+  const option =
+    AI_MODEL_OPTIONS.find((o) => o.id === model) ??
+    AI_MODEL_OPTIONS.find((o) => o.id === "claude-sonnet-4-6")!
+  return (
+    (inputTokens / 1_000_000) * option.inputCostPer1M +
+    (outputTokens / 1_000_000) * option.outputCostPer1M
+  )
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Map a Prisma analysis row to the `AiAnalysisData` DTO, deserializing
+ * the sections JSON field.
+ *
+ * @param row - Raw analysis row from Prisma
+ * @returns Serialized analysis data for the API/UI
+ */
 function toAnalysisData(row: {
   id: string
   tradeId: string
@@ -45,7 +75,11 @@ function toAnalysisData(row: {
     model: row.model as AiClaudeModel,
     tradeStatus: row.tradeStatus,
     triggeredBy: row.triggeredBy as AiAnalysisTriggeredBy,
-    sections: safeJsonParse<AiAnalysisSections | null>(row.sections, null, `analysis ${row.id} sections`),
+    sections: safeJsonParse<AiAnalysisSections | null>(
+      row.sections,
+      null,
+      `analysis ${row.id} sections`,
+    ),
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
     costUsd: row.costUsd,
@@ -58,6 +92,12 @@ function toAnalysisData(row: {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+/**
+ * Create a new AI analysis record in "pending" status.
+ *
+ * @param input - Analysis creation parameters including trade ID, depth, and model
+ * @returns The created analysis data
+ */
 export async function createAnalysis(input: {
   tradeId: string
   depth: AiAnalysisDepth
@@ -80,6 +120,13 @@ export async function createAnalysis(input: {
   return toAnalysisData(row)
 }
 
+/**
+ * Update an analysis record's status, optionally recording an error message.
+ *
+ * @param id - Analysis ID
+ * @param status - New status to set
+ * @param errorMessage - Optional error message for failed analyses
+ */
 export async function updateAnalysisStatus(
   id: string,
   status: AiAnalysisStatus,
@@ -91,6 +138,14 @@ export async function updateAnalysisStatus(
   })
 }
 
+/**
+ * Persist a completed analysis result with token usage, parsed sections,
+ * and computed cost. Marks the analysis as "completed".
+ *
+ * @param id - Analysis ID
+ * @param result - The analysis result including raw response, sections, and token counts
+ * @returns The updated analysis data
+ */
 export async function saveAnalysisResult(
   id: string,
   result: {
@@ -122,16 +177,26 @@ export async function saveAnalysisResult(
   return toAnalysisData(row)
 }
 
+/**
+ * Retrieve a single analysis by ID.
+ *
+ * @param id - Analysis ID
+ * @returns The analysis data, or null if not found
+ */
 export async function getAnalysis(id: string): Promise<AiAnalysisData | null> {
   const row = await db.aiAnalysis.findUnique({ where: { id } })
   if (!row) return null
   return toAnalysisData(row)
 }
 
-export async function getAnalysisHistory(
-  tradeId: string,
-  limit = 20,
-): Promise<AiAnalysisData[]> {
+/**
+ * Get the analysis history for a specific trade, ordered by most recent first.
+ *
+ * @param tradeId - Trade ID to get analyses for
+ * @param limit - Maximum number of analyses to return (default: 20)
+ * @returns Array of analysis data records
+ */
+export async function getAnalysisHistory(tradeId: string, limit = 20): Promise<AiAnalysisData[]> {
   const rows = await db.aiAnalysis.findMany({
     where: { tradeId },
     orderBy: { createdAt: "desc" },
@@ -140,9 +205,13 @@ export async function getAnalysisHistory(
   return rows.map(toAnalysisData)
 }
 
-export async function getLatestCompletedAnalysis(
-  tradeId: string,
-): Promise<AiAnalysisData | null> {
+/**
+ * Get the most recent completed analysis for a trade.
+ *
+ * @param tradeId - Trade ID to find the latest completed analysis for
+ * @returns The latest completed analysis, or null if none exist
+ */
+export async function getLatestCompletedAnalysis(tradeId: string): Promise<AiAnalysisData | null> {
   const row = await db.aiAnalysis.findFirst({
     where: { tradeId, status: "completed" },
     orderBy: { createdAt: "desc" },
@@ -151,6 +220,11 @@ export async function getLatestCompletedAnalysis(
   return toAnalysisData(row)
 }
 
+/**
+ * Mark an analysis as cancelled.
+ *
+ * @param id - Analysis ID to cancel
+ */
 export async function cancelAnalysis(id: string): Promise<void> {
   await db.aiAnalysis.update({
     where: { id },
@@ -158,6 +232,14 @@ export async function cancelAnalysis(id: string): Promise<void> {
   })
 }
 
+/**
+ * Find a recent active analysis for a trade within a time window.
+ * Used to prevent duplicate analyses from being created in quick succession.
+ *
+ * @param tradeId - Trade ID to check
+ * @param withinMinutes - Time window in minutes (default: 30)
+ * @returns The most recent active analysis, or null if none in window
+ */
 export async function getRecentAnalysisForTrade(
   tradeId: string,
   withinMinutes = 30,
@@ -175,6 +257,13 @@ export async function getRecentAnalysisForTrade(
   return toAnalysisData(row)
 }
 
+/**
+ * Compute comprehensive AI usage statistics including token counts, costs,
+ * period breakdowns, model breakdowns, and average quality metrics.
+ * Uses parallel aggregation queries for performance.
+ *
+ * @returns Aggregated usage stats across all completed analyses
+ */
 export async function getUsageStats(): Promise<AiUsageStats> {
   const now = new Date()
   const todayStart = new Date(now)
@@ -261,9 +350,19 @@ export async function getUsageStats(): Promise<AiUsageStats> {
   let qualityCount = 0
   for (const row of recentSections) {
     if (!row.sections) continue
-    const sections = safeJsonParse<AiAnalysisSections | null>(row.sections, null, "usage-stats sections")
-    if (sections?.winProbability != null) { winProbSum += sections.winProbability; winProbCount++ }
-    if (sections?.tradeQualityScore != null) { qualitySum += sections.tradeQualityScore; qualityCount++ }
+    const sections = safeJsonParse<AiAnalysisSections | null>(
+      row.sections,
+      null,
+      "usage-stats sections",
+    )
+    if (sections?.winProbability != null) {
+      winProbSum += sections.winProbability
+      winProbCount++
+    }
+    if (sections?.tradeQualityScore != null) {
+      qualitySum += sections.tradeQualityScore
+      qualityCount++
+    }
   }
 
   const totalCount = totals._count._all
@@ -302,6 +401,13 @@ export async function getUsageStats(): Promise<AiUsageStats> {
   }
 }
 
+/**
+ * Batch-fetch the latest non-cancelled analysis for multiple trades.
+ * Used by trade tables to show analysis status indicators.
+ *
+ * @param tradeIds - Array of trade IDs to look up
+ * @returns Map of trade ID to latest analysis data
+ */
 export async function getLatestAnalysisByTradeIds(
   tradeIds: string[],
 ): Promise<Record<string, AiAnalysisData>> {
@@ -321,6 +427,12 @@ export async function getLatestAnalysisByTradeIds(
   return result
 }
 
+/**
+ * Batch-count completed analyses per trade for multiple trade IDs.
+ *
+ * @param tradeIds - Array of trade IDs to count analyses for
+ * @returns Map of trade ID to completed analysis count
+ */
 export async function getAnalysisCountsByTradeIds(
   tradeIds: string[],
 ): Promise<Record<string, number>> {
@@ -337,6 +449,7 @@ export async function getAnalysisCountsByTradeIds(
   return result
 }
 
+/** Summary view of an analysis joined with its trade's instrument and direction. */
 export interface RecentAnalysisSummary {
   id: string
   tradeId: string
@@ -356,18 +469,39 @@ export interface RecentAnalysisSummary {
   createdAt: string
 }
 
-export async function getRecentAnalysesWithTrade(
-  limit = 3,
-): Promise<RecentAnalysisSummary[]> {
+/**
+ * Get the most recent completed analyses joined with trade details.
+ * Used by the AI insights dashboard card.
+ *
+ * @param limit - Maximum number of analyses to return (default: 3)
+ * @returns Array of analysis summaries with trade context
+ */
+export async function getRecentAnalysesWithTrade(limit = 3): Promise<RecentAnalysisSummary[]> {
   const rows = await db.aiAnalysis.findMany({
     where: { status: "completed" },
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: { trade: { select: { instrument: true, direction: true, entryPrice: true, openedAt: true, notes: true } } },
+    include: {
+      trade: {
+        select: {
+          instrument: true,
+          direction: true,
+          entryPrice: true,
+          openedAt: true,
+          notes: true,
+        },
+      },
+    },
   })
   return rows.map((row) => toAnalysisSummary(row))
 }
 
+/**
+ * Map a Prisma analysis row with included trade to a `RecentAnalysisSummary` DTO.
+ *
+ * @param row - Raw analysis row with trade include from Prisma
+ * @returns Serialized analysis summary for the API/UI
+ */
 function toAnalysisSummary(row: {
   id: string
   tradeId: string
@@ -379,7 +513,13 @@ function toAnalysisSummary(row: {
   sections: string | null
   costUsd: number
   createdAt: Date
-  trade: { instrument: string; direction: string; entryPrice: number; openedAt: Date; notes: string | null }
+  trade: {
+    instrument: string
+    direction: string
+    entryPrice: number
+    openedAt: Date
+    notes: string | null
+  }
 }): RecentAnalysisSummary {
   const sections = safeJsonParse<AiAnalysisSections | null>(row.sections, null, `summary ${row.id}`)
   return {
@@ -404,6 +544,13 @@ function toAnalysisSummary(row: {
 
 const AUTO_TRIGGERED_VALUES = ["auto_pending", "auto_fill", "auto_close", "auto_interval"] as const
 
+/**
+ * Get analyses with pagination and filtering by trigger type and status.
+ * Supports "automated" filter that matches all auto_* triggered-by values.
+ *
+ * @param opts - Pagination and filter options
+ * @returns Paginated analysis summaries with total count
+ */
 export async function getAnalysesPaginated(opts: {
   page: number
   pageSize: number
@@ -427,7 +574,17 @@ export async function getAnalysesPaginated(opts: {
       orderBy: { createdAt: "desc" },
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
-      include: { trade: { select: { instrument: true, direction: true, entryPrice: true, openedAt: true, notes: true } } },
+      include: {
+        trade: {
+          select: {
+            instrument: true,
+            direction: true,
+            entryPrice: true,
+            openedAt: true,
+            notes: true,
+          },
+        },
+      },
     }),
     db.aiAnalysis.count({ where }),
   ])
@@ -437,6 +594,12 @@ export async function getAnalysesPaginated(opts: {
   }
 }
 
+/**
+ * Delete analyses older than the specified number of days.
+ *
+ * @param days - Age threshold in days (default: 90)
+ * @returns Number of analyses deleted
+ */
 export async function cleanupOldAnalyses(days = 90): Promise<number> {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
   const result = await db.aiAnalysis.deleteMany({
@@ -469,10 +632,20 @@ export async function resetStuckAnalyses(): Promise<number> {
   return result.count
 }
 
+/**
+ * Delete a single analysis record by ID.
+ *
+ * @param id - Analysis ID to delete
+ */
 export async function deleteAnalysis(id: string): Promise<void> {
   await db.aiAnalysis.delete({ where: { id } })
 }
 
+/**
+ * Delete all analysis records. Returns the count of deleted records.
+ *
+ * @returns Number of analyses deleted
+ */
 export async function clearAllAnalyses(): Promise<number> {
   const result = await db.aiAnalysis.deleteMany()
   return result.count

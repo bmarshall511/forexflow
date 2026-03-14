@@ -1,3 +1,12 @@
+/**
+ * Trade Finder service — manages supply/demand zone-based trade setups.
+ *
+ * Handles creation, scoring, status transitions, and auto-trade tracking
+ * for setups detected by the Trade Finder scanner. Setups follow the lifecycle:
+ * active -> approaching -> placed -> filled -> invalidated/expired.
+ *
+ * @module trade-finder-service
+ */
 import { db } from "./client"
 import type {
   TradeFinderSetupData,
@@ -10,7 +19,7 @@ import type {
   CurveData,
 } from "@fxflow/types"
 
-/** Safely convert a Prisma date (may be invalid with libsql adapter) to ISO string */
+/** Safely convert a Prisma date (may be invalid with libsql adapter) to ISO string. */
 function safeIso(val: unknown): string {
   if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString()
   if (typeof val === "string" && val) {
@@ -23,6 +32,13 @@ function safeIso(val: unknown): string {
 
 // ─── Mappers ────────────────────────────────────────────────────────────────
 
+/**
+ * Map a Prisma row to the `TradeFinderSetupData` DTO, deserializing JSON fields
+ * for scores, zone, trend, and curve data.
+ *
+ * @param row - Raw setup row from Prisma
+ * @returns Serialized setup data for the API/UI
+ */
 function toSetupData(row: {
   id: string
   instrument: string
@@ -117,6 +133,7 @@ export async function getSetup(id: string): Promise<TradeFinderSetupData | null>
 
 // ─── Mutations ──────────────────────────────────────────────────────────────
 
+/** Fields required to create a new trade finder setup. */
 export interface CreateSetupInput {
   instrument: string
   direction: TradeDirection
@@ -135,6 +152,12 @@ export interface CreateSetupInput {
   distanceToEntryPips: number
 }
 
+/**
+ * Create a new trade finder setup with computed scores and zone data.
+ *
+ * @param input - Setup creation parameters including instrument, levels, and scores
+ * @returns The created setup data
+ */
 export async function createSetup(input: CreateSetupInput): Promise<TradeFinderSetupData> {
   const row = await db.tradeFinderSetup.create({
     data: {
@@ -159,6 +182,15 @@ export async function createSetup(input: CreateSetupInput): Promise<TradeFinderS
   return toSetupData(row)
 }
 
+/**
+ * Transition a setup to a new status, optionally updating related fields.
+ * Automatically sets `placedAt` when status is "placed" and `expiredAt` when
+ * status is "expired" or "invalidated".
+ *
+ * @param id - Setup ID
+ * @param status - New status to transition to
+ * @param extra - Optional fields to update alongside the status change
+ */
 export async function updateSetupStatus(
   id: string,
   status: TradeFinderSetupStatus,
@@ -177,6 +209,15 @@ export async function updateSetupStatus(
   await db.tradeFinderSetup.update({ where: { id }, data })
 }
 
+/**
+ * Update a setup's scores, distance to entry, and optionally position size.
+ * Called during periodic re-scoring as price moves.
+ *
+ * @param id - Setup ID
+ * @param scores - Updated score breakdown
+ * @param distanceToEntry - Current distance from price to entry in pips
+ * @param positionSize - Optional updated position size
+ */
 export async function updateSetupScores(
   id: string,
   scores: TradeFinderScoreBreakdown,
@@ -265,7 +306,9 @@ export async function getPendingAutoPlacedSetups(): Promise<TradeFinderSetupData
 }
 
 /** Get total risk pips across all pending auto-placed setups (for risk cap) */
-export async function getAutoPlacedTotalRiskPips(): Promise<{ instrument: string; riskPips: number; positionSize: number }[]> {
+export async function getAutoPlacedTotalRiskPips(): Promise<
+  { instrument: string; riskPips: number; positionSize: number }[]
+> {
   const rows = await db.tradeFinderSetup.findMany({
     where: { status: "placed", autoPlaced: true },
     select: { instrument: true, riskPips: true, positionSize: true },
@@ -290,7 +333,9 @@ export async function clearSetupHistory(): Promise<number> {
 }
 
 /** Find a setup by its OANDA result source ID (order or trade ID) */
-export async function findSetupByResultSourceId(sourceId: string): Promise<TradeFinderSetupData | null> {
+export async function findSetupByResultSourceId(
+  sourceId: string,
+): Promise<TradeFinderSetupData | null> {
   const row = await db.tradeFinderSetup.findFirst({
     where: { resultSourceId: sourceId },
   })

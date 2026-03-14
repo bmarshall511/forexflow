@@ -1,4 +1,4 @@
-import type { TradingMode, AnyDaemonMessage, PositionPriceTick } from "@fxflow/types"
+import type { AnyDaemonMessage, PositionPriceTick } from "@fxflow/types"
 import type { StateManager } from "../state-manager.js"
 import type { PositionManager } from "./position-manager.js"
 import { getStreamUrl } from "../oanda/api-client.js"
@@ -133,7 +133,13 @@ export class PositionPriceTracker {
           const trimmed = line.trim()
           if (!trimmed) continue
           try {
-            const msg = JSON.parse(trimmed) as { type: string; instrument?: string; bids?: Array<{ price: string }>; asks?: Array<{ price: string }>; time?: string }
+            const msg = JSON.parse(trimmed) as {
+              type: string
+              instrument?: string
+              bids?: Array<{ price: string }>
+              asks?: Array<{ price: string }>
+              time?: string
+            }
             this.handleMessage(msg)
           } catch {
             // Ignore malformed lines
@@ -150,7 +156,13 @@ export class PositionPriceTracker {
     }
   }
 
-  private handleMessage(msg: { type: string; instrument?: string; bids?: Array<{ price: string }>; asks?: Array<{ price: string }>; time?: string }): void {
+  private handleMessage(msg: {
+    type: string
+    instrument?: string
+    bids?: Array<{ price: string }>
+    asks?: Array<{ price: string }>
+    time?: string
+  }): void {
     if (msg.type === "HEARTBEAT") {
       this.lastHeartbeat = Date.now()
       return

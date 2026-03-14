@@ -1,3 +1,11 @@
+/**
+ * Tag service — manages trade tags and tag-to-trade assignments.
+ *
+ * Handles CRUD for tags and idempotent tag assignment/removal on trades.
+ * Supports batch fetching of tags across multiple trades for table views.
+ *
+ * @module tag-service
+ */
 import { db } from "./client"
 import type { TagData, TradeTagData } from "@fxflow/types"
 
@@ -54,7 +62,9 @@ export async function getTagsForTrade(tradeId: string): Promise<TagData[]> {
 }
 
 /** Get tags for multiple trade IDs in a single query. */
-export async function getTagsForTradeIds(tradeIds: string[]): Promise<Record<string, TradeTagData[]>> {
+export async function getTagsForTradeIds(
+  tradeIds: string[],
+): Promise<Record<string, TradeTagData[]>> {
   if (tradeIds.length === 0) return {}
 
   const assignments = await db.tradeTag.findMany({
@@ -65,7 +75,7 @@ export async function getTagsForTradeIds(tradeIds: string[]): Promise<Record<str
 
   const result: Record<string, TradeTagData[]> = {}
   for (const a of assignments) {
-    const arr = result[a.tradeId] ??= []
+    const arr = (result[a.tradeId] ??= [])
     arr.push({
       tagId: a.tagId,
       tag: { id: a.tag.id, name: a.tag.name, color: a.tag.color },

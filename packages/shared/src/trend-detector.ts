@@ -16,7 +16,6 @@ import type {
   TrendData,
   TrendDetectionConfig,
   SwingPoint,
-  SwingPointType,
   SwingPointLabel,
   TrendSegment,
   TrendDirection,
@@ -33,6 +32,20 @@ function uid(): string {
 
 // ─── Main Entry Point ────────────────────────────────────────────────────────
 
+/**
+ * Detect the trend direction and status from OHLC candle data using swing point analysis.
+ *
+ * Algorithm: detects swing highs/lows via N-bar pivot, filters by ATR to remove noise,
+ * then scans right-to-left for Higher-Highs/Higher-Lows (uptrend) or Lower-Highs/Lower-Lows
+ * (downtrend). A trend is "terminated" when price crosses the controlling swing level.
+ *
+ * @param candles - OHLC candle data (requires at least 10 candles).
+ * @param instrument - OANDA instrument name (e.g., "EUR_USD"), used for pip calculations.
+ * @param timeframe - Timeframe label (e.g., "H1"), used for adaptive swing strength.
+ * @param config - Detection parameters (swing strength, min segment ATR, max swing points).
+ * @param currentPrice - Current market price, used for termination detection.
+ * @returns Trend data including direction, status, swing points, segments, and controlling swing.
+ */
 export function detectTrend(
   candles: ZoneCandle[],
   instrument: string,
@@ -50,13 +63,19 @@ export function detectTrend(
 
   // Step 1: Compute ATR for noise filtering
   const atrValues = computeATR(candles, 14)
-  const currentAtr = atrValues[atrValues.length - 1] ?? 0
+  const _currentAtr = atrValues[atrValues.length - 1] ?? 0
 
   // Step 2: Detect raw swing points
   const rawSwings = detectSwingPoints(candles, strength)
 
   // Step 3: Filter insignificant swings (too close together relative to ATR)
-  const filtered = filterSwingsByAtr(rawSwings, candles, atrValues, config.minSegmentAtr, instrument)
+  const filtered = filterSwingsByAtr(
+    rawSwings,
+    candles,
+    atrValues,
+    config.minSegmentAtr,
+    instrument,
+  )
 
   // Step 4: Limit to maxSwingPoints (keep most recent)
   const swings = filtered.slice(-config.maxSwingPoints)
@@ -80,7 +99,10 @@ export function detectTrend(
   // Compute controlling swing distance
   let controllingSwingDistancePips: number | null = null
   if (controllingSwing) {
-    controllingSwingDistancePips = priceToPips(instrument, Math.abs(currentPrice - controllingSwing.price))
+    controllingSwingDistancePips = priceToPips(
+      instrument,
+      Math.abs(currentPrice - controllingSwing.price),
+    )
   }
 
   return {
@@ -199,7 +221,7 @@ function filterSwingsByAtr(
   candles: ZoneCandle[],
   atrValues: number[],
   minSegmentAtr: number,
-  instrument: string,
+  _instrument: string,
 ): SwingPoint[] {
   if (swings.length <= 2 || minSegmentAtr <= 0) return swings
 
@@ -286,7 +308,11 @@ function identifyTrend(swings: SwingPoint[], currentPrice: number): TrendIdentif
   const recentHighs: SwingPoint[] = []
 
   // Scan right-to-left to collect swing points
-  for (let i = swings.length - 1; i >= 0 && (recentLows.length < 3 || recentHighs.length < 3); i--) {
+  for (
+    let i = swings.length - 1;
+    i >= 0 && (recentLows.length < 3 || recentHighs.length < 3);
+    i--
+  ) {
     const sw = swings[i]!
     if (sw.type === "low" && recentLows.length < 3) recentLows.unshift(sw)
     if (sw.type === "high" && recentHighs.length < 3) recentHighs.unshift(sw)
@@ -373,7 +399,7 @@ function checkDowntrend(
  * First of each type gets the base label (H/L).
  * Subsequent ones get comparative labels (HH/HL/LH/LL).
  */
-function labelSwingPoints(swings: SwingPoint[], direction: TrendDirection | null): void {
+function labelSwingPoints(swings: SwingPoint[], _direction: TrendDirection | null): void {
   let lastHigh: SwingPoint | null = null
   let lastLow: SwingPoint | null = null
 
@@ -424,7 +450,12 @@ function markBreakoutSegment(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function emptyTrend(instrument: string, timeframe: string, currentPrice: number, candlesAnalyzed: number): TrendData {
+function emptyTrend(
+  instrument: string,
+  timeframe: string,
+  currentPrice: number,
+  candlesAnalyzed: number,
+): TrendData {
   return {
     instrument,
     timeframe,

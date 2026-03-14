@@ -50,13 +50,15 @@ export {
   type ForexPairGroup,
 } from "./forex-pairs"
 
-export {
-  mapTVTickerToOandaInstrument,
-  isValidOandaInstrument,
-} from "./ticker-mapping"
+export { mapTVTickerToOandaInstrument, isValidOandaInstrument } from "./ticker-mapping"
 
 export { detectZones } from "./zone-detector"
-export { scoreZone, scoreZoneExtended, type RawZoneCandidate, type ExtendedScoringContext } from "./zone-scorer"
+export {
+  scoreZone,
+  scoreZoneExtended,
+  type RawZoneCandidate,
+  type ExtendedScoringContext,
+} from "./zone-scorer"
 export {
   computeATR,
   classifyCandles,
@@ -77,6 +79,22 @@ export {
   type CommodityCorrelation,
 } from "./commodity-correlation"
 
+export {
+  computeRSI,
+  computeMACD,
+  computeEMA,
+  computeEMASeries,
+  computeBollingerBands,
+  computeWilliamsR,
+  computeADX,
+  computeStochastic,
+  type Candle,
+  type MACDResult,
+  type BollingerBandsResult,
+  type ADXResult,
+  type StochasticResult,
+} from "./technical-indicators"
+
 export { detectTrend } from "./trend-detector"
 export {
   DEFAULT_TREND_DISPLAY_SETTINGS,
@@ -84,3 +102,54 @@ export {
   DEFAULT_TREND_DETECTION_CONFIG,
   getDefaultSwingStrength,
 } from "./trend-defaults"
+
+export {
+  FIBONACCI_LEVELS,
+  FIBONACCI_EXTENSIONS,
+  computeFibonacciRetracement,
+  isInOTEZone,
+  findFibonacciFromSwings,
+  type FibonacciLevel,
+  type FibonacciResult,
+} from "./fibonacci-calculator"
+export type { SwingPoint } from "./fibonacci-calculator"
+
+export {
+  detectRSIDivergence,
+  detectMACDDivergence,
+  type DivergenceType,
+  type Divergence,
+} from "./divergence-detector"
+
+export {
+  getCurrentSession,
+  getSessionForTime,
+  isKillZone,
+  getSessionBestPairs,
+  getSessionScore,
+  type ForexSession,
+  type SessionInfo,
+} from "./session-utils"
+
+export { detectRegime, type MarketRegime, type RegimeResult } from "./regime-detector"
+
+export {
+  computeConfluenceScore,
+  type ConfluenceInput,
+  type ConfluenceResult,
+} from "./confluence-scorer"
+
+export {
+  detectSwingPoints,
+  detectMarketStructure,
+  detectFairValueGaps,
+  detectOrderBlocks,
+  detectLiquiditySweeps,
+  detectEqualLevels,
+  type SwingPoint as SmcSwingPoint,
+  type MarketStructureEvent,
+  type FairValueGap,
+  type OrderBlock,
+  type LiquiditySweep,
+  type EqualLevel,
+} from "./smc-detector"

@@ -1,6 +1,15 @@
+/**
+ * Chart layout service — persists the user's chart panel arrangement.
+ *
+ * Stores the layout mode (single, dual, quad) and per-panel instrument/timeframe
+ * configuration. Uses a singleton row (id=1) with JSON-serialized panel data.
+ *
+ * @module chart-layout-service
+ */
 import { db } from "./client"
 import type { ChartLayoutData, ChartPanelConfig } from "@fxflow/types"
 
+/** Default panel configuration used when no saved layout exists. */
 const DEFAULT_PANEL: ChartPanelConfig = { instrument: "EUR_USD", timeframe: "H1" }
 
 /** Get the saved chart layout, or return defaults if none exists. */

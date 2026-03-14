@@ -1,4 +1,10 @@
 /**
+ * Shared database utilities used across service files.
+ *
+ * @module utils
+ */
+
+/**
  * Safely parse a JSON string with a fallback value.
  * Logs a warning on parse failure instead of throwing.
  */

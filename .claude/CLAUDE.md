@@ -42,35 +42,43 @@ packages/
 
 ## Build / Test / Lint Commands
 
-| Command            | Scope         | Description                        |
-| ------------------ | ------------- | ---------------------------------- |
-| `pnpm dev`         | all           | Start all apps in dev mode         |
-| `pnpm build`       | all           | Production build                   |
-| `pnpm lint`        | all           | ESLint across workspaces           |
-| `pnpm typecheck`   | all           | `tsc --noEmit` across workspaces   |
-| `pnpm test`        | all           | Run test suites                    |
-| `pnpm format`      | all           | Prettier format                    |
+| Command             | Scope    | Description                      |
+| ------------------- | -------- | -------------------------------- |
+| `pnpm dev`          | all      | Start all apps in dev mode       |
+| `pnpm build`        | all      | Production build                 |
+| `pnpm lint`         | all      | ESLint across workspaces         |
+| `pnpm typecheck`    | all      | `tsc --noEmit` across workspaces |
+| `pnpm test`         | all      | Run test suites                  |
+| `pnpm format`       | all      | Prettier format                  |
+| `pnpm format:check` | all      | Check formatting (no write)      |
+| `pnpm knip`         | all      | Find unused exports/dependencies |
+| `pnpm docs:api`     | packages | Generate TypeDoc API docs        |
+| `pnpm changelog`    | root     | Generate changelog from commits  |
 
 ## Key Domain Concepts
 
 ### OANDA as Trade Repository
+
 - OANDA is the source of truth for all positions and orders.
 - Daemon reconciles OANDA state into the DB every 2 minutes.
 - Transaction stream provides instant fill/cancel notifications.
 
 ### Source / Metadata Pattern
+
 - `Trade.source` in the DB is always `"oanda"` (the trade repository).
 - True origin is stored in `Trade.metadata = JSON.stringify({ placedVia: "..." })`.
 - `placedVia` values: `"fxflow"` | `"ut_bot_alerts"` | `"trade_finder"` | `"trade_finder_auto"`.
 - `enrichSource(source, metadata)` in `packages/db/src/trade-service.ts` maps to display labels.
 
 ### Daemon (port 4100)
+
 - HTTP REST API + WebSocket broadcast to connected web clients.
 - StateManager is single source of truth — use event listeners, not polling.
 - Per-instrument mutex for trade syncing and signal processing.
 - Crash recovery: reset stuck "executing" states on startup.
 
 ### Signal Flow
+
 TradingView → CF Worker POST /webhook/{token} → Daemon WebSocket → SignalProcessor → placeOrder()
 
 ## Deep Dive References

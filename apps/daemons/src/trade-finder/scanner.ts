@@ -4,10 +4,8 @@ import type {
   TradeFinderSetupData,
   TradeFinderScanStatus,
   TradeFinderScoreBreakdown,
-  TradeFinderTimeframeSet,
   TradeFinderAutoTradeEvent,
   TradeDirection,
-  ZoneCandle,
   ZoneData,
   TrendData,
   CurveData,
@@ -19,14 +17,12 @@ import { TIMEFRAME_SET_MAP, SCAN_INTERVAL_MAP } from "@fxflow/types"
 import {
   detectZones,
   detectTrend,
-  scoreZoneExtended,
   computeATR,
   getPresetConfig,
   isMarketExpectedOpen,
   getCorrelation,
   getPipSize,
 } from "@fxflow/shared"
-import type { ExtendedScoringContext, RawZoneCandidate } from "@fxflow/shared"
 import {
   getTradeFinderConfig,
   getActiveSetups,
@@ -35,7 +31,6 @@ import {
   updateSetupScores,
   findExistingSetup,
   pruneSetupHistory,
-  getRiskPercent,
   countPendingAutoPlaced,
   countAutoPlacedToday,
   getAutoPlacedTotalRiskPips,
@@ -49,8 +44,15 @@ import { getRestUrl } from "../oanda/api-client.js"
 import { CandleCache, fetchOandaCandles } from "./candle-cache.js"
 
 const CANDLE_COUNT_MAP: Record<string, number> = {
-  M1: 500, M5: 500, M15: 300, M30: 300,
-  H1: 200, H4: 200, D: 120, W: 104, M: 60,
+  M1: 500,
+  M5: 500,
+  M15: 300,
+  M30: 300,
+  H1: 200,
+  H4: 200,
+  D: 120,
+  W: 104,
+  M: 60,
 }
 
 /** Callback for placing an order (provided by server.ts) */
@@ -116,10 +118,7 @@ export class TradeFinderScanner {
   // Auto-trade activity event ring buffer
   private autoTradeEvents: TradeFinderAutoTradeEvent[] = []
 
-  constructor(
-    stateManager: StateManager,
-    broadcast: (msg: AnyDaemonMessage) => void,
-  ) {
+  constructor(stateManager: StateManager, broadcast: (msg: AnyDaemonMessage) => void) {
     this.stateManager = stateManager
     this.broadcast = broadcast
   }
@@ -225,9 +224,8 @@ export class TradeFinderScanner {
       this.activeSetupCount = (await getActiveSetups()).length
 
       // Determine next scan interval (use shortest TF set interval from enabled pairs)
-      const minInterval = Math.min(
-        ...enabledPairs.map((p) => SCAN_INTERVAL_MAP[p.timeframeSet]),
-      ) * 60_000
+      const minInterval =
+        Math.min(...enabledPairs.map((p) => SCAN_INTERVAL_MAP[p.timeframeSet])) * 60_000
 
       this.scheduleScan(minInterval)
     } catch (err) {
@@ -272,7 +270,9 @@ export class TradeFinderScanner {
 
     // 3. MTF: Detect trend
     const trendData = detectTrend(
-      mtfCandles, instrument, mtf,
+      mtfCandles,
+      instrument,
+      mtf,
       { swingStrength: 5, minSegmentAtr: 0.5, maxSwingPoints: 20, lookbackCandles: 500 },
       currentPrice,
     )
@@ -286,12 +286,22 @@ export class TradeFinderScanner {
     const correlation = getCorrelation(instrument)
     if (correlation) {
       const commCandles = await fetchOandaCandles(
-        correlation.commodity, htf,
-        CANDLE_COUNT_MAP[htf] ?? 200, apiUrl, token, this.cache,
+        correlation.commodity,
+        htf,
+        CANDLE_COUNT_MAP[htf] ?? 200,
+        apiUrl,
+        token,
+        this.cache,
       )
       if (commCandles.length > 0) {
         const commPrice = commCandles[commCandles.length - 1]!.close
-        const commResult = detectZones(commCandles, correlation.commodity, htf, zoneConfig, commPrice)
+        const commResult = detectZones(
+          commCandles,
+          correlation.commodity,
+          htf,
+          zoneConfig,
+          commPrice,
+        )
         commodityZones = commResult.zones
       }
     }
@@ -314,14 +324,19 @@ export class TradeFinderScanner {
       if (existing) continue
 
       // Extended scoring
-      const extendedScores = this.computeExtendedScores(zone, ltfResult.zones, trendData, curveData, commodityZones)
+      const extendedScores = this.computeExtendedScores(
+        zone,
+        ltfResult.zones,
+        trendData,
+        curveData,
+        commodityZones,
+      )
       if (extendedScores.total < config.minScore) continue
 
       // Compute SL/TP
       const slBuffer = atr * 0.02 + spread
-      const stopLoss = zone.type === "demand"
-        ? zone.distalLine - slBuffer
-        : zone.distalLine + slBuffer
+      const stopLoss =
+        zone.type === "demand" ? zone.distalLine - slBuffer : zone.distalLine + slBuffer
       const riskPips = Math.abs(zone.proximalLine - stopLoss) / pipSize
 
       // Find TP: opposing fresh zone or 2:1 fallback
@@ -335,15 +350,17 @@ export class TradeFinderScanner {
 
       let takeProfit: number
       if (freshOpposing.length > 0) {
-        takeProfit = zone.type === "demand"
-          ? freshOpposing[0]!.proximalLine - spread
-          : freshOpposing[0]!.proximalLine + spread
+        takeProfit =
+          zone.type === "demand"
+            ? freshOpposing[0]!.proximalLine - spread
+            : freshOpposing[0]!.proximalLine + spread
       } else {
         // 2:1 fallback
         const riskDistance = Math.abs(zone.proximalLine - stopLoss)
-        takeProfit = zone.type === "demand"
-          ? zone.proximalLine + riskDistance * 2
-          : zone.proximalLine - riskDistance * 2
+        takeProfit =
+          zone.type === "demand"
+            ? zone.proximalLine + riskDistance * 2
+            : zone.proximalLine - riskDistance * 2
       }
 
       const rewardPips = Math.abs(takeProfit - zone.proximalLine) / pipSize
@@ -351,7 +368,11 @@ export class TradeFinderScanner {
 
       // Position sizing: risk% of balance / risk in account currency
       const positionSize = this.calculatePositionSize(
-        accountBalance, riskPercent, riskPips, pipSize, instrument,
+        accountBalance,
+        riskPercent,
+        riskPips,
+        pipSize,
+        instrument,
       )
 
       if (positionSize <= 0) continue
@@ -385,10 +406,12 @@ export class TradeFinderScanner {
         data: setup,
       })
 
-      console.log(`[trade-finder] New setup: ${instrument} ${direction} (score: ${extendedScores.total}/12, R:R ${rrRatio})`)
+      console.log(
+        `[trade-finder] New setup: ${instrument} ${direction} (score: ${extendedScores.total}/12, R:R ${rrRatio})`,
+      )
 
       // ── Auto-trade: attempt to place if eligible ──
-      if (config.autoTradeEnabled && (pair.autoTradeEnabled !== false)) {
+      if (config.autoTradeEnabled && pair.autoTradeEnabled !== false) {
         await this.tryAutoPlace(setup, config, pair)
       }
     }
@@ -399,7 +422,7 @@ export class TradeFinderScanner {
   private async tryAutoPlace(
     setup: TradeFinderSetupData,
     config: TradeFinderConfigData,
-    pair: TradeFinderPairConfig,
+    _pair: TradeFinderPairConfig,
   ): Promise<void> {
     if (!this.placeOrderFn) {
       this.broadcastAutoTradeSkipped(setup, "Trade syncer not available")
@@ -408,14 +431,20 @@ export class TradeFinderScanner {
 
     // 1. Score threshold check
     if (setup.scores.total < config.autoTradeMinScore) {
-      this.broadcastAutoTradeSkipped(setup, `Score ${setup.scores.total} below auto-trade threshold ${config.autoTradeMinScore}`)
+      this.broadcastAutoTradeSkipped(
+        setup,
+        `Score ${setup.scores.total} below auto-trade threshold ${config.autoTradeMinScore}`,
+      )
       return
     }
 
     // 1b. Minimum R:R check
     const rrNum = parseFloat(setup.rrRatio) // e.g. "2.1:1" → 2.1
     if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
-      this.broadcastAutoTradeSkipped(setup, `R:R ${setup.rrRatio} below minimum ${config.autoTradeMinRR}:1`)
+      this.broadcastAutoTradeSkipped(
+        setup,
+        `R:R ${setup.rrRatio} below minimum ${config.autoTradeMinRR}:1`,
+      )
       return
     }
 
@@ -428,14 +457,20 @@ export class TradeFinderScanner {
     // 3. Max concurrent check
     const pendingCount = await countPendingAutoPlaced()
     if (pendingCount >= config.autoTradeMaxConcurrent) {
-      this.broadcastAutoTradeSkipped(setup, `Max concurrent auto-trades reached (${pendingCount}/${config.autoTradeMaxConcurrent})`)
+      this.broadcastAutoTradeSkipped(
+        setup,
+        `Max concurrent auto-trades reached (${pendingCount}/${config.autoTradeMaxConcurrent})`,
+      )
       return
     }
 
     // 4. Max daily check
     const dailyCount = await countAutoPlacedToday()
     if (dailyCount >= config.autoTradeMaxDaily) {
-      this.broadcastAutoTradeSkipped(setup, `Max daily auto-trades reached (${dailyCount}/${config.autoTradeMaxDaily})`)
+      this.broadcastAutoTradeSkipped(
+        setup,
+        `Max daily auto-trades reached (${dailyCount}/${config.autoTradeMaxDaily})`,
+      )
       return
     }
 
@@ -454,7 +489,10 @@ export class TradeFinderScanner {
       totalRiskDollars += thisRiskDollars
       const totalRiskPercent = (totalRiskDollars / balance) * 100
       if (totalRiskPercent > config.autoTradeMaxRiskPercent) {
-        this.broadcastAutoTradeSkipped(setup, `Total risk ${totalRiskPercent.toFixed(1)}% exceeds cap ${config.autoTradeMaxRiskPercent}%`)
+        this.broadcastAutoTradeSkipped(
+          setup,
+          `Total risk ${totalRiskPercent.toFixed(1)}% exceeds cap ${config.autoTradeMaxRiskPercent}%`,
+        )
         return
       }
     }
@@ -482,7 +520,9 @@ export class TradeFinderScanner {
       } catch (firstErr) {
         // Retry once on transient errors (5xx, timeouts, network)
         if (isTransientError(firstErr)) {
-          console.warn(`[trade-finder] Transient error placing ${setup.instrument}, retrying in 2s...`)
+          console.warn(
+            `[trade-finder] Transient error placing ${setup.instrument}, retrying in 2s...`,
+          )
           await sleep(2000)
           result = await this.placeOrderFn(orderRequest)
         } else {
@@ -524,7 +564,9 @@ export class TradeFinderScanner {
         timestamp: now,
       })
 
-      console.log(`[trade-finder] AUTO-PLACED: ${setup.instrument} ${setup.direction} LIMIT @ ${setup.entryPrice} (score: ${setup.scores.total})`)
+      console.log(
+        `[trade-finder] AUTO-PLACED: ${setup.instrument} ${setup.direction} LIMIT @ ${setup.entryPrice} (score: ${setup.scores.total})`,
+      )
       const pair = setup.instrument.replace("_", "/")
       const dir = setup.direction === "long" ? "Long" : "Short"
       void this.notificationEmitter?.emitTradeFinder(
@@ -590,14 +632,29 @@ export class TradeFinderScanner {
     const trend = this.scoreTrend(zone.type as "demand" | "supply", trendData)
     const curve = this.scoreCurve(zone.type as "demand" | "supply", curveData)
     const profitZone = this.scoreProfitZone(zone, allZones)
-    const commodityCorrelation = this.scoreCommodity(zone.instrument, zone.type as "demand" | "supply", commodityZones)
+    const commodityCorrelation = this.scoreCommodity(
+      zone.instrument,
+      zone.type as "demand" | "supply",
+      commodityZones,
+    )
 
-    const total = strength.value + time.value + freshness.value +
-      trend.value + curve.value + profitZone.value + commodityCorrelation.value
+    const total =
+      strength.value +
+      time.value +
+      freshness.value +
+      trend.value +
+      curve.value +
+      profitZone.value +
+      commodityCorrelation.value
 
     return {
-      strength, time, freshness,
-      trend, curve, profitZone, commodityCorrelation,
+      strength,
+      time,
+      freshness,
+      trend,
+      curve,
+      profitZone,
+      commodityCorrelation,
       total,
       maxPossible: 12,
     }
@@ -615,10 +672,20 @@ export class TradeFinderScanner {
       return { value: 0, max: 2, label: "Poor", explanation: `Trend opposes ${zoneType} zone` }
     }
     if (trendData.status === "confirmed") {
-      return { value: 2, max: 2, label: "Best", explanation: `Confirmed ${trendData.direction}trend aligns` }
+      return {
+        value: 2,
+        max: 2,
+        label: "Best",
+        explanation: `Confirmed ${trendData.direction}trend aligns`,
+      }
     }
     if (trendData.status === "forming") {
-      return { value: 1, max: 2, label: "Good", explanation: `Forming ${trendData.direction}trend aligns` }
+      return {
+        value: 1,
+        max: 2,
+        label: "Good",
+        explanation: `Forming ${trendData.direction}trend aligns`,
+      }
     }
     return { value: 0, max: 2, label: "Poor", explanation: "Trend terminated" }
   }
@@ -632,8 +699,18 @@ export class TradeFinderScanner {
       (zoneType === "supply" && (curveData.position === "high" || curveData.position === "above"))
 
     return favorable
-      ? { value: 1, max: 1, label: "Best", explanation: `Price in ${curveData.position} — favorable` }
-      : { value: 0, max: 1, label: "Poor", explanation: `Price in ${curveData.position} — not ideal` }
+      ? {
+          value: 1,
+          max: 1,
+          label: "Best",
+          explanation: `Price in ${curveData.position} — favorable`,
+        }
+      : {
+          value: 0,
+          max: 1,
+          label: "Poor",
+          explanation: `Price in ${curveData.position} — not ideal`,
+        }
   }
 
   private scoreProfitZone(zone: ZoneData, allZones: ZoneData[]) {
@@ -646,7 +723,9 @@ export class TradeFinderScanner {
     const opposingType = zone.type === "demand" ? "supply" : "demand"
     const fresh = allZones
       .filter((z) => z.type === opposingType && z.status === "active" && z.testCount === 0)
-      .sort((a, b) => zone.type === "demand" ? a.proximalLine - b.proximalLine : b.proximalLine - a.proximalLine)
+      .sort((a, b) =>
+        zone.type === "demand" ? a.proximalLine - b.proximalLine : b.proximalLine - a.proximalLine,
+      )
 
     let rewardPips: number
     let src: string
@@ -659,18 +738,26 @@ export class TradeFinderScanner {
     }
 
     const rr = rewardPips / riskPips
-    if (rr >= 3) return { value: 3, max: 3, label: "Best", explanation: `${rr.toFixed(1)}:1 to ${src}` }
-    if (rr >= 2) return { value: 2, max: 3, label: "Good", explanation: `${rr.toFixed(1)}:1 to ${src}` }
-    if (rr >= 1) return { value: 1, max: 3, label: "Fair", explanation: `${rr.toFixed(1)}:1 to ${src}` }
+    if (rr >= 3)
+      return { value: 3, max: 3, label: "Best", explanation: `${rr.toFixed(1)}:1 to ${src}` }
+    if (rr >= 2)
+      return { value: 2, max: 3, label: "Good", explanation: `${rr.toFixed(1)}:1 to ${src}` }
+    if (rr >= 1)
+      return { value: 1, max: 3, label: "Fair", explanation: `${rr.toFixed(1)}:1 to ${src}` }
     return { value: 0, max: 3, label: "Poor", explanation: `${rr.toFixed(1)}:1 to ${src}` }
   }
 
-  private scoreCommodity(instrument: string, zoneType: "demand" | "supply", commodityZones: ZoneData[] | null) {
+  private scoreCommodity(
+    instrument: string,
+    zoneType: "demand" | "supply",
+    commodityZones: ZoneData[] | null,
+  ) {
     const correlation = getCorrelation(instrument)
     if (!correlation || !commodityZones) {
       return { value: 0, max: 1, label: "N/A", explanation: "No commodity correlation" }
     }
-    const expectedType = correlation.direction === 1 ? zoneType : (zoneType === "demand" ? "supply" : "demand")
+    const expectedType =
+      correlation.direction === 1 ? zoneType : zoneType === "demand" ? "supply" : "demand"
     const aligned = commodityZones.some((z) => z.type === expectedType && z.status === "active")
     return aligned
       ? { value: 1, max: 1, label: "Best", explanation: `${correlation.commodity} confirms` }
@@ -722,7 +809,7 @@ export class TradeFinderScanner {
     riskPercent: number,
     riskPips: number,
     pipSize: number,
-    instrument: string,
+    _instrument: string,
   ): number {
     if (riskPips <= 0 || balance <= 0) return 0
 
@@ -730,7 +817,7 @@ export class TradeFinderScanner {
     const pipValue = pipSize * 100_000
     if (pipValue <= 0) return 0
 
-    const units = Math.floor(riskAmount / (riskPips * pipValue / 100_000))
+    const units = Math.floor(riskAmount / ((riskPips * pipValue) / 100_000))
     return Math.max(0, units)
   }
 
@@ -748,8 +835,12 @@ export class TradeFinderScanner {
     for (const setup of setups) {
       const { ltf } = TIMEFRAME_SET_MAP[setup.timeframeSet]
       const candles = await fetchOandaCandles(
-        setup.instrument, ltf,
-        CANDLE_COUNT_MAP[ltf] ?? 300, apiUrl, token, this.cache,
+        setup.instrument,
+        ltf,
+        CANDLE_COUNT_MAP[ltf] ?? 300,
+        apiUrl,
+        token,
+        this.cache,
       )
       if (candles.length === 0) continue
 
@@ -759,9 +850,8 @@ export class TradeFinderScanner {
 
       // Check if zone has been invalidated (price broke through distal)
       const zone = setup.zone
-      const invalidated = zone.type === "demand"
-        ? currentPrice < zone.distalLine
-        : currentPrice > zone.distalLine
+      const invalidated =
+        zone.type === "demand" ? currentPrice < zone.distalLine : currentPrice > zone.distalLine
 
       if (invalidated) {
         // Auto-cancel pending order if this was auto-placed and config says to cancel
@@ -781,7 +871,7 @@ export class TradeFinderScanner {
       // Check if approaching
       const atrArr2 = computeATR(candles, 14)
       const atrVal = atrArr2.length > 0 ? atrArr2[atrArr2.length - 1]! : 0
-      const approachingDistance = atrVal * config.approachingAtrMultiple / pipSize
+      const approachingDistance = (atrVal * config.approachingAtrMultiple) / pipSize
       const newStatus = distanceToEntry <= approachingDistance ? "approaching" : "active"
 
       if (newStatus !== setup.status || Math.abs(distanceToEntry - setup.distanceToEntryPips) > 1) {
@@ -836,7 +926,11 @@ export class TradeFinderScanner {
       this.broadcast({
         type: "trade_finder_setup_removed",
         timestamp: now,
-        data: { setupId: setup.id, instrument: setup.instrument, reason: "Order cancelled externally" },
+        data: {
+          setupId: setup.id,
+          instrument: setup.instrument,
+          reason: "Order cancelled externally",
+        },
       })
       this.pushAutoTradeEvent({
         type: "cancelled",
@@ -848,7 +942,9 @@ export class TradeFinderScanner {
         sourceId,
         timestamp: now,
       })
-      console.log(`[trade-finder] External cancellation detected: ${setup.instrument} order ${sourceId}`)
+      console.log(
+        `[trade-finder] External cancellation detected: ${setup.instrument} order ${sourceId}`,
+      )
     }
   }
 
@@ -876,7 +972,9 @@ export class TradeFinderScanner {
       sourceId: setup.resultSourceId!,
       timestamp: now,
     })
-    console.log(`[trade-finder] AUTO-FILLED: ${setup.instrument} ${setup.direction} (order ${setup.resultSourceId})`)
+    console.log(
+      `[trade-finder] AUTO-FILLED: ${setup.instrument} ${setup.direction} (order ${setup.resultSourceId})`,
+    )
     const pair = setup.instrument.replace("_", "/")
     const dir = setup.direction === "long" ? "Long" : "Short"
     void this.notificationEmitter?.emitTradeFinder(
@@ -914,7 +1012,9 @@ export class TradeFinderScanner {
         timestamp: now,
       })
 
-      console.log(`[trade-finder] AUTO-CANCELLED: ${setup.instrument} order ${setup.resultSourceId} — ${reason}`)
+      console.log(
+        `[trade-finder] AUTO-CANCELLED: ${setup.instrument} order ${setup.resultSourceId} — ${reason}`,
+      )
       void this.notificationEmitter?.emitTradeFinder(
         "Auto-Trade Cancelled",
         `${setup.instrument.replace("_", "/")} — ${reason}`,

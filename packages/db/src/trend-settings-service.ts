@@ -1,3 +1,11 @@
+/**
+ * Trend display settings service — manages user preferences for trend visualization.
+ *
+ * Uses a singleton row (id=1) for app-wide trend display settings,
+ * falling back to defaults when no settings are stored.
+ *
+ * @module trend-settings-service
+ */
 import { db } from "./client"
 import type { TrendDisplaySettings } from "@fxflow/types"
 import { DEFAULT_TREND_DISPLAY_SETTINGS } from "@fxflow/shared"
