@@ -105,3 +105,4 @@ Path-scoped rules in `.claude/rules/` provide context-specific guidance:
 - `06-accessibility.md` — AAA accessibility
 - `07-dependencies.md` — dependency management
 - `08-trading-domain.md` — trading domain rules
+- `09-docs-sync.md` — keep docs in sync with code changes
