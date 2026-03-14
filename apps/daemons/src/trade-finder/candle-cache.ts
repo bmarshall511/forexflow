@@ -81,7 +81,9 @@ export async function fetchOandaCandles(
     })
 
     if (!response.ok) {
-      console.warn(`[trade-finder] Candle fetch failed: ${instrument} ${timeframe} HTTP ${response.status}`)
+      console.warn(
+        `[trade-finder] Candle fetch failed: ${instrument} ${timeframe} HTTP ${response.status}`,
+      )
       return []
     }
 

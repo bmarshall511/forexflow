@@ -45,10 +45,15 @@ export class ConditionMonitor {
       const { recoverExecutingConditions } = await import("@fxflow/db")
       const recovered = await recoverExecutingConditions()
       if (recovered > 0) {
-        console.warn(`[condition-monitor] Recovered ${recovered} condition(s) stuck in "executing" state from previous crash`)
+        console.warn(
+          `[condition-monitor] Recovered ${recovered} condition(s) stuck in "executing" state from previous crash`,
+        )
       }
     } catch (err) {
-      console.error("[condition-monitor] Failed to recover executing conditions:", (err as Error).message)
+      console.error(
+        "[condition-monitor] Failed to recover executing conditions:",
+        (err as Error).message,
+      )
     }
 
     // Crash recovery: activate orphaned child conditions whose parent already triggered
@@ -64,7 +69,9 @@ export class ConditionMonitor {
       })
 
       if (orphanedChildren.length > 0) {
-        console.log(`[condition-monitor] Crash recovery: activating ${orphanedChildren.length} orphaned child conditions`)
+        console.log(
+          `[condition-monitor] Crash recovery: activating ${orphanedChildren.length} orphaned child conditions`,
+        )
         for (const child of orphanedChildren) {
           await db.tradeCondition.update({
             where: { id: child.id },
@@ -73,7 +80,10 @@ export class ConditionMonitor {
         }
       }
     } catch (err) {
-      console.error("[condition-monitor] Failed to recover orphaned child conditions:", (err as Error).message)
+      console.error(
+        "[condition-monitor] Failed to recover orphaned child conditions:",
+        (err as Error).message,
+      )
     }
 
     await this.loadFromDB()
@@ -104,7 +114,10 @@ export class ConditionMonitor {
         triggerValue = JSON.parse(row.triggerValue) as Record<string, unknown>
         actionParams = JSON.parse(row.actionParams) as Record<string, unknown>
       } catch (parseErr) {
-        console.error(`[condition-monitor] Invalid JSON in condition ${conditionId}:`, (parseErr as Error).message)
+        console.error(
+          `[condition-monitor] Invalid JSON in condition ${conditionId}:`,
+          (parseErr as Error).message,
+        )
         return // Skip this condition — don't add malformed data to in-memory map
       }
 
@@ -146,7 +159,10 @@ export class ConditionMonitor {
     const mid = (tick.bid + tick.ask) / 2
     this.priceMap[tick.instrument] = mid
     this.evaluatePriceConditions(tick.instrument, mid).catch((err) => {
-      console.error(`[condition-monitor] Price condition evaluation error for ${tick.instrument}:`, (err as Error).message)
+      console.error(
+        `[condition-monitor] Price condition evaluation error for ${tick.instrument}:`,
+        (err as Error).message,
+      )
     })
   }
 
@@ -232,7 +248,10 @@ export class ConditionMonitor {
               }),
             })
           } catch (err) {
-            console.error(`[condition-monitor] Trailing stop SL move failed for ${condition.id}:`, (err as Error).message)
+            console.error(
+              `[condition-monitor] Trailing stop SL move failed for ${condition.id}:`,
+              (err as Error).message,
+            )
           }
         }
         continue
@@ -278,16 +297,17 @@ export class ConditionMonitor {
         if (!tradeData) return false
         const targetPips = val.pips as number | undefined
         if (targetPips === undefined) return false
-        const priceDiff = tradeData.direction === "long"
-          ? currentPrice - tradeData.entryPrice
-          : tradeData.entryPrice - currentPrice
+        const priceDiff =
+          tradeData.direction === "long"
+            ? currentPrice - tradeData.entryPrice
+            : tradeData.entryPrice - currentPrice
         const currentPips = priceDiff / pip
 
         // Support direction: "profit" (default) triggers when profit >= target
         //                     "loss" triggers when unrealized loss >= target (absolute)
         const direction = (val.direction as string) ?? "profit"
         if (direction === "loss") {
-          return currentPips <= -(Math.abs(targetPips))
+          return currentPips <= -Math.abs(targetPips)
         }
         return currentPips >= targetPips
       }
@@ -300,9 +320,10 @@ export class ConditionMonitor {
 
         // Calculate approximate unrealized P&L in account currency
         // P&L = (currentPrice - entryPrice) * units for long, inverse for short
-        const priceDiff = tradeData.direction === "long"
-          ? currentPrice - tradeData.entryPrice
-          : tradeData.entryPrice - currentPrice
+        const priceDiff =
+          tradeData.direction === "long"
+            ? currentPrice - tradeData.entryPrice
+            : tradeData.entryPrice - currentPrice
         const units = Math.abs(tradeData.currentUnits)
         // For most USD-quoted pairs, P&L ≈ priceDiff * units
         // For cross pairs, this is an approximation (exact conversion needs live rates)
@@ -310,7 +331,7 @@ export class ConditionMonitor {
 
         const direction = (val.direction as string) ?? "profit"
         if (direction === "loss") {
-          return estimatedPnl <= -(Math.abs(targetCurrency))
+          return estimatedPnl <= -Math.abs(targetCurrency)
         }
         return estimatedPnl >= targetCurrency
       }
@@ -367,18 +388,25 @@ export class ConditionMonitor {
     }
   }
 
-  private async triggerCondition(condition: TradeConditionData, currentPrice: number | null): Promise<void> {
+  private async triggerCondition(
+    condition: TradeConditionData,
+    currentPrice: number | null,
+  ): Promise<void> {
     // Step 1: Remove from in-memory map immediately (prevent concurrent re-evaluation)
     this.conditions.delete(condition.id)
 
-    const { updateConditionStatus, createTradeEvent, createNotification } = await import("@fxflow/db")
+    const { updateConditionStatus, createTradeEvent, createNotification } =
+      await import("@fxflow/db")
 
     // Step 2: Mark as "executing" in DB BEFORE running the action (C2 crash safety)
     // If daemon crashes after this point, startup recovery will find it
     try {
       await updateConditionStatus(condition.id, "executing")
     } catch (err) {
-      console.error(`[condition-monitor] Failed to set executing status for ${condition.id}:`, (err as Error).message)
+      console.error(
+        `[condition-monitor] Failed to set executing status for ${condition.id}:`,
+        (err as Error).message,
+      )
       // Re-add to memory so it can be retried on next tick
       this.conditions.set(condition.id, condition)
       return
@@ -388,7 +416,9 @@ export class ConditionMonitor {
     let errorMsg: string | undefined
 
     try {
-      console.log(`[condition-monitor] Triggering condition ${condition.id}: ${condition.actionType}`)
+      console.log(
+        `[condition-monitor] Triggering condition ${condition.id}: ${condition.actionType}`,
+      )
 
       // Step 3: Execute the action
       await this.executeConditionAction(condition)
@@ -405,10 +435,15 @@ export class ConditionMonitor {
           await this.reloadCondition(childId)
         }
         if (activatedIds.length > 0) {
-          console.log(`[condition-monitor] Activated ${activatedIds.length} child condition(s) for parent ${condition.id}`)
+          console.log(
+            `[condition-monitor] Activated ${activatedIds.length} child condition(s) for parent ${condition.id}`,
+          )
         }
       } catch (chainErr) {
-        console.error(`[condition-monitor] Failed to activate child conditions for ${condition.id}:`, (chainErr as Error).message)
+        console.error(
+          `[condition-monitor] Failed to activate child conditions for ${condition.id}:`,
+          (chainErr as Error).message,
+        )
       }
 
       // Log as trade event for audit trail
@@ -433,7 +468,9 @@ export class ConditionMonitor {
       // Step 4b: Execution failed — revert to "active" and re-add to memory for retry
       try {
         await updateConditionStatus(condition.id, "active")
-      } catch { /* best effort revert */ }
+      } catch {
+        /* best effort revert */
+      }
       this.conditions.set(condition.id, condition)
     }
 
@@ -520,7 +557,9 @@ export class ConditionMonitor {
 
       case "cancel_order":
         if (trade.status !== "pending") {
-          throw new Error(`Cannot cancel order — trade status is "${trade.status}", expected "pending"`)
+          throw new Error(
+            `Cannot cancel order — trade status is "${trade.status}", expected "pending"`,
+          )
         }
         await this.tradeSyncer.cancelOrder(
           trade.sourceTradeId,
@@ -542,9 +581,10 @@ export class ConditionMonitor {
     currentPrice: number,
     tradeData: CachedTradeData,
   ): { shouldMove: boolean; newSL: number } | null {
-    const triggerValue = typeof condition.triggerValue === "string"
-      ? JSON.parse(condition.triggerValue)
-      : condition.triggerValue
+    const triggerValue =
+      typeof condition.triggerValue === "string"
+        ? JSON.parse(condition.triggerValue)
+        : condition.triggerValue
     const distancePips = triggerValue.distance_pips as number
     const stepPips = (triggerValue.step_pips ?? distancePips) as number
     const instrument = tradeData.instrument
@@ -554,9 +594,7 @@ export class ConditionMonitor {
     const step = stepPips * pip
 
     // Calculate ideal SL based on current price
-    const idealSL = direction === "long"
-      ? currentPrice - distance
-      : currentPrice + distance
+    const idealSL = direction === "long" ? currentPrice - distance : currentPrice + distance
 
     const currentSL = tradeData.stopLoss
     if (!currentSL) return { shouldMove: true, newSL: Math.round(idealSL / pip) * pip }
@@ -581,7 +619,16 @@ export class ConditionMonitor {
       const { db } = await import("@fxflow/db")
       const trade = await db.trade.findUnique({
         where: { id: tradeId },
-        select: { id: true, instrument: true, entryPrice: true, direction: true, currentUnits: true, stopLoss: true, openedAt: true, status: true },
+        select: {
+          id: true,
+          instrument: true,
+          entryPrice: true,
+          direction: true,
+          currentUnits: true,
+          stopLoss: true,
+          openedAt: true,
+          status: true,
+        },
       })
       if (trade) {
         const data: CachedTradeData = {

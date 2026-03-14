@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server"
-import { getTVAlertsConfig, listSignals, findOrCreateTag, assignTagToTrade, getTradeBySourceId, markSignalAsTest } from "@fxflow/db"
+import {
+  getTVAlertsConfig,
+  listSignals,
+  findOrCreateTag,
+  assignTagToTrade,
+  getTradeBySourceId,
+  markSignalAsTest,
+} from "@fxflow/db"
 import { mapTVTickerToOandaInstrument } from "@fxflow/shared"
 import type { ApiResponse, TVAlertSignal } from "@fxflow/types"
 
@@ -18,12 +25,15 @@ function sleep(ms: number): Promise<void> {
 
 export async function POST(request: Request): Promise<NextResponse<ApiResponse<TestSignalResult>>> {
   try {
-    const body = await request.json() as { action?: string; ticker?: string }
+    const body = (await request.json()) as { action?: string; ticker?: string }
     const action = body.action
     const ticker = body.ticker
 
     if (!action || (action !== "buy" && action !== "sell")) {
-      return NextResponse.json({ ok: false, error: "action must be 'buy' or 'sell'" }, { status: 400 })
+      return NextResponse.json(
+        { ok: false, error: "action must be 'buy' or 'sell'" },
+        { status: 400 },
+      )
     }
     if (!ticker || typeof ticker !== "string") {
       return NextResponse.json({ ok: false, error: "ticker is required" }, { status: 400 })
@@ -31,7 +41,10 @@ export async function POST(request: Request): Promise<NextResponse<ApiResponse<T
 
     const instrument = mapTVTickerToOandaInstrument(ticker)
     if (!instrument) {
-      return NextResponse.json({ ok: false, error: `Unknown instrument: ${ticker}` }, { status: 400 })
+      return NextResponse.json(
+        { ok: false, error: `Unknown instrument: ${ticker}` },
+        { status: 400 },
+      )
     }
 
     // 1. Read config
@@ -55,7 +68,9 @@ export async function POST(request: Request): Promise<NextResponse<ApiResponse<T
     }
 
     // 3. Build webhook URL from cfWorkerUrl
-    const cfHost = new URL(config.cfWorkerUrl.replace("wss://", "https://").replace("ws://", "http://")).host
+    const cfHost = new URL(
+      config.cfWorkerUrl.replace("wss://", "https://").replace("ws://", "http://"),
+    ).host
     const protocol = config.cfWorkerUrl.startsWith("wss://") ? "https" : "http"
     const webhookUrl = `${protocol}://${cfHost}/webhook/${config.webhookToken}`
 
@@ -72,7 +87,7 @@ export async function POST(request: Request): Promise<NextResponse<ApiResponse<T
 
     let cfWorkerResponse: TestSignalResult["cfWorkerResponse"]
     try {
-      cfWorkerResponse = await cfRes.json() as TestSignalResult["cfWorkerResponse"]
+      cfWorkerResponse = (await cfRes.json()) as TestSignalResult["cfWorkerResponse"]
     } catch {
       return NextResponse.json(
         { ok: false, error: `CF Worker returned status ${cfRes.status} with non-JSON response` },
@@ -112,9 +127,7 @@ export async function POST(request: Request): Promise<NextResponse<ApiResponse<T
         await sleep(500)
         const { signals } = await listSignals({ instrument, pageSize: 5, page: 1 })
         const match = signals.find(
-          (s) => s.id === foundSignalId &&
-            s.status !== "received" &&
-            s.status !== "executing",
+          (s) => s.id === foundSignalId && s.status !== "received" && s.status !== "executing",
         )
         if (match) {
           signalResult = match

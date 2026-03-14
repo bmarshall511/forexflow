@@ -16,12 +16,14 @@ Wire a new REST endpoint through daemon → web API → hook.
 ## Steps
 
 1. **packages/types/src/index.ts** — Add request/response types:
+
    ```typescript
    export interface MyActionRequest { ... }
    export interface MyActionResponse { ... }
    ```
 
 2. **apps/daemons/src/server.ts** — Add route handler:
+
    ```typescript
    if (method === "POST" && pathname === "/actions/my-action") {
      const body = await parseBody<MyActionRequest>(req)
@@ -31,6 +33,7 @@ Wire a new REST endpoint through daemon → web API → hook.
    ```
 
 3. **apps/web/src/app/api/my-action/route.ts** — Create Next.js API route that proxies to daemon:
+
    ```typescript
    const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL || "http://localhost:4100"
    export async function POST(request: Request) {
@@ -45,7 +48,8 @@ Wire a new REST endpoint through daemon → web API → hook.
    }
    ```
 
-4. **apps/web/src/hooks/use-*.ts** — Add hook method or create new hook:
+4. **apps/web/src/hooks/use-\*.ts** — Add hook method or create new hook:
+
    ```typescript
    const myAction = async (params: MyActionRequest) => {
      const res = await fetch("/api/my-action", { method: "POST", body: JSON.stringify(params) })

@@ -1,7 +1,15 @@
 "use client"
 
 import type { PendingOrderData, OpenTradeData, ClosedTradeData } from "@fxflow/types"
-import { formatCurrency, formatPips, getDecimalPlaces, formatShortDateTime, calculateRiskReward, getPipSize, TIMEFRAME_OPTIONS } from "@fxflow/shared"
+import {
+  formatCurrency,
+  formatPips,
+  getDecimalPlaces,
+  formatShortDateTime,
+  calculateRiskReward,
+  getPipSize,
+  TIMEFRAME_OPTIONS,
+} from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
 import { SourceBadge } from "./source-badge"
 import { OutcomeBadge } from "./outcome-badge"
@@ -17,10 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  MoreVertical, Eye, XCircle,
-  Target, ShieldAlert, DollarSign,
-} from "lucide-react"
+import { MoreVertical, Eye, XCircle, Target, ShieldAlert, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type TradeCardVariant = "pending" | "open" | "closed"
@@ -88,17 +93,27 @@ export function TradeCardMobile({
       : "text-muted-foreground"
 
   // Risk / Reward
-  const rr = calculateRiskReward(data.direction, entryPrice, data.stopLoss ?? null, data.takeProfit ?? null, data.instrument)
-  const riskDollars = rr.riskPips !== null ? computeDollarAmount(units, rr.riskPips, data.instrument) : null
-  const rewardDollars = rr.rewardPips !== null ? computeDollarAmount(units, rr.rewardPips, data.instrument) : null
+  const rr = calculateRiskReward(
+    data.direction,
+    entryPrice,
+    data.stopLoss ?? null,
+    data.takeProfit ?? null,
+    data.instrument,
+  )
+  const riskDollars =
+    rr.riskPips !== null ? computeDollarAmount(units, rr.riskPips, data.instrument) : null
+  const rewardDollars =
+    rr.rewardPips !== null ? computeDollarAmount(units, rr.rewardPips, data.instrument) : null
 
   const accentColor = isLong ? "border-l-green-500" : "border-l-red-500"
 
   return (
-    <div className={cn(
-      "rounded-xl border border-border/60 bg-card overflow-hidden border-l-[3px] p-4 space-y-3",
-      accentColor,
-    )}>
+    <div
+      className={cn(
+        "border-border/60 bg-card space-y-3 overflow-hidden rounded-xl border border-l-[3px] p-4",
+        accentColor,
+      )}
+    >
       {/* Header: pair + direction + P/L + actions */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -107,7 +122,7 @@ export function TradeCardMobile({
             <Badge
               variant="outline"
               className={cn(
-                "text-[10px] px-1.5 py-0 font-semibold border-0",
+                "border-0 px-1.5 py-0 text-[10px] font-semibold",
                 isLong ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500",
               )}
             >
@@ -120,12 +135,15 @@ export function TradeCardMobile({
               />
             )}
             {isPending && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-500 border-amber-500/20">
+              <Badge
+                variant="outline"
+                className="border-amber-500/20 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-500"
+              >
                 {(data as PendingOrderData).orderType}
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+          <div className="text-muted-foreground mt-1 flex items-center gap-2 text-[11px]">
             <SourceBadge source={data.source} />
             {rr.ratio && <span>{rr.ratio} R:R</span>}
           </div>
@@ -135,15 +153,16 @@ export function TradeCardMobile({
           {/* P/L */}
           {plValue !== null && (
             <div className="text-right">
-              <div className={cn("text-lg font-bold font-mono tabular-nums", plColor)}>
-                {isPositive ? "+" : ""}{formatCurrency(plValue, currency)}
+              <div className={cn("font-mono text-lg font-bold tabular-nums", plColor)}>
+                {isPositive ? "+" : ""}
+                {formatCurrency(plValue, currency)}
               </div>
             </div>
           )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="size-7 p-0 shrink-0">
+              <Button variant="ghost" size="sm" className="size-7 shrink-0 p-0">
                 <MoreVertical className="size-4" />
                 <span className="sr-only">Actions</span>
               </Button>
@@ -178,21 +197,22 @@ export function TradeCardMobile({
       {/* Risk / Reward bar */}
       {(riskDollars !== null || rewardDollars !== null) && (
         <div className="space-y-1">
-          <div className="flex gap-0.5 h-5 rounded-lg overflow-hidden">
+          <div className="flex h-5 gap-0.5 overflow-hidden rounded-lg">
             {riskDollars !== null && (
               <div
-                className="bg-red-500/15 flex items-center justify-center text-[10px] text-red-500 font-semibold rounded-l-lg"
+                className="flex items-center justify-center rounded-l-lg bg-red-500/15 text-[10px] font-semibold text-red-500"
                 style={{
-                  width: rr.riskPips !== null && rr.rewardPips !== null
-                    ? `${Math.max(25, Math.min(50, (rr.riskPips / (rr.riskPips + rr.rewardPips)) * 100))}%`
-                    : "40%",
+                  width:
+                    rr.riskPips !== null && rr.rewardPips !== null
+                      ? `${Math.max(25, Math.min(50, (rr.riskPips / (rr.riskPips + rr.rewardPips)) * 100))}%`
+                      : "40%",
                 }}
               >
                 -{fmtDollar(riskDollars)}
               </div>
             )}
             {rewardDollars !== null && (
-              <div className="bg-green-500/15 flex items-center justify-center text-[10px] text-green-500 font-semibold flex-1 rounded-r-lg">
+              <div className="flex flex-1 items-center justify-center rounded-r-lg bg-green-500/15 text-[10px] font-semibold text-green-500">
                 +{fmtDollar(rewardDollars)}
               </div>
             )}
@@ -242,10 +262,13 @@ export function TradeCardMobile({
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="text-muted-foreground flex items-center justify-between text-[11px]">
         <div className="flex items-center gap-2">
           {isOpen && (
-            <DurationDisplay openedAt={(data as OpenTradeData).openedAt} className="inline text-[11px]" />
+            <DurationDisplay
+              openedAt={(data as OpenTradeData).openedAt}
+              className="inline text-[11px]"
+            />
           )}
           {isClosed && (
             <DurationDisplay
@@ -264,7 +287,12 @@ export function TradeCardMobile({
   )
 }
 
-function PriceBox({ icon, label, value, color }: {
+function PriceBox({
+  icon,
+  label,
+  value,
+  color,
+}: {
   icon: React.ReactNode
   label: string
   value: string
@@ -272,18 +300,22 @@ function PriceBox({ icon, label, value, color }: {
 }) {
   const isUnset = value === "None" || value === "—"
   return (
-    <div className={cn(
-      "rounded-lg border p-1.5 text-center",
-      isUnset ? "border-dashed border-border/40 bg-muted/20" : "bg-muted/30",
-    )}>
-      <div className={cn("flex items-center justify-center gap-1 mb-0.5", color)}>
+    <div
+      className={cn(
+        "rounded-lg border p-1.5 text-center",
+        isUnset ? "border-border/40 bg-muted/20 border-dashed" : "bg-muted/30",
+      )}
+    >
+      <div className={cn("mb-0.5 flex items-center justify-center gap-1", color)}>
         {icon}
         <span className="text-[9px] font-semibold uppercase tracking-wider">{label}</span>
       </div>
-      <div className={cn(
-        "text-xs font-mono tabular-nums font-bold",
-        isUnset ? "text-muted-foreground/50" : color,
-      )}>
+      <div
+        className={cn(
+          "font-mono text-xs font-bold tabular-nums",
+          isUnset ? "text-muted-foreground/50" : color,
+        )}
+      >
         {value}
       </div>
     </div>

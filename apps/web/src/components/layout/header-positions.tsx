@@ -22,45 +22,53 @@ export function HeaderPositions() {
         <button
           type="button"
           className={cn(
-            "flex items-center gap-1 rounded-md bg-muted/50 px-1.5 py-1 whitespace-nowrap",
+            "bg-muted/50 flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1",
             "hover:bg-accent/50 transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
           )}
           aria-label={`Positions: ${summary.pendingCount} pending, ${summary.openCount} open, ${summary.closedTodayCount} closed today`}
         >
           {/* Pending */}
-          <Clock className="size-3 text-status-warning" aria-hidden="true" />
-          <span className="font-mono text-xs tabular-nums font-semibold text-foreground">
+          <Clock className="text-status-warning size-3" aria-hidden="true" />
+          <span className="text-foreground font-mono text-xs font-semibold tabular-nums">
             {summary.pendingCount}
           </span>
-          <span className="hidden @5xl/header:inline text-[11px] text-muted-foreground">Pending</span>
+          <span className="@5xl/header:inline text-muted-foreground hidden text-[11px]">
+            Pending
+          </span>
 
-          <span className="text-border text-[10px]" aria-hidden="true">&middot;</span>
+          <span className="text-border text-[10px]" aria-hidden="true">
+            &middot;
+          </span>
 
           {/* Open */}
-          <TrendingUp className="size-3 text-status-connected" aria-hidden="true" />
-          <span className="font-mono text-xs tabular-nums font-semibold text-foreground">
+          <TrendingUp className="text-status-connected size-3" aria-hidden="true" />
+          <span className="text-foreground font-mono text-xs font-semibold tabular-nums">
             {summary.openCount}
           </span>
-          <span className="hidden @5xl/header:inline text-[11px] text-muted-foreground">Open</span>
+          <span className="@5xl/header:inline text-muted-foreground hidden text-[11px]">Open</span>
 
-          <span className="text-border text-[10px]" aria-hidden="true">&middot;</span>
+          <span className="text-border text-[10px]" aria-hidden="true">
+            &middot;
+          </span>
 
           {/* Closed */}
-          <CheckCircle2 className="size-3 text-muted-foreground" aria-hidden="true" />
-          <span className="font-mono text-xs tabular-nums font-semibold text-foreground">
+          <CheckCircle2 className="text-muted-foreground size-3" aria-hidden="true" />
+          <span className="text-foreground font-mono text-xs font-semibold tabular-nums">
             {summary.closedTodayCount}
           </span>
-          <span className="hidden @5xl/header:inline text-[11px] text-muted-foreground">Closed</span>
+          <span className="@5xl/header:inline text-muted-foreground hidden text-[11px]">
+            Closed
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0">
         <Tabs defaultValue="open">
-          <TabsList variant="line" className="w-full border-b border-border px-2 pt-2">
+          <TabsList variant="line" className="border-border w-full border-b px-2 pt-2">
             <TabsTrigger value="pending" className="text-xs">
               Pending
               {summary.pendingCount > 0 && (
-                <span className="ml-1 inline-flex size-4 items-center justify-center rounded-full bg-status-warning/15 text-[10px] font-semibold text-status-warning">
+                <span className="bg-status-warning/15 text-status-warning ml-1 inline-flex size-4 items-center justify-center rounded-full text-[10px] font-semibold">
                   {summary.pendingCount}
                 </span>
               )}
@@ -68,7 +76,7 @@ export function HeaderPositions() {
             <TabsTrigger value="open" className="text-xs">
               Open
               {summary.openCount > 0 && (
-                <span className="ml-1 inline-flex size-4 items-center justify-center rounded-full bg-status-connected/15 text-[10px] font-semibold text-status-connected">
+                <span className="bg-status-connected/15 text-status-connected ml-1 inline-flex size-4 items-center justify-center rounded-full text-[10px] font-semibold">
                   {summary.openCount}
                 </span>
               )}
@@ -76,7 +84,7 @@ export function HeaderPositions() {
             <TabsTrigger value="closed" className="text-xs">
               Closed
               {summary.closedTodayCount > 0 && (
-                <span className="ml-1 inline-flex size-4 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                <span className="bg-muted text-muted-foreground ml-1 inline-flex size-4 items-center justify-center rounded-full text-[10px] font-semibold">
                   {summary.closedTodayCount}
                 </span>
               )}

@@ -15,16 +15,11 @@ export async function GET(): Promise<NextResponse<ApiResponse<TagData[]>>> {
   }
 }
 
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse<TagData>>> {
+export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<TagData>>> {
   try {
     const { name, color } = (await request.json()) as { name: string; color: string }
     if (!name || !color) {
-      return NextResponse.json(
-        { ok: false, error: "name and color are required" },
-        { status: 400 },
-      )
+      return NextResponse.json({ ok: false, error: "name and color are required" }, { status: 400 })
     }
     const tag = await createTag(name.trim(), color)
     return NextResponse.json({ ok: true, data: tag })

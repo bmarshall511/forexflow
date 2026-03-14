@@ -17,15 +17,15 @@ export function AiAnalysisDashboard() {
   return (
     <div className="min-h-screen">
       {/* ─── Hero Header ─── */}
-      <div className="px-4 md:px-6 pt-6 pb-8 border-b">
-        <div className="flex items-start justify-between gap-4 mb-6">
+      <div className="border-b px-4 pb-8 pt-6 md:px-6">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">AI Analysis</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               All AI analyses and automated conditions across your trades
             </p>
           </div>
-          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 shrink-0" asChild>
+          <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5 text-xs" asChild>
             <Link href="/settings/ai">
               <Settings2 className="size-3.5" />
               <span className="hidden sm:inline">Settings</span>
@@ -55,7 +55,7 @@ export function AiAnalysisDashboard() {
       </TabNav>
 
       {/* ─── Tab Content ─── */}
-      <div className="px-4 md:px-6 py-6 space-y-4">
+      <div className="space-y-4 px-4 py-6 md:px-6">
         {tab === "analyses" && <AiAnalysesTab />}
         {tab === "conditions" && <AiConditionsTab />}
       </div>

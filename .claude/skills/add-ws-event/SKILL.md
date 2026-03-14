@@ -18,6 +18,7 @@ Wire a new real-time event through all layers of the FXFlow stack.
 1. **packages/types/src/index.ts** — Add to `DaemonMessageType` union and create typed message interface.
 
 2. **apps/daemons/src/server.ts** — Add broadcast call in the appropriate listener or endpoint:
+
    ```typescript
    broadcast({ type: "event_name", timestamp: new Date().toISOString(), data })
    ```
@@ -34,6 +35,7 @@ Wire a new real-time event through all layers of the FXFlow stack.
 6. Run `/verify` to confirm types and lint pass.
 
 ## Checklist
+
 - [ ] Type added to packages/types
 - [ ] Daemon broadcasts the event
 - [ ] Hook handles the message

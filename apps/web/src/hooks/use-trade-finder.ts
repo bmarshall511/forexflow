@@ -1,7 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type { TradeFinderSetupData, TradeFinderScanStatus, TradeFinderAutoTradeEvent } from "@fxflow/types"
+import type {
+  TradeFinderSetupData,
+  TradeFinderScanStatus,
+  TradeFinderAutoTradeEvent,
+} from "@fxflow/types"
 import { useDaemonConnection } from "./use-daemon-connection"
 
 const DAEMON_URL =
@@ -82,7 +86,7 @@ export function useTradeFinder() {
     setSetups((prev) => {
       const exists = prev.find((s) => s.id === lastTradeFinderSetup.id)
       if (exists) {
-        return prev.map((s) => s.id === lastTradeFinderSetup.id ? lastTradeFinderSetup : s)
+        return prev.map((s) => (s.id === lastTradeFinderSetup.id ? lastTradeFinderSetup : s))
       }
       return [lastTradeFinderSetup, ...prev].sort((a, b) => b.scores.total - a.scores.total)
     })
@@ -124,18 +128,21 @@ export function useTradeFinder() {
   }, [])
 
   // Place order from setup
-  const placeOrder = useCallback(async (setupId: string, orderType: "MARKET" | "LIMIT" = "LIMIT") => {
-    const res = await fetch(`${DAEMON_URL}/actions/trade-finder/place/${setupId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderType }),
-    })
-    const json = await res.json()
-    if (!json.ok) throw new Error(json.error)
-    void fetchSetups()
-    void fetchHistory()
-    return json.data
-  }, [fetchSetups, fetchHistory])
+  const placeOrder = useCallback(
+    async (setupId: string, orderType: "MARKET" | "LIMIT" = "LIMIT") => {
+      const res = await fetch(`${DAEMON_URL}/actions/trade-finder/place/${setupId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderType }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error)
+      void fetchSetups()
+      void fetchHistory()
+      return json.data
+    },
+    [fetchSetups, fetchHistory],
+  )
 
   // Clear active setups
   const clearActive = useCallback(async () => {

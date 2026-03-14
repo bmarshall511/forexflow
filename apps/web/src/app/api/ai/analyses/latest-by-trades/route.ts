@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 import { getLatestAnalysisByTradeIds, getAnalysisCountsByTradeIds } from "@fxflow/db"
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -6,7 +7,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!ids) return NextResponse.json({ ok: true, data: { latest: {}, counts: {} } })
 
   const tradeIds = ids.split(",").filter(Boolean)
-  if (tradeIds.length === 0) return NextResponse.json({ ok: true, data: { latest: {}, counts: {} } })
+  if (tradeIds.length === 0)
+    return NextResponse.json({ ok: true, data: { latest: {}, counts: {} } })
 
   try {
     const [latest, counts] = await Promise.all([

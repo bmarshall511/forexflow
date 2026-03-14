@@ -57,7 +57,9 @@ export function useTradeConditions(tradeId: string | null): UseTradeConditionsRe
         if (!cancelled) setIsLoading(false)
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [tradeId, fetchKey])
 
   const createCondition = useCallback(
@@ -68,7 +70,7 @@ export function useTradeConditions(tradeId: string | null): UseTradeConditionsRe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      const json = await res.json() as { ok: boolean; data?: TradeConditionData; error?: string }
+      const json = (await res.json()) as { ok: boolean; data?: TradeConditionData; error?: string }
       if (!json.ok || !json.data) throw new Error(json.error ?? "Failed to create condition")
       setConditions((prev) => [json.data!, ...prev])
       return json.data
@@ -85,8 +87,10 @@ export function useTradeConditions(tradeId: string | null): UseTradeConditionsRe
       setConditions((prev) => prev.filter((c) => c.id !== conditionId))
 
       try {
-        const res = await fetch(`/api/ai/conditions/${tradeId}/${conditionId}`, { method: "DELETE" })
-        const json = await res.json() as { ok: boolean; error?: string }
+        const res = await fetch(`/api/ai/conditions/${tradeId}/${conditionId}`, {
+          method: "DELETE",
+        })
+        const json = (await res.json()) as { ok: boolean; error?: string }
         if (!json.ok) throw new Error(json.error ?? "Delete failed")
       } catch (err) {
         // Rollback on failure

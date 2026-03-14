@@ -47,7 +47,7 @@ export function DataTile({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border/50 bg-card p-3 space-y-1",
+        "border-border/50 bg-card space-y-1 rounded-lg border p-3",
         variantStyles[variant],
         wide && "col-span-2",
         className,
@@ -55,21 +55,14 @@ export function DataTile({
     >
       <div className="flex items-center gap-1.5">
         {icon && <span className="text-muted-foreground shrink-0">{icon}</span>}
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
           {label}
         </span>
       </div>
-      <p
-        className={cn(
-          "text-sm font-semibold font-mono tabular-nums",
-          valueColorStyles[variant],
-        )}
-      >
+      <p className={cn("font-mono text-sm font-semibold tabular-nums", valueColorStyles[variant])}>
         {value}
       </p>
-      {subtitle && (
-        <p className="text-[10px] text-muted-foreground truncate">{subtitle}</p>
-      )}
+      {subtitle && <p className="text-muted-foreground truncate text-[10px]">{subtitle}</p>}
       {sparkline && <div className="pt-1">{sparkline}</div>}
     </div>
   )
@@ -87,8 +80,8 @@ export function InlineStat({
 }) {
   return (
     <div className="flex items-center justify-between py-1">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className={cn("text-xs font-mono tabular-nums text-foreground", className)}>
+      <span className="text-muted-foreground text-[10px]">{label}</span>
+      <span className={cn("text-foreground font-mono text-xs tabular-nums", className)}>
         {value}
       </span>
     </div>
@@ -111,7 +104,11 @@ export function DonutChart({
   const circumference = 2 * Math.PI * radius
   const offset = circumference * (1 - Math.min(Math.max(value, 0), 100) / 100)
   const color =
-    value >= 60 ? "stroke-status-connected" : value >= 40 ? "stroke-status-warning" : "stroke-status-disconnected"
+    value >= 60
+      ? "stroke-status-connected"
+      : value >= 40
+        ? "stroke-status-warning"
+        : "stroke-status-disconnected"
 
   return (
     <div className={cn("relative inline-flex items-center justify-center", className)}>
@@ -136,7 +133,7 @@ export function DonutChart({
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute text-xs font-semibold font-mono tabular-nums">
+      <span className="absolute font-mono text-xs font-semibold tabular-nums">
         {Math.round(value)}%
       </span>
     </div>
@@ -156,7 +153,7 @@ export function ProportionBar({
 
   return (
     <div className={cn("space-y-1", className)}>
-      <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+      <div className="bg-muted flex h-2 overflow-hidden rounded-full">
         {segments.map((seg, i) => {
           const pct = (seg.value / total) * 100
           if (pct === 0) return null
@@ -171,9 +168,9 @@ export function ProportionBar({
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
         {segments.map((seg, i) => (
-          <div key={i} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <div key={i} className="text-muted-foreground flex items-center gap-1 text-[10px]">
             <span
-              className="size-1.5 rounded-full shrink-0"
+              className="size-1.5 shrink-0 rounded-full"
               style={{ backgroundColor: seg.color }}
             />
             {seg.label && <span>{seg.label}</span>}

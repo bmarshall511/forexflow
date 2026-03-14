@@ -3,12 +3,7 @@
 import type { PeriodPnL } from "@fxflow/types"
 import { formatPnL, type PnLColorIntent } from "@fxflow/shared"
 import { DataTile } from "@/components/ui/data-tile"
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  CheckCircle2,
-} from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, CheckCircle2 } from "lucide-react"
 
 interface TodayPnLSectionProps {
   today: PeriodPnL
@@ -45,7 +40,7 @@ export function TodayPnLSection({
 
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
         Today
       </h3>
       <div className="grid grid-cols-2 gap-2">

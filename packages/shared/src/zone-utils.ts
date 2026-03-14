@@ -198,7 +198,8 @@ export function findBaseCluster(
 
   // Verify leg-in is a leg or near-leg candle
   const legIn = candles[legInIdx]!
-  const isValidLegIn = legIn.classification === "leg" ||
+  const isValidLegIn =
+    legIn.classification === "leg" ||
     (legIn.bodyVsAtr >= legInAtrThreshold && legIn.bodyRatio >= 0.35)
   if (!isValidLegIn) return null
 

@@ -15,7 +15,7 @@ export function PendingOrdersPopover({ orders, pricesByInstrument }: PendingOrde
     return (
       <div className="space-y-2">
         <h4 className="text-sm font-semibold">Pending Orders</h4>
-        <p className="text-xs text-muted-foreground">No pending orders</p>
+        <p className="text-muted-foreground text-xs">No pending orders</p>
       </div>
     )
   }
@@ -40,18 +40,18 @@ export function PendingOrdersPopover({ orders, pricesByInstrument }: PendingOrde
       <div className="space-y-2">
         {sorted.map(({ order, distance }) => (
           <div key={order.id} className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-medium truncate">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-xs font-medium">
                 {order.instrument.replace("_", "/")}
               </span>
               <DirectionBadge direction={order.direction} />
             </div>
-            <div className="flex items-center gap-2 text-right shrink-0">
-              <span className="text-xs font-mono tabular-nums text-muted-foreground">
+            <div className="flex shrink-0 items-center gap-2 text-right">
+              <span className="text-muted-foreground font-mono text-xs tabular-nums">
                 @ {order.entryPrice}
               </span>
               {distance && (
-                <span className="text-[10px] font-mono tabular-nums text-status-warning">
+                <span className="text-status-warning font-mono text-[10px] tabular-nums">
                   {formatPips(distance.pips)}
                 </span>
               )}
@@ -62,7 +62,7 @@ export function PendingOrdersPopover({ orders, pricesByInstrument }: PendingOrde
 
       <Link
         href="/positions?tab=pending"
-        className="block text-xs text-primary hover:underline pt-1 border-t border-border"
+        className="text-primary border-border block border-t pt-1 text-xs hover:underline"
       >
         View all {orders.length} pending &rarr;
       </Link>

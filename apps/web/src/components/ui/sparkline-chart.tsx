@@ -131,12 +131,17 @@ function SparklineChartInner({
   if (data.length < 2) {
     return (
       <div
-        className={cn("flex items-center justify-center text-muted-foreground/30", className)}
+        className={cn("text-muted-foreground/30 flex items-center justify-center", className)}
         style={{ height }}
         aria-hidden="true"
       >
         <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
-          <path d="M2 10 L8 6 L14 8 L22 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path
+            d="M2 10 L8 6 L14 8 L22 2"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
       </div>
     )

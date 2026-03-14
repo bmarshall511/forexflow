@@ -48,19 +48,18 @@ export default function PositionsPage() {
   // Batch tags for pending + open trades
   const liveTradeIds = useMemo(() => {
     if (!positions) return []
-    return [
-      ...positions.pending.map((o) => o.id),
-      ...positions.open.map((t) => t.id),
-    ]
+    return [...positions.pending.map((o) => o.id), ...positions.open.map((t) => t.id)]
   }, [positions])
   const { tagsByTradeId, refetch: refetchTags } = useTradeTagsBatch(liveTradeIds)
 
   // Batch latest analysis + counts for live trades
-  const { latestByTradeId: liveAnalyses, countByTradeId: liveCounts } = useTradeAnalysesBatch(liveTradeIds)
+  const { latestByTradeId: liveAnalyses, countByTradeId: liveCounts } =
+    useTradeAnalysesBatch(liveTradeIds)
 
   // Batch latest analysis + counts for history trades (current page)
   const historyTradeIds = useMemo(() => history.trades.map((t) => t.id), [history.trades])
-  const { latestByTradeId: historyAnalyses, countByTradeId: historyCounts } = useTradeAnalysesBatch(historyTradeIds)
+  const { latestByTradeId: historyAnalyses, countByTradeId: historyCounts } =
+    useTradeAnalysesBatch(historyTradeIds)
 
   // Track in-progress AI analyses via WebSocket events
   const activeAiByTradeId = useActiveAiAnalyses()
@@ -124,9 +123,12 @@ export default function PositionsPage() {
         toast.success(`Cleared ${count} closed trade${count !== 1 ? "s" : ""}`)
         if (rawPositions) setPositions({ ...rawPositions, closed: [] })
         history.refetch()
-        fetch(`${process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"}/actions/refresh-positions`, {
-          method: "POST",
-        }).catch(() => {})
+        fetch(
+          `${process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"}/actions/refresh-positions`,
+          {
+            method: "POST",
+          },
+        ).catch(() => {})
       } else {
         toast.error("Failed to clear trade history")
       }
@@ -149,38 +151,43 @@ export default function PositionsPage() {
   return (
     <div className="min-h-screen">
       {/* ─── Hero Header ─── */}
-      <div className={cn(
-        "px-4 md:px-6 pt-6 pb-8 border-b",
-        isPositivePL ? "bg-green-500/[0.02]" : isNegativePL ? "bg-red-500/[0.02]" : "",
-      )}>
-        <div className="flex items-start justify-between gap-4 mb-6">
+      <div
+        className={cn(
+          "border-b px-4 pb-8 pt-6 md:px-6",
+          isPositivePL ? "bg-green-500/[0.02]" : isNegativePL ? "bg-red-500/[0.02]" : "",
+        )}
+      >
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">My Trades</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               Track your orders, see how open trades are doing, and review past results
             </p>
           </div>
           {/* Live P/L hero number */}
           {summary.openCount > 0 && (
-            <div className="text-right shrink-0">
-              <div className={cn(
-                "text-3xl font-bold font-mono tabular-nums tracking-tight",
-                isPositivePL ? "text-green-500" : isNegativePL ? "text-red-500" : "text-muted-foreground",
-              )}>
-                {isPositivePL ? "+" : ""}{formatCurrency(totalUnrealizedPL, currency)}
+            <div className="shrink-0 text-right">
+              <div
+                className={cn(
+                  "font-mono text-3xl font-bold tabular-nums tracking-tight",
+                  isPositivePL
+                    ? "text-green-500"
+                    : isNegativePL
+                      ? "text-red-500"
+                      : "text-muted-foreground",
+                )}
+              >
+                {isPositivePL ? "+" : ""}
+                {formatCurrency(totalUnrealizedPL, currency)}
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
+              <div className="text-muted-foreground mt-0.5 text-xs">
                 open P/L across {summary.openCount} trade{summary.openCount !== 1 ? "s" : ""}
               </div>
             </div>
           )}
         </div>
 
-        <OverviewCards
-          positions={positions}
-          openWithPrices={openWithPrices}
-          currency={currency}
-        />
+        <OverviewCards positions={positions} openWithPrices={openWithPrices} currency={currency} />
       </div>
 
       {/* ─── Tab Navigation ─── */}
@@ -210,10 +217,10 @@ export default function PositionsPage() {
       </TabNav>
 
       {/* ─── Tab Content ─── */}
-      <div className="px-4 md:px-6 py-6 space-y-4">
+      <div className="space-y-4 px-4 py-6 md:px-6">
         {/* Filter bar */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-0 flex-1">
             {tab === "pending" && (
               <PositionsFilterBar
                 tab="pending"
@@ -253,7 +260,11 @@ export default function PositionsPage() {
           {tab === "history" && history.totalCount > 0 && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive shrink-0 gap-1.5"
+                >
                   <Trash2 className="size-3.5" />
                   <span className="hidden sm:inline">Clear History</span>
                 </Button>
@@ -262,8 +273,8 @@ export default function PositionsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Clear trade history?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete all closed trades from the database.
-                    This action cannot be undone.
+                    This will permanently delete all closed trades from the database. This action
+                    cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -334,4 +345,3 @@ export default function PositionsPage() {
     </div>
   )
 }
-

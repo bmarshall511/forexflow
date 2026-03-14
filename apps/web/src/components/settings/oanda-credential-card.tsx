@@ -19,12 +19,7 @@ export function OandaCredentialCard({
   const isLive = mode === "live"
 
   return (
-    <Card
-      className={cn(
-        "transition-colors",
-        isLive && "border-status-connected/20",
-      )}
-    >
+    <Card className={cn("transition-colors", isLive && "border-status-connected/20")}>
       <CardHeader className="pb-4">
         <div className="flex items-center gap-2">
           <span
@@ -34,9 +29,7 @@ export function OandaCredentialCard({
             )}
             aria-hidden="true"
           />
-          <CardTitle className="text-base">
-            {isLive ? "Live" : "Practice"} Credentials
-          </CardTitle>
+          <CardTitle className="text-base">{isLive ? "Live" : "Practice"} Credentials</CardTitle>
         </div>
         <CardDescription>
           {isLive

@@ -12,14 +12,11 @@ interface ProximityFillingSectionProps {
   onSelectTrade: (order: PendingOrderData) => void
 }
 
-export function ProximityFillingSection({
-  orders,
-  onSelectTrade,
-}: ProximityFillingSectionProps) {
+export function ProximityFillingSection({ orders, onSelectTrade }: ProximityFillingSectionProps) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <h3 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <h3 className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
           Near Filling
         </h3>
         {orders.length > 0 && (
@@ -30,9 +27,7 @@ export function ProximityFillingSection({
       </div>
 
       {orders.length === 0 ? (
-        <p className="py-3 text-center text-xs text-muted-foreground">
-          No orders near fill
-        </p>
+        <p className="text-muted-foreground py-3 text-center text-xs">No orders near fill</p>
       ) : (
         <div className="space-y-0.5">
           {orders.map((item) => {
@@ -63,7 +58,7 @@ export function ProximityFillingSection({
 
           <Link
             href="/positions?tab=pending"
-            className="mt-1 block text-center text-[10px] font-medium text-primary hover:underline"
+            className="text-primary mt-1 block text-center text-[10px] font-medium hover:underline"
             aria-label="View all pending orders"
           >
             View all pending orders

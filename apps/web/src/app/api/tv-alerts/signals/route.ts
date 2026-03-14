@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server"
 import { listSignals, clearAllSignals } from "@fxflow/db"
 import type { ApiResponse, TVSignalListResponse } from "@fxflow/types"
 
-export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<TVSignalListResponse>>> {
+export async function GET(
+  request: NextRequest,
+): Promise<NextResponse<ApiResponse<TVSignalListResponse>>> {
   try {
     const params = request.nextUrl.searchParams
 
@@ -30,7 +32,15 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
       return NextResponse.json({ ok: false, error: "Invalid dateTo" }, { status: 400 })
     }
 
-    const result = await listSignals({ page, pageSize, status, instrument, source, dateFrom, dateTo })
+    const result = await listSignals({
+      page,
+      pageSize,
+      status,
+      instrument,
+      source,
+      dateFrom,
+      dateTo,
+    })
     return NextResponse.json({ ok: true, data: result })
   } catch (error) {
     console.error("[GET /api/tv-alerts/signals]", error)

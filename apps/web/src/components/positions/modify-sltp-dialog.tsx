@@ -70,16 +70,16 @@ export function ModifySltpDialog({
   const pair = trade.instrument.replace("_", "/")
 
   const handleConfirm = () => {
-    const sl = removeSl ? null : (slValue ? parseFloat(slValue) : undefined)
-    const tp = removeTp ? null : (tpValue ? parseFloat(tpValue) : undefined)
+    const sl = removeSl ? null : slValue ? parseFloat(slValue) : undefined
+    const tp = removeTp ? null : tpValue ? parseFloat(tpValue) : undefined
 
     // When pre-filled with AI suggestions, always send — user is confirming a recommendation
     const hasInitialValues = initialSl !== undefined || initialTp !== undefined
 
     if (!hasInitialValues) {
       // Only send values that actually changed (normal manual edit flow)
-      const slArg = removeSl ? null : (sl !== undefined && sl !== trade.stopLoss ? sl : undefined)
-      const tpArg = removeTp ? null : (tp !== undefined && tp !== trade.takeProfit ? tp : undefined)
+      const slArg = removeSl ? null : sl !== undefined && sl !== trade.stopLoss ? sl : undefined
+      const tpArg = removeTp ? null : tp !== undefined && tp !== trade.takeProfit ? tp : undefined
 
       if (slArg === undefined && tpArg === undefined) {
         onOpenChange(false)
@@ -87,8 +87,8 @@ export function ModifySltpDialog({
       }
 
       onConfirm(
-        slArg !== undefined ? slArg : (trade.stopLoss ?? undefined) as number | null,
-        tpArg !== undefined ? tpArg : (trade.takeProfit ?? undefined) as number | null,
+        slArg !== undefined ? slArg : ((trade.stopLoss ?? undefined) as number | null),
+        tpArg !== undefined ? tpArg : ((trade.takeProfit ?? undefined) as number | null),
       )
       return
     }
@@ -117,8 +117,10 @@ export function ModifySltpDialog({
           {/* Stop Loss */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="sl-price" className="text-sm">Stop Loss</Label>
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Label htmlFor="sl-price" className="text-sm">
+                Stop Loss
+              </Label>
+              <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
                 <input
                   type="checkbox"
                   checked={removeSl}
@@ -139,7 +141,7 @@ export function ModifySltpDialog({
                 placeholder={trade.stopLoss?.toString() ?? "No SL set"}
               />
               {slPips !== null && (
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                <span className="text-muted-foreground whitespace-nowrap text-xs">
                   {formatPips(slPips)}
                 </span>
               )}
@@ -149,8 +151,10 @@ export function ModifySltpDialog({
           {/* Take Profit */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="tp-price" className="text-sm">Take Profit</Label>
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Label htmlFor="tp-price" className="text-sm">
+                Take Profit
+              </Label>
+              <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
                 <input
                   type="checkbox"
                   checked={removeTp}
@@ -171,7 +175,7 @@ export function ModifySltpDialog({
                 placeholder={trade.takeProfit?.toString() ?? "No TP set"}
               />
               {tpPips !== null && (
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                <span className="text-muted-foreground whitespace-nowrap text-xs">
                   {formatPips(tpPips)}
                 </span>
               )}

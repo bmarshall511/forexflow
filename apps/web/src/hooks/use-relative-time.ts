@@ -8,10 +8,7 @@ import { formatRelativeTime } from "@fxflow/shared"
  * Re-renders every `intervalMs` (default 5s) so the displayed
  * time stays current instead of frozen at mount time.
  */
-export function useRelativeTime(
-  isoString: string | null,
-  intervalMs: number = 1000,
-): string {
+export function useRelativeTime(isoString: string | null, intervalMs: number = 1000): string {
   const [text, setText] = useState(() => formatRelativeTime(isoString))
 
   useEffect(() => {

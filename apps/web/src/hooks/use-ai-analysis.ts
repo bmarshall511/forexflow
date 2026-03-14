@@ -1,7 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback, useContext, useRef } from "react"
-import { ANALYSIS_STALE_THRESHOLD_MS, type AiAnalysisData, type AiClaudeModel, type AiAnalysisDepth } from "@fxflow/types"
+import {
+  ANALYSIS_STALE_THRESHOLD_MS,
+  type AiAnalysisData,
+  type AiClaudeModel,
+  type AiAnalysisDepth,
+} from "@fxflow/types"
 import { DaemonStatusContext } from "@/state/daemon-status-context"
 
 const MAX_STREAM_TEXT_LENGTH = 100_000 // 100KB limit to prevent memory issues
@@ -19,7 +24,10 @@ export interface UseAiAnalysisReturn {
   progress: AiAnalysisProgress | null
   isLoading: boolean
   isTriggeringAnalysis: boolean
-  triggerAnalysis: (opts: { model: AiClaudeModel; depth: AiAnalysisDepth }) => Promise<string | null>
+  triggerAnalysis: (opts: {
+    model: AiClaudeModel
+    depth: AiAnalysisDepth
+  }) => Promise<string | null>
   cancelAnalysis: (analysisId: string) => Promise<void>
   refetch: () => void
 }
@@ -77,7 +85,9 @@ export function useAiAnalysis(tradeId: string | null): UseAiAnalysisReturn {
         if (!cancelled) setIsLoading(false)
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [tradeId, fetchKey])
 
   // Listen to WS events for real-time updates
@@ -142,7 +152,11 @@ export function useAiAnalysis(tradeId: string | null): UseAiAnalysisReturn {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(opts),
         })
-        const json = await res.json() as { ok: boolean; data?: { analysisId: string }; error?: string }
+        const json = (await res.json()) as {
+          ok: boolean
+          data?: { analysisId: string }
+          error?: string
+        }
         if (!json.ok) throw new Error(json.error ?? "Failed to trigger analysis")
         return json.data?.analysisId ?? null
       } catch (err) {
@@ -155,14 +169,20 @@ export function useAiAnalysis(tradeId: string | null): UseAiAnalysisReturn {
     [tradeId],
   )
 
-  const cancelAnalysis = useCallback(
-    async (analysisId: string): Promise<void> => {
-      await fetch(`/api/ai/analyses/cancel/${analysisId}`, { method: "POST" })
-      setActiveAnalysis(null)
-      setProgress(null)
-    },
-    [],
-  )
+  const cancelAnalysis = useCallback(async (analysisId: string): Promise<void> => {
+    await fetch(`/api/ai/analyses/cancel/${analysisId}`, { method: "POST" })
+    setActiveAnalysis(null)
+    setProgress(null)
+  }, [])
 
-  return { history, activeAnalysis, progress, isLoading, isTriggeringAnalysis, triggerAnalysis, cancelAnalysis, refetch }
+  return {
+    history,
+    activeAnalysis,
+    progress,
+    isLoading,
+    isTriggeringAnalysis,
+    triggerAnalysis,
+    cancelAnalysis,
+    refetch,
+  }
 }

@@ -22,9 +22,5 @@ export function DurationDisplay({ openedAt, closedAt, className }: DurationDispl
   const endTime = closedAt ? new Date(closedAt).getTime() : now
   const duration = endTime - new Date(openedAt).getTime()
 
-  return (
-    <span className={className}>
-      {formatDuration(duration)}
-    </span>
-  )
+  return <span className={className}>{formatDuration(duration)}</span>
 }

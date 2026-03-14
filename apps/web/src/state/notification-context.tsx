@@ -71,9 +71,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [isOnline])
 
   return (
-    <NotificationContext.Provider value={notifications}>
-      {children}
-    </NotificationContext.Provider>
+    <NotificationContext.Provider value={notifications}>{children}</NotificationContext.Provider>
   )
 }
 

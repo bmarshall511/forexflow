@@ -26,7 +26,7 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse<{ digestId: string }>>> {
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       period: "weekly" | "monthly"
       periodStart: string
       periodEnd: string

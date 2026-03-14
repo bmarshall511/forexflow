@@ -76,7 +76,7 @@ export function CloseTradeDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="rounded-md bg-muted/50 p-3 space-y-1 text-sm">
+        <div className="bg-muted/50 space-y-1 rounded-md p-3 text-sm">
           <div className="flex items-center gap-2">
             <span className="font-medium">{pair}</span>
             <DirectionBadge direction={trade.direction} />
@@ -138,7 +138,7 @@ export function CloseTradeDialog({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Why are you closing this trade?"
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[60px] resize-none"
+            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[60px] w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             rows={2}
           />
         </div>
@@ -153,11 +153,7 @@ export function CloseTradeDialog({
             }}
             disabled={isLoading}
           >
-            {isLoading
-              ? "Closing..."
-              : mode === "partial"
-                ? "Close Partial"
-                : "Close Trade"}
+            {isLoading ? "Closing..." : mode === "partial" ? "Close Partial" : "Close Trade"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -14,7 +14,7 @@ import { priceToPips, calculateDistanceInfo } from "@fxflow/shared"
 // ─── Proximity thresholds (hysteresis to prevent flickering) ────────────────
 
 const PROXIMITY_ENTER = 70 // percent — threshold to appear in the list
-const PROXIMITY_EXIT = 55  // percent — threshold to leave the list
+const PROXIMITY_EXIT = 55 // percent — threshold to leave the list
 
 // ─── Derived types ──────────────────────────────────────────────────────────
 
@@ -55,7 +55,9 @@ export interface PositionsDashboardData {
 
 // ─── Pure computation helpers ───────────────────────────────────────────────
 
-function computeOpenTradeProgress(trade: OpenTradeData): { clamped: number; slPips: number | null; tpPips: number | null } | null {
+function computeOpenTradeProgress(
+  trade: OpenTradeData,
+): { clamped: number; slPips: number | null; tpPips: number | null } | null {
   const { stopLoss, takeProfit, entryPrice, currentPrice, direction, instrument } = trade
 
   if (!stopLoss && !takeProfit) return null
@@ -118,8 +120,16 @@ function computePendingFillPercent(
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
 export function usePositionsDashboard(): PositionsDashboardData {
-  const { positions, isLoaded, isConfigured, hasError, errorMessage, summary, openWithPrices, pricesByInstrument } =
-    usePositions()
+  const {
+    positions,
+    isLoaded,
+    isConfigured,
+    hasError,
+    errorMessage,
+    summary,
+    openWithPrices,
+    pricesByInstrument,
+  } = usePositions()
   const { accountOverview } = useDaemonStatus()
   const currency = accountOverview?.summary.currency ?? "USD"
 
@@ -191,10 +201,7 @@ export function usePositionsDashboard(): PositionsDashboardData {
     return `${Math.round((summary.todayWins / total) * 100)}%`
   }, [summary.todayWins, summary.todayLosses])
 
-  const recentClosed = useMemo(
-    () => (positions?.closed ?? []).slice(0, 5),
-    [positions?.closed],
-  )
+  const recentClosed = useMemo(() => (positions?.closed ?? []).slice(0, 5), [positions?.closed])
 
   return {
     summary,

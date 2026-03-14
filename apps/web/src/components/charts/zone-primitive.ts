@@ -22,7 +22,7 @@ const INVALIDATED_COLOR = "#6b7280"
 
 function getZoneOpacity(score: number): number {
   if (score >= 4.5) return 0.15
-  if (score >= 3.0) return 0.10
+  if (score >= 3.0) return 0.1
   if (score >= 1.5) return 0.07
   return 0.05
 }
@@ -65,7 +65,13 @@ class ZoneAxisView implements ISeriesPrimitiveAxisView {
   private _textColor: string
   private _backColor: string
 
-  constructor(series: ISeriesApi<SeriesType, Time>, price: number, text: string, textColor: string, backColor: string) {
+  constructor(
+    series: ISeriesApi<SeriesType, Time>,
+    price: number,
+    text: string,
+    textColor: string,
+    backColor: string,
+  ) {
     this._series = series
     this._price = price
     this._text = text
@@ -77,9 +83,15 @@ class ZoneAxisView implements ISeriesPrimitiveAxisView {
     return (this._series.priceToCoordinate(this._price) as number | null) ?? -1000
   }
 
-  text(): string { return this._text }
-  textColor(): string { return this._textColor }
-  backColor(): string { return this._backColor }
+  text(): string {
+    return this._text
+  }
+  textColor(): string {
+    return this._textColor
+  }
+  backColor(): string {
+    return this._backColor
+  }
 }
 
 // ─── Pane View & Renderer ───────────────────────────────────────────────────
@@ -107,8 +119,11 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
     this._source = source
   }
 
-  draw(target: { useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T }): void {
-    const { chart, series, zones, higherTfZones, isDark, nearestDemandId, nearestSupplyId } = this._source
+  draw(target: {
+    useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T
+  }): void {
+    const { chart, series, zones, higherTfZones, isDark, nearestDemandId, nearestSupplyId } =
+      this._source
     if (!chart || !series) return
 
     target.useMediaCoordinateSpace(({ context }) => {
@@ -146,7 +161,9 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
     if (proximalY == null || distalY == null) return
 
     // Zone starts at base start time and extends to the right edge of the chart
-    const startX = timeScale.timeToCoordinate(zone.baseStartTime as unknown as Time) as Coordinate | null
+    const startX = timeScale.timeToCoordinate(
+      zone.baseStartTime as unknown as Time,
+    ) as Coordinate | null
     const leftX = startX ?? 0
     const rightX = chartWidth
 
@@ -264,13 +281,27 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
   }
 
   // Public getters for the renderer
-  get zones(): ZoneData[] { return this._zones }
-  get higherTfZones(): ZoneData[] { return this._higherTfZones }
-  get isDark(): boolean { return this._isDark }
-  get nearestDemandId(): string | null { return this._nearestDemandId }
-  get nearestSupplyId(): string | null { return this._nearestSupplyId }
-  get chart(): IChartApiBase<Time> | null { return this._chart }
-  get series(): ISeriesApi<SeriesType, Time> | null { return this._series }
+  get zones(): ZoneData[] {
+    return this._zones
+  }
+  get higherTfZones(): ZoneData[] {
+    return this._higherTfZones
+  }
+  get isDark(): boolean {
+    return this._isDark
+  }
+  get nearestDemandId(): string | null {
+    return this._nearestDemandId
+  }
+  get nearestSupplyId(): string | null {
+    return this._nearestSupplyId
+  }
+  get chart(): IChartApiBase<Time> | null {
+    return this._chart
+  }
+  get series(): ISeriesApi<SeriesType, Time> | null {
+    return this._series
+  }
 
   attached(params: SeriesAttachedParameter<Time>): void {
     this._chart = params.chart
@@ -299,7 +330,10 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
   private _rebuildAxisViews(): void {
     const views: ISeriesPrimitiveAxisView[] = []
     const series = this._series
-    if (!series) { this._priceAxisViews = []; return }
+    if (!series) {
+      this._priceAxisViews = []
+      return
+    }
 
     const allZones = [...this._zones, ...this._higherTfZones]
     const dec = this._decimals
@@ -312,9 +346,19 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
       const txtColor = color
 
       // Proximal label
-      views.push(new ZoneAxisView(series, zone.proximalLine, zone.proximalLine.toFixed(dec), txtColor, bgColor))
+      views.push(
+        new ZoneAxisView(
+          series,
+          zone.proximalLine,
+          zone.proximalLine.toFixed(dec),
+          txtColor,
+          bgColor,
+        ),
+      )
       // Distal label
-      views.push(new ZoneAxisView(series, zone.distalLine, zone.distalLine.toFixed(dec), txtColor, bgColor))
+      views.push(
+        new ZoneAxisView(series, zone.distalLine, zone.distalLine.toFixed(dec), txtColor, bgColor),
+      )
     }
 
     this._priceAxisViews = views
@@ -329,12 +373,18 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
     // Find nearest demand/supply for highlight
     const activeDemand = zones.filter((z) => z.type === "demand" && z.status === "active")
     const activeSupply = zones.filter((z) => z.type === "supply" && z.status === "active")
-    this._nearestDemandId = activeDemand.length > 0
-      ? activeDemand.reduce((best, z) => z.distanceFromPricePips < best.distanceFromPricePips ? z : best).id
-      : null
-    this._nearestSupplyId = activeSupply.length > 0
-      ? activeSupply.reduce((best, z) => z.distanceFromPricePips < best.distanceFromPricePips ? z : best).id
-      : null
+    this._nearestDemandId =
+      activeDemand.length > 0
+        ? activeDemand.reduce((best, z) =>
+            z.distanceFromPricePips < best.distanceFromPricePips ? z : best,
+          ).id
+        : null
+    this._nearestSupplyId =
+      activeSupply.length > 0
+        ? activeSupply.reduce((best, z) =>
+            z.distanceFromPricePips < best.distanceFromPricePips ? z : best,
+          ).id
+        : null
 
     this._rebuildAxisViews()
     this._requestUpdate?.()

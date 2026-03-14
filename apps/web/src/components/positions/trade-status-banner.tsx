@@ -51,18 +51,13 @@ export function TradeStatusBanner({
   const Icon = config.icon
 
   return (
-    <div className={cn(
-      "flex items-center justify-between rounded-lg border px-3 py-2",
-      config.bg,
-    )}>
+    <div className={cn("flex items-center justify-between rounded-lg border px-3 py-2", config.bg)}>
       <div className="flex items-center gap-2">
-        <div className={cn("size-2 rounded-full animate-pulse", config.dot)} />
+        <div className={cn("size-2 animate-pulse rounded-full", config.dot)} />
         <span className={cn("text-xs font-semibold", config.text)}>
           {config.label}
           {status === "pending" && orderType && (
-            <span className="font-normal ml-1 opacity-70">
-              ({orderType.replace("_", " ")})
-            </span>
+            <span className="ml-1 font-normal opacity-70">({orderType.replace("_", " ")})</span>
           )}
         </span>
       </div>
@@ -71,14 +66,11 @@ export function TradeStatusBanner({
         {status === "open" && openedAt && (
           <DurationDisplay
             openedAt={openedAt}
-            className={cn("text-[10px] font-mono tabular-nums", config.text)}
+            className={cn("font-mono text-[10px] tabular-nums", config.text)}
           />
         )}
         {status === "closed" && outcome && (
-          <OutcomeBadge
-            outcome={outcome}
-            closeReason={closeReason as TradeCloseReason}
-          />
+          <OutcomeBadge outcome={outcome} closeReason={closeReason as TradeCloseReason} />
         )}
       </div>
     </div>

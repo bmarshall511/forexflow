@@ -9,13 +9,26 @@ import type {
   ClassifiedCandle,
 } from "@fxflow/types"
 import { getPipSize, priceToPips } from "./pip-utils"
-import { classifyCandles, detectExplosiveMove, findBaseCluster, getZoneStatus, computeZoneWidth, computeATR } from "./zone-utils"
+import {
+  classifyCandles,
+  detectExplosiveMove,
+  findBaseCluster,
+  getZoneStatus,
+  computeZoneWidth,
+  computeATR,
+} from "./zone-utils"
 import { scoreZone, type RawZoneCandidate } from "./zone-scorer"
 
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
 /** Generate a deterministic ID from zone properties for deduplication. */
-function generateZoneId(instrument: string, timeframe: string, type: ZoneType, baseStartTime: number, baseEndTime: number): string {
+function generateZoneId(
+  instrument: string,
+  timeframe: string,
+  type: ZoneType,
+  baseStartTime: number,
+  baseEndTime: number,
+): string {
   return `${instrument}_${timeframe}_${type}_${baseStartTime}_${baseEndTime}`
 }
 
@@ -28,7 +41,10 @@ function generateZoneId(instrument: string, timeframe: string, type: ZoneType, b
  *   rally + drop  = RBD (supply)
  *   drop  + drop  = DBD (supply)
  */
-function determineFormation(legInBullish: boolean, legOutBullish: boolean): {
+function determineFormation(
+  legInBullish: boolean,
+  legOutBullish: boolean,
+): {
   formation: ZoneFormationType
   zoneType: ZoneType
 } {
@@ -115,12 +131,10 @@ function computeRiskReward(
   }
 
   const takeProfitPrice = nearestOpposing?.proximalLine ?? null
-  const rewardPips = takeProfitPrice !== null
-    ? Math.abs(takeProfitPrice - zone.proximalLine) / pipSize
-    : null
-  const ratio = rewardPips !== null && riskPips > 0
-    ? `1:${(rewardPips / riskPips).toFixed(1)}`
-    : null
+  const rewardPips =
+    takeProfitPrice !== null ? Math.abs(takeProfitPrice - zone.proximalLine) / pipSize : null
+  const ratio =
+    rewardPips !== null && riskPips > 0 ? `1:${(rewardPips / riskPips).toFixed(1)}` : null
 
   return {
     entryPrice: zone.proximalLine,
@@ -136,7 +150,10 @@ function computeRiskReward(
  * Check if two zones overlap more than a threshold percentage.
  * Used for deduplication — when two zones overlap significantly, keep the higher-scored one.
  */
-function zonesOverlap(a: { proximalLine: number; distalLine: number; type: ZoneType }, b: typeof a): number {
+function zonesOverlap(
+  a: { proximalLine: number; distalLine: number; type: ZoneType },
+  b: typeof a,
+): number {
   // For demand: proximal > distal. Zone range is [distal, proximal].
   // For supply: proximal < distal. Zone range is [proximal, distal].
   const aLow = Math.min(a.proximalLine, a.distalLine)
@@ -226,11 +243,16 @@ export function detectZones(
     }
 
     rawCandidates.push({
-      type: zoneType, formation, instrument,
-      proximalLine: lines.proximalLine, distalLine: lines.distalLine,
-      baseStartIndex: base.startIdx, baseEndIndex: base.endIdx,
+      type: zoneType,
+      formation,
+      instrument,
+      proximalLine: lines.proximalLine,
+      distalLine: lines.distalLine,
+      baseStartIndex: base.startIdx,
+      baseEndIndex: base.endIdx,
       baseCandles: base.candles.length,
-      legOutStartIndex: move.startIdx, legOutEndIndex: move.endIdx,
+      legOutStartIndex: move.startIdx,
+      legOutEndIndex: move.endIdx,
       legInIndex: base.legInIdx,
     })
     return true
@@ -268,21 +290,24 @@ export function detectZones(
 
     // Find extent of this base cluster (consecutive "base" candles only)
     let clusterEnd = i
-    for (let j = i + 1; j < classified.length && (clusterEnd - i + 1) < config.maxBaseCandles; j++) {
+    for (let j = i + 1; j < classified.length && clusterEnd - i + 1 < config.maxBaseCandles; j++) {
       if (usedIndices.has(j)) break
       if (classified[j]!.classification !== "base") break
       clusterEnd = j
     }
 
     const baseLength = clusterEnd - i + 1
-    if (baseLength > config.maxBaseCandles) { i = clusterEnd; continue }
+    if (baseLength > config.maxBaseCandles) {
+      i = clusterEnd
+      continue
+    }
 
     // Need a directional candle BEFORE this cluster (leg-in)
     const legInIdx = i - 1
     if (legInIdx < config.atrPeriod || usedIndices.has(legInIdx)) continue
     const legIn = classified[legInIdx]!
     // Accept any candle with decent body relative to ATR as leg-in
-    if (legIn.bodyVsAtr < 0.5 || legIn.bodyRatio < 0.30) continue
+    if (legIn.bodyVsAtr < 0.5 || legIn.bodyRatio < 0.3) continue
 
     // Need significant price movement AFTER this cluster (leg-out)
     const legOutStart = clusterEnd + 1
@@ -351,20 +376,41 @@ export function detectZones(
 
   for (const candidate of rawCandidates) {
     const opposing = candidate.type === "demand" ? supplyCandidates : demandCandidates
-    const { scores, testCount, penetrationPercent } = scoreZone(candidate, classified, opposing, config)
+    const { scores, testCount, penetrationPercent } = scoreZone(
+      candidate,
+      classified,
+      opposing,
+      config,
+    )
 
-    const { width, widthPips } = computeZoneWidth(candidate.proximalLine, candidate.distalLine, instrument)
-    const status = getZoneStatus(candidate.type, candidate.proximalLine, candidate.distalLine, currentPrice)
+    const { width, widthPips } = computeZoneWidth(
+      candidate.proximalLine,
+      candidate.distalLine,
+      instrument,
+    )
+    const status = getZoneStatus(
+      candidate.type,
+      candidate.proximalLine,
+      candidate.distalLine,
+      currentPrice,
+    )
 
-    const distanceFromPrice = candidate.type === "demand"
-      ? currentPrice - candidate.proximalLine
-      : candidate.proximalLine - currentPrice
+    const distanceFromPrice =
+      candidate.type === "demand"
+        ? currentPrice - candidate.proximalLine
+        : candidate.proximalLine - currentPrice
     const distanceFromPricePips = priceToPips(instrument, distanceFromPrice)
 
     const ageInCandles = candles.length - 1 - candidate.baseEndIndex
 
     const zone: ZoneData = {
-      id: generateZoneId(instrument, timeframe, candidate.type, candles[candidate.baseStartIndex]!.time, candles[candidate.baseEndIndex]!.time),
+      id: generateZoneId(
+        instrument,
+        timeframe,
+        candidate.type,
+        candles[candidate.baseStartIndex]!.time,
+        candles[candidate.baseEndIndex]!.time,
+      ),
       type: candidate.type,
       formation: candidate.formation,
       instrument,
@@ -379,7 +425,14 @@ export function detectZones(
       baseStartIndex: candidate.baseStartIndex,
       baseEndIndex: candidate.baseEndIndex,
       scores,
-      riskReward: { entryPrice: candidate.proximalLine, stopLossPrice: candidate.distalLine, takeProfitPrice: null, riskPips: widthPips, rewardPips: null, ratio: null },
+      riskReward: {
+        entryPrice: candidate.proximalLine,
+        stopLossPrice: candidate.distalLine,
+        takeProfitPrice: null,
+        riskPips: widthPips,
+        rewardPips: null,
+        ratio: null,
+      },
       status,
       penetrationPercent,
       testCount,
@@ -399,7 +452,9 @@ export function detectZones(
   // When two same-type zones overlap significantly, keep only the higher-scored one.
   // This prevents stacking duplicate zones on top of each other.
   const deduped: ZoneData[] = []
-  const sorted = [...allZones].sort((a, b) => b.scores.total - a.scores.total || a.distanceFromPricePips - b.distanceFromPricePips)
+  const sorted = [...allZones].sort(
+    (a, b) => b.scores.total - a.scores.total || a.distanceFromPricePips - b.distanceFromPricePips,
+  )
   const dropped = new Set<string>()
 
   for (const zone of sorted) {
@@ -421,13 +476,19 @@ export function detectZones(
   const activeDemand = deduped.filter((z) => z.type === "demand" && z.status === "active")
   const activeSupply = deduped.filter((z) => z.type === "supply" && z.status === "active")
 
-  const nearestDemand = activeDemand.length > 0
-    ? activeDemand.reduce((best, z) => z.distanceFromPricePips < best.distanceFromPricePips ? z : best)
-    : null
+  const nearestDemand =
+    activeDemand.length > 0
+      ? activeDemand.reduce((best, z) =>
+          z.distanceFromPricePips < best.distanceFromPricePips ? z : best,
+        )
+      : null
 
-  const nearestSupply = activeSupply.length > 0
-    ? activeSupply.reduce((best, z) => z.distanceFromPricePips < best.distanceFromPricePips ? z : best)
-    : null
+  const nearestSupply =
+    activeSupply.length > 0
+      ? activeSupply.reduce((best, z) =>
+          z.distanceFromPricePips < best.distanceFromPricePips ? z : best,
+        )
+      : null
 
   return {
     instrument,

@@ -1,8 +1,22 @@
 "use client"
 
-import type { PendingOrderData, OpenTradeData, ClosedTradeData, TradeTagData, AiAnalysisData } from "@fxflow/types"
+import type {
+  PendingOrderData,
+  OpenTradeData,
+  ClosedTradeData,
+  TradeTagData,
+  AiAnalysisData,
+} from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
-import { formatCurrency, formatPips, getDecimalPlaces, formatShortDateTime, calculateRiskReward, getPipSize, TIMEFRAME_OPTIONS } from "@fxflow/shared"
+import {
+  formatCurrency,
+  formatPips,
+  getDecimalPlaces,
+  formatShortDateTime,
+  calculateRiskReward,
+  getPipSize,
+  TIMEFRAME_OPTIONS,
+} from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
@@ -15,10 +29,7 @@ import { DurationDisplay } from "./duration-display"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { PriceCard, StatRow } from "@/components/ui/price-card"
 import { AiAnalysisCell } from "./ai-analysis-cell"
-import {
-  Eye, XCircle, Sparkles, ChevronDown,
-  Target, ShieldAlert, DollarSign,
-} from "lucide-react"
+import { Eye, XCircle, Sparkles, ChevronDown, Target, ShieldAlert, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type TradeCardVariant = "pending" | "open" | "closed"
@@ -99,26 +110,40 @@ export function TradeCard({
       : 0
   const isPositive = plValue >= 0.005
   const isNegative = plValue <= -0.005
-  const plColor = isPositive ? "text-green-500" : isNegative ? "text-red-500" : "text-muted-foreground"
+  const plColor = isPositive
+    ? "text-green-500"
+    : isNegative
+      ? "text-red-500"
+      : "text-muted-foreground"
 
   // Risk / Reward
-  const rr = calculateRiskReward(data.direction, entryPrice, data.stopLoss ?? null, data.takeProfit ?? null, data.instrument)
-  const riskDollars = rr.riskPips !== null ? computeDollarAmount(units, rr.riskPips, data.instrument) : null
-  const rewardDollars = rr.rewardPips !== null ? computeDollarAmount(units, rr.rewardPips, data.instrument) : null
+  const rr = calculateRiskReward(
+    data.direction,
+    entryPrice,
+    data.stopLoss ?? null,
+    data.takeProfit ?? null,
+    data.instrument,
+  )
+  const riskDollars =
+    rr.riskPips !== null ? computeDollarAmount(units, rr.riskPips, data.instrument) : null
+  const rewardDollars =
+    rr.rewardPips !== null ? computeDollarAmount(units, rr.rewardPips, data.instrument) : null
 
   // Left accent color
   const accentColor = isLong ? "border-l-green-500" : "border-l-red-500"
 
   return (
-    <div className={cn(
-      "rounded-xl border border-border/60 bg-card overflow-hidden border-l-[3px]",
-      accentColor,
-    )}>
+    <div
+      className={cn(
+        "border-border/60 bg-card overflow-hidden rounded-xl border border-l-[3px]",
+        accentColor,
+      )}
+    >
       <Collapsible open={isExpanded} onOpenChange={() => onToggleExpand()}>
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="w-full text-left px-4 py-3.5 hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            className="hover:bg-muted/30 focus-visible:ring-ring w-full px-4 py-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
             aria-expanded={isExpanded}
             aria-label={`${pair} ${data.direction} trade${isExpanded ? ", collapse details" : ", expand details"}`}
           >
@@ -130,16 +155,17 @@ export function TradeCard({
                   <Badge
                     variant="outline"
                     className={cn(
-                      "text-[10px] px-1.5 py-0 font-semibold border-0",
-                      isLong
-                        ? "bg-green-500/15 text-green-500"
-                        : "bg-red-500/15 text-red-500",
+                      "border-0 px-1.5 py-0 text-[10px] font-semibold",
+                      isLong ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500",
                     )}
                   >
                     {isLong ? "BUY" : "SELL"}
                   </Badge>
                   {isPending && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-500 border-amber-500/20">
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500/20 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-500"
+                    >
                       {(data as PendingOrderData).orderType}
                     </Badge>
                   )}
@@ -152,7 +178,7 @@ export function TradeCard({
                 </div>
 
                 {/* Subtitle: source + metrics */}
-                <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                <div className="text-muted-foreground mt-1 flex items-center gap-2 text-[11px]">
                   <SourceBadge source={data.source} />
                   {rr.ratio && <span>{rr.ratio} R:R</span>}
                   {isOpen && (
@@ -172,17 +198,23 @@ export function TradeCard({
               </div>
 
               {/* P/L — the hero element */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 {(isOpen || isClosed) && (
                   <div className="text-right">
-                    <div className={cn("text-lg font-bold font-mono tabular-nums leading-tight", plColor)}>
-                      {isPositive ? "+" : ""}{isOpen ? (
+                    <div
+                      className={cn(
+                        "font-mono text-lg font-bold tabular-nums leading-tight",
+                        plColor,
+                      )}
+                    >
+                      {isPositive ? "+" : ""}
+                      {isOpen ? (
                         <AnimatedNumber value={formatCurrency(plValue, currency)} />
                       ) : (
                         formatCurrency(plValue, currency)
                       )}
                     </div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                    <div className="text-muted-foreground mt-0.5 text-[10px]">
                       {isOpen ? "unrealized P/L" : "final result"}
                     </div>
                   </div>
@@ -192,21 +224,38 @@ export function TradeCard({
                   <div
                     role="button"
                     tabIndex={0}
-                    className="shrink-0 size-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors cursor-pointer"
-                    onClick={(e) => { e.stopPropagation(); onAiAnalysis() }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onAiAnalysis() } }}
+                    className="hover:bg-muted flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAiAnalysis()
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onAiAnalysis()
+                      }
+                    }}
                     aria-label="AI Analysis"
                   >
-                    <Sparkles className={cn(
-                      "size-4",
-                      activeAiProgress ? "text-amber-500 animate-pulse" : latestAnalysis ? "text-purple-500" : "text-muted-foreground",
-                    )} />
+                    <Sparkles
+                      className={cn(
+                        "size-4",
+                        activeAiProgress
+                          ? "animate-pulse text-amber-500"
+                          : latestAnalysis
+                            ? "text-purple-500"
+                            : "text-muted-foreground",
+                      )}
+                    />
                   </div>
                 )}
-                <ChevronDown className={cn(
-                  "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                  isExpanded && "rotate-180",
-                )} />
+                <ChevronDown
+                  className={cn(
+                    "text-muted-foreground size-4 shrink-0 transition-transform duration-200",
+                    isExpanded && "rotate-180",
+                  )}
+                />
               </div>
             </div>
 
@@ -230,12 +279,14 @@ export function TradeCard({
                 />
               )}
               {isClosed && data.stopLoss && data.takeProfit && (
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                <div className="text-muted-foreground flex items-center gap-3 text-[10px]">
                   <span className="text-red-500/70">Stop: {data.stopLoss.toFixed(decimals)}</span>
                   <span className="text-muted-foreground/40">→</span>
                   <span>Entry: {entryPrice.toFixed(decimals)}</span>
                   <span className="text-muted-foreground/40">→</span>
-                  <span className="text-green-500/70">Target: {data.takeProfit.toFixed(decimals)}</span>
+                  <span className="text-green-500/70">
+                    Target: {data.takeProfit.toFixed(decimals)}
+                  </span>
                 </div>
               )}
             </div>
@@ -244,8 +295,7 @@ export function TradeCard({
 
         {/* ─── Expanded Content ─── */}
         <CollapsibleContent>
-          <div className="px-4 pb-4 space-y-4 border-t border-border/40 pt-4">
-
+          <div className="border-border/40 space-y-4 border-t px-4 pb-4 pt-4">
             {/* Price cards — Entry / SL / TP */}
             <div className="grid grid-cols-3 gap-2">
               <PriceCard
@@ -273,23 +323,30 @@ export function TradeCard({
 
             {/* Current / Exit price */}
             {isOpen && (data as OpenTradeData).currentPrice && (
-              <div className={cn(
-                "rounded-lg p-3 flex items-center justify-between",
-                isPositive ? "bg-green-500/5" : isNegative ? "bg-red-500/5" : "bg-muted/50",
-              )}>
-                <span className="text-xs text-muted-foreground">Price now</span>
-                <span className={cn("text-base font-mono tabular-nums font-bold", plColor)}>
-                  <AnimatedNumber value={(data as OpenTradeData).currentPrice!.toFixed(decimals)} className={plColor} />
+              <div
+                className={cn(
+                  "flex items-center justify-between rounded-lg p-3",
+                  isPositive ? "bg-green-500/5" : isNegative ? "bg-red-500/5" : "bg-muted/50",
+                )}
+              >
+                <span className="text-muted-foreground text-xs">Price now</span>
+                <span className={cn("font-mono text-base font-bold tabular-nums", plColor)}>
+                  <AnimatedNumber
+                    value={(data as OpenTradeData).currentPrice!.toFixed(decimals)}
+                    className={plColor}
+                  />
                 </span>
               </div>
             )}
             {isClosed && (data as ClosedTradeData).exitPrice && (
-              <div className={cn(
-                "rounded-lg p-3 flex items-center justify-between",
-                isPositive ? "bg-green-500/5" : isNegative ? "bg-red-500/5" : "bg-muted/50",
-              )}>
-                <span className="text-xs text-muted-foreground">Closed at</span>
-                <span className={cn("text-base font-mono tabular-nums font-bold", plColor)}>
+              <div
+                className={cn(
+                  "flex items-center justify-between rounded-lg p-3",
+                  isPositive ? "bg-green-500/5" : isNegative ? "bg-red-500/5" : "bg-muted/50",
+                )}
+              >
+                <span className="text-muted-foreground text-xs">Closed at</span>
+                <span className={cn("font-mono text-base font-bold tabular-nums", plColor)}>
                   {(data as ClosedTradeData).exitPrice!.toFixed(decimals)}
                 </span>
               </div>
@@ -299,26 +356,25 @@ export function TradeCard({
             {(riskDollars !== null || rewardDollars !== null) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-medium text-muted-foreground">Risk vs Reward</span>
-                  {rr.ratio && (
-                    <span className="font-mono text-muted-foreground">{rr.ratio}</span>
-                  )}
+                  <span className="text-muted-foreground font-medium">Risk vs Reward</span>
+                  {rr.ratio && <span className="text-muted-foreground font-mono">{rr.ratio}</span>}
                 </div>
-                <div className="flex gap-0.5 h-6 rounded-lg overflow-hidden">
+                <div className="flex h-6 gap-0.5 overflow-hidden rounded-lg">
                   {riskDollars !== null && (
                     <div
-                      className="bg-red-500/15 flex items-center justify-center text-[10px] text-red-500 font-semibold rounded-l-lg"
+                      className="flex items-center justify-center rounded-l-lg bg-red-500/15 text-[10px] font-semibold text-red-500"
                       style={{
-                        width: rr.riskPips !== null && rr.rewardPips !== null
-                          ? `${Math.max(25, Math.min(50, (rr.riskPips / (rr.riskPips + rr.rewardPips)) * 100))}%`
-                          : "40%",
+                        width:
+                          rr.riskPips !== null && rr.rewardPips !== null
+                            ? `${Math.max(25, Math.min(50, (rr.riskPips / (rr.riskPips + rr.rewardPips)) * 100))}%`
+                            : "40%",
                       }}
                     >
                       -{fmtDollar(riskDollars)}
                     </div>
                   )}
                   {rewardDollars !== null && (
-                    <div className="bg-green-500/15 flex items-center justify-center text-[10px] text-green-500 font-semibold flex-1 rounded-r-lg">
+                    <div className="flex flex-1 items-center justify-center rounded-r-lg bg-green-500/15 text-[10px] font-semibold text-green-500">
                       +{fmtDollar(rewardDollars)}
                     </div>
                   )}
@@ -334,46 +390,87 @@ export function TradeCard({
               {(isOpen || isClosed) && (data as OpenTradeData).mfe !== null && (
                 <StatRow
                   label="Best run"
-                  value={<span className="text-green-500">+{formatPips((data as OpenTradeData).mfe!)}p</span>}
+                  value={
+                    <span className="text-green-500">
+                      +{formatPips((data as OpenTradeData).mfe!)}p
+                    </span>
+                  }
                 />
               )}
               {(isOpen || isClosed) && (data as OpenTradeData).mae !== null && (
                 <StatRow
                   label="Worst dip"
-                  value={<span className="text-red-500">-{formatPips(Math.abs((data as OpenTradeData).mae!))}p</span>}
+                  value={
+                    <span className="text-red-500">
+                      -{formatPips(Math.abs((data as OpenTradeData).mae!))}p
+                    </span>
+                  }
                 />
               )}
 
               {(isOpen || isClosed) && (
-                <StatRow label="Fees" value={formatCurrency((data as OpenTradeData).financing, currency)} />
+                <StatRow
+                  label="Fees"
+                  value={formatCurrency((data as OpenTradeData).financing, currency)}
+                />
               )}
 
               <StatRow
                 label="Timeframe"
-                value={data.timeframe ? TIMEFRAME_OPTIONS.find((o) => o.value === data.timeframe)?.label ?? data.timeframe : "—"}
+                value={
+                  data.timeframe
+                    ? (TIMEFRAME_OPTIONS.find((o) => o.value === data.timeframe)?.label ??
+                      data.timeframe)
+                    : "—"
+                }
               />
 
               {isOpen && (
-                <StatRow label="Open for" value={
-                  <DurationDisplay openedAt={(data as OpenTradeData).openedAt} className="font-mono tabular-nums text-xs" />
-                } />
+                <StatRow
+                  label="Open for"
+                  value={
+                    <DurationDisplay
+                      openedAt={(data as OpenTradeData).openedAt}
+                      className="font-mono text-xs tabular-nums"
+                    />
+                  }
+                />
               )}
               {isClosed && (
-                <StatRow label="Duration" value={
-                  <DurationDisplay openedAt={(data as ClosedTradeData).openedAt} closedAt={(data as ClosedTradeData).closedAt} className="font-mono tabular-nums text-xs" />
-                } />
+                <StatRow
+                  label="Duration"
+                  value={
+                    <DurationDisplay
+                      openedAt={(data as ClosedTradeData).openedAt}
+                      closedAt={(data as ClosedTradeData).closedAt}
+                      className="font-mono text-xs tabular-nums"
+                    />
+                  }
+                />
               )}
 
               {isPending && (
-                <StatRow label="Created" value={formatShortDateTime(new Date((data as PendingOrderData).createdAt))} />
+                <StatRow
+                  label="Created"
+                  value={formatShortDateTime(new Date((data as PendingOrderData).createdAt))}
+                />
               )}
               {isOpen && (
-                <StatRow label="Opened" value={formatShortDateTime(new Date((data as OpenTradeData).openedAt))} />
+                <StatRow
+                  label="Opened"
+                  value={formatShortDateTime(new Date((data as OpenTradeData).openedAt))}
+                />
               )}
               {isClosed && (
                 <>
-                  <StatRow label="Opened" value={formatShortDateTime(new Date((data as ClosedTradeData).openedAt))} />
-                  <StatRow label="Closed" value={formatShortDateTime(new Date((data as ClosedTradeData).closedAt))} />
+                  <StatRow
+                    label="Opened"
+                    value={formatShortDateTime(new Date((data as ClosedTradeData).openedAt))}
+                  />
+                  <StatRow
+                    label="Closed"
+                    value={formatShortDateTime(new Date((data as ClosedTradeData).closedAt))}
+                  />
                 </>
               )}
             </div>
@@ -388,24 +485,29 @@ export function TradeCard({
             {/* AI Analysis inline */}
             {onAiAnalysis && (
               <div
-                className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 flex items-center justify-between cursor-pointer hover:bg-purple-500/10 transition-colors"
-                onClick={(e) => { e.stopPropagation(); onAiAnalysis() }}
+                className="flex cursor-pointer items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 transition-colors hover:bg-purple-500/10"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAiAnalysis()
+                }}
               >
                 <div className="flex items-center gap-2">
                   <Sparkles className="size-4 text-purple-500" />
                   <div>
                     <span className="text-xs font-medium">AI Analysis</span>
                     {latestAnalysis && (
-                      <span className="text-[10px] text-muted-foreground ml-2">
+                      <span className="text-muted-foreground ml-2 text-[10px]">
                         {analysisCount ?? 1} analysis{(analysisCount ?? 1) !== 1 ? "es" : ""}
                       </span>
                     )}
                     {activeAiProgress && (
-                      <span className="text-[10px] text-amber-500 ml-2 animate-pulse">Running...</span>
+                      <span className="ml-2 animate-pulse text-[10px] text-amber-500">
+                        Running...
+                      </span>
                     )}
                   </div>
                 </div>
-                <ChevronDown className="size-3.5 text-muted-foreground -rotate-90" />
+                <ChevronDown className="text-muted-foreground size-3.5 -rotate-90" />
               </div>
             )}
 
@@ -415,8 +517,11 @@ export function TradeCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1.5 flex-1"
-                  onClick={(e) => { e.stopPropagation(); onViewDetails() }}
+                  className="h-8 flex-1 gap-1.5 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onViewDetails()
+                  }}
                 >
                   <Eye className="size-3.5" />
                   Full Details
@@ -426,8 +531,11 @@ export function TradeCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1.5 text-destructive hover:text-destructive border-destructive/30"
-                  onClick={(e) => { e.stopPropagation(); onCancelOrder() }}
+                  className="text-destructive hover:text-destructive border-destructive/30 h-8 gap-1.5 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCancelOrder()
+                  }}
                 >
                   <XCircle className="size-3.5" />
                   Cancel
@@ -437,8 +545,11 @@ export function TradeCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1.5 text-destructive hover:text-destructive border-destructive/30"
-                  onClick={(e) => { e.stopPropagation(); onCloseTrade() }}
+                  className="text-destructive hover:text-destructive border-destructive/30 h-8 gap-1.5 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCloseTrade()
+                  }}
                 >
                   <XCircle className="size-3.5" />
                   Close Trade
@@ -451,4 +562,3 @@ export function TradeCard({
     </div>
   )
 }
-

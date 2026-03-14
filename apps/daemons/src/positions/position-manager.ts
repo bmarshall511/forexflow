@@ -168,8 +168,6 @@ function computePLPips(
   currentPrice: number,
   pipSize: number,
 ): number {
-  const distance = direction === "long"
-    ? currentPrice - entryPrice
-    : entryPrice - currentPrice
+  const distance = direction === "long" ? currentPrice - entryPrice : entryPrice - currentPrice
   return distance / pipSize
 }

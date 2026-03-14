@@ -20,14 +20,12 @@ export function RecentActivitySection({
 }: RecentActivitySectionProps) {
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
         Recent Activity
       </h3>
 
       {trades.length === 0 ? (
-        <p className="py-3 text-center text-xs text-muted-foreground">
-          No trades closed today
-        </p>
+        <p className="text-muted-foreground py-3 text-center text-xs">No trades closed today</p>
       ) : (
         <div className="space-y-0.5">
           {trades.map((trade) => {
@@ -40,9 +38,7 @@ export function RecentActivitySection({
                 direction={trade.direction}
                 value={formatCurrency(trade.realizedPL, currency)}
                 valueClassName={cn(
-                  trade.realizedPL >= 0
-                    ? "text-status-connected"
-                    : "text-status-disconnected",
+                  trade.realizedPL >= 0 ? "text-status-connected" : "text-status-disconnected",
                 )}
                 detail={formatRelativeTime(trade.closedAt)}
                 detailClassName="text-muted-foreground"
@@ -60,7 +56,7 @@ export function RecentActivitySection({
 
           <Link
             href="/positions?tab=history"
-            className="mt-1 block text-center text-[10px] font-medium text-primary hover:underline"
+            className="text-primary mt-1 block text-center text-[10px] font-medium hover:underline"
             aria-label="View all trade history"
           >
             View full history

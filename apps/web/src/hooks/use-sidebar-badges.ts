@@ -22,16 +22,27 @@ export function useSidebarBadges(): Record<string, NavBadge[]> {
   const { summary } = usePositions()
   const activeAnalyses = useActiveAiAnalyses()
 
-  return useMemo(() => ({
-    positions: [
-      { count: summary.openCount, label: "open", color: "text-blue-500", icon: TrendingUp },
-      { count: summary.pendingCount, label: "pending", color: "text-amber-500", icon: Clock },
-    ],
-    tvAlerts: [
-      { count: tvAlertsStatus?.signalCountToday ?? 0, label: "signals today", color: "text-emerald-500" },
-    ],
-    aiAnalysis: [
-      { count: Object.keys(activeAnalyses).length, label: "in progress", color: "text-purple-500" },
-    ],
-  }), [summary.openCount, summary.pendingCount, tvAlertsStatus?.signalCountToday, activeAnalyses])
+  return useMemo(
+    () => ({
+      positions: [
+        { count: summary.openCount, label: "open", color: "text-blue-500", icon: TrendingUp },
+        { count: summary.pendingCount, label: "pending", color: "text-amber-500", icon: Clock },
+      ],
+      tvAlerts: [
+        {
+          count: tvAlertsStatus?.signalCountToday ?? 0,
+          label: "signals today",
+          color: "text-emerald-500",
+        },
+      ],
+      aiAnalysis: [
+        {
+          count: Object.keys(activeAnalyses).length,
+          label: "in progress",
+          color: "text-purple-500",
+        },
+      ],
+    }),
+    [summary.openCount, summary.pendingCount, tvAlertsStatus?.signalCountToday, activeAnalyses],
+  )
 }

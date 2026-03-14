@@ -25,25 +25,29 @@ export function RiskRewardDisplay({
 
   if (result.unprotected) {
     return (
-      <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-status-warning border-status-warning/30">
+      <Badge
+        variant="outline"
+        className="text-status-warning border-status-warning/30 px-1.5 py-0 text-[10px]"
+      >
         Unprotected
       </Badge>
     )
   }
 
   if (!result.ratio) {
-    return <span className="text-xs text-muted-foreground">N/A</span>
+    return <span className="text-muted-foreground text-xs">N/A</span>
   }
 
   if (compact) {
-    return <span className="text-xs font-mono tabular-nums">{result.ratio}</span>
+    return <span className="font-mono text-xs tabular-nums">{result.ratio}</span>
   }
 
   return (
     <div className="flex flex-col items-end gap-0.5">
-      <span className="text-xs font-mono tabular-nums font-medium">{result.ratio}</span>
-      <span className="text-[10px] text-muted-foreground">
-        {result.riskPips !== null ? formatPips(result.riskPips) : "—"} / {result.rewardPips !== null ? formatPips(result.rewardPips) : "—"}
+      <span className="font-mono text-xs font-medium tabular-nums">{result.ratio}</span>
+      <span className="text-muted-foreground text-[10px]">
+        {result.riskPips !== null ? formatPips(result.riskPips) : "—"} /{" "}
+        {result.rewardPips !== null ? formatPips(result.rewardPips) : "—"}
       </span>
     </div>
   )

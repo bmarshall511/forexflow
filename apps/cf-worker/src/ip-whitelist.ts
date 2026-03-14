@@ -4,12 +4,7 @@
  * @see https://www.tradingview.com/support/solutions/43000529348-about-webhooks/
  * Last verified: 2026-03-03
  */
-const TRADINGVIEW_IPS = new Set([
-  "52.89.214.238",
-  "34.212.75.30",
-  "54.218.53.128",
-  "52.32.178.7",
-])
+const TRADINGVIEW_IPS = new Set(["52.89.214.238", "34.212.75.30", "54.218.53.128", "52.32.178.7"])
 
 /** Check if a request IP is in the TradingView whitelist. */
 export function isAllowedIP(ip: string | null): boolean {

@@ -3,14 +3,7 @@
 import type { PositionsSummary } from "@fxflow/types"
 import { formatPnL, type PnLColorIntent } from "@fxflow/shared"
 import { DataTile } from "@/components/ui/data-tile"
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  BarChart3,
-  Clock,
-  CheckCircle2,
-} from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, BarChart3, Clock, CheckCircle2 } from "lucide-react"
 
 interface PositionSummarySectionProps {
   summary: PositionsSummary
@@ -40,7 +33,7 @@ export function PositionSummarySection({
 
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
         Positions
       </h3>
       <div className="grid grid-cols-2 gap-2">
@@ -51,8 +44,18 @@ export function PositionSummarySection({
           icon={<ExposureIcon className="size-3.5" />}
           wide
         />
-        <DataTile label="Open" value={summary.openCount} variant="muted" icon={<BarChart3 className="size-3.5" />} />
-        <DataTile label="Pending" value={summary.pendingCount} variant="muted" icon={<Clock className="size-3.5" />} />
+        <DataTile
+          label="Open"
+          value={summary.openCount}
+          variant="muted"
+          icon={<BarChart3 className="size-3.5" />}
+        />
+        <DataTile
+          label="Pending"
+          value={summary.pendingCount}
+          variant="muted"
+          icon={<Clock className="size-3.5" />}
+        />
         <DataTile
           label="Closed Today"
           value={summary.closedTodayCount}

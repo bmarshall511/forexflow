@@ -1,7 +1,15 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect } from "react"
-import type { PendingOrderData, OpenTradeData, ClosedTradeData, PositionPriceTick, TradeDirection, TradeTagData, AiAnalysisData } from "@fxflow/types"
+import type {
+  PendingOrderData,
+  OpenTradeData,
+  ClosedTradeData,
+  PositionPriceTick,
+  TradeDirection,
+  TradeTagData,
+  AiAnalysisData,
+} from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
 import { Button } from "@/components/ui/button"
 import {
@@ -77,13 +85,26 @@ export function TradeCardList({
   onPageChange,
 }: TradeCardListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [sort, setSort] = useState<SortState>({ key: variant === "closed" ? "closedAt" : "unrealizedPL", direction: "desc" })
-  const [drawerTrade, setDrawerTrade] = useState<PendingOrderData | OpenTradeData | ClosedTradeData | null>(null)
+  const [sort, setSort] = useState<SortState>({
+    key: variant === "closed" ? "closedAt" : "unrealizedPL",
+    direction: "desc",
+  })
+  const [drawerTrade, setDrawerTrade] = useState<
+    PendingOrderData | OpenTradeData | ClosedTradeData | null
+  >(null)
   const [closeTrade, setCloseTrade] = useState<OpenTradeData | null>(null)
   const [cancelOrder, setCancelOrder] = useState<PendingOrderData | null>(null)
-  const [aiAnalysisTrade, setAiAnalysisTrade] = useState<PendingOrderData | OpenTradeData | null>(null)
+  const [aiAnalysisTrade, setAiAnalysisTrade] = useState<PendingOrderData | OpenTradeData | null>(
+    null,
+  )
   const [isClosingAll, setIsClosingAll] = useState(false)
-  const { closeTrade: doCloseTrade, closeAllTrades, cancelOrder: doCancelOrder, refreshPositions, isLoading: actionLoading } = useTradeActions()
+  const {
+    closeTrade: doCloseTrade,
+    closeAllTrades,
+    cancelOrder: doCancelOrder,
+    refreshPositions,
+    isLoading: actionLoading,
+  } = useTradeActions()
   const { positions, setPositions } = useDaemonStatus()
 
   // Deep-link: open AI sheet for a specific trade
@@ -105,8 +126,14 @@ export function TradeCardList({
       const key = sort.key
       let va: unknown, vb: unknown
       switch (key) {
-        case "instrument": va = a.instrument; vb = b.instrument; break
-        case "direction": va = a.direction; vb = b.direction; break
+        case "instrument":
+          va = a.instrument
+          vb = b.instrument
+          break
+        case "direction":
+          va = a.direction
+          vb = b.direction
+          break
         case "unrealizedPL":
           va = "unrealizedPL" in a ? a.unrealizedPL : "realizedPL" in a ? a.realizedPL : 0
           vb = "unrealizedPL" in b ? b.unrealizedPL : "realizedPL" in b ? b.realizedPL : 0
@@ -119,7 +146,9 @@ export function TradeCardList({
           va = "closedAt" in a ? a.closedAt : ""
           vb = "closedAt" in b ? b.closedAt : ""
           break
-        default: va = a.instrument; vb = b.instrument
+        default:
+          va = a.instrument
+          vb = b.instrument
       }
       return compareValues(va, vb, sort.direction)
     })
@@ -175,42 +204,45 @@ export function TradeCardList({
     }))
   }
 
-  const hasPagination = totalCount !== undefined && page !== undefined && pageSize !== undefined && onPageChange
+  const hasPagination =
+    totalCount !== undefined && page !== undefined && pageSize !== undefined && onPageChange
   const totalPages = hasPagination ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1
 
   if (isLoading) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground animate-pulse">
-        Loading…
-      </div>
+      <div className="text-muted-foreground animate-pulse py-12 text-center text-sm">Loading…</div>
     )
   }
 
   if (sorted.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
-        {variant === "pending" ? "No orders waiting to fill" : variant === "open" ? "No live trades right now" : "No past trades to show"}
+      <div className="text-muted-foreground py-12 text-center text-sm">
+        {variant === "pending"
+          ? "No orders waiting to fill"
+          : variant === "open"
+            ? "No live trades right now"
+            : "No past trades to show"}
       </div>
     )
   }
 
   const drawerTradeUnion: TradeUnion | null = liveDrawerTrade
-    ? { ...liveDrawerTrade, _type: variant } as TradeUnion
+    ? ({ ...liveDrawerTrade, _type: variant } as TradeUnion)
     : null
 
   return (
     <>
       {/* Sort controls + actions */}
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <div className="flex items-center gap-0.5 bg-muted/40 rounded-lg p-0.5">
-          <ArrowUpDown className="size-3 text-muted-foreground mx-1.5" />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="bg-muted/40 flex items-center gap-0.5 rounded-lg p-0.5">
+          <ArrowUpDown className="text-muted-foreground mx-1.5 size-3" />
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.key}
               type="button"
               onClick={() => handleSortToggle(opt.key)}
               className={cn(
-                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all",
+                "rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
                 sort.key === opt.key
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
@@ -230,7 +262,7 @@ export function TradeCardList({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive gap-1.5"
                 disabled={isClosingAll || actionLoading}
               >
                 <Trash2 className="size-3.5" />
@@ -241,7 +273,8 @@ export function TradeCardList({
               <AlertDialogHeader>
                 <AlertDialogTitle>Close all {sorted.length} open trades?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will close every open trade at the current market price. This action cannot be undone.
+                  This will close every open trade at the current market price. This action cannot
+                  be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -266,12 +299,20 @@ export function TradeCardList({
             variant={variant}
             data={trade}
             currency={currency}
-            currentPrice={variant === "pending" && pricesByInstrument ? (pricesByInstrument.get(trade.instrument)?.bid ?? null) : undefined}
+            currentPrice={
+              variant === "pending" && pricesByInstrument
+                ? (pricesByInstrument.get(trade.instrument)?.bid ?? null)
+                : undefined
+            }
             isExpanded={expandedId === trade.id}
             onToggleExpand={() => setExpandedId(expandedId === trade.id ? null : trade.id)}
             onViewDetails={() => setDrawerTrade(trade)}
-            onCloseTrade={variant === "open" ? () => setCloseTrade(trade as OpenTradeData) : undefined}
-            onCancelOrder={variant === "pending" ? () => setCancelOrder(trade as PendingOrderData) : undefined}
+            onCloseTrade={
+              variant === "open" ? () => setCloseTrade(trade as OpenTradeData) : undefined
+            }
+            onCancelOrder={
+              variant === "pending" ? () => setCancelOrder(trade as PendingOrderData) : undefined
+            }
             onAiAnalysis={() => setAiAnalysisTrade(trade as PendingOrderData | OpenTradeData)}
             tags={tagsByTradeId[trade.id]}
             latestAnalysis={latestAnalysisByTradeId?.[trade.id]}
@@ -284,7 +325,7 @@ export function TradeCardList({
       {/* Pagination */}
       {hasPagination && totalPages > 1 && (
         <div className="flex items-center justify-between pt-3">
-          <span className="text-xs text-muted-foreground">
+          <span className="text-muted-foreground text-xs">
             {totalCount} trade{totalCount !== 1 ? "s" : ""}
           </span>
           <div className="flex items-center gap-1">
@@ -298,7 +339,7 @@ export function TradeCardList({
             >
               <ChevronLeft className="size-3.5" />
             </Button>
-            <span className="text-xs text-muted-foreground px-2 tabular-nums">
+            <span className="text-muted-foreground px-2 text-xs tabular-nums">
               {page}/{totalPages}
             </span>
             <Button
@@ -323,7 +364,7 @@ export function TradeCardList({
         currency={currency}
         lastTick={
           liveDrawerTrade && pricesByInstrument
-            ? pricesByInstrument.get(liveDrawerTrade.instrument) ?? null
+            ? (pricesByInstrument.get(liveDrawerTrade.instrument) ?? null)
             : null
         }
         onCloseTrade={

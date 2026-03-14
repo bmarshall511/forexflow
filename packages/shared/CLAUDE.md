@@ -31,23 +31,28 @@ src/
 ## Key Utilities
 
 ### Market & Time
+
 - `market-hours.ts` — uses ET (Eastern Time) timezone for all market session logic.
 - `forex-trading-day.ts` — forex day rolls at 5pm ET, not midnight.
 
 ### Formatting
+
 - `format-currency.ts` — handles P&L display with sign, color hints, currency symbols.
 - `pip-utils.ts` — pip calculations vary by pair (JPY pairs = 0.01, others = 0.0001).
 
 ### Ticker Mapping
+
 - `mapTVTickerToOandaInstrument()` — converts TradingView ticker format to OANDA instrument name.
 - Used by CF Worker when processing incoming webhooks.
 
 ### Zone Detection
+
 - `zone-detector.ts` — `detectZones()` identifies supply/demand zones from candle data.
 - `zone-scorer.ts` — `scoreZone()` and `scoreZoneExtended()` rank zones by quality.
 - `zone-utils.ts` — ATR (Average True Range) calculation, candle body/wick classification.
 
 ### Trend Detection
+
 - `trend-detector.ts` — `detectTrend()` analyzes price action for trend direction/strength.
 
 ## Gotchas

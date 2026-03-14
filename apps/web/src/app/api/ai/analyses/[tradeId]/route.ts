@@ -28,7 +28,7 @@ export async function POST(
 ): Promise<NextResponse<ApiResponse<{ analysisId: string }>>> {
   try {
     const { tradeId } = await params
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       model?: AiClaudeModel
       depth?: AiAnalysisDepth
     }
@@ -63,16 +63,21 @@ export async function POST(
     })
 
     if (!daemonRes.ok) {
-      const err = await daemonRes.json().catch(() => ({ error: "Daemon error" })) as { error?: string }
+      const err = (await daemonRes.json().catch(() => ({ error: "Daemon error" }))) as {
+        error?: string
+      }
       return NextResponse.json(
         { ok: false, error: err.error ?? "Failed to start analysis" },
         { status: daemonRes.status },
       )
     }
 
-    const result = await daemonRes.json() as { ok: boolean; data?: { analysisId: string } }
+    const result = (await daemonRes.json()) as { ok: boolean; data?: { analysisId: string } }
     if (!result.ok || !result.data) {
-      return NextResponse.json({ ok: false, error: "Daemon did not return analysisId" }, { status: 500 })
+      return NextResponse.json(
+        { ok: false, error: "Daemon did not return analysisId" },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ ok: true, data: { analysisId: result.data.analysisId } })

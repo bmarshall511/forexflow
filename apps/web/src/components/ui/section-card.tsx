@@ -10,13 +10,13 @@ interface SectionCardProps {
 
 export function SectionCard({ icon: Icon, title, helper, children, className }: SectionCardProps) {
   return (
-    <div className={cn("rounded-lg border border-border/50 bg-card", className)}>
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
-        <Icon className="size-3.5 text-muted-foreground shrink-0" />
-        <span className="text-[11px] font-medium text-muted-foreground">{title}</span>
+    <div className={cn("border-border/50 bg-card rounded-lg border", className)}>
+      <div className="flex items-center gap-2 px-3 pb-1 pt-2.5">
+        <Icon className="text-muted-foreground size-3.5 shrink-0" />
+        <span className="text-muted-foreground text-[11px] font-medium">{title}</span>
       </div>
       {helper && (
-        <p className="text-[10px] text-muted-foreground/60 px-3 leading-tight">{helper}</p>
+        <p className="text-muted-foreground/60 px-3 text-[10px] leading-tight">{helper}</p>
       )}
       <div className="px-3 pb-3 pt-1.5">{children}</div>
     </div>
@@ -31,9 +31,11 @@ interface DetailRowProps {
 
 export function DetailRow({ label, value, className }: DetailRowProps) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-dashed border-border/50 last:border-b-0">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className={cn("text-xs font-mono tabular-nums text-foreground", className)}>{value}</span>
+    <div className="border-border/50 flex items-center justify-between border-b border-dashed py-1.5 last:border-b-0">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className={cn("text-foreground font-mono text-xs tabular-nums", className)}>
+        {value}
+      </span>
     </div>
   )
 }
@@ -47,9 +49,15 @@ interface MetricTileProps {
 
 export function MetricTile({ label, value, className, large }: MetricTileProps) {
   return (
-    <div className={cn("rounded-lg bg-background/60 p-2.5", large && "col-span-2")}>
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{label}</p>
-      <p className={cn("font-mono tabular-nums font-medium", large ? "text-base" : "text-sm", className)}>
+    <div className={cn("bg-background/60 rounded-lg p-2.5", large && "col-span-2")}>
+      <p className="text-muted-foreground mb-0.5 text-[10px] uppercase tracking-wide">{label}</p>
+      <p
+        className={cn(
+          "font-mono font-medium tabular-nums",
+          large ? "text-base" : "text-sm",
+          className,
+        )}
+      >
         {value}
       </p>
     </div>
@@ -65,8 +73,8 @@ interface SummaryRowProps {
 export function SummaryRow({ label, value, className }: SummaryRowProps) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className={cn("text-xs font-mono tabular-nums", className)}>{value}</span>
+      <span className="text-muted-foreground text-[10px]">{label}</span>
+      <span className={cn("font-mono text-xs tabular-nums", className)}>{value}</span>
     </div>
   )
 }

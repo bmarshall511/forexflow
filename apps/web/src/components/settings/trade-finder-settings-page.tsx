@@ -55,12 +55,14 @@ export function TradeFinderSettingsPage() {
   }, [])
 
   if (isLoading || !config) {
-    return <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>
+    return <div className="text-muted-foreground py-12 text-center text-sm">Loading...</div>
   }
 
   const pairs = config.pairs
   const enabledCount = pairs.filter((p) => p.enabled).length
-  const autoTradeEnabledPairCount = pairs.filter((p) => p.enabled && p.autoTradeEnabled !== false).length
+  const autoTradeEnabledPairCount = pairs.filter(
+    (p) => p.enabled && p.autoTradeEnabled !== false,
+  ).length
 
   const getPairConfig = (instrument: string): TradeFinderPairConfig | undefined =>
     pairs.find((p) => p.instrument === instrument)
@@ -70,15 +72,16 @@ export function TradeFinderSettingsPage() {
     let newPairs: TradeFinderPairConfig[]
 
     if (existing) {
-      newPairs = pairs.map((p) =>
-        p.instrument === instrument ? { ...p, enabled: !p.enabled } : p,
-      )
+      newPairs = pairs.map((p) => (p.instrument === instrument ? { ...p, enabled: !p.enabled } : p))
     } else {
       if (enabledCount >= config.maxEnabledPairs) {
         toast.error(`Maximum ${config.maxEnabledPairs} pairs allowed`)
         return
       }
-      newPairs = [...pairs, { instrument, enabled: true, timeframeSet: "daily" as TradeFinderTimeframeSet }]
+      newPairs = [
+        ...pairs,
+        { instrument, enabled: true, timeframeSet: "daily" as TradeFinderTimeframeSet },
+      ]
     }
 
     await handleUpdate({ pairs: newPairs })
@@ -92,9 +95,7 @@ export function TradeFinderSettingsPage() {
   }
 
   const changeTfSet = async (instrument: string, timeframeSet: TradeFinderTimeframeSet) => {
-    const newPairs = pairs.map((p) =>
-      p.instrument === instrument ? { ...p, timeframeSet } : p,
-    )
+    const newPairs = pairs.map((p) => (p.instrument === instrument ? { ...p, timeframeSet } : p))
     await handleUpdate({ pairs: newPairs })
   }
 
@@ -141,7 +142,8 @@ export function TradeFinderSettingsPage() {
         <CardHeader>
           <CardTitle>Trade Finder</CardTitle>
           <CardDescription>
-            Multi-timeframe scanner for high-probability trade setups using the 7 Odds Enhancers scoring system.
+            Multi-timeframe scanner for high-probability trade setups using the 7 Odds Enhancers
+            scoring system.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -151,7 +153,7 @@ export function TradeFinderSettingsPage() {
             <Button
               variant={config.enabled ? "default" : "outline"}
               size="sm"
-              className="h-8 text-xs min-w-[80px]"
+              className="h-8 min-w-[80px] text-xs"
               onClick={() => handleUpdate({ enabled: !config.enabled })}
               disabled={saving}
             >
@@ -163,7 +165,7 @@ export function TradeFinderSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <Label>Minimum Score</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 Only show setups scoring at or above this threshold (max 12)
               </p>
             </div>
@@ -174,7 +176,7 @@ export function TradeFinderSettingsPage() {
               step={0.5}
               defaultValue={config.minScore}
               onBlur={(e) => handleMinScoreChange(e.target.value)}
-              className="w-16 h-8 text-sm px-2 border rounded bg-background text-right font-mono"
+              className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
             />
           </div>
 
@@ -182,7 +184,7 @@ export function TradeFinderSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <Label>Max Enabled Pairs</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 Maximum number of pairs to scan simultaneously
               </p>
             </div>
@@ -198,7 +200,7 @@ export function TradeFinderSettingsPage() {
                   void handleUpdate({ maxEnabledPairs: num })
                 }
               }}
-              className="w-16 h-8 text-sm px-2 border rounded bg-background text-right font-mono"
+              className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
             />
           </div>
 
@@ -206,11 +208,11 @@ export function TradeFinderSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <Label>Risk % per Trade</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 Configured in global settings (shared with TV Alerts)
               </p>
             </div>
-            <span className="text-sm font-mono text-muted-foreground">{config.riskPercent}%</span>
+            <span className="text-muted-foreground font-mono text-sm">{config.riskPercent}%</span>
           </div>
         </CardContent>
       </Card>
@@ -223,7 +225,8 @@ export function TradeFinderSettingsPage() {
             <CardTitle>Auto-Trade</CardTitle>
           </div>
           <CardDescription>
-            Automatically place limit orders for setups that meet your score threshold. Orders are placed as LIMIT orders only.
+            Automatically place limit orders for setups that meet your score threshold. Orders are
+            placed as LIMIT orders only.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -231,7 +234,7 @@ export function TradeFinderSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <Label>Auto-Trade</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 {config.autoTradeEnabled
                   ? `Active on ${autoTradeEnabledPairCount} pair(s)`
                   : "Disabled — setups are shown but not automatically placed"}
@@ -241,8 +244,8 @@ export function TradeFinderSettingsPage() {
               variant={config.autoTradeEnabled ? "default" : "outline"}
               size="sm"
               className={cn(
-                "h-8 text-xs min-w-[80px]",
-                config.autoTradeEnabled && "bg-teal-600 hover:bg-teal-700 text-white",
+                "h-8 min-w-[80px] text-xs",
+                config.autoTradeEnabled && "bg-teal-600 text-white hover:bg-teal-700",
               )}
               onClick={() => handleUpdate({ autoTradeEnabled: !config.autoTradeEnabled })}
               disabled={saving}
@@ -254,10 +257,11 @@ export function TradeFinderSettingsPage() {
           {config.autoTradeEnabled && (
             <>
               {/* Warning */}
-              <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                 <span>
-                  Auto-trade places real orders with real money. Make sure you understand the risks. Orders are always placed as LIMIT orders — never market orders.
+                  Auto-trade places real orders with real money. Make sure you understand the risks.
+                  Orders are always placed as LIMIT orders — never market orders.
                 </span>
               </div>
 
@@ -265,7 +269,7 @@ export function TradeFinderSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Auto-Trade Minimum Score</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Only auto-trade setups scoring at or above this (max 12)
                   </p>
                 </div>
@@ -276,7 +280,7 @@ export function TradeFinderSettingsPage() {
                   step={0.5}
                   defaultValue={config.autoTradeMinScore}
                   onBlur={(e) => handleAutoTradeMinScoreChange(e.target.value)}
-                  className="w-16 h-8 text-sm px-2 border rounded bg-background text-right font-mono"
+                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
                 />
               </div>
 
@@ -284,7 +288,7 @@ export function TradeFinderSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Max Concurrent Auto-Orders</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Maximum pending auto-placed orders at once
                   </p>
                 </div>
@@ -295,7 +299,7 @@ export function TradeFinderSettingsPage() {
                   step={1}
                   defaultValue={config.autoTradeMaxConcurrent}
                   onBlur={(e) => handleAutoTradeMaxConcurrentChange(e.target.value)}
-                  className="w-16 h-8 text-sm px-2 border rounded bg-background text-right font-mono"
+                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
                 />
               </div>
 
@@ -303,7 +307,7 @@ export function TradeFinderSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Max Daily Auto-Trades</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Maximum auto-trades in a 24-hour window
                   </p>
                 </div>
@@ -314,7 +318,7 @@ export function TradeFinderSettingsPage() {
                   step={1}
                   defaultValue={config.autoTradeMaxDaily}
                   onBlur={(e) => handleAutoTradeMaxDailyChange(e.target.value)}
-                  className="w-16 h-8 text-sm px-2 border rounded bg-background text-right font-mono"
+                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
                 />
               </div>
 
@@ -322,7 +326,7 @@ export function TradeFinderSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Max Total Risk %</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Stop auto-trading if total risk across auto-orders exceeds this % of balance
                   </p>
                 </div>
@@ -333,7 +337,7 @@ export function TradeFinderSettingsPage() {
                   step={0.5}
                   defaultValue={config.autoTradeMaxRiskPercent}
                   onBlur={(e) => handleAutoTradeMaxRiskChange(e.target.value)}
-                  className="w-16 h-8 text-sm px-2 border rounded bg-background text-right font-mono"
+                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
                 />
               </div>
 
@@ -341,7 +345,7 @@ export function TradeFinderSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Minimum Risk:Reward</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Only auto-trade setups with at least this R:R ratio (e.g. 2 = 2:1)
                   </p>
                 </div>
@@ -352,7 +356,7 @@ export function TradeFinderSettingsPage() {
                   step={0.5}
                   defaultValue={config.autoTradeMinRR}
                   onBlur={(e) => handleAutoTradeMinRRChange(e.target.value)}
-                  className="w-16 h-8 text-sm px-2 border rounded bg-background text-right font-mono"
+                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
                 />
               </div>
 
@@ -360,15 +364,19 @@ export function TradeFinderSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Auto-Cancel on Zone Invalidation</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Cancel pending auto-placed orders when the zone is broken
                   </p>
                 </div>
                 <Button
                   variant={config.autoTradeCancelOnInvalidation ? "default" : "outline"}
                   size="sm"
-                  className="h-8 text-xs min-w-[80px]"
-                  onClick={() => handleUpdate({ autoTradeCancelOnInvalidation: !config.autoTradeCancelOnInvalidation })}
+                  className="h-8 min-w-[80px] text-xs"
+                  onClick={() =>
+                    handleUpdate({
+                      autoTradeCancelOnInvalidation: !config.autoTradeCancelOnInvalidation,
+                    })
+                  }
                   disabled={saving}
                 >
                   {config.autoTradeCancelOnInvalidation ? "Enabled" : "Disabled"}
@@ -376,7 +384,7 @@ export function TradeFinderSettingsPage() {
               </div>
 
               {/* Cancel all auto-placed */}
-              <div className="pt-2 border-t">
+              <div className="border-t pt-2">
                 <Button
                   variant="destructive"
                   size="sm"
@@ -386,7 +394,7 @@ export function TradeFinderSettingsPage() {
                 >
                   {cancellingAuto ? "Cancelling..." : "Cancel All Auto-Placed Orders"}
                 </Button>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-muted-foreground mt-1 text-[10px]">
                   Cancels all currently pending auto-placed limit orders on OANDA
                 </p>
               </div>
@@ -400,14 +408,16 @@ export function TradeFinderSettingsPage() {
         <CardHeader>
           <CardTitle>Pairs to Scan</CardTitle>
           <CardDescription>
-            Toggle pairs on/off and set the timeframe set for each. {enabledCount}/{config.maxEnabledPairs} enabled.
-            {config.autoTradeEnabled && ` ${autoTradeEnabledPairCount} pair(s) have auto-trade enabled.`}
+            Toggle pairs on/off and set the timeframe set for each. {enabledCount}/
+            {config.maxEnabledPairs} enabled.
+            {config.autoTradeEnabled &&
+              ` ${autoTradeEnabledPairCount} pair(s) have auto-trade enabled.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {FOREX_PAIR_GROUPS.map((group) => (
             <div key={group.label}>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+              <h3 className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wider">
                 {group.label}
               </h3>
               <div className="space-y-0.5">
@@ -422,7 +432,7 @@ export function TradeFinderSettingsPage() {
                     <div
                       key={fp.value}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                        "flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
                         isEnabled ? "bg-accent/50" : "hover:bg-muted/50",
                       )}
                     >
@@ -431,7 +441,7 @@ export function TradeFinderSettingsPage() {
                         onClick={() => togglePair(fp.value)}
                         disabled={atLimit && !isEnabled}
                         className={cn(
-                          "size-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
+                          "flex size-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
                           isEnabled
                             ? "bg-primary border-primary text-primary-foreground"
                             : atLimit
@@ -441,7 +451,13 @@ export function TradeFinderSettingsPage() {
                         aria-label={`Toggle ${fp.label}`}
                       >
                         {isEnabled && (
-                          <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            viewBox="0 0 12 12"
+                            className="size-3"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M2 6l3 3 5-5" />
                           </svg>
                         )}
@@ -450,7 +466,7 @@ export function TradeFinderSettingsPage() {
                       {/* Pair label */}
                       <span
                         className={cn(
-                          "text-sm font-mono flex-1",
+                          "flex-1 font-mono text-sm",
                           isEnabled ? "text-foreground" : "text-muted-foreground",
                         )}
                       >
@@ -462,10 +478,10 @@ export function TradeFinderSettingsPage() {
                         <button
                           onClick={() => togglePairAutoTrade(fp.value)}
                           className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors",
+                            "flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors",
                             pairAutoTrade
-                              ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20"
-                              : "text-muted-foreground border-transparent hover:border-border",
+                              ? "border-teal-500/20 bg-teal-500/10 text-teal-600 dark:text-teal-400"
+                              : "text-muted-foreground hover:border-border border-transparent",
                           )}
                           aria-label={`Toggle auto-trade for ${fp.label}`}
                         >
@@ -477,9 +493,11 @@ export function TradeFinderSettingsPage() {
                       {/* Timeframe set selector (only shown when added) */}
                       {isAdded && (
                         <select
-                          className="h-7 text-xs px-1.5 border rounded bg-background"
+                          className="bg-background h-7 rounded border px-1.5 text-xs"
                           value={pairConfig!.timeframeSet}
-                          onChange={(e) => changeTfSet(fp.value, e.target.value as TradeFinderTimeframeSet)}
+                          onChange={(e) =>
+                            changeTfSet(fp.value, e.target.value as TradeFinderTimeframeSet)
+                          }
                           aria-label={`Timeframe set for ${fp.label}`}
                         >
                           {TF_SET_OPTIONS.map((opt) => (

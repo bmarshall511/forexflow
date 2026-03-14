@@ -23,7 +23,12 @@ export interface UseTradeActionsReturn {
   ) => Promise<boolean>
   modifyPendingOrder: (
     sourceOrderId: string,
-    opts: { stopLoss?: number | null; takeProfit?: number | null; entryPrice?: number; gtdTime?: string | null },
+    opts: {
+      stopLoss?: number | null
+      takeProfit?: number | null
+      entryPrice?: number
+      gtdTime?: string | null
+    },
   ) => Promise<boolean>
   placeOrder: (request: PlaceOrderRequest) => Promise<PlaceOrderResponseData | null>
   refreshPositions: () => Promise<void>
@@ -33,30 +38,27 @@ export interface UseTradeActionsReturn {
 export function useTradeActions(): UseTradeActionsReturn {
   const [isLoading, setIsLoading] = useState(false)
 
-  const callDaemon = useCallback(
-    async (path: string, body: unknown): Promise<boolean> => {
-      setIsLoading(true)
-      try {
-        const res = await fetch(`${DAEMON_URL}${path}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        })
-        const json = (await res.json()) as TradeActionResponse
-        if (!json.ok) {
-          toast.error(json.error ?? "Action failed")
-          return false
-        }
-        return true
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Network error")
+  const callDaemon = useCallback(async (path: string, body: unknown): Promise<boolean> => {
+    setIsLoading(true)
+    try {
+      const res = await fetch(`${DAEMON_URL}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = (await res.json()) as TradeActionResponse
+      if (!json.ok) {
+        toast.error(json.error ?? "Action failed")
         return false
-      } finally {
-        setIsLoading(false)
       }
-    },
-    [],
-  )
+      return true
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Network error")
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   const cancelOrder = useCallback(
     async (sourceOrderId: string, reason?: string): Promise<boolean> => {
@@ -83,7 +85,9 @@ export function useTradeActions(): UseTradeActionsReturn {
         }
         const result = json.data!
         if (result.failed === 0) {
-          toast.success(`${result.succeeded} ${result.succeeded === 1 ? "order" : "orders"} cancelled`)
+          toast.success(
+            `${result.succeeded} ${result.succeeded === 1 ? "order" : "orders"} cancelled`,
+          )
         } else {
           toast.warning(`${result.succeeded} cancelled, ${result.failed} failed`)
         }
@@ -138,14 +142,13 @@ export function useTradeActions(): UseTradeActionsReturn {
     [],
   )
 
-  const refreshPositions = useCallback(
-    async (): Promise<void> => {
-      try {
-        await fetch(`${DAEMON_URL}/actions/refresh-positions`, { method: "POST" })
-      } catch { /* best-effort */ }
-    },
-    [],
-  )
+  const refreshPositions = useCallback(async (): Promise<void> => {
+    try {
+      await fetch(`${DAEMON_URL}/actions/refresh-positions`, { method: "POST" })
+    } catch {
+      /* best-effort */
+    }
+  }, [])
 
   const modifyTrade = useCallback(
     async (
@@ -169,7 +172,12 @@ export function useTradeActions(): UseTradeActionsReturn {
   const modifyPendingOrder = useCallback(
     async (
       sourceOrderId: string,
-      opts: { stopLoss?: number | null; takeProfit?: number | null; entryPrice?: number; gtdTime?: string | null },
+      opts: {
+        stopLoss?: number | null
+        takeProfit?: number | null
+        entryPrice?: number
+        gtdTime?: string | null
+      },
     ): Promise<boolean> => {
       const ok = await callDaemon("/actions/modify-pending-order", {
         sourceOrderId,
@@ -219,5 +227,15 @@ export function useTradeActions(): UseTradeActionsReturn {
     [],
   )
 
-  return { cancelOrder, cancelAllOrders, closeTrade, closeAllTrades, modifyTrade, modifyPendingOrder, placeOrder, refreshPositions, isLoading }
+  return {
+    cancelOrder,
+    cancelAllOrders,
+    closeTrade,
+    closeAllTrades,
+    modifyTrade,
+    modifyPendingOrder,
+    placeOrder,
+    refreshPositions,
+    isLoading,
+  }
 }

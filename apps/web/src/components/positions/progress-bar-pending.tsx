@@ -17,7 +17,7 @@ export function PendingProgressBar({
   className,
 }: PendingProgressBarProps) {
   if (!currentPrice) {
-    return <div className={cn("h-2 rounded-full bg-muted", className)} />
+    return <div className={cn("bg-muted h-2 rounded-full", className)} />
   }
 
   const info = calculateDistanceInfo(instrument, currentPrice, entryPrice)
@@ -29,7 +29,7 @@ export function PendingProgressBar({
   return (
     <div className={cn("flex flex-col gap-1", className)}>
       <div
-        className="h-2 rounded-full bg-muted overflow-hidden"
+        className="bg-muted h-2 overflow-hidden rounded-full"
         role="progressbar"
         aria-valuenow={Math.round(fillPercent)}
         aria-valuemin={0}
@@ -44,7 +44,7 @@ export function PendingProgressBar({
           style={{ width: `${fillPercent}%` }}
         />
       </div>
-      <span className="text-[10px] text-muted-foreground tabular-nums">
+      <span className="text-muted-foreground text-[10px] tabular-nums">
         {formatPips(info.pips)} ({info.percentage.toFixed(2)}%)
       </span>
     </div>

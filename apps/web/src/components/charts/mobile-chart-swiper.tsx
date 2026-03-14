@@ -24,7 +24,16 @@ interface MobileChartSwiperProps {
   orderOverlayPanelIndex?: number
 }
 
-export function MobileChartSwiper({ panels, onPanelChange, chartPrices, tradeCharts, onClearTrade, onOrderEntry, orderOverlay, orderOverlayPanelIndex }: MobileChartSwiperProps) {
+export function MobileChartSwiper({
+  panels,
+  onPanelChange,
+  chartPrices,
+  tradeCharts,
+  onClearTrade,
+  onOrderEntry,
+  orderOverlay,
+  orderOverlayPanelIndex,
+}: MobileChartSwiperProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -55,7 +64,7 @@ export function MobileChartSwiper({ panels, onPanelChange, chartPrices, tradeCha
     const tickInstrument = tradeCharts[0] ? tradeCharts[0].trade.instrument : config.instrument
     const tick = chartPrices.get(tickInstrument) ?? null
     return (
-      <div className="flex-1 min-h-0">
+      <div className="min-h-0 flex-1">
         <ChartPanel
           config={config}
           onConfigChange={(partial) => onPanelChange(0, partial)}
@@ -73,10 +82,10 @@ export function MobileChartSwiper({ panels, onPanelChange, chartPrices, tradeCha
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div
         ref={scrollRef}
-        className="flex flex-1 min-h-0 overflow-x-auto snap-x snap-mandatory scrollbar-none"
+        className="scrollbar-none flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto"
         onScroll={handleScroll}
       >
         {panels.map((config, index) => {
@@ -85,7 +94,7 @@ export function MobileChartSwiper({ panels, onPanelChange, chartPrices, tradeCha
           const tick = chartPrices.get(tickInstrument) ?? null
           const isActive = index === activeIndex
           return (
-            <div key={index} className="w-full shrink-0 snap-start min-h-0">
+            <div key={index} className="min-h-0 w-full shrink-0 snap-start">
               <ChartPanel
                 config={config}
                 onConfigChange={(partial) => onPanelChange(index, partial)}
@@ -104,14 +113,14 @@ export function MobileChartSwiper({ panels, onPanelChange, chartPrices, tradeCha
         })}
       </div>
 
-      <div className="flex items-center justify-center gap-1 py-1.5 border-t bg-background shrink-0">
+      <div className="bg-background flex shrink-0 items-center justify-center gap-1 border-t py-1.5">
         {panels.map((config, index) => (
           <button
             key={index}
             type="button"
             onClick={() => scrollToIndex(index)}
             className={cn(
-              "px-2.5 py-1 text-[10px] font-medium rounded-full transition-colors",
+              "rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors",
               index === activeIndex
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted",

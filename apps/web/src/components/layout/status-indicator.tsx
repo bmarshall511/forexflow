@@ -35,7 +35,7 @@ export function StatusIndicator({ label, status, className }: StatusIndicatorPro
         className={cn("size-1.5 shrink-0 rounded-full", dotStyles[status])}
         aria-hidden="true"
       />
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground text-[11px]">{label}</span>
     </div>
   )
 }

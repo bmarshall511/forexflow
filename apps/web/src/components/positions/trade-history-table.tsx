@@ -5,7 +5,12 @@ import type { ClosedTradeData, AiAnalysisData } from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
 import { formatCurrency, formatPips } from "@fxflow/shared"
 import {
-  Table, TableHeader, TableHead, TableBody, TableRow, TableCell,
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
 } from "@/components/ui/table"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { DirectionBadge } from "./direction-badge"
@@ -63,7 +68,6 @@ export function TradeHistoryTable({
   const [drawerTrade, setDrawerTrade] = useState<ClosedTradeData | null>(null)
   const [aiAnalysisTrade, setAiAnalysisTrade] = useState<ClosedTradeData | null>(null)
 
-
   const handleSort = (key: string) => setSort(nextSort(sort, key))
 
   const sorted = useMemo(() => {
@@ -71,38 +75,83 @@ export function TradeHistoryTable({
       const key = sort.key
       let va: unknown, vb: unknown
       switch (key) {
-        case "instrument": va = a.instrument; vb = b.instrument; break
-        case "direction": va = a.direction; vb = b.direction; break
-        case "source": va = a.source; vb = b.source; break
-        case "timeframe": va = a.timeframe; vb = b.timeframe; break
-        case "entryPrice": va = a.entryPrice; vb = b.entryPrice; break
-        case "exitPrice": va = a.exitPrice; vb = b.exitPrice; break
-        case "stopLoss": va = a.stopLoss; vb = b.stopLoss; break
-        case "takeProfit": va = a.takeProfit; vb = b.takeProfit; break
-        case "units": va = a.units; vb = b.units; break
-        case "realizedPL": va = a.realizedPL; vb = b.realizedPL; break
-        case "outcome": va = a.outcome; vb = b.outcome; break
-        case "mfe": va = a.mfe; vb = b.mfe; break
-        case "mae": va = a.mae; vb = b.mae; break
+        case "instrument":
+          va = a.instrument
+          vb = b.instrument
+          break
+        case "direction":
+          va = a.direction
+          vb = b.direction
+          break
+        case "source":
+          va = a.source
+          vb = b.source
+          break
+        case "timeframe":
+          va = a.timeframe
+          vb = b.timeframe
+          break
+        case "entryPrice":
+          va = a.entryPrice
+          vb = b.entryPrice
+          break
+        case "exitPrice":
+          va = a.exitPrice
+          vb = b.exitPrice
+          break
+        case "stopLoss":
+          va = a.stopLoss
+          vb = b.stopLoss
+          break
+        case "takeProfit":
+          va = a.takeProfit
+          vb = b.takeProfit
+          break
+        case "units":
+          va = a.units
+          vb = b.units
+          break
+        case "realizedPL":
+          va = a.realizedPL
+          vb = b.realizedPL
+          break
+        case "outcome":
+          va = a.outcome
+          vb = b.outcome
+          break
+        case "mfe":
+          va = a.mfe
+          vb = b.mfe
+          break
+        case "mae":
+          va = a.mae
+          vb = b.mae
+          break
         case "duration": {
           const da = new Date(a.closedAt).getTime() - new Date(a.openedAt).getTime()
           const db = new Date(b.closedAt).getTime() - new Date(b.openedAt).getTime()
-          va = da; vb = db; break
+          va = da
+          vb = db
+          break
         }
-        case "closedAt": va = a.closedAt; vb = b.closedAt; break
-        case "tags": va = a.tags.length; vb = b.tags.length; break
-        default: va = a.closedAt; vb = b.closedAt
+        case "closedAt":
+          va = a.closedAt
+          vb = b.closedAt
+          break
+        case "tags":
+          va = a.tags.length
+          vb = b.tags.length
+          break
+        default:
+          va = a.closedAt
+          vb = b.closedAt
       }
       return compareValues(va, vb, sort.direction)
     })
   }, [trades, sort])
 
   if (!isLoading && sorted.length === 0) {
-    return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
-        No trade history
-      </div>
-    )
+    return <div className="text-muted-foreground py-12 text-center text-sm">No trade history</div>
   }
 
   if (isMobile) {
@@ -118,7 +167,9 @@ export function TradeHistoryTable({
               onViewDetails={() => setDrawerTrade(trade)}
             />
           ))}
-          {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} />}
+          {totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} />
+          )}
         </div>
         <TradeDetailDrawer
           trade={drawerTrade ? { ...drawerTrade, _type: "closed" } : null}
@@ -137,22 +188,121 @@ export function TradeHistoryTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableHead label="Pair" sortKey="instrument" currentSort={sort} onSort={handleSort} />
-              <SortableHead label="Dir" sortKey="direction" currentSort={sort} onSort={handleSort} title="Direction (Long or Short)" />
-              <SortableHead label="Source" sortKey="source" currentSort={sort} onSort={handleSort} />
-              <SortableHead label="TF" sortKey="timeframe" currentSort={sort} onSort={handleSort} title="Timeframe" />
-              <SortableHead label="Entry" sortKey="entryPrice" currentSort={sort} onSort={handleSort} className="text-right" title="Entry Price" />
-              <SortableHead label="Exit" sortKey="exitPrice" currentSort={sort} onSort={handleSort} className="text-right" title="Exit Price" />
-              <SortableHead label="SL" sortKey="stopLoss" currentSort={sort} onSort={handleSort} className="text-right" title="Stop Loss" />
-              <SortableHead label="TP" sortKey="takeProfit" currentSort={sort} onSort={handleSort} className="text-right" title="Take Profit" />
-              <SortableHead label="Units" sortKey="units" currentSort={sort} onSort={handleSort} className="text-right" />
-              <SortableHead label="P/L" sortKey="realizedPL" currentSort={sort} onSort={handleSort} className="text-right" title="Realized Profit / Loss" />
-              <SortableHead label="R:R" sortKey="rr" currentSort={sort} onSort={handleSort} className="text-right" title="Risk / Reward Ratio" />
-              <SortableHead label="Outcome" sortKey="outcome" currentSort={sort} onSort={handleSort} />
-              <SortableHead label="MFE" sortKey="mfe" currentSort={sort} onSort={handleSort} className="text-right" title="Best Pip Run (Maximum Favorable Excursion)" />
-              <SortableHead label="MAE" sortKey="mae" currentSort={sort} onSort={handleSort} className="text-right" title="Worst Drawdown (Maximum Adverse Excursion)" />
-              <SortableHead label="Duration" sortKey="duration" currentSort={sort} onSort={handleSort} />
-              <SortableHead label="Closed" sortKey="closedAt" currentSort={sort} onSort={handleSort} />
+              <SortableHead
+                label="Pair"
+                sortKey="instrument"
+                currentSort={sort}
+                onSort={handleSort}
+              />
+              <SortableHead
+                label="Dir"
+                sortKey="direction"
+                currentSort={sort}
+                onSort={handleSort}
+                title="Direction (Long or Short)"
+              />
+              <SortableHead
+                label="Source"
+                sortKey="source"
+                currentSort={sort}
+                onSort={handleSort}
+              />
+              <SortableHead
+                label="TF"
+                sortKey="timeframe"
+                currentSort={sort}
+                onSort={handleSort}
+                title="Timeframe"
+              />
+              <SortableHead
+                label="Entry"
+                sortKey="entryPrice"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Entry Price"
+              />
+              <SortableHead
+                label="Exit"
+                sortKey="exitPrice"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Exit Price"
+              />
+              <SortableHead
+                label="SL"
+                sortKey="stopLoss"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Stop Loss"
+              />
+              <SortableHead
+                label="TP"
+                sortKey="takeProfit"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Take Profit"
+              />
+              <SortableHead
+                label="Units"
+                sortKey="units"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+              />
+              <SortableHead
+                label="P/L"
+                sortKey="realizedPL"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Realized Profit / Loss"
+              />
+              <SortableHead
+                label="R:R"
+                sortKey="rr"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Risk / Reward Ratio"
+              />
+              <SortableHead
+                label="Outcome"
+                sortKey="outcome"
+                currentSort={sort}
+                onSort={handleSort}
+              />
+              <SortableHead
+                label="MFE"
+                sortKey="mfe"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Best Pip Run (Maximum Favorable Excursion)"
+              />
+              <SortableHead
+                label="MAE"
+                sortKey="mae"
+                currentSort={sort}
+                onSort={handleSort}
+                className="text-right"
+                title="Worst Drawdown (Maximum Adverse Excursion)"
+              />
+              <SortableHead
+                label="Duration"
+                sortKey="duration"
+                currentSort={sort}
+                onSort={handleSort}
+              />
+              <SortableHead
+                label="Closed"
+                sortKey="closedAt"
+                currentSort={sort}
+                onSort={handleSort}
+              />
               <SortableHead label="Tags" sortKey="tags" currentSort={sort} onSort={handleSort} />
               <TableHead className="w-10">AI</TableHead>
               <TableHead className="w-10" />
@@ -160,20 +310,30 @@ export function TradeHistoryTable({
           </TableHeader>
           <TableBody>
             {sorted.map((trade) => {
-              const plColor = trade.realizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
+              const plColor =
+                trade.realizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
 
               return (
                 <TableRow
                   key={trade.id}
                   className="cursor-pointer select-none"
-                  onMouseDown={(e) => { if (e.button === 0) setDrawerTrade(trade) }}
+                  onMouseDown={(e) => {
+                    if (e.button === 0) setDrawerTrade(trade)
+                  }}
                 >
                   <TableCell className="text-xs font-medium">
                     {trade.instrument.replace("_", "/")}
                   </TableCell>
-                  <TableCell><DirectionBadge direction={trade.direction} /></TableCell>
-                  <TableCell><SourceBadge source={trade.source} /></TableCell>
-                  <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                  <TableCell>
+                    <DirectionBadge direction={trade.direction} />
+                  </TableCell>
+                  <TableCell>
+                    <SourceBadge source={trade.source} />
+                  </TableCell>
+                  <TableCell
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <TimeframeSelect
                       value={trade.timeframe}
                       onChange={async (tf) => {
@@ -185,16 +345,27 @@ export function TradeHistoryTable({
                       }}
                     />
                   </TableCell>
-                  <TableCell className="text-xs text-right font-mono tabular-nums">{trade.entryPrice}</TableCell>
-                  <TableCell className="text-xs text-right font-mono tabular-nums">{trade.exitPrice ?? "—"}</TableCell>
-                  <TableCell className="text-xs text-right font-mono tabular-nums text-muted-foreground">
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
+                    {trade.entryPrice}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
+                    {trade.exitPrice ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                     {trade.stopLoss ?? "—"}
                   </TableCell>
-                  <TableCell className="text-xs text-right font-mono tabular-nums text-muted-foreground">
+                  <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                     {trade.takeProfit ?? "—"}
                   </TableCell>
-                  <TableCell className="text-xs text-right font-mono tabular-nums">{trade.units}</TableCell>
-                  <TableCell className={cn("text-xs text-right font-mono tabular-nums font-semibold", plColor)}>
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
+                    {trade.units}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right font-mono text-xs font-semibold tabular-nums",
+                      plColor,
+                    )}
+                  >
                     {formatCurrency(trade.realizedPL, currency)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -210,15 +381,21 @@ export function TradeHistoryTable({
                   <TableCell>
                     <OutcomeBadge outcome={trade.outcome} closeReason={trade.closeReason} />
                   </TableCell>
-                  <TableCell className="text-xs text-right font-mono tabular-nums">
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
                     {trade.mfe !== null ? (
                       <span className="text-status-connected">{formatPips(trade.mfe)}</span>
-                    ) : "—"}
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
-                  <TableCell className="text-xs text-right font-mono tabular-nums">
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
                     {trade.mae !== null ? (
-                      <span className="text-status-disconnected">{formatPips(Math.abs(trade.mae))}</span>
-                    ) : "—"}
+                      <span className="text-status-disconnected">
+                        {formatPips(Math.abs(trade.mae))}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-xs">
                     <DurationDisplay
@@ -227,7 +404,7 @@ export function TradeHistoryTable({
                       className="font-mono tabular-nums"
                     />
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="text-muted-foreground text-xs">
                     {new Date(trade.closedAt).toLocaleString(undefined, {
                       month: "short",
                       day: "numeric",
@@ -238,7 +415,10 @@ export function TradeHistoryTable({
                   <TableCell>
                     <TagBadges tags={trade.tags} />
                   </TableCell>
-                  <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                  <TableCell
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <AiAnalysisCell
                       latestAnalysis={latestAnalysisByTradeId?.[trade.id]}
                       analysisCount={countByTradeId?.[trade.id]}
@@ -246,7 +426,10 @@ export function TradeHistoryTable({
                       onClick={() => setAiAnalysisTrade(trade)}
                     />
                   </TableCell>
-                  <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                  <TableCell
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="size-7 p-0">
@@ -271,7 +454,9 @@ export function TradeHistoryTable({
             })}
           </TableBody>
         </Table>
-        {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} />}
+        {totalPages > 1 && (
+          <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} />
+        )}
       </div>
 
       <TradeDetailDrawer
@@ -302,7 +487,7 @@ function Pagination({
 }) {
   return (
     <div className="flex items-center justify-between px-2">
-      <span className="text-xs text-muted-foreground">
+      <span className="text-muted-foreground text-xs">
         Page {page} of {totalPages}
       </span>
       <div className="flex gap-1">

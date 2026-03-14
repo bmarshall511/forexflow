@@ -4,7 +4,11 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { TradeConditionTriggerType, TradeConditionActionType, TradeConditionData } from "@fxflow/types"
+import type {
+  TradeConditionTriggerType,
+  TradeConditionActionType,
+  TradeConditionData,
+} from "@fxflow/types"
 import type { CreateConditionInput } from "@/hooks/use-trade-conditions"
 import { cn } from "@/lib/utils"
 import { AlertTriangle, Info } from "lucide-react"
@@ -22,7 +26,12 @@ const selectClass = cn(
   "focus:ring-1 focus:ring-ring",
 )
 
-const TRIGGER_OPTIONS: { value: TradeConditionTriggerType; label: string; forStatus: string[]; description?: string }[] = [
+const TRIGGER_OPTIONS: {
+  value: TradeConditionTriggerType
+  label: string
+  forStatus: string[]
+  description?: string
+}[] = [
   { value: "price_breaks_above", label: "Price breaks above", forStatus: ["open", "pending"] },
   { value: "price_breaks_below", label: "Price breaks below", forStatus: ["open", "pending"] },
   { value: "price_reaches", label: "Price reaches (±0.5 pip)", forStatus: ["open", "pending"] },
@@ -30,7 +39,12 @@ const TRIGGER_OPTIONS: { value: TradeConditionTriggerType; label: string; forSta
   { value: "pnl_currency", label: "P&L reaches $X", forStatus: ["open"] },
   { value: "time_reached", label: "Specific time/date", forStatus: ["open", "pending"] },
   { value: "duration_hours", label: "After X hours open", forStatus: ["open"] },
-  { value: "trailing_stop", label: "Trailing Stop", forStatus: ["open"], description: "Trail your stop loss behind price as it moves in your favor" },
+  {
+    value: "trailing_stop",
+    label: "Trailing Stop",
+    forStatus: ["open"],
+    description: "Trail your stop loss behind price as it moves in your favor",
+  },
 ]
 
 const ACTION_OPTIONS: { value: TradeConditionActionType; label: string; forStatus: string[] }[] = [
@@ -42,7 +56,12 @@ const ACTION_OPTIONS: { value: TradeConditionActionType; label: string; forStatu
   { value: "notify", label: "Send notification", forStatus: ["open", "pending"] },
 ]
 
-export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingConditions }: ConditionBuilderProps) {
+export function ConditionBuilder({
+  tradeStatus,
+  onSubmit,
+  onCancel,
+  existingConditions,
+}: ConditionBuilderProps) {
   const [triggerType, setTriggerType] = useState<TradeConditionTriggerType>("price_breaks_above")
   const [actionType, setActionType] = useState<TradeConditionActionType>("notify")
   const [label, setLabel] = useState("")
@@ -127,7 +146,11 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
       case "duration_hours":
         return !!hoursValue && !isNaN(parseFloat(hoursValue)) && parseFloat(hoursValue) > 0
       case "trailing_stop":
-        return !!trailDistancePips && !isNaN(parseFloat(trailDistancePips)) && parseFloat(trailDistancePips) > 0
+        return (
+          !!trailDistancePips &&
+          !isNaN(parseFloat(trailDistancePips)) &&
+          parseFloat(trailDistancePips) > 0
+        )
     }
   }
 
@@ -151,8 +174,10 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
   const selectedTriggerDesc = TRIGGER_OPTIONS.find((t) => t.value === triggerType)?.description
 
   return (
-    <div className="rounded-lg border p-4 space-y-4 bg-muted/30">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">New Condition</p>
+    <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
+      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+        New Condition
+      </p>
 
       {/* Label */}
       <div className="space-y-1">
@@ -174,19 +199,23 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
           className={selectClass}
         >
           {availableTriggers.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
           ))}
         </select>
 
         {selectedTriggerDesc && (
-          <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-            <Info className="size-3 shrink-0 mt-0.5" />
+          <div className="text-muted-foreground flex items-start gap-1.5 text-[10px]">
+            <Info className="mt-0.5 size-3 shrink-0" />
             <span>{selectedTriggerDesc}</span>
           </div>
         )}
 
         {/* Trigger value inputs */}
-        {(triggerType === "price_reaches" || triggerType === "price_breaks_above" || triggerType === "price_breaks_below") && (
+        {(triggerType === "price_reaches" ||
+          triggerType === "price_breaks_above" ||
+          triggerType === "price_breaks_below") && (
           <Input
             type="number"
             step="any"
@@ -203,7 +232,11 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
                 type="button"
                 variant="outline"
                 size="sm"
-                className={cn("h-7 flex-1 text-xs", pnlDirection === "profit" && "bg-emerald-500/15 text-emerald-600 border-emerald-500/40")}
+                className={cn(
+                  "h-7 flex-1 text-xs",
+                  pnlDirection === "profit" &&
+                    "border-emerald-500/40 bg-emerald-500/15 text-emerald-600",
+                )}
                 onClick={() => setPnlDirection("profit")}
               >
                 Profit
@@ -212,7 +245,10 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
                 type="button"
                 variant="outline"
                 size="sm"
-                className={cn("h-7 flex-1 text-xs", pnlDirection === "loss" && "bg-red-500/15 text-red-600 border-red-500/40")}
+                className={cn(
+                  "h-7 flex-1 text-xs",
+                  pnlDirection === "loss" && "border-red-500/40 bg-red-500/15 text-red-600",
+                )}
                 onClick={() => setPnlDirection("loss")}
               >
                 Loss
@@ -236,7 +272,11 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
                 type="button"
                 variant="outline"
                 size="sm"
-                className={cn("h-7 flex-1 text-xs", pnlDirection === "profit" && "bg-emerald-500/15 text-emerald-600 border-emerald-500/40")}
+                className={cn(
+                  "h-7 flex-1 text-xs",
+                  pnlDirection === "profit" &&
+                    "border-emerald-500/40 bg-emerald-500/15 text-emerald-600",
+                )}
                 onClick={() => setPnlDirection("profit")}
               >
                 Profit
@@ -245,7 +285,10 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
                 type="button"
                 variant="outline"
                 size="sm"
-                className={cn("h-7 flex-1 text-xs", pnlDirection === "loss" && "bg-red-500/15 text-red-600 border-red-500/40")}
+                className={cn(
+                  "h-7 flex-1 text-xs",
+                  pnlDirection === "loss" && "border-red-500/40 bg-red-500/15 text-red-600",
+                )}
                 onClick={() => setPnlDirection("loss")}
               >
                 Loss
@@ -261,7 +304,7 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
               onChange={(e) => setCurrencyValue(e.target.value)}
             />
             <div className="flex items-start gap-1.5 text-[10px] text-amber-600">
-              <AlertTriangle className="size-3 shrink-0 mt-0.5" />
+              <AlertTriangle className="mt-0.5 size-3 shrink-0" />
               <span>Currency P&amp;L is an approximation for non-USD denominated pairs.</span>
             </div>
           </>
@@ -298,7 +341,9 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
                 value={trailDistancePips}
                 onChange={(e) => setTrailDistancePips(e.target.value)}
               />
-              <p className="text-[10px] text-muted-foreground">How far behind the current price to place your stop loss</p>
+              <p className="text-muted-foreground text-[10px]">
+                How far behind the current price to place your stop loss
+              </p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Minimum Step (pips)</Label>
@@ -311,7 +356,9 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
                 value={trailStepPips}
                 onChange={(e) => setTrailStepPips(e.target.value)}
               />
-              <p className="text-[10px] text-muted-foreground">Minimum price movement before adjusting stop (defaults to distance)</p>
+              <p className="text-muted-foreground text-[10px]">
+                Minimum price movement before adjusting stop (defaults to distance)
+              </p>
             </div>
           </>
         )}
@@ -327,7 +374,9 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
             className={selectClass}
           >
             {availableActions.map((a) => (
-              <option key={a.value} value={a.value}>{a.label}</option>
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
             ))}
           </select>
 
@@ -357,8 +406,8 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
       )}
 
       {isTrailingStop && (
-        <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-          <Info className="size-3 shrink-0 mt-0.5" />
+        <div className="text-muted-foreground flex items-start gap-1.5 text-[10px]">
+          <Info className="mt-0.5 size-3 shrink-0" />
           <span>Action: Move Stop Loss (automatic for trailing stops)</span>
         </div>
       )}
@@ -379,17 +428,28 @@ export function ConditionBuilder({ tradeStatus, onSubmit, onCancel, existingCond
               </option>
             ))}
           </select>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-muted-foreground text-[10px]">
             This condition will wait until the selected condition triggers first.
           </p>
         </div>
       )}
 
-      <div className="flex gap-2 justify-end">
-        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onCancel} disabled={isSubmitting}>
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
           Cancel
         </Button>
-        <Button size="sm" className="h-7 text-xs" onClick={() => void handleSubmit()} disabled={!isValid() || isSubmitting}>
+        <Button
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => void handleSubmit()}
+          disabled={!isValid() || isSubmitting}
+        >
           {isSubmitting ? "Adding..." : "Add Condition"}
         </Button>
       </div>

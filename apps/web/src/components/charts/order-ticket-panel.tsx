@@ -2,8 +2,18 @@
 
 import { useState, useCallback, useRef, useMemo } from "react"
 import {
-  X, ArrowUp, ArrowDown, Loader2, Plus,
-  BarChart3, DollarSign, Shield, Ruler, FileText, Clock, Tag,
+  X,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
+  Plus,
+  BarChart3,
+  DollarSign,
+  Shield,
+  Ruler,
+  FileText,
+  Clock,
+  Tag,
 } from "lucide-react"
 import type { TradeDirection, PlaceOrderRequest, Timeframe, TradeTagData } from "@fxflow/types"
 import {
@@ -27,12 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { useTags } from "@/hooks/use-tags"
 import { LOT_UNITS } from "@/hooks/use-order-ticket"
@@ -74,13 +79,13 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-lg border border-border/50 bg-card">
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
-        <Icon className="size-3.5 text-muted-foreground shrink-0" />
-        <span className="text-[11px] font-medium text-muted-foreground">{title}</span>
+    <div className="border-border/50 bg-card rounded-lg border">
+      <div className="flex items-center gap-2 px-3 pb-1 pt-2.5">
+        <Icon className="text-muted-foreground size-3.5 shrink-0" />
+        <span className="text-muted-foreground text-[11px] font-medium">{title}</span>
       </div>
       {helper && (
-        <p className="text-[10px] text-muted-foreground/60 px-3 leading-tight">{helper}</p>
+        <p className="text-muted-foreground/60 px-3 text-[10px] leading-tight">{helper}</p>
       )}
       <div className="px-3 pb-3 pt-1.5">{children}</div>
     </div>
@@ -170,9 +175,9 @@ function OrderTicketContent({
   const directionBgMuted = isBuy ? "bg-blue-500/10" : "bg-red-500/10"
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
-      <div className={cn("flex items-center justify-between px-4 py-3 border-b", directionBgMuted)}>
+      <div className={cn("flex items-center justify-between border-b px-4 py-3", directionBgMuted)}>
         <div className="flex items-center gap-2">
           {isBuy ? (
             <ArrowUp className="size-4 text-blue-500" />
@@ -186,7 +191,7 @@ function OrderTicketContent({
         <button
           type="button"
           onClick={onClose}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          className="hover:bg-muted text-muted-foreground hover:text-foreground rounded p-1 transition-colors"
           aria-label="Close order ticket"
         >
           <X className="size-4" />
@@ -196,24 +201,25 @@ function OrderTicketContent({
       {/* Scrollable body */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-3 p-3">
-
           {/* Live price bar */}
           <div className="flex items-center justify-between rounded-lg border p-2.5">
-            <div className="flex flex-col items-center flex-1">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Bid</span>
-              <span className="text-sm font-mono tabular-nums font-medium text-red-500">
+            <div className="flex flex-1 flex-col items-center">
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Bid</span>
+              <span className="font-mono text-sm font-medium tabular-nums text-red-500">
                 {displayBid !== null ? displayBid.toFixed(decimals) : "—"}
               </span>
             </div>
             <div className="flex flex-col items-center px-3">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Spread</span>
-              <span className="text-xs font-mono tabular-nums text-muted-foreground">
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                Spread
+              </span>
+              <span className="text-muted-foreground font-mono text-xs tabular-nums">
                 {ticket.spreadPips !== null ? `${formatPips(ticket.spreadPips)} pips` : "—"}
               </span>
             </div>
-            <div className="flex flex-col items-center flex-1">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Ask</span>
-              <span className="text-sm font-mono tabular-nums font-medium text-blue-500">
+            <div className="flex flex-1 flex-col items-center">
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Ask</span>
+              <span className="font-mono text-sm font-medium tabular-nums text-blue-500">
                 {displayAsk !== null ? displayAsk.toFixed(decimals) : "—"}
               </span>
             </div>
@@ -230,8 +236,12 @@ function OrderTicketContent({
               onValueChange={(v) => ticket.setOrderType(v as PlaceableOrderType)}
             >
               <TabsList className="w-full">
-                <TabsTrigger value="LIMIT" className="flex-1">Limit</TabsTrigger>
-                <TabsTrigger value="MARKET" className="flex-1">Market</TabsTrigger>
+                <TabsTrigger value="LIMIT" className="flex-1">
+                  Limit
+                </TabsTrigger>
+                <TabsTrigger value="MARKET" className="flex-1">
+                  Market
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </SectionCard>
@@ -260,7 +270,9 @@ function OrderTicketContent({
                 aria-invalid={!!ticket.validationErrors.entryPrice}
               />
               {ticket.validationErrors.entryPrice && (
-                <p className="text-[10px] text-destructive mt-1">{ticket.validationErrors.entryPrice}</p>
+                <p className="text-destructive mt-1 text-[10px]">
+                  {ticket.validationErrors.entryPrice}
+                </p>
               )}
             </SectionCard>
           )}
@@ -280,7 +292,9 @@ function OrderTicketContent({
               </SelectTrigger>
               <SelectContent>
                 {TIMEFRAME_OPTIONS.map(({ value, label }) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -297,7 +311,9 @@ function OrderTicketContent({
               {ticket.slEnabled ? (
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground w-[70px] shrink-0">Stop Loss</span>
+                    <span className="text-muted-foreground w-[70px] shrink-0 text-[11px]">
+                      Stop Loss
+                    </span>
                     <Input
                       type="number"
                       step={step}
@@ -307,35 +323,37 @@ function OrderTicketContent({
                         if (!isNaN(val)) ticket.setStopLoss(val)
                       }}
                       className={cn(
-                        "h-8 font-mono tabular-nums flex-1",
+                        "h-8 flex-1 font-mono tabular-nums",
                         ticket.validationErrors.stopLoss && "border-destructive",
                       )}
                       aria-label="Stop loss price"
                       aria-invalid={!!ticket.validationErrors.stopLoss}
                     />
                     {ticket.slPips !== null && (
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap w-12 text-right">
+                      <span className="text-muted-foreground w-12 whitespace-nowrap text-right text-[10px]">
                         {formatPips(ticket.slPips)}p
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={() => ticket.setSlEnabled(false)}
-                      className="p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                      className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
                       aria-label="Remove stop loss"
                     >
                       <X className="size-3.5" />
                     </button>
                   </div>
                   {ticket.validationErrors.stopLoss && (
-                    <p className="text-[10px] text-destructive mt-1 ml-[78px]">{ticket.validationErrors.stopLoss}</p>
+                    <p className="text-destructive ml-[78px] mt-1 text-[10px]">
+                      {ticket.validationErrors.stopLoss}
+                    </p>
                   )}
                 </div>
               ) : (
                 <button
                   type="button"
                   onClick={() => ticket.setSlEnabled(true)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 py-1 text-xs transition-colors"
                   aria-label="Add stop loss"
                 >
                   <Plus className="size-3.5" />
@@ -347,7 +365,9 @@ function OrderTicketContent({
               {ticket.tpEnabled ? (
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground w-[70px] shrink-0">Take Profit</span>
+                    <span className="text-muted-foreground w-[70px] shrink-0 text-[11px]">
+                      Take Profit
+                    </span>
                     <Input
                       type="number"
                       step={step}
@@ -357,35 +377,37 @@ function OrderTicketContent({
                         if (!isNaN(val)) ticket.setTakeProfit(val)
                       }}
                       className={cn(
-                        "h-8 font-mono tabular-nums flex-1",
+                        "h-8 flex-1 font-mono tabular-nums",
                         ticket.validationErrors.takeProfit && "border-destructive",
                       )}
                       aria-label="Take profit price"
                       aria-invalid={!!ticket.validationErrors.takeProfit}
                     />
                     {ticket.tpPips !== null && (
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap w-12 text-right">
+                      <span className="text-muted-foreground w-12 whitespace-nowrap text-right text-[10px]">
                         {formatPips(ticket.tpPips)}p
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={() => ticket.setTpEnabled(false)}
-                      className="p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                      className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
                       aria-label="Remove take profit"
                     >
                       <X className="size-3.5" />
                     </button>
                   </div>
                   {ticket.validationErrors.takeProfit && (
-                    <p className="text-[10px] text-destructive mt-1 ml-[78px]">{ticket.validationErrors.takeProfit}</p>
+                    <p className="text-destructive ml-[78px] mt-1 text-[10px]">
+                      {ticket.validationErrors.takeProfit}
+                    </p>
                   )}
                 </div>
               ) : (
                 <button
                   type="button"
                   onClick={() => ticket.setTpEnabled(true)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 py-1 text-xs transition-colors"
                   aria-label="Add take profit"
                 >
                   <Plus className="size-3.5" />
@@ -395,9 +417,11 @@ function OrderTicketContent({
 
               {/* Risk:Reward (when both SL and TP are active) */}
               {ticket.riskReward?.ratio && (
-                <div className="flex items-center justify-between pt-1 border-t border-border/30">
-                  <span className="text-[10px] text-muted-foreground">Risk : Reward</span>
-                  <span className="text-xs font-mono tabular-nums font-medium">{ticket.riskReward.ratio}</span>
+                <div className="border-border/30 flex items-center justify-between border-t pt-1">
+                  <span className="text-muted-foreground text-[10px]">Risk : Reward</span>
+                  <span className="font-mono text-xs font-medium tabular-nums">
+                    {ticket.riskReward.ratio}
+                  </span>
                 </div>
               )}
             </div>
@@ -410,7 +434,7 @@ function OrderTicketContent({
             helper="How much to trade. 1,000 units = 0.01 lots (micro lot)."
           >
             <div>
-              <div className="flex items-center justify-end mb-1.5">
+              <div className="mb-1.5 flex items-center justify-end">
                 <div className="flex items-center rounded-md border text-[10px]">
                   {(["units", "lots", "risk"] as UnitsMode[]).map((mode) => (
                     <button
@@ -450,7 +474,7 @@ function OrderTicketContent({
                     aria-invalid={!!ticket.validationErrors.units}
                   />
                   {/* Presets */}
-                  <div className="flex flex-wrap gap-1 mt-1.5">
+                  <div className="mt-1.5 flex flex-wrap gap-1">
                     {ticket.unitsMode === "units"
                       ? UNIT_PRESETS.map((preset) => (
                           <button
@@ -458,10 +482,10 @@ function OrderTicketContent({
                             type="button"
                             onClick={() => ticket.setUnits(preset)}
                             className={cn(
-                              "px-2 py-0.5 text-[10px] rounded border transition-colors",
+                              "rounded border px-2 py-0.5 text-[10px] transition-colors",
                               ticket.units === preset
                                 ? "border-foreground/30 bg-muted text-foreground"
-                                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent",
                             )}
                           >
                             {preset >= 1000 ? `${preset / 1000}K` : preset}
@@ -473,10 +497,10 @@ function OrderTicketContent({
                             type="button"
                             onClick={() => ticket.setUnits(size)}
                             className={cn(
-                              "px-2 py-0.5 text-[10px] rounded border transition-colors capitalize",
+                              "rounded border px-2 py-0.5 text-[10px] capitalize transition-colors",
                               ticket.units === size
                                 ? "border-foreground/30 bg-muted text-foreground"
-                                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent",
                             )}
                           >
                             {name}
@@ -497,25 +521,26 @@ function OrderTicketContent({
                         const val = parseFloat(e.target.value)
                         if (!isNaN(val)) ticket.setRiskPercent(val)
                       }}
-                      className="font-mono tabular-nums w-20"
+                      className="w-20 font-mono tabular-nums"
                       aria-label="Risk percentage"
                     />
-                    <span className="text-xs text-muted-foreground">%</span>
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      = {formatCurrency(accountBalance * (ticket.riskPercent / 100), accountCurrency)}
+                    <span className="text-muted-foreground text-xs">%</span>
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      ={" "}
+                      {formatCurrency(accountBalance * (ticket.riskPercent / 100), accountCurrency)}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
+                  <div className="mt-1.5 flex flex-wrap gap-1">
                     {RISK_PRESETS.map((pct) => (
                       <button
                         key={pct}
                         type="button"
                         onClick={() => ticket.setRiskPercent(pct)}
                         className={cn(
-                          "px-2 py-0.5 text-[10px] rounded border transition-colors",
+                          "rounded border px-2 py-0.5 text-[10px] transition-colors",
                           ticket.riskPercent === pct
                             ? "border-foreground/30 bg-muted text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent",
                         )}
                       >
                         {pct}%
@@ -523,10 +548,15 @@ function OrderTicketContent({
                     ))}
                   </div>
                   {ticket.validationErrors.units && (
-                    <p className="text-[10px] text-destructive mt-1">{ticket.validationErrors.units}</p>
+                    <p className="text-destructive mt-1 text-[10px]">
+                      {ticket.validationErrors.units}
+                    </p>
                   )}
-                  <div className="text-[10px] text-muted-foreground mt-1">
-                    Calculated units: <span className="font-mono tabular-nums font-medium text-foreground">{ticket.units.toLocaleString()}</span>
+                  <div className="text-muted-foreground mt-1 text-[10px]">
+                    Calculated units:{" "}
+                    <span className="text-foreground font-mono font-medium tabular-nums">
+                      {ticket.units.toLocaleString()}
+                    </span>
                   </div>
                 </>
               )}
@@ -569,15 +599,19 @@ function OrderTicketContent({
           </SectionCard>
 
           {/* Order summary */}
-          <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
-            <SummaryRow label="Direction" value={isBuy ? "Long" : "Short"} className={directionColor} />
+          <div className="bg-muted/30 space-y-1.5 rounded-lg border p-3">
+            <SummaryRow
+              label="Direction"
+              value={isBuy ? "Long" : "Short"}
+              className={directionColor}
+            />
             <SummaryRow label="Units" value={ticket.units.toLocaleString()} />
             <SummaryRow
               label="Entry"
               value={
                 ticket.orderType === "MARKET"
                   ? `Market (${ticket.effectiveEntryPrice?.toFixed(decimals) ?? "—"})`
-                  : ticket.entryPrice?.toFixed(decimals) ?? "—"
+                  : (ticket.entryPrice?.toFixed(decimals) ?? "—")
               }
             />
             {ticket.slEnabled && ticket.slPips !== null && (
@@ -592,12 +626,13 @@ function OrderTicketContent({
             {ticket.timeframe && (
               <SummaryRow
                 label="Timeframe"
-                value={TIMEFRAME_OPTIONS.find((o) => o.value === ticket.timeframe)?.label ?? ticket.timeframe}
+                value={
+                  TIMEFRAME_OPTIONS.find((o) => o.value === ticket.timeframe)?.label ??
+                  ticket.timeframe
+                }
               />
             )}
-            {ticket.notes && (
-              <SummaryRow label="Notes" value="Attached" />
-            )}
+            {ticket.notes && <SummaryRow label="Notes" value="Attached" />}
             {ticket.selectedTagIds.length > 0 && (
               <SummaryRow label="Tags" value={`${ticket.selectedTagIds.length} selected`} />
             )}
@@ -606,16 +641,20 @@ function OrderTicketContent({
       </ScrollArea>
 
       {/* Execute button */}
-      <div className="p-3 border-t">
+      <div className="border-t p-3">
         <Button
           onClick={handleSubmit}
           disabled={!ticket.isValid || isSubmitting || ticket.effectiveEntryPrice === null}
-          className={cn("w-full h-11 text-sm font-semibold text-white", directionBg, `hover:${directionBg}/90`)}
+          className={cn(
+            "h-11 w-full text-sm font-semibold text-white",
+            directionBg,
+            `hover:${directionBg}/90`,
+          )}
           aria-label={`${buttonLabel} order for ${formatInstrument(instrument)}`}
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="size-4 animate-spin mr-2" />
+              <Loader2 className="mr-2 size-4 animate-spin" />
               Placing Order...
             </>
           ) : (
@@ -629,11 +668,19 @@ function OrderTicketContent({
 
 // ─── Summary Row ─────────────────────────────────────────────────────────────
 
-function SummaryRow({ label, value, className }: { label: string; value: string; className?: string }) {
+function SummaryRow({
+  label,
+  value,
+  className,
+}: {
+  label: string
+  value: string
+  className?: string
+}) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className={cn("text-xs font-mono tabular-nums", className)}>{value}</span>
+      <span className="text-muted-foreground text-[10px]">{label}</span>
+      <span className={cn("font-mono text-xs tabular-nums", className)}>{value}</span>
     </div>
   )
 }
@@ -645,7 +692,12 @@ export function OrderTicketPanel(props: OrderTicketPanelProps) {
 
   if (isMobile) {
     return (
-      <Sheet open onOpenChange={(open) => { if (!open) props.onClose() }}>
+      <Sheet
+        open
+        onOpenChange={(open) => {
+          if (!open) props.onClose()
+        }}
+      >
         <SheetContent side="bottom" className="h-[85vh] p-0" showCloseButton={false}>
           <SheetHeader className="sr-only">
             <SheetTitle>Order Ticket</SheetTitle>
@@ -657,7 +709,7 @@ export function OrderTicketPanel(props: OrderTicketPanelProps) {
   }
 
   return (
-    <div className="w-80 border-l bg-background flex flex-col shrink-0 h-full">
+    <div className="bg-background flex h-full w-80 shrink-0 flex-col border-l">
       <OrderTicketContent {...props} />
     </div>
   )

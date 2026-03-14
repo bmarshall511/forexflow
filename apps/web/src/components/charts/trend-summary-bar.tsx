@@ -22,34 +22,44 @@ export function TrendSummaryBar({
 
   const isTerminated = status === "terminated"
   const dirLabel = direction === "up" ? "Uptrend" : direction === "down" ? "Downtrend" : "Range"
-  const dirColor = direction === "up" ? "text-blue-500" : direction === "down" ? "text-orange-500" : "text-muted-foreground"
-  const dirBg = direction === "up" ? "bg-blue-500/10" : direction === "down" ? "bg-orange-500/10" : "bg-muted"
+  const dirColor =
+    direction === "up"
+      ? "text-blue-500"
+      : direction === "down"
+        ? "text-orange-500"
+        : "text-muted-foreground"
+  const dirBg =
+    direction === "up" ? "bg-blue-500/10" : direction === "down" ? "bg-orange-500/10" : "bg-muted"
   const arrow = direction === "up" ? "\u25B2" : direction === "down" ? "\u25BC" : "\u25C6"
 
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-2.5 py-1 text-[11px] bg-muted/50 rounded-md border",
+        "bg-muted/50 flex items-center gap-3 rounded-md border px-2.5 py-1 text-[11px]",
         className,
       )}
       role="status"
       aria-label="Trend summary"
     >
       {/* Trend direction badge */}
-      <span className={cn("flex items-center gap-1 font-semibold shrink-0 px-1.5 py-0.5 rounded", dirBg, dirColor)}>
+      <span
+        className={cn(
+          "flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-semibold",
+          dirBg,
+          dirColor,
+        )}
+      >
         <span>{arrow}</span>
         <span>{dirLabel}</span>
         <span className="text-muted-foreground font-normal">({timeframe})</span>
-        {isTerminated && (
-          <span className="text-red-500 font-bold ml-0.5">TERM</span>
-        )}
+        {isTerminated && <span className="ml-0.5 font-bold text-red-500">TERM</span>}
       </span>
 
       {/* Controlling swing level */}
       {controllingSwing && (
         <>
-          <div className="h-3 w-px bg-border shrink-0" />
-          <span className="flex items-center gap-1 shrink-0">
+          <div className="bg-border h-3 w-px shrink-0" />
+          <span className="flex shrink-0 items-center gap-1">
             <span className="text-muted-foreground">Ctrl:</span>
             <span className="font-medium tabular-nums">
               {controllingSwing.price.toFixed(controllingSwing.price < 10 ? 5 : 3)}
@@ -66,18 +76,20 @@ export function TrendSummaryBar({
       {/* HTF trend (if available) */}
       {higherTfTrendData && higherTfTrendData.direction && (
         <>
-          <div className="h-3 w-px bg-border shrink-0" />
-          <span className="flex items-center gap-1 shrink-0">
+          <div className="bg-border h-3 w-px shrink-0" />
+          <span className="flex shrink-0 items-center gap-1">
             <span className="text-muted-foreground">HTF:</span>
-            <span className={cn(
-              "font-medium",
-              higherTfTrendData.direction === "up" ? "text-blue-500" : "text-orange-500",
-            )}>
-              {higherTfTrendData.direction === "up" ? "\u25B2" : "\u25BC"}
-              {" "}
-              {higherTfTrendData.direction === "up" ? "Up" : "Down"}
-              {" "}
-              <span className="text-muted-foreground font-normal">({higherTfTrendData.timeframe})</span>
+            <span
+              className={cn(
+                "font-medium",
+                higherTfTrendData.direction === "up" ? "text-blue-500" : "text-orange-500",
+              )}
+            >
+              {higherTfTrendData.direction === "up" ? "\u25B2" : "\u25BC"}{" "}
+              {higherTfTrendData.direction === "up" ? "Up" : "Down"}{" "}
+              <span className="text-muted-foreground font-normal">
+                ({higherTfTrendData.timeframe})
+              </span>
             </span>
           </span>
         </>
@@ -87,7 +99,7 @@ export function TrendSummaryBar({
       {isComputing && (
         <>
           <div className="flex-1" />
-          <span className="text-muted-foreground animate-pulse shrink-0">Scanning...</span>
+          <span className="text-muted-foreground shrink-0 animate-pulse">Scanning...</span>
         </>
       )}
     </div>

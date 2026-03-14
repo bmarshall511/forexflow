@@ -15,7 +15,10 @@ interface ZoneSummaryBarProps {
   className?: string
 }
 
-const CURVE_POSITION_STYLES: Record<CurvePosition, { label: string; color: string; arrow: string } | null> = {
+const CURVE_POSITION_STYLES: Record<
+  CurvePosition,
+  { label: string; color: string; arrow: string } | null
+> = {
   high: { label: "High on Curve", color: "text-red-500", arrow: "\u2193" },
   middle: { label: "Mid on Curve", color: "text-muted-foreground", arrow: "\u2194" },
   low: { label: "Low on Curve", color: "text-emerald-500", arrow: "\u2191" },
@@ -47,7 +50,7 @@ export function ZoneSummaryBar({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-2.5 py-1 text-[11px] bg-muted/50 rounded-md border",
+        "bg-muted/50 flex items-center gap-3 rounded-md border px-2.5 py-1 text-[11px]",
         className,
       )}
       role="status"
@@ -64,9 +67,7 @@ export function ZoneSummaryBar({
       )}
 
       {/* Separator */}
-      {nearestDemand && nearestSupply && (
-        <div className="h-3 w-px bg-border shrink-0" />
-      )}
+      {nearestDemand && nearestSupply && <div className="bg-border h-3 w-px shrink-0" />}
 
       {/* Nearest Supply */}
       {nearestSupply && (
@@ -81,15 +82,35 @@ export function ZoneSummaryBar({
       {/* Curve alignment */}
       {curveAlignment !== "neutral" && (
         <>
-          <div className="h-3 w-px bg-border shrink-0" />
-          <span className={cn("flex items-center gap-1 shrink-0", alignment.color)}>
+          <div className="bg-border h-3 w-px shrink-0" />
+          <span className={cn("flex shrink-0 items-center gap-1", alignment.color)}>
             {curveAlignment === "aligned" ? (
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             ) : (
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             )}
             <span className="font-medium">{alignment.label}</span>
@@ -100,8 +121,13 @@ export function ZoneSummaryBar({
       {/* Curve position */}
       {curvePosition && curvePosition !== "none" && CURVE_POSITION_STYLES[curvePosition] && (
         <>
-          <div className="h-3 w-px bg-border shrink-0" />
-          <span className={cn("flex items-center gap-1 shrink-0", CURVE_POSITION_STYLES[curvePosition]!.color)}>
+          <div className="bg-border h-3 w-px shrink-0" />
+          <span
+            className={cn(
+              "flex shrink-0 items-center gap-1",
+              CURVE_POSITION_STYLES[curvePosition]!.color,
+            )}
+          >
             <span className="font-medium">{CURVE_POSITION_STYLES[curvePosition]!.arrow}</span>
             <span className="font-medium">{CURVE_POSITION_STYLES[curvePosition]!.label}</span>
           </span>
@@ -112,7 +138,7 @@ export function ZoneSummaryBar({
       {isComputing && (
         <>
           <div className="flex-1" />
-          <span className="text-muted-foreground animate-pulse shrink-0">Scanning...</span>
+          <span className="text-muted-foreground shrink-0 animate-pulse">Scanning...</span>
         </>
       )}
     </div>
@@ -136,7 +162,7 @@ function ZonePill({
   return (
     <button
       type="button"
-      className="flex items-center gap-1.5 min-w-0 rounded px-1 -mx-1 hover:bg-muted transition-colors cursor-pointer"
+      className="hover:bg-muted -mx-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded px-1 transition-colors"
       onClick={(e) => {
         e.stopPropagation()
         onClick?.(zone)
@@ -144,23 +170,23 @@ function ZonePill({
       aria-label={`${isDemand ? "Demand" : "Supply"} zone at ${zone.proximalLine.toFixed(zone.proximalLine < 10 ? 5 : 3)}`}
     >
       <span
-        className={cn(
-          "h-2 w-2 rounded-full shrink-0",
-          isDemand ? "bg-emerald-500" : "bg-red-500",
-        )}
+        className={cn("h-2 w-2 shrink-0 rounded-full", isDemand ? "bg-emerald-500" : "bg-red-500")}
       />
-      <span className="font-medium truncate">
+      <span className="truncate font-medium">
         {isDemand ? "DZ" : "SZ"}{" "}
-        <span className="tabular-nums">{zone.proximalLine.toFixed(zone.proximalLine < 10 ? 5 : 3)}</span>
+        <span className="tabular-nums">
+          {zone.proximalLine.toFixed(zone.proximalLine < 10 ? 5 : 3)}
+        </span>
       </span>
-      <span className="text-muted-foreground tabular-nums shrink-0">
-        {distance.toFixed(1)}p
-      </span>
+      <span className="text-muted-foreground shrink-0 tabular-nums">{distance.toFixed(1)}p</span>
       <span
         className={cn(
-          "tabular-nums font-medium shrink-0",
-          zone.scores.total >= 3.5 ? "text-emerald-500" :
-          zone.scores.total >= 2.0 ? "text-amber-500" : "text-red-500",
+          "shrink-0 font-medium tabular-nums",
+          zone.scores.total >= 3.5
+            ? "text-emerald-500"
+            : zone.scores.total >= 2.0
+              ? "text-amber-500"
+              : "text-red-500",
         )}
       >
         {zone.scores.total.toFixed(1)}

@@ -15,7 +15,9 @@ export async function GET(): Promise<NextResponse<ApiResponse<TradeFinderConfigD
   }
 }
 
-export async function PUT(request: NextRequest): Promise<NextResponse<ApiResponse<TradeFinderConfigData>>> {
+export async function PUT(
+  request: NextRequest,
+): Promise<NextResponse<ApiResponse<TradeFinderConfigData>>> {
   try {
     const body = await request.json()
     const config = await updateTradeFinderConfig(body)

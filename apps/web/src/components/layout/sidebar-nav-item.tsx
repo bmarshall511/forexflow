@@ -2,11 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSidebar } from "@/hooks/use-sidebar"
 import { cn } from "@/lib/utils"
 import type { NavItem } from "@/lib/constants"
@@ -33,7 +29,7 @@ export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
       className={cn(
         "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        "focus-visible:ring-sidebar-ring focus-visible:outline-none focus-visible:ring-2",
         isActive
           ? "bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-sidebar-foreground/70",
@@ -51,7 +47,7 @@ export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
         <Icon className="size-5" />
         {!isOpen && hasBadges && (
           <span
-            className="absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[16px] h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold tabular-nums px-1 ring-2 ring-sidebar"
+            className="bg-primary text-primary-foreground ring-sidebar absolute -right-2.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums ring-2"
             aria-hidden="true"
           >
             {totalCount}
@@ -64,7 +60,7 @@ export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
         <>
           <span className="flex-1 truncate">{item.label}</span>
           {hasBadges && (
-            <span className="ml-auto flex items-center gap-1.5 shrink-0">
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
               {visibleBadges.map((badge) => {
                 const BadgeIcon = badge.icon
                 return (
@@ -74,9 +70,7 @@ export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
                     title={`${badge.count} ${badge.label}`}
                   >
                     {BadgeIcon && <BadgeIcon className="size-3" />}
-                    <span className="text-[11px] font-semibold leading-none">
-                      {badge.count}
-                    </span>
+                    <span className="text-[11px] font-semibold leading-none">{badge.count}</span>
                   </span>
                 )
               })}
@@ -98,7 +92,10 @@ export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
               {visibleBadges.map((badge) => {
                 const BadgeIcon = badge.icon
                 return (
-                  <span key={badge.label} className={cn("flex items-center gap-1.5 text-xs", badge.color)}>
+                  <span
+                    key={badge.label}
+                    className={cn("flex items-center gap-1.5 text-xs", badge.color)}
+                  >
                     {BadgeIcon && <BadgeIcon className="size-3" />}
                     <span className="font-semibold tabular-nums">{badge.count}</span>
                     <span className="text-muted-foreground">{badge.label}</span>

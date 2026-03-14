@@ -55,7 +55,8 @@ export class AutoAnalyzer {
   async onPendingCreated(tradeId: string): Promise<void> {
     const settings = await this.getSettings()
     if (!settings?.enabled || !settings.onPendingCreate) {
-      if (settings && !settings.enabled) console.log(`[auto-analyzer] Skipping pending-create — auto-analysis disabled`)
+      if (settings && !settings.enabled)
+        console.log(`[auto-analyzer] Skipping pending-create — auto-analysis disabled`)
       return
     }
     this.enqueue({
@@ -72,7 +73,8 @@ export class AutoAnalyzer {
   async onOrderFilled(tradeId: string): Promise<void> {
     const settings = await this.getSettings()
     if (!settings?.enabled || !settings.onOrderFill) {
-      if (settings && !settings.enabled) console.log(`[auto-analyzer] Skipping order-fill — auto-analysis disabled`)
+      if (settings && !settings.enabled)
+        console.log(`[auto-analyzer] Skipping order-fill — auto-analysis disabled`)
       return
     }
     this.enqueue({
@@ -89,7 +91,8 @@ export class AutoAnalyzer {
   async onTradeClosed(tradeId: string): Promise<void> {
     const settings = await this.getSettings()
     if (!settings?.enabled || !settings.onTradeClose) {
-      if (settings && !settings.enabled) console.log(`[auto-analyzer] Skipping trade-close — auto-analysis disabled`)
+      if (settings && !settings.enabled)
+        console.log(`[auto-analyzer] Skipping trade-close — auto-analysis disabled`)
       return
     }
     this.enqueue({
@@ -128,12 +131,16 @@ export class AutoAnalyzer {
   private enqueue(item: QueueItem): void {
     // Prevent duplicate queuing for the same trade + trigger (except retries)
     if (item.retryCount === 0) {
-      const alreadyQueued = this.queue.some((q) => q.tradeId === item.tradeId && q.triggeredBy === item.triggeredBy)
+      const alreadyQueued = this.queue.some(
+        (q) => q.tradeId === item.tradeId && q.triggeredBy === item.triggeredBy,
+      )
       if (alreadyQueued) return
     }
 
     this.queue.push(item)
-    console.log(`[auto-analyzer] Queued ${item.triggeredBy} analysis for trade ${item.tradeId}${item.retryCount > 0 ? ` (retry ${item.retryCount}/${MAX_RETRIES})` : ""} (queue: ${this.queue.length})`)
+    console.log(
+      `[auto-analyzer] Queued ${item.triggeredBy} analysis for trade ${item.tradeId}${item.retryCount > 0 ? ` (retry ${item.retryCount}/${MAX_RETRIES})` : ""} (queue: ${this.queue.length})`,
+    )
     void this.processQueue()
   }
 
@@ -147,7 +154,10 @@ export class AutoAnalyzer {
         try {
           await this.runAnalysis(item)
         } catch (err) {
-          console.error(`[auto-analyzer] Unhandled error processing ${item.tradeId}:`, (err as Error).message)
+          console.error(
+            `[auto-analyzer] Unhandled error processing ${item.tradeId}:`,
+            (err as Error).message,
+          )
         }
       }
     } finally {
@@ -209,7 +219,10 @@ export class AutoAnalyzer {
     const now = Date.now()
     this.recentFailures.push(now)
     // Prune old failures outside the sliding window
-    while (this.recentFailures.length > 0 && this.recentFailures[0]! < now - this.FAILURE_WINDOW_MS) {
+    while (
+      this.recentFailures.length > 0 &&
+      this.recentFailures[0]! < now - this.FAILURE_WINDOW_MS
+    ) {
       this.recentFailures.shift()
     }
 
@@ -223,7 +236,9 @@ export class AutoAnalyzer {
     if (item.retryCount < MAX_RETRIES) {
       const delay = RETRY_DELAYS_MS[item.retryCount] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]!
       const nextRetry = item.retryCount + 1
-      console.log(`[auto-analyzer] Scheduling retry ${nextRetry}/${MAX_RETRIES} for ${item.tradeId} in ${delay / 1000}s`)
+      console.log(
+        `[auto-analyzer] Scheduling retry ${nextRetry}/${MAX_RETRIES} for ${item.tradeId} in ${delay / 1000}s`,
+      )
 
       setTimeout(() => {
         this.enqueue({ ...item, retryCount: nextRetry })
@@ -234,7 +249,9 @@ export class AutoAnalyzer {
   }
 
   private async disableAutoAnalysis(lastError: string): Promise<void> {
-    console.error(`[auto-analyzer] ${CONSECUTIVE_FAILURE_THRESHOLD} consecutive failures — disabling auto-analysis`)
+    console.error(
+      `[auto-analyzer] ${CONSECUTIVE_FAILURE_THRESHOLD} consecutive failures — disabling auto-analysis`,
+    )
 
     try {
       const { disableAutoAnalysis, createNotification } = await import("@fxflow/db")

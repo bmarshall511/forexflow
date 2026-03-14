@@ -9,6 +9,7 @@
 ## Organization
 
 Types are grouped by domain in this order:
+
 1. **Trading** — Trade, Order, Position interfaces
 2. **Settings** — App settings types
 3. **Market** — Market hours, sessions, instruments
@@ -26,20 +27,24 @@ Types are grouped by domain in this order:
 ## Key Patterns
 
 ### WebSocket Messages
+
 - `DaemonMessageType` enum defines all WS message types.
 - Each message type has a corresponding typed interface.
 - Discriminated union pattern: `type` field determines payload shape.
 
 ### Status Lifecycles
+
 - Trade finder setups: `active → approaching → placed → filled → invalidated → expired`
 - AI analysis: `pending → executing → completed → failed → cancelled`
 - Signals: `received → executing → executed → failed`
 
 ### AI Model Options
+
 - `AI_MODEL_OPTIONS` array with per-model pricing (input/output per million tokens).
 - Used by both daemon (execution) and web (settings UI) and db (cost calculation).
 
 ### Branded/Literal Types
+
 - Instrument names as string literals (e.g., `"EUR_USD"`).
 - Status fields as discriminated string unions.
 

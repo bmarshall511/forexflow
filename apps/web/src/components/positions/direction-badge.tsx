@@ -14,7 +14,7 @@ export function DirectionBadge({ direction, className }: DirectionBadgeProps) {
     <Badge
       variant="outline"
       className={cn(
-        "text-[10px] px-1.5 py-0 font-semibold uppercase",
+        "px-1.5 py-0 text-[10px] font-semibold uppercase",
         direction === "long"
           ? "border-status-connected/30 bg-status-connected/10 text-status-connected"
           : "border-status-disconnected/30 bg-status-disconnected/10 text-status-disconnected",

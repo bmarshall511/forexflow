@@ -12,35 +12,44 @@ export function registerTradeTools(server: McpServer) {
       try {
         const status = await daemonGet<{ positions: { open: unknown[] } }>("/status")
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(status.positions?.open ?? [], null, 2) }],
+          content: [
+            { type: "text" as const, text: JSON.stringify(status.positions?.open ?? [], null, 2) },
+          ],
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error fetching open trades: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error fetching open trades: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
-  server.tool(
-    "get_pending_orders",
-    "Get all pending orders waiting to be filled",
-    {},
-    async () => {
-      try {
-        const status = await daemonGet<{ positions: { pending: unknown[] } }>("/status")
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(status.positions?.pending ?? [], null, 2) }],
-        }
-      } catch (error) {
-        return {
-          content: [{ type: "text" as const, text: `Error fetching pending orders: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true,
-        }
+  server.tool("get_pending_orders", "Get all pending orders waiting to be filled", {}, async () => {
+    try {
+      const status = await daemonGet<{ positions: { pending: unknown[] } }>("/status")
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(status.positions?.pending ?? [], null, 2) },
+        ],
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error fetching pending orders: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        isError: true,
       }
     }
-  )
+  })
 
   server.tool(
     "get_trade_history",
@@ -63,23 +72,34 @@ export function registerTradeTools(server: McpServer) {
           offset: offset ?? 0,
         })
         return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({
-              trades: result.trades,
-              totalCount: result.totalCount,
-              page: result.page,
-              pageSize: result.pageSize,
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  trades: result.trades,
+                  totalCount: result.totalCount,
+                  page: result.page,
+                  pageSize: result.pageSize,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
@@ -102,10 +122,15 @@ export function registerTradeTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 }

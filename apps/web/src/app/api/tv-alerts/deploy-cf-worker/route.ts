@@ -73,8 +73,7 @@ export async function POST(): Promise<NextResponse<ApiResponse<DeployResult>>> {
     // 2. Generate secrets (reuse existing webhook token if set)
     const daemonSecret = randomBytes(24).toString("hex")
     const existingConfig = await getTVAlertsConfig()
-    const webhookToken =
-      existingConfig.webhookToken || randomBytes(16).toString("hex")
+    const webhookToken = existingConfig.webhookToken || randomBytes(16).toString("hex")
 
     // 3. Deploy the worker
     let deployOutput: string
@@ -99,9 +98,7 @@ export async function POST(): Promise<NextResponse<ApiResponse<DeployResult>>> {
     }
 
     // 4. Parse worker URL from deploy output
-    const urlMatch = deployOutput.match(
-      /https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/,
-    )
+    const urlMatch = deployOutput.match(/https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/)
     if (!urlMatch) {
       return NextResponse.json(
         {

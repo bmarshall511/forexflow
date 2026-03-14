@@ -140,11 +140,12 @@ export function TradePriceChart({
     const tpPct = takeProfit !== null ? priceToPct(takeProfit) : null
     const currentPct = currentPrice !== null ? priceToPct(currentPrice) : null
 
-    const isProfit = currentPrice !== null
-      ? direction === "long"
-        ? currentPrice > entryPrice
-        : currentPrice < entryPrice
-      : false
+    const isProfit =
+      currentPrice !== null
+        ? direction === "long"
+          ? currentPrice > entryPrice
+          : currentPrice < entryPrice
+        : false
 
     return { levels, entryPct, slPct, tpPct, currentPct, isProfit }
   }, [entryPrice, stopLoss, takeProfit, currentPrice, exitPrice, direction, instrument, keyLevels])
@@ -153,13 +154,13 @@ export function TradePriceChart({
     <div className={cn("relative w-full", className)} style={{ height: effectiveHeight }}>
       {/* Chart area */}
       <div
-        className="absolute inset-0 rounded-md overflow-hidden"
+        className="absolute inset-0 overflow-hidden rounded-md"
         style={{ right: effectiveShowLabels ? 110 : 0 }}
       >
         {/* Risk zone (SL → Entry) */}
         {layout.slPct !== null && (
           <div
-            className="absolute left-0 right-0 bg-status-disconnected/8"
+            className="bg-status-disconnected/8 absolute left-0 right-0"
             style={{
               bottom: `${Math.min(layout.slPct, layout.entryPct)}%`,
               height: `${Math.abs(layout.entryPct - layout.slPct)}%`,
@@ -170,7 +171,7 @@ export function TradePriceChart({
         {/* Reward zone (Entry → TP) */}
         {layout.tpPct !== null && (
           <div
-            className="absolute left-0 right-0 bg-status-connected/8"
+            className="bg-status-connected/8 absolute left-0 right-0"
             style={{
               bottom: `${Math.min(layout.tpPct, layout.entryPct)}%`,
               height: `${Math.abs(layout.entryPct - layout.tpPct)}%`,
@@ -211,7 +212,7 @@ export function TradePriceChart({
               }}
             />
             <div
-              className="absolute left-1/2 -translate-x-1/2 size-2.5 rounded-full transition-all duration-300 animate-pulse"
+              className="absolute left-1/2 size-2.5 -translate-x-1/2 animate-pulse rounded-full transition-all duration-300"
               style={{
                 bottom: `calc(${layout.currentPct}% - 5px)`,
                 backgroundColor: layout.isProfit
@@ -229,27 +230,33 @@ export function TradePriceChart({
           {layout.levels.map((level) => (
             <div
               key={level.label}
-              className="absolute right-0 flex items-center gap-1 text-[10px] font-mono tabular-nums whitespace-nowrap -translate-y-1/2"
+              className="absolute right-0 flex -translate-y-1/2 items-center gap-1 whitespace-nowrap font-mono text-[10px] tabular-nums"
               style={{ bottom: `${level.pct}%` }}
             >
-              <span className={cn("font-medium font-sans", level.colorClass)}>
-                {level.label}
-              </span>
-              <span className="text-muted-foreground">
-                {level.price.toFixed(decimals)}
-              </span>
+              <span className={cn("font-sans font-medium", level.colorClass)}>{level.label}</span>
+              <span className="text-muted-foreground">{level.price.toFixed(decimals)}</span>
             </div>
           ))}
 
           {layout.currentPct !== null && currentPrice !== null && (
             <div
-              className="absolute right-0 flex items-center gap-1 text-[10px] font-mono tabular-nums whitespace-nowrap -translate-y-1/2 transition-all duration-300"
+              className="absolute right-0 flex -translate-y-1/2 items-center gap-1 whitespace-nowrap font-mono text-[10px] tabular-nums transition-all duration-300"
               style={{ bottom: `${layout.currentPct}%` }}
             >
-              <span className={cn("font-medium font-sans", layout.isProfit ? "text-status-connected" : "text-status-disconnected")}>
+              <span
+                className={cn(
+                  "font-sans font-medium",
+                  layout.isProfit ? "text-status-connected" : "text-status-disconnected",
+                )}
+              >
                 Now
               </span>
-              <span className={cn("font-semibold", layout.isProfit ? "text-status-connected" : "text-status-disconnected")}>
+              <span
+                className={cn(
+                  "font-semibold",
+                  layout.isProfit ? "text-status-connected" : "text-status-disconnected",
+                )}
+              >
                 {currentPrice.toFixed(decimals)}
               </span>
             </div>
@@ -259,7 +266,7 @@ export function TradePriceChart({
 
       {/* Compact: pip distance summary */}
       {compact && currentPrice !== null && (
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[10px] tabular-nums px-1">
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1 text-[10px] tabular-nums">
           {stopLoss !== null && (
             <span className="text-status-disconnected">
               SL: -{formatPips(priceToPips(instrument, Math.abs(entryPrice - stopLoss)))}p

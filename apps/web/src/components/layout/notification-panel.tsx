@@ -28,14 +28,8 @@ const FILTER_OPTIONS: { value: SeverityFilter; label: string }[] = [
 ]
 
 export function NotificationPanel() {
-  const {
-    notifications,
-    undismissedCount,
-    dismiss,
-    dismissAll,
-    deleteOne,
-    deleteAllDismissed,
-  } = useNotificationContext()
+  const { notifications, undismissedCount, dismiss, dismissAll, deleteOne, deleteAllDismissed } =
+    useNotificationContext()
 
   const [filter, setFilter] = useState<SeverityFilter>("all")
   const [sort, setSort] = useState<SortMode>("newest")
@@ -65,7 +59,7 @@ export function NotificationPanel() {
         <div className="flex items-center gap-2">
           <h2 className="text-base font-semibold">Notifications</h2>
           {undismissedCount > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
               {undismissedCount}
             </Badge>
           )}
@@ -118,13 +112,11 @@ export function NotificationPanel() {
       {/* List */}
       <ScrollArea className="flex-1">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
+          <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 py-12">
             <Bell className="size-8 opacity-40" />
             <p className="text-sm font-medium">No notifications</p>
             <p className="text-xs">
-              {filter !== "all"
-                ? `No ${filter} notifications`
-                : "System alerts will appear here"}
+              {filter !== "all" ? `No ${filter} notifications` : "System alerts will appear here"}
             </p>
           </div>
         ) : (
@@ -149,7 +141,7 @@ export function NotificationPanel() {
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-xs text-muted-foreground"
+              className="text-muted-foreground w-full text-xs"
               onClick={() => void deleteAllDismissed()}
             >
               Delete dismissed

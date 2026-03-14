@@ -48,7 +48,7 @@ export function NotesEditor({ initialNotes, onSave }: NotesEditorProps) {
     <div className="space-y-1">
       {saveStatus !== "idle" && (
         <div className="flex justify-end">
-          <span className="text-[10px] text-muted-foreground animate-in fade-in">
+          <span className="text-muted-foreground animate-in fade-in text-[10px]">
             {saveStatus === "saving" ? "Saving..." : "Saved"}
           </span>
         </div>

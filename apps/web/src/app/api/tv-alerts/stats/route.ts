@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server"
 import { getSignalPerformanceStats } from "@fxflow/db"
 import type { ApiResponse, TVSignalPerformanceStats } from "@fxflow/types"
 
-export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<TVSignalPerformanceStats>>> {
+export async function GET(
+  request: NextRequest,
+): Promise<NextResponse<ApiResponse<TVSignalPerformanceStats>>> {
   try {
     const params = request.nextUrl.searchParams
     const from = params.get("from") ? new Date(params.get("from")!) : undefined

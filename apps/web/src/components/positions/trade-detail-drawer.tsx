@@ -1,8 +1,19 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import type { PendingOrderData, OpenTradeData, ClosedTradeData, TradeCloseReason } from "@fxflow/types"
-import { formatCurrency, formatPips, priceToPips, calculateRiskReward, getDecimalPlaces } from "@fxflow/shared"
+import type {
+  PendingOrderData,
+  OpenTradeData,
+  ClosedTradeData,
+  TradeCloseReason,
+} from "@fxflow/types"
+import {
+  formatCurrency,
+  formatPips,
+  priceToPips,
+  calculateRiskReward,
+  getDecimalPlaces,
+} from "@fxflow/shared"
 import {
   Sheet,
   SheetContent,
@@ -76,7 +87,8 @@ export function TradeDetailDrawer({
 }: TradeDetailDrawerProps) {
   const tradeId = trade?.id ?? null
   const [aiSheetOpen, setAiSheetOpen] = useState(false)
-  const { detail, isLoading, updateNotes, updateTimeframe, assignTag, removeTag, refetch } = useTradeDetail(tradeId)
+  const { detail, isLoading, updateNotes, updateTimeframe, assignTag, removeTag, refetch } =
+    useTradeDetail(tradeId)
   const { history: aiHistory } = useAiAnalysis(tradeId)
   const { tags: allTags, createTag } = useTags()
 
@@ -92,7 +104,14 @@ export function TradeDetailDrawer({
     if (trade._type === "closed") {
       return [
         createEntryLevel(trade.openedAt, trade.direction, trade.entryPrice, tf, decimals),
-        createExitLevel(trade.closedAt, trade.direction, trade.closeReason as TradeCloseReason, trade.exitPrice ?? trade.entryPrice, tf, decimals),
+        createExitLevel(
+          trade.closedAt,
+          trade.direction,
+          trade.closeReason as TradeCloseReason,
+          trade.exitPrice ?? trade.entryPrice,
+          tf,
+          decimals,
+        ),
       ]
     }
     return []
@@ -111,34 +130,43 @@ export function TradeDetailDrawer({
   const decimals = getDecimalPlaces(trade.instrument)
 
   // Live price: from open trade data or external prop (pending orders)
-  const livePrice = trade._type === "open"
-    ? trade.currentPrice
-    : externalCurrentPrice ?? null
+  const livePrice = trade._type === "open" ? trade.currentPrice : (externalCurrentPrice ?? null)
 
   // Compute performance metrics
-  const rr = calculateRiskReward(trade.direction, trade.entryPrice, trade.stopLoss, trade.takeProfit, trade.instrument)
+  const rr = calculateRiskReward(
+    trade.direction,
+    trade.entryPrice,
+    trade.stopLoss,
+    trade.takeProfit,
+    trade.instrument,
+  )
 
-  const tradeUnits = trade._type === "pending"
-    ? trade.units
-    : trade._type === "open"
-      ? trade.currentUnits
-      : (trade as ClosedTradeData).units
+  const tradeUnits =
+    trade._type === "pending"
+      ? trade.units
+      : trade._type === "open"
+        ? trade.currentUnits
+        : (trade as ClosedTradeData).units
 
-  const potGain = trade.takeProfit !== null
-    ? Math.abs(
-        trade.direction === "long"
-          ? trade.takeProfit - trade.entryPrice
-          : trade.entryPrice - trade.takeProfit,
-      ) * tradeUnits
-    : null
+  const potGain =
+    trade.takeProfit !== null
+      ? Math.abs(
+          trade.direction === "long"
+            ? trade.takeProfit - trade.entryPrice
+            : trade.entryPrice - trade.takeProfit,
+        ) * tradeUnits
+      : null
 
-  const potLoss = trade.stopLoss !== null
-    ? -(Math.abs(
-        trade.direction === "long"
-          ? trade.entryPrice - trade.stopLoss
-          : trade.stopLoss - trade.entryPrice,
-      ) * tradeUnits)
-    : null
+  const potLoss =
+    trade.stopLoss !== null
+      ? -(
+          Math.abs(
+            trade.direction === "long"
+              ? trade.entryPrice - trade.stopLoss
+              : trade.stopLoss - trade.entryPrice,
+          ) * tradeUnits
+        )
+      : null
 
   const handleAssignTag = async (tagId: string) => {
     await assignTag(tagId)
@@ -161,425 +189,452 @@ export function TradeDetailDrawer({
 
   return (
     <>
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
-        {/* Header */}
-        <SheetHeader className="px-5 pt-5 pb-3 border-b border-border/50 shrink-0">
-          <div className="flex items-center gap-2">
-            <SheetTitle className="text-xl font-bold">{pair}</SheetTitle>
-            <DirectionBadge direction={trade.direction} />
-            <SourceBadge source={trade.source} />
-          </div>
-          <SheetDescription className="text-xs text-muted-foreground">
-            {trade._type === "pending" && `${trade.orderType.replace("_", " ")} Order`}
-            {trade._type === "open" && "Open Trade"}
-            {trade._type === "closed" && "Closed Trade"}
-            {trade._type !== "pending" && (
-              <> &middot; Opened {new Date(trade.openedAt).toLocaleString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}</>
-            )}
-            {trade._type === "closed" && (
-              <> &middot; Closed {new Date(trade.closedAt).toLocaleString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}</>
-            )}
-          </SheetDescription>
-        </SheetHeader>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {/* Status Banner */}
-          <TradeStatusBanner
-            status={trade._type}
-            orderType={trade._type === "pending" ? trade.orderType : undefined}
-            openedAt={trade._type !== "pending" ? trade.openedAt : undefined}
-            closedAt={trade._type === "closed" ? trade.closedAt : undefined}
-            outcome={trade._type === "closed" ? trade.outcome : undefined}
-            closeReason={trade._type === "closed" ? trade.closeReason : undefined}
-          />
-
-          {/* Chart with price overlays */}
-          <SectionCard
-            icon={BarChart3}
-            title="Chart"
-            helper={
-              trade._type !== "closed"
-                ? "Drag the SL/TP lines on the chart to adjust them. Changes are saved automatically."
-                : "A chart of this trade from entry to exit."
-            }
-          >
-            {trade._type === "open" || trade._type === "pending" ? (
-              <TradeEditorPanel
-                trade={trade}
-                defaultTimeframe={detail?.timeframe}
-                currency={currency}
-                onAction={trade._type === "open" ? onCloseTrade : onCancelOrder}
-                currentPrice={trade._type === "pending" ? livePrice : undefined}
-                lastTick={lastTick}
-                onSaved={refetch}
-                tradeLevels={tradeLevels}
-                scrollToTime={scrollToTime}
-              />
-            ) : (
-              <TradingViewChart
-                instrument={trade.instrument}
-                direction={trade.direction}
-                entryPrice={trade.entryPrice}
-                currentPrice={livePrice}
-                lastTick={lastTick}
-                stopLoss={trade.stopLoss}
-                takeProfit={trade.takeProfit}
-                exitPrice={trade.exitPrice}
-                defaultTimeframe={detail?.timeframe}
-                tradeLevels={tradeLevels}
-                scrollToTime={scrollToTime}
-                height={260}
-              />
-            )}
-          </SectionCard>
-
-          {/* Trade Details */}
-          <SectionCard
-            icon={Info}
-            title="Trade Details"
-            helper="The basic setup of your trade — what you're trading and how."
-          >
-            <div>
-              <DetailRow label="Pair" value={pair} />
-              <DetailRow label="Direction" value={
-                <DirectionBadge direction={trade.direction} />
-              } />
-              {trade._type === "pending" && (
-                <DetailRow label="Order Type" value={trade.orderType.replace("_", " ")} />
-              )}
-              <DetailRow label="Entry Price" value={trade.entryPrice.toFixed(decimals)} />
-              {trade._type === "closed" && (trade as ClosedTradeData).exitPrice !== null && (
-                <DetailRow label="Exit Price" value={(trade as ClosedTradeData).exitPrice!.toFixed(decimals)} />
-              )}
-              <DetailRow label="Units" value={
-                trade._type === "open" && trade.currentUnits !== trade.initialUnits
-                  ? `${trade.currentUnits} / ${trade.initialUnits}`
-                  : tradeUnits.toLocaleString()
-              } />
-              <DetailRow label="Timeframe" value={
-                <TimeframeSelect
-                  value={detail?.timeframe ?? trade.timeframe}
-                  onChange={async (tf) => {
-                    await updateTimeframe(tf)
-                  }}
-                />
-              } />
-              {trade._type === "pending" && (
-                <>
-                  <DetailRow label="Time in Force" value={trade.timeInForce} />
-                  {trade.timeInForce === "GTD" && trade.gtdTime && (
-                    <DetailRow label="Expires" value={
-                      new Date(trade.gtdTime).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    } />
-                  )}
-                </>
-              )}
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="flex w-full flex-col p-0 sm:max-w-lg">
+          {/* Header */}
+          <SheetHeader className="border-border/50 shrink-0 border-b px-5 pb-3 pt-5">
+            <div className="flex items-center gap-2">
+              <SheetTitle className="text-xl font-bold">{pair}</SheetTitle>
+              <DirectionBadge direction={trade.direction} />
+              <SourceBadge source={trade.source} />
             </div>
-          </SectionCard>
-
-          {/* Protection (SL, TP, R:R) */}
-          <SectionCard
-            icon={Shield}
-            title="Protection"
-            helper="Stop Loss limits your loss if the market moves against you. Take Profit locks in your gains automatically."
-          >
-            <div>
-              <DetailRow
-                label="Stop Loss"
-                value={trade.stopLoss !== null ? trade.stopLoss.toFixed(decimals) : "Not set"}
-                className={trade.stopLoss === null ? "text-muted-foreground" : undefined}
-              />
-              {trade.stopLoss !== null && (
-                <DetailRow
-                  label="SL Distance"
-                  value={formatPips(priceToPips(
-                    trade.instrument,
-                    Math.abs(trade.entryPrice - trade.stopLoss),
-                  )) + " pips"}
-                  className="text-muted-foreground"
-                />
-              )}
-              <DetailRow
-                label="Take Profit"
-                value={trade.takeProfit !== null ? trade.takeProfit.toFixed(decimals) : "Not set"}
-                className={trade.takeProfit === null ? "text-muted-foreground" : undefined}
-              />
-              {trade.takeProfit !== null && (
-                <DetailRow
-                  label="TP Distance"
-                  value={formatPips(priceToPips(
-                    trade.instrument,
-                    Math.abs(trade.takeProfit - trade.entryPrice),
-                  )) + " pips"}
-                  className="text-muted-foreground"
-                />
-              )}
-              {trade._type !== "closed" && trade.trailingStopDistance !== null && trade.trailingStopDistance > 0 && (
-                <DetailRow
-                  label="Trailing Stop"
-                  value={`${trade.trailingStopDistance} pips`}
-                />
-              )}
-              <DetailRow label="Risk : Reward" value={
-                <RiskRewardDisplay
-                  direction={trade.direction}
-                  entryPrice={trade.entryPrice}
-                  stopLoss={trade.stopLoss}
-                  takeProfit={trade.takeProfit}
-                  instrument={trade.instrument}
-                  compact
-                />
-              } />
-            </div>
-          </SectionCard>
-
-          {/* Performance */}
-          <SectionCard
-            icon={TrendingUp}
-            title="Performance"
-            helper="How your trade is performing right now. Green means profit, red means loss."
-          >
-            <div className="grid grid-cols-2 gap-2">
-              {/* Pending: Current price + distance to fill */}
-              {trade._type === "pending" && livePrice !== null && (
-                <>
-                  <MetricTile
-                    label="Current Price"
-                    value={<AnimatedNumber value={livePrice.toFixed(decimals)} />}
-                  />
-                  <MetricTile
-                    label="Distance to Fill"
-                    value={formatPips(priceToPips(
-                      trade.instrument,
-                      Math.abs(livePrice - trade.entryPrice),
-                    )) + " pips"}
-                  />
-                </>
-              )}
-
-              {/* Open: Live P/L, current price, duration */}
-              {trade._type === "open" && (
-                <>
-                  <MetricTile
-                    label="Unrealized P/L"
-                    value={
-                      <AnimatedNumber
-                        value={formatCurrency(trade.unrealizedPL, currency)}
-                        className={cn(
-                          "font-semibold",
-                          trade.unrealizedPL >= 0 ? "text-status-connected" : "text-status-disconnected",
-                        )}
-                      />
-                    }
-                    large
-                  />
-                  {trade.currentPrice !== null && (
-                    <MetricTile
-                      label="Current Price"
-                      value={<AnimatedNumber value={trade.currentPrice.toFixed(decimals)} />}
-                    />
-                  )}
-                  <MetricTile
-                    label="Duration"
-                    value={
-                      <DurationDisplay openedAt={trade.openedAt} className="font-mono tabular-nums text-sm" />
-                    }
-                  />
-                </>
-              )}
-
-              {/* Closed: Final P/L, duration */}
-              {trade._type === "closed" && (
-                <>
-                  <MetricTile
-                    label="Realized P/L"
-                    value={formatCurrency(trade.realizedPL, currency)}
-                    className={cn(
-                      "font-semibold",
-                      trade.realizedPL >= 0 ? "text-status-connected" : "text-status-disconnected",
-                    )}
-                    large
-                  />
-                  <MetricTile
-                    label="Duration"
-                    value={
-                      <DurationDisplay
-                        openedAt={trade.openedAt}
-                        closedAt={trade.closedAt}
-                        className="font-mono tabular-nums text-sm"
-                      />
-                    }
-                  />
-                  <MetricTile
-                    label="Close Reason"
-                    value={trade.closeReason?.replace(/_/g, " ") ?? "—"}
-                  />
-                </>
-              )}
-
-              {/* MFE/MAE — shown for open and closed */}
+            <SheetDescription className="text-muted-foreground text-xs">
+              {trade._type === "pending" && `${trade.orderType.replace("_", " ")} Order`}
+              {trade._type === "open" && "Open Trade"}
+              {trade._type === "closed" && "Closed Trade"}
               {trade._type !== "pending" && (
                 <>
-                  <MetricTile
-                    label="Best (MFE)"
-                    value={trade.mfe !== null
-                      ? formatPips(trade.mfe) + " pips"
-                      : "—"
-                    }
-                    className={trade.mfe !== null ? "text-status-connected" : undefined}
-                  />
-                  <MetricTile
-                    label="Worst (MAE)"
-                    value={trade.mae !== null
-                      ? formatPips(Math.abs(trade.mae)) + " pips"
-                      : "—"
-                    }
-                    className={trade.mae !== null ? "text-status-disconnected" : undefined}
-                  />
+                  {" "}
+                  &middot; Opened{" "}
+                  {new Date(trade.openedAt).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </>
               )}
-
-              {/* Potential Gain/Loss — all states */}
-              {potGain !== null && (
-                <MetricTile
-                  label="Potential Gain"
-                  value={formatCurrency(potGain, currency)}
-                  className="text-status-connected"
-                />
+              {trade._type === "closed" && (
+                <>
+                  {" "}
+                  &middot; Closed{" "}
+                  {new Date(trade.closedAt).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </>
               )}
-              {potLoss !== null && (
-                <MetricTile
-                  label="Potential Loss"
-                  value={formatCurrency(potLoss, currency)}
-                  className="text-status-disconnected"
-                />
-              )}
+            </SheetDescription>
+          </SheetHeader>
 
-              {/* Financing — open and closed */}
-              {trade._type !== "pending" && trade.financing !== 0 && (
-                <MetricTile
-                  label="Financing"
-                  value={formatCurrency(trade.financing, currency)}
-                  className={trade.financing >= 0 ? "text-status-connected" : "text-status-disconnected"}
-                />
-              )}
-
-              {/* Margin — open trades */}
-              {trade._type === "open" && trade.marginUsed > 0 && (
-                <MetricTile
-                  label="Margin Used"
-                  value={formatCurrency(trade.marginUsed, currency)}
-                />
-              )}
-            </div>
-          </SectionCard>
-
-          {/* Tags */}
-          <SectionCard
-            icon={Tag}
-            title="Tags"
-            helper="Organize your trades with colored labels — use them to track strategies, setups, or categories."
-          >
-            <TagEditor
-              assignedTags={detail?.tags ?? []}
-              allTags={allTags}
-              onAssign={handleAssignTag}
-              onRemove={handleRemoveTag}
-              onCreate={handleCreateAndAssignTag}
+          {/* Scrollable body */}
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            {/* Status Banner */}
+            <TradeStatusBanner
+              status={trade._type}
+              orderType={trade._type === "pending" ? trade.orderType : undefined}
+              openedAt={trade._type !== "pending" ? trade.openedAt : undefined}
+              closedAt={trade._type === "closed" ? trade.closedAt : undefined}
+              outcome={trade._type === "closed" ? trade.outcome : undefined}
+              closeReason={trade._type === "closed" ? trade.closeReason : undefined}
             />
-          </SectionCard>
 
-          {/* Notes */}
-          <SectionCard
-            icon={FileText}
-            title="Notes"
-            helper="Add personal notes about your reasoning, setup, or lessons learned."
-          >
-            <NotesEditor
-              initialNotes={detail?.notes ?? ""}
-              onSave={updateNotes}
-            />
-          </SectionCard>
-
-          {/* Events Timeline */}
-          {detail?.events && detail.events.length > 0 && (
+            {/* Chart with price overlays */}
             <SectionCard
-              icon={ClipboardList}
-              title="Events"
-              helper="A timeline of everything that happened with this trade."
+              icon={BarChart3}
+              title="Chart"
+              helper={
+                trade._type !== "closed"
+                  ? "Drag the SL/TP lines on the chart to adjust them. Changes are saved automatically."
+                  : "A chart of this trade from entry to exit."
+              }
             >
-              <TradeEventsTimeline events={detail.events} />
+              {trade._type === "open" || trade._type === "pending" ? (
+                <TradeEditorPanel
+                  trade={trade}
+                  defaultTimeframe={detail?.timeframe}
+                  currency={currency}
+                  onAction={trade._type === "open" ? onCloseTrade : onCancelOrder}
+                  currentPrice={trade._type === "pending" ? livePrice : undefined}
+                  lastTick={lastTick}
+                  onSaved={refetch}
+                  tradeLevels={tradeLevels}
+                  scrollToTime={scrollToTime}
+                />
+              ) : (
+                <TradingViewChart
+                  instrument={trade.instrument}
+                  direction={trade.direction}
+                  entryPrice={trade.entryPrice}
+                  currentPrice={livePrice}
+                  lastTick={lastTick}
+                  stopLoss={trade.stopLoss}
+                  takeProfit={trade.takeProfit}
+                  exitPrice={trade.exitPrice}
+                  defaultTimeframe={detail?.timeframe}
+                  tradeLevels={tradeLevels}
+                  scrollToTime={scrollToTime}
+                  height={260}
+                />
+              )}
             </SectionCard>
-          )}
-        </div>
 
-        {/* Footer — action buttons */}
-        <div className="shrink-0 border-t border-border/50 p-4 flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => setAiSheetOpen(true)}
-          >
-            <Sparkles className="size-3" />
-            AI Analysis
-            {aiHistory.length > 0 && (
-              <span className="text-[9px] bg-primary/10 text-primary rounded-full px-1.5 ml-0.5">
-                {aiHistory.length}
-              </span>
+            {/* Trade Details */}
+            <SectionCard
+              icon={Info}
+              title="Trade Details"
+              helper="The basic setup of your trade — what you're trading and how."
+            >
+              <div>
+                <DetailRow label="Pair" value={pair} />
+                <DetailRow
+                  label="Direction"
+                  value={<DirectionBadge direction={trade.direction} />}
+                />
+                {trade._type === "pending" && (
+                  <DetailRow label="Order Type" value={trade.orderType.replace("_", " ")} />
+                )}
+                <DetailRow label="Entry Price" value={trade.entryPrice.toFixed(decimals)} />
+                {trade._type === "closed" && (trade as ClosedTradeData).exitPrice !== null && (
+                  <DetailRow
+                    label="Exit Price"
+                    value={(trade as ClosedTradeData).exitPrice!.toFixed(decimals)}
+                  />
+                )}
+                <DetailRow
+                  label="Units"
+                  value={
+                    trade._type === "open" && trade.currentUnits !== trade.initialUnits
+                      ? `${trade.currentUnits} / ${trade.initialUnits}`
+                      : tradeUnits.toLocaleString()
+                  }
+                />
+                <DetailRow
+                  label="Timeframe"
+                  value={
+                    <TimeframeSelect
+                      value={detail?.timeframe ?? trade.timeframe}
+                      onChange={async (tf) => {
+                        await updateTimeframe(tf)
+                      }}
+                    />
+                  }
+                />
+                {trade._type === "pending" && (
+                  <>
+                    <DetailRow label="Time in Force" value={trade.timeInForce} />
+                    {trade.timeInForce === "GTD" && trade.gtdTime && (
+                      <DetailRow
+                        label="Expires"
+                        value={new Date(trade.gtdTime).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            </SectionCard>
+
+            {/* Protection (SL, TP, R:R) */}
+            <SectionCard
+              icon={Shield}
+              title="Protection"
+              helper="Stop Loss limits your loss if the market moves against you. Take Profit locks in your gains automatically."
+            >
+              <div>
+                <DetailRow
+                  label="Stop Loss"
+                  value={trade.stopLoss !== null ? trade.stopLoss.toFixed(decimals) : "Not set"}
+                  className={trade.stopLoss === null ? "text-muted-foreground" : undefined}
+                />
+                {trade.stopLoss !== null && (
+                  <DetailRow
+                    label="SL Distance"
+                    value={
+                      formatPips(
+                        priceToPips(trade.instrument, Math.abs(trade.entryPrice - trade.stopLoss)),
+                      ) + " pips"
+                    }
+                    className="text-muted-foreground"
+                  />
+                )}
+                <DetailRow
+                  label="Take Profit"
+                  value={trade.takeProfit !== null ? trade.takeProfit.toFixed(decimals) : "Not set"}
+                  className={trade.takeProfit === null ? "text-muted-foreground" : undefined}
+                />
+                {trade.takeProfit !== null && (
+                  <DetailRow
+                    label="TP Distance"
+                    value={
+                      formatPips(
+                        priceToPips(
+                          trade.instrument,
+                          Math.abs(trade.takeProfit - trade.entryPrice),
+                        ),
+                      ) + " pips"
+                    }
+                    className="text-muted-foreground"
+                  />
+                )}
+                {trade._type !== "closed" &&
+                  trade.trailingStopDistance !== null &&
+                  trade.trailingStopDistance > 0 && (
+                    <DetailRow label="Trailing Stop" value={`${trade.trailingStopDistance} pips`} />
+                  )}
+                <DetailRow
+                  label="Risk : Reward"
+                  value={
+                    <RiskRewardDisplay
+                      direction={trade.direction}
+                      entryPrice={trade.entryPrice}
+                      stopLoss={trade.stopLoss}
+                      takeProfit={trade.takeProfit}
+                      instrument={trade.instrument}
+                      compact
+                    />
+                  }
+                />
+              </div>
+            </SectionCard>
+
+            {/* Performance */}
+            <SectionCard
+              icon={TrendingUp}
+              title="Performance"
+              helper="How your trade is performing right now. Green means profit, red means loss."
+            >
+              <div className="grid grid-cols-2 gap-2">
+                {/* Pending: Current price + distance to fill */}
+                {trade._type === "pending" && livePrice !== null && (
+                  <>
+                    <MetricTile
+                      label="Current Price"
+                      value={<AnimatedNumber value={livePrice.toFixed(decimals)} />}
+                    />
+                    <MetricTile
+                      label="Distance to Fill"
+                      value={
+                        formatPips(
+                          priceToPips(trade.instrument, Math.abs(livePrice - trade.entryPrice)),
+                        ) + " pips"
+                      }
+                    />
+                  </>
+                )}
+
+                {/* Open: Live P/L, current price, duration */}
+                {trade._type === "open" && (
+                  <>
+                    <MetricTile
+                      label="Unrealized P/L"
+                      value={
+                        <AnimatedNumber
+                          value={formatCurrency(trade.unrealizedPL, currency)}
+                          className={cn(
+                            "font-semibold",
+                            trade.unrealizedPL >= 0
+                              ? "text-status-connected"
+                              : "text-status-disconnected",
+                          )}
+                        />
+                      }
+                      large
+                    />
+                    {trade.currentPrice !== null && (
+                      <MetricTile
+                        label="Current Price"
+                        value={<AnimatedNumber value={trade.currentPrice.toFixed(decimals)} />}
+                      />
+                    )}
+                    <MetricTile
+                      label="Duration"
+                      value={
+                        <DurationDisplay
+                          openedAt={trade.openedAt}
+                          className="font-mono text-sm tabular-nums"
+                        />
+                      }
+                    />
+                  </>
+                )}
+
+                {/* Closed: Final P/L, duration */}
+                {trade._type === "closed" && (
+                  <>
+                    <MetricTile
+                      label="Realized P/L"
+                      value={formatCurrency(trade.realizedPL, currency)}
+                      className={cn(
+                        "font-semibold",
+                        trade.realizedPL >= 0
+                          ? "text-status-connected"
+                          : "text-status-disconnected",
+                      )}
+                      large
+                    />
+                    <MetricTile
+                      label="Duration"
+                      value={
+                        <DurationDisplay
+                          openedAt={trade.openedAt}
+                          closedAt={trade.closedAt}
+                          className="font-mono text-sm tabular-nums"
+                        />
+                      }
+                    />
+                    <MetricTile
+                      label="Close Reason"
+                      value={trade.closeReason?.replace(/_/g, " ") ?? "—"}
+                    />
+                  </>
+                )}
+
+                {/* MFE/MAE — shown for open and closed */}
+                {trade._type !== "pending" && (
+                  <>
+                    <MetricTile
+                      label="Best (MFE)"
+                      value={trade.mfe !== null ? formatPips(trade.mfe) + " pips" : "—"}
+                      className={trade.mfe !== null ? "text-status-connected" : undefined}
+                    />
+                    <MetricTile
+                      label="Worst (MAE)"
+                      value={trade.mae !== null ? formatPips(Math.abs(trade.mae)) + " pips" : "—"}
+                      className={trade.mae !== null ? "text-status-disconnected" : undefined}
+                    />
+                  </>
+                )}
+
+                {/* Potential Gain/Loss — all states */}
+                {potGain !== null && (
+                  <MetricTile
+                    label="Potential Gain"
+                    value={formatCurrency(potGain, currency)}
+                    className="text-status-connected"
+                  />
+                )}
+                {potLoss !== null && (
+                  <MetricTile
+                    label="Potential Loss"
+                    value={formatCurrency(potLoss, currency)}
+                    className="text-status-disconnected"
+                  />
+                )}
+
+                {/* Financing — open and closed */}
+                {trade._type !== "pending" && trade.financing !== 0 && (
+                  <MetricTile
+                    label="Financing"
+                    value={formatCurrency(trade.financing, currency)}
+                    className={
+                      trade.financing >= 0 ? "text-status-connected" : "text-status-disconnected"
+                    }
+                  />
+                )}
+
+                {/* Margin — open trades */}
+                {trade._type === "open" && trade.marginUsed > 0 && (
+                  <MetricTile
+                    label="Margin Used"
+                    value={formatCurrency(trade.marginUsed, currency)}
+                  />
+                )}
+              </div>
+            </SectionCard>
+
+            {/* Tags */}
+            <SectionCard
+              icon={Tag}
+              title="Tags"
+              helper="Organize your trades with colored labels — use them to track strategies, setups, or categories."
+            >
+              <TagEditor
+                assignedTags={detail?.tags ?? []}
+                allTags={allTags}
+                onAssign={handleAssignTag}
+                onRemove={handleRemoveTag}
+                onCreate={handleCreateAndAssignTag}
+              />
+            </SectionCard>
+
+            {/* Notes */}
+            <SectionCard
+              icon={FileText}
+              title="Notes"
+              helper="Add personal notes about your reasoning, setup, or lessons learned."
+            >
+              <NotesEditor initialNotes={detail?.notes ?? ""} onSave={updateNotes} />
+            </SectionCard>
+
+            {/* Events Timeline */}
+            {detail?.events && detail.events.length > 0 && (
+              <SectionCard
+                icon={ClipboardList}
+                title="Events"
+                helper="A timeline of everything that happened with this trade."
+              >
+                <TradeEventsTimeline events={detail.events} />
+              </SectionCard>
             )}
-          </Button>
+          </div>
 
-          <div className="flex-1" />
-
-          {trade._type === "pending" && onCancelOrder && (
+          {/* Footer — action buttons */}
+          <div className="border-border/50 flex shrink-0 items-center gap-2 border-t p-4">
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 text-xs text-destructive hover:text-destructive"
-              onClick={onCancelOrder}
+              className="gap-1.5 text-xs"
+              onClick={() => setAiSheetOpen(true)}
             >
-              Cancel Order
+              <Sparkles className="size-3" />
+              AI Analysis
+              {aiHistory.length > 0 && (
+                <span className="bg-primary/10 text-primary ml-0.5 rounded-full px-1.5 text-[9px]">
+                  {aiHistory.length}
+                </span>
+              )}
             </Button>
-          )}
-          {trade._type === "open" && onCloseTrade && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs text-destructive hover:text-destructive"
-              onClick={onCloseTrade}
-            >
-              Close Trade
-            </Button>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
 
-    {/* AI Analysis Sheet */}
-    <AiAnalysisSheet
-      trade={trade}
-      tradeStatus={trade._type}
-      open={aiSheetOpen}
-      onOpenChange={setAiSheetOpen}
-    />
+            <div className="flex-1" />
+
+            {trade._type === "pending" && onCancelOrder && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive gap-1.5 text-xs"
+                onClick={onCancelOrder}
+              >
+                Cancel Order
+              </Button>
+            )}
+            {trade._type === "open" && onCloseTrade && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive gap-1.5 text-xs"
+                onClick={onCloseTrade}
+              >
+                Close Trade
+              </Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* AI Analysis Sheet */}
+      <AiAnalysisSheet
+        trade={trade}
+        tradeStatus={trade._type}
+        open={aiSheetOpen}
+        onOpenChange={setAiSheetOpen}
+      />
     </>
   )
 }

@@ -48,13 +48,18 @@ export function useTradeAnalysesBatch(tradeIds: string[]): UseTradeAnalysesBatch
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
-      .then((json: { ok: boolean; data?: { latest: Record<string, AiAnalysisData>; counts: Record<string, number> } }) => {
-        if (cancelled) return
-        if (json.ok && json.data) {
-          setLatestByTradeId(json.data.latest)
-          setCountByTradeId(json.data.counts)
-        }
-      })
+      .then(
+        (json: {
+          ok: boolean
+          data?: { latest: Record<string, AiAnalysisData>; counts: Record<string, number> }
+        }) => {
+          if (cancelled) return
+          if (json.ok && json.data) {
+            setLatestByTradeId(json.data.latest)
+            setCountByTradeId(json.data.counts)
+          }
+        },
+      )
       .catch(() => {
         if (!cancelled) {
           setLatestByTradeId({})
@@ -65,7 +70,9 @@ export function useTradeAnalysesBatch(tradeIds: string[]): UseTradeAnalysesBatch
         if (!cancelled) setIsLoading(false)
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [sortedKey, fetchKey])
 
   return { latestByTradeId, countByTradeId, isLoading, refetch }

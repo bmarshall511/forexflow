@@ -56,24 +56,25 @@ export function useNotifications(): UseNotificationsReturn {
     }
   }, [fetchNotifications])
 
-  const dismiss = useCallback(async (id: string) => {
-    // Optimistic update
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)),
-    )
-    setUndismissedCount((prev) => Math.max(0, prev - 1))
+  const dismiss = useCallback(
+    async (id: string) => {
+      // Optimistic update
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)))
+      setUndismissedCount((prev) => Math.max(0, prev - 1))
 
-    try {
-      await fetch(`/api/notifications/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dismissed: true }),
-      })
-    } catch {
-      // Revert on failure — refetch
-      void fetchNotifications()
-    }
-  }, [fetchNotifications])
+      try {
+        await fetch(`/api/notifications/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dismissed: true }),
+        })
+      } catch {
+        // Revert on failure — refetch
+        void fetchNotifications()
+      }
+    },
+    [fetchNotifications],
+  )
 
   const dismissAll = useCallback(async () => {
     // Optimistic update
@@ -91,19 +92,22 @@ export function useNotifications(): UseNotificationsReturn {
     }
   }, [fetchNotifications])
 
-  const deleteOne = useCallback(async (id: string) => {
-    const target = notifications.find((n) => n.id === id)
-    setNotifications((prev) => prev.filter((n) => n.id !== id))
-    if (target && !target.dismissed) {
-      setUndismissedCount((prev) => Math.max(0, prev - 1))
-    }
+  const deleteOne = useCallback(
+    async (id: string) => {
+      const target = notifications.find((n) => n.id === id)
+      setNotifications((prev) => prev.filter((n) => n.id !== id))
+      if (target && !target.dismissed) {
+        setUndismissedCount((prev) => Math.max(0, prev - 1))
+      }
 
-    try {
-      await fetch(`/api/notifications/${id}`, { method: "DELETE" })
-    } catch {
-      void fetchNotifications()
-    }
-  }, [notifications, fetchNotifications])
+      try {
+        await fetch(`/api/notifications/${id}`, { method: "DELETE" })
+      } catch {
+        void fetchNotifications()
+      }
+    },
+    [notifications, fetchNotifications],
+  )
 
   const deleteAllDismissed = useCallback(async () => {
     setNotifications((prev) => prev.filter((n) => !n.dismissed))

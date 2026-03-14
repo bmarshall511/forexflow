@@ -1,7 +1,12 @@
 "use client"
 
 import { useMemo } from "react"
-import type { ChartGridLayout, ChartPanelConfig, PositionPriceTick, TradeDirection } from "@fxflow/types"
+import type {
+  ChartGridLayout,
+  ChartPanelConfig,
+  PositionPriceTick,
+  TradeDirection,
+} from "@fxflow/types"
 import type { OrderOverlayConfig } from "./standalone-chart"
 import type { TradeChartConfig } from "./chart-panel"
 import { ChartPanel } from "./chart-panel"
@@ -35,7 +40,19 @@ const GRID_CLASSES: Record<ChartGridLayout, string> = {
   "6-grid": "grid-cols-3 grid-rows-2",
 }
 
-export function ChartGrid({ layout, panels, onPanelChange, chartPrices, activeIndex, onActiveChange, tradeCharts, onClearTrade, onOrderEntry, orderOverlay, orderOverlayPanelIndex }: ChartGridProps) {
+export function ChartGrid({
+  layout,
+  panels,
+  onPanelChange,
+  chartPrices,
+  activeIndex,
+  onActiveChange,
+  tradeCharts,
+  onClearTrade,
+  onOrderEntry,
+  orderOverlay,
+  orderOverlayPanelIndex,
+}: ChartGridProps) {
   // Clamp active index to valid range
   const clampedActive = Math.min(activeIndex, panels.length - 1)
 
@@ -67,11 +84,23 @@ export function ChartGrid({ layout, panels, onPanelChange, chartPrices, activeIn
           />
         )
       }),
-    [panels, layout, onPanelChange, chartPrices, clampedActive, onActiveChange, tradeCharts, onClearTrade, onOrderEntry, orderOverlay, orderOverlayPanelIndex],
+    [
+      panels,
+      layout,
+      onPanelChange,
+      chartPrices,
+      clampedActive,
+      onActiveChange,
+      tradeCharts,
+      onClearTrade,
+      onOrderEntry,
+      orderOverlay,
+      orderOverlayPanelIndex,
+    ],
   )
 
   return (
-    <div className={`grid flex-1 min-h-0 gap-px bg-border overflow-hidden ${GRID_CLASSES[layout]}`}>
+    <div className={`bg-border grid min-h-0 flex-1 gap-px overflow-hidden ${GRID_CLASSES[layout]}`}>
       {panelElements}
     </div>
   )

@@ -24,10 +24,10 @@ interface UseZoneSettingsReturn {
  * Global settings come from /api/zones/settings (persisted in DB).
  * Per-chart overrides come from the caller (stored in ChartPanelConfig).
  */
-export function useZoneSettings(
-  chartOverrides?: ChartPanelZoneOverrides,
-): UseZoneSettingsReturn {
-  const [globalSettings, setGlobalSettings] = useState<ZoneDisplaySettings>(DEFAULT_ZONE_DISPLAY_SETTINGS)
+export function useZoneSettings(chartOverrides?: ChartPanelZoneOverrides): UseZoneSettingsReturn {
+  const [globalSettings, setGlobalSettings] = useState<ZoneDisplaySettings>(
+    DEFAULT_ZONE_DISPLAY_SETTINGS,
+  )
   const [overrides, setOverrides] = useState<ChartPanelZoneOverrides>(chartOverrides ?? {})
   const [isLoading, setIsLoading] = useState(true)
 
@@ -49,8 +49,12 @@ export function useZoneSettings(
         }
       })
       .catch(() => {}) // Silently fail — use defaults
-      .finally(() => { if (!cancelled) setIsLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Sync external overrides changes
@@ -73,14 +77,21 @@ export function useZoneSettings(
   }, [])
 
   // Merge global + overrides
-  const settings = useMemo((): ZoneDisplaySettings => ({
-    ...globalSettings,
-    ...(overrides.enabled !== undefined && { enabled: overrides.enabled }),
-    ...(overrides.maxZonesPerType !== undefined && { maxZonesPerType: overrides.maxZonesPerType }),
-    ...(overrides.minScore !== undefined && { minScore: overrides.minScore }),
-    ...(overrides.showInvalidated !== undefined && { showInvalidated: overrides.showInvalidated }),
-    ...(overrides.showHigherTf !== undefined && { showHigherTf: overrides.showHigherTf }),
-  }), [globalSettings, overrides])
+  const settings = useMemo(
+    (): ZoneDisplaySettings => ({
+      ...globalSettings,
+      ...(overrides.enabled !== undefined && { enabled: overrides.enabled }),
+      ...(overrides.maxZonesPerType !== undefined && {
+        maxZonesPerType: overrides.maxZonesPerType,
+      }),
+      ...(overrides.minScore !== undefined && { minScore: overrides.minScore }),
+      ...(overrides.showInvalidated !== undefined && {
+        showInvalidated: overrides.showInvalidated,
+      }),
+      ...(overrides.showHigherTf !== undefined && { showHigherTf: overrides.showHigherTf }),
+    }),
+    [globalSettings, overrides],
+  )
 
   return { settings, globalSettings, saveGlobal, overrides, setOverrides, isLoading }
 }

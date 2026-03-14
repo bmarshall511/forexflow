@@ -17,6 +17,7 @@ Run verification across the entire monorepo.
    - `pnpm format:check` (Prettier)
 
 2. Run all checks sequentially:
+
    ```bash
    pnpm lint
    pnpm typecheck

@@ -15,17 +15,17 @@ export function TVAlertsStatusPopover({ tvAlerts, isConnected }: TVAlertsStatusP
     return (
       <div className="space-y-2">
         <h4 className="text-sm font-semibold">TradingView Alerts</h4>
-        <p className="text-xs text-muted-foreground">
-          {!isConnected
-            ? "Daemon not connected. TradingView Alerts status unavailable."
-            : (
-                <>
-                  CF Worker not configured.{" "}
-                  <Link href="/settings/tv-alerts" className="underline hover:text-foreground">
-                    Configure in Settings
-                  </Link>
-                </>
-              )}
+        <p className="text-muted-foreground text-xs">
+          {!isConnected ? (
+            "Daemon not connected. TradingView Alerts status unavailable."
+          ) : (
+            <>
+              CF Worker not configured.{" "}
+              <Link href="/settings/tv-alerts" className="hover:text-foreground underline">
+                Configure in Settings
+              </Link>
+            </>
+          )}
         </p>
       </div>
     )
@@ -39,7 +39,7 @@ export function TVAlertsStatusPopover({ tvAlerts, isConnected }: TVAlertsStatusP
         <Badge
           variant="outline"
           className={cn(
-            "text-[10px] px-1.5 py-0",
+            "px-1.5 py-0 text-[10px]",
             tvAlerts.enabled ? "text-status-connected" : "text-muted-foreground",
           )}
         >
@@ -48,7 +48,7 @@ export function TVAlertsStatusPopover({ tvAlerts, isConnected }: TVAlertsStatusP
       </div>
 
       {/* Connection details */}
-      <div className="space-y-1.5 border-t border-border pt-2">
+      <div className="border-border space-y-1.5 border-t pt-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">CF Worker</span>
           <div className="flex items-center gap-1.5">
@@ -73,19 +73,29 @@ export function TVAlertsStatusPopover({ tvAlerts, isConnected }: TVAlertsStatusP
       </div>
 
       {/* Safety */}
-      <div className="space-y-1.5 border-t border-border pt-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="border-border space-y-1.5 border-t pt-2">
+        <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
           Safety
         </span>
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Today P&L</span>
-          <span className={cn("font-mono tabular-nums font-medium", tvAlerts.todayAutoPL >= 0 ? "text-green-500" : "text-red-500")}>
+          <span
+            className={cn(
+              "font-mono font-medium tabular-nums",
+              tvAlerts.todayAutoPL >= 0 ? "text-green-500" : "text-red-500",
+            )}
+          >
             ${tvAlerts.todayAutoPL.toFixed(2)}
           </span>
         </div>
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Circuit Breaker</span>
-          <span className={cn("font-medium", tvAlerts.circuitBreakerTripped ? "text-red-500" : "text-green-500")}>
+          <span
+            className={cn(
+              "font-medium",
+              tvAlerts.circuitBreakerTripped ? "text-red-500" : "text-green-500",
+            )}
+          >
             {tvAlerts.circuitBreakerTripped ? "TRIPPED" : "OK"}
           </span>
         </div>

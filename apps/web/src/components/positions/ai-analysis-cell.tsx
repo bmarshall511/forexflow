@@ -13,7 +13,12 @@ interface AiAnalysisCellProps {
   onClick: () => void
 }
 
-export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, onClick }: AiAnalysisCellProps) {
+export function AiAnalysisCell({
+  latestAnalysis,
+  analysisCount,
+  activeProgress,
+  onClick,
+}: AiAnalysisCellProps) {
   const status = latestAnalysis?.status
 
   // ── State 1: Live WS progress (real-time streaming) ───────────────────────
@@ -23,17 +28,20 @@ export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, 
         <TooltipTrigger asChild>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onClick() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick()
+            }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-primary/60"
+            className="text-primary/60 flex items-center gap-1"
           >
             <Sparkles className="size-3 animate-pulse" />
-            <span className="text-[10px] font-mono tabular-nums text-muted-foreground">
+            <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
               {activeProgress.progress}%
             </span>
           </button>
         </TooltipTrigger>
-        <TooltipContent side="left" className="text-xs max-w-48">
+        <TooltipContent side="left" className="max-w-48 text-xs">
           {activeProgress.stage}
         </TooltipContent>
       </Tooltip>
@@ -47,9 +55,12 @@ export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, 
         <TooltipTrigger asChild>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onClick() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick()
+            }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-primary/60"
+            className="text-primary/60 flex items-center gap-1"
           >
             <Loader2 className="size-3 animate-spin" />
           </button>
@@ -72,17 +83,20 @@ export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, 
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onClick() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onClick()
+              }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-primary/60 hover:text-primary transition-colors"
+              className="text-primary/60 hover:text-primary flex items-center gap-1 transition-colors"
             >
               <Sparkles className="size-3" />
               <AlertCircle className="size-2.5 text-red-500/70" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="left" className="text-xs max-w-52">
+          <TooltipContent side="left" className="max-w-52 text-xs">
             <span className="text-red-500">Latest analysis failed</span>
-            <span className="block text-muted-foreground">{count} completed</span>
+            <span className="text-muted-foreground block">{count} completed</span>
           </TooltipContent>
         </Tooltip>
       )
@@ -92,17 +106,22 @@ export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, 
         <TooltipTrigger asChild>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onClick() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick()
+            }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-red-500/70 hover:text-red-500 transition-colors"
+            className="flex items-center gap-1 text-red-500/70 transition-colors hover:text-red-500"
           >
             <AlertCircle className="size-3" />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="left" className="text-xs max-w-52">
+        <TooltipContent side="left" className="max-w-52 text-xs">
           <span className="text-red-500">Analysis failed</span>
           {latestAnalysis?.errorMessage && (
-            <span className="block text-muted-foreground truncate">{latestAnalysis.errorMessage}</span>
+            <span className="text-muted-foreground block truncate">
+              {latestAnalysis.errorMessage}
+            </span>
           )}
         </TooltipContent>
       </Tooltip>
@@ -121,7 +140,10 @@ export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, 
         <TooltipTrigger asChild>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onClick() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick()
+            }}
             onMouseDown={(e) => e.stopPropagation()}
             className={cn(
               "flex items-center gap-1 transition-colors",
@@ -130,7 +152,7 @@ export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, 
           >
             <Sparkles className="size-3" />
             {count > 1 && (
-              <span className="text-[10px] font-semibold text-muted-foreground">{count}</span>
+              <span className="text-muted-foreground text-[10px] font-semibold">{count}</span>
             )}
           </button>
         </TooltipTrigger>
@@ -149,13 +171,18 @@ export function AiAnalysisCell({ latestAnalysis, analysisCount, activeProgress, 
         <TooltipTrigger asChild>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onClick() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick()
+            }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-primary/60 hover:text-primary transition-colors"
+            className="text-primary/60 hover:text-primary flex items-center gap-1 transition-colors"
           >
             <Sparkles className="size-3" />
             {completedCount > 1 && (
-              <span className="text-[10px] font-semibold text-muted-foreground">{completedCount}</span>
+              <span className="text-muted-foreground text-[10px] font-semibold">
+                {completedCount}
+              </span>
             )}
           </button>
         </TooltipTrigger>

@@ -13,17 +13,12 @@ interface IndicatorPillProps {
 function IndicatorPill({ icon, label, count, className }: IndicatorPillProps) {
   return (
     <div
-      className={cn(
-        "flex items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1",
-        className,
-      )}
+      className={cn("bg-muted/50 flex items-center gap-1.5 rounded-md px-2.5 py-1", className)}
       aria-label={`${count} ${label}`}
     >
       {icon}
-      <span className="font-mono text-xs tabular-nums font-semibold text-foreground">
-        {count}
-      </span>
-      <span className="hidden xl:inline text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-foreground font-mono text-xs font-semibold tabular-nums">{count}</span>
+      <span className="text-muted-foreground hidden text-[11px] xl:inline">{label}</span>
     </div>
   )
 }
@@ -40,19 +35,19 @@ export function HeaderTradingIndicators({
   closedPositions = 0,
 }: HeaderTradingIndicatorsProps) {
   return (
-    <div className="hidden md:flex items-center gap-1.5">
+    <div className="hidden items-center gap-1.5 md:flex">
       <IndicatorPill
-        icon={<Clock className="size-3 text-status-warning" />}
+        icon={<Clock className="text-status-warning size-3" />}
         label="Pending"
         count={pendingOrders}
       />
       <IndicatorPill
-        icon={<TrendingUp className="size-3 text-status-connected" />}
+        icon={<TrendingUp className="text-status-connected size-3" />}
         label="Open"
         count={openPositions}
       />
       <IndicatorPill
-        icon={<CheckCircle2 className="size-3 text-muted-foreground" />}
+        icon={<CheckCircle2 className="text-muted-foreground size-3" />}
         label="Closed"
         count={closedPositions}
       />

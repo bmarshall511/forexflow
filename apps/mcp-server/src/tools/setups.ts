@@ -16,11 +16,16 @@ export function registerSetupTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
@@ -37,10 +42,15 @@ export function registerSetupTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 }

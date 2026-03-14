@@ -18,11 +18,16 @@ export function registerAiTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
@@ -36,7 +41,9 @@ export function registerAiTools(server: McpServer) {
         const analysis = await getLatestCompletedAnalysis(tradeId)
         if (!analysis) {
           return {
-            content: [{ type: "text" as const, text: `No completed analysis found for trade ${tradeId}` }],
+            content: [
+              { type: "text" as const, text: `No completed analysis found for trade ${tradeId}` },
+            ],
           }
         }
         return {
@@ -44,11 +51,16 @@ export function registerAiTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
@@ -63,10 +75,15 @@ export function registerAiTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 }

@@ -53,6 +53,7 @@ src/
 ## Page Layout Pattern
 
 Every feature page follows this structure:
+
 1. Hero header (title + subtitle + action buttons)
 2. Status/summary tiles (DataTile grid)
 3. Sticky `TabNav` for sub-sections

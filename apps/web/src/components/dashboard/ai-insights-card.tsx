@@ -8,8 +8,18 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { DataTile, InlineStat } from "@/components/ui/data-tile"
 import {
-  Sparkles, Settings2, CheckCircle2, Loader2, AlertCircle, Circle,
-  TrendingUp, Clock, ArrowUpRight, Bot, User, AlertTriangle,
+  Sparkles,
+  Settings2,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Circle,
+  TrendingUp,
+  Clock,
+  ArrowUpRight,
+  Bot,
+  User,
+  AlertTriangle,
 } from "lucide-react"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import type { AiUsageStats, AiSettingsData, AiAccuracyStats } from "@fxflow/types"
@@ -75,31 +85,51 @@ export function AiInsightsCard() {
   const fetchAll = () => {
     setIsLoading(true)
     Promise.all([
-      fetch("/api/ai/settings").then((r) => r.json()).catch(() => null),
-      fetch("/api/ai/usage").then((r) => r.json()).catch(() => null),
-      fetch("/api/ai/analyses/recent?limit=3").then((r) => r.json()).catch(() => null),
-      fetch("/api/ai/accuracy").then((r) => r.json()).catch(() => null),
-    ]).then(([settingsRes, usageRes, recentRes, accuracyRes]) => {
-      if (settingsRes?.ok) setSettings(settingsRes.data as AiSettingsData)
-      if (usageRes?.ok) setUsage(usageRes.data as AiUsageStats)
-      if (recentRes?.ok) setRecent(recentRes.data as RecentAnalysisSummary[])
-      if (accuracyRes?.ok) setAccuracy(accuracyRes.data as AiAccuracyStats)
-    }).finally(() => setIsLoading(false))
+      fetch("/api/ai/settings")
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch("/api/ai/usage")
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch("/api/ai/analyses/recent?limit=3")
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch("/api/ai/accuracy")
+        .then((r) => r.json())
+        .catch(() => null),
+    ])
+      .then(([settingsRes, usageRes, recentRes, accuracyRes]) => {
+        if (settingsRes?.ok) setSettings(settingsRes.data as AiSettingsData)
+        if (usageRes?.ok) setUsage(usageRes.data as AiUsageStats)
+        if (recentRes?.ok) setRecent(recentRes.data as RecentAnalysisSummary[])
+        if (accuracyRes?.ok) setAccuracy(accuracyRes.data as AiAccuracyStats)
+      })
+      .finally(() => setIsLoading(false))
   }
 
-  useEffect(() => { fetchAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchAll()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!lastAiAnalysisCompleted) return
     Promise.all([
-      fetch("/api/ai/usage").then((r) => r.json()).catch(() => null),
-      fetch("/api/ai/analyses/recent?limit=3").then((r) => r.json()).catch(() => null),
-      fetch("/api/ai/accuracy").then((r) => r.json()).catch(() => null),
-    ]).then(([usageRes, recentRes, accuracyRes]) => {
-      if (usageRes?.ok && usageRes.data) setUsage(usageRes.data as AiUsageStats)
-      if (recentRes?.ok && recentRes.data) setRecent(recentRes.data as RecentAnalysisSummary[])
-      if (accuracyRes?.ok && accuracyRes.data) setAccuracy(accuracyRes.data as AiAccuracyStats)
-    }).catch(() => {})
+      fetch("/api/ai/usage")
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch("/api/ai/analyses/recent?limit=3")
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch("/api/ai/accuracy")
+        .then((r) => r.json())
+        .catch(() => null),
+    ])
+      .then(([usageRes, recentRes, accuracyRes]) => {
+        if (usageRes?.ok && usageRes.data) setUsage(usageRes.data as AiUsageStats)
+        if (recentRes?.ok && recentRes.data) setRecent(recentRes.data as RecentAnalysisSummary[])
+        if (accuracyRes?.ok && accuracyRes.data) setAccuracy(accuracyRes.data as AiAccuracyStats)
+      })
+      .catch(() => {})
   }, [lastAiAnalysisCompleted])
 
   useEffect(() => {
@@ -115,7 +145,8 @@ export function AiInsightsCard() {
   const s = settings!
 
   const openAnalysis = (a: RecentAnalysisSummary) => {
-    const tab = a.tradeStatus === "closed" ? "history" : a.tradeStatus === "pending" ? "pending" : "open"
+    const tab =
+      a.tradeStatus === "closed" ? "history" : a.tradeStatus === "pending" ? "pending" : "open"
     const params = new URLSearchParams({ tab })
     if (a.tradeStatus !== "closed") params.set("openAnalysis", a.tradeId)
     router.push(`/positions?${params.toString()}`)
@@ -125,7 +156,7 @@ export function AiInsightsCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4 text-primary" />
+          <Sparkles className="text-primary size-4" />
           AI Analysis
           {activeCount > 0 && (
             <Badge variant="secondary" className="gap-1 text-[10px]">
@@ -135,7 +166,10 @@ export function AiInsightsCard() {
           )}
         </CardTitle>
         <CardAction>
-          <Link href="/settings/ai" className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/settings/ai"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             <Settings2 className="size-4" />
             <span className="sr-only">AI Settings</span>
           </Link>
@@ -154,10 +188,10 @@ export function AiInsightsCard() {
             <Skeleton className="h-24" />
           </div>
         ) : !hasKey ? (
-          <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
-            <AlertCircle className="size-6 text-muted-foreground mx-auto" />
-            <p className="text-sm text-muted-foreground">Claude API key not configured</p>
-            <Link href="/settings/ai" className="text-xs text-primary hover:underline">
+          <div className="space-y-2 rounded-lg border border-dashed p-4 text-center">
+            <AlertCircle className="text-muted-foreground mx-auto size-6" />
+            <p className="text-muted-foreground text-sm">Claude API key not configured</p>
+            <Link href="/settings/ai" className="text-primary text-xs hover:underline">
               Configure in Settings →
             </Link>
           </div>
@@ -171,7 +205,7 @@ export function AiInsightsCard() {
                 {s.claudeKeyLastFour && (
                   <span className="text-muted-foreground/60">••••{s.claudeKeyLastFour}</span>
                 )}
-                <Badge variant="outline" className="text-[10px] h-4 px-1 ml-auto">
+                <Badge variant="outline" className="ml-auto h-4 px-1 text-[10px]">
                   {modelLabel(s.defaultModel)}
                 </Badge>
               </div>
@@ -183,13 +217,18 @@ export function AiInsightsCard() {
                     {s.finnhubKeyLastFour && (
                       <span className="text-muted-foreground/60">••••{s.finnhubKeyLastFour}</span>
                     )}
-                    <span className="text-muted-foreground/50 ml-auto text-[10px]">calendar & news</span>
+                    <span className="text-muted-foreground/50 ml-auto text-[10px]">
+                      calendar & news
+                    </span>
                   </>
                 ) : (
                   <>
-                    <Circle className="size-3.5 shrink-0 text-muted-foreground/40" />
+                    <Circle className="text-muted-foreground/40 size-3.5 shrink-0" />
                     <span className="text-muted-foreground/50">FinnHub not configured</span>
-                    <Link href="/settings/ai" className="ml-auto text-[10px] text-primary hover:underline">
+                    <Link
+                      href="/settings/ai"
+                      className="text-primary ml-auto text-[10px] hover:underline"
+                    >
                       Add key
                     </Link>
                   </>
@@ -224,7 +263,7 @@ export function AiInsightsCard() {
                 </div>
 
                 {/* ── Projections + quality metrics ── */}
-                <div className="rounded-lg bg-muted/30 px-3 py-1.5">
+                <div className="bg-muted/30 rounded-lg px-3 py-1.5">
                   {usage.byPeriod.thisMonth.count > 0 && (
                     <InlineStat
                       label="Est. month-end cost"
@@ -242,16 +281,18 @@ export function AiInsightsCard() {
                       label="Avg win probability"
                       value={`${usage.avgWinProbability}%`}
                       className={
-                        usage.avgWinProbability >= 60 ? "text-emerald-600"
-                          : usage.avgWinProbability >= 40 ? "text-amber-600"
-                          : "text-red-500"
+                        usage.avgWinProbability >= 60
+                          ? "text-emerald-600"
+                          : usage.avgWinProbability >= 40
+                            ? "text-amber-600"
+                            : "text-red-500"
                       }
                     />
                   )}
                   {usage.avgQualityScore !== null && (
                     <InlineStat label="Avg quality score" value={`${usage.avgQualityScore}/10`} />
                   )}
-                  {(usage.statusCounts.completed + usage.statusCounts.failed) > 0 && (
+                  {usage.statusCounts.completed + usage.statusCounts.failed > 0 && (
                     <InlineStat
                       label="Analysis success rate"
                       value={`${Math.round((usage.statusCounts.completed / (usage.statusCounts.completed + usage.statusCounts.failed)) * 100)}%`}
@@ -263,17 +304,19 @@ export function AiInsightsCard() {
                 {/* ── Auto vs Manual split ── */}
                 {usage.totalAnalyses > 0 && (
                   <div className="flex items-center gap-2 text-xs">
-                    <Bot className="size-3.5 text-muted-foreground shrink-0" />
-                    <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <Bot className="text-muted-foreground size-3.5 shrink-0" />
+                    <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
                       <div
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${Math.round((usage.autoCount / usage.totalAnalyses) * 100)}%` }}
+                        className="bg-primary h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.round((usage.autoCount / usage.totalAnalyses) * 100)}%`,
+                        }}
                       />
                     </div>
                     <span className="text-muted-foreground/60 shrink-0 tabular-nums">
                       {usage.autoCount}a / {usage.manualCount}m
                     </span>
-                    <User className="size-3.5 text-muted-foreground shrink-0" />
+                    <User className="text-muted-foreground size-3.5 shrink-0" />
                   </div>
                 )}
               </>
@@ -284,17 +327,23 @@ export function AiInsightsCard() {
               <>
                 <Separator />
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">By Model</p>
+                  <p className="text-muted-foreground text-xs font-medium">By Model</p>
                   {usage.byModel.map((m) => (
                     <div key={m.model} className="flex items-center gap-2 text-xs">
-                      <Badge variant={modelVariant(m.model)} className="text-[10px] h-4 px-1.5 shrink-0">
+                      <Badge
+                        variant={modelVariant(m.model)}
+                        className="h-4 shrink-0 px-1.5 text-[10px]"
+                      >
                         {modelLabel(m.model)}
                       </Badge>
                       <span className="text-muted-foreground">{m.count} analyses</span>
-                      <span className="text-muted-foreground/50 tabular-nums text-[10px]">
-                        {(m.inputTokens / 1000).toFixed(0)}k/{(m.outputTokens / 1000).toFixed(0)}k tok
+                      <span className="text-muted-foreground/50 text-[10px] tabular-nums">
+                        {(m.inputTokens / 1000).toFixed(0)}k/{(m.outputTokens / 1000).toFixed(0)}k
+                        tok
                       </span>
-                      <span className="ml-auto text-muted-foreground/60 tabular-nums">{fmtCost(m.costUsd)}</span>
+                      <span className="text-muted-foreground/60 ml-auto tabular-nums">
+                        {fmtCost(m.costUsd)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -306,33 +355,37 @@ export function AiInsightsCard() {
               <>
                 <Separator />
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Recent Analyses</p>
+                  <p className="text-muted-foreground text-xs font-medium">Recent Analyses</p>
                   {recent.map((a) => (
                     <button
                       key={a.id}
                       type="button"
                       onClick={() => openAnalysis(a)}
-                      className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-accent transition-colors text-left"
+                      className="hover:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors"
                     >
-                      <span className="font-medium shrink-0">
-                        {a.instrument.replace("_", "/")}
-                      </span>
-                      <span className={cn(
-                        "text-[10px] shrink-0",
-                        a.direction === "long" ? "text-emerald-600" : "text-red-500",
-                      )}>
+                      <span className="shrink-0 font-medium">{a.instrument.replace("_", "/")}</span>
+                      <span
+                        className={cn(
+                          "shrink-0 text-[10px]",
+                          a.direction === "long" ? "text-emerald-600" : "text-red-500",
+                        )}
+                      >
                         {a.direction === "long" ? "↑" : "↓"}
                       </span>
-                      <Badge variant="outline" className="text-[10px] h-4 px-1 shrink-0 capitalize">
+                      <Badge variant="outline" className="h-4 shrink-0 px-1 text-[10px] capitalize">
                         {a.depth}
                       </Badge>
                       {a.winProbability !== null && (
-                        <span className={cn(
-                          "shrink-0",
-                          a.winProbability >= 60 ? "text-emerald-600"
-                            : a.winProbability >= 40 ? "text-amber-600"
-                            : "text-red-500",
-                        )}>
+                        <span
+                          className={cn(
+                            "shrink-0",
+                            a.winProbability >= 60
+                              ? "text-emerald-600"
+                              : a.winProbability >= 40
+                                ? "text-amber-600"
+                                : "text-red-500",
+                          )}
+                        >
                           {a.winProbability}%
                         </span>
                       )}
@@ -341,10 +394,10 @@ export function AiInsightsCard() {
                           Q{a.tradeQualityScore}
                         </span>
                       )}
-                      <span className="ml-auto text-muted-foreground/50 tabular-nums shrink-0">
+                      <span className="text-muted-foreground/50 ml-auto shrink-0 tabular-nums">
                         {formatRelativeTime(a.createdAt)}
                       </span>
-                      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground/40" />
+                      <ArrowUpRight className="text-muted-foreground/40 size-3 shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -356,32 +409,39 @@ export function AiInsightsCard() {
               <>
                 <Separator />
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Prediction Accuracy</p>
+                  <p className="text-muted-foreground text-xs font-medium">Prediction Accuracy</p>
 
-                  <div className="rounded-lg bg-muted/30 px-3 py-1.5">
-                    {accuracy.overallPredictedWinRate !== null && accuracy.overallActualWinRate !== null && (
-                      <InlineStat
-                        label={`AI predicted ${accuracy.overallPredictedWinRate}% win chance`}
-                        value={`${accuracy.overallActualWinRate}% actual`}
-                        className={
-                          Math.abs(accuracy.overallPredictedWinRate - accuracy.overallActualWinRate) <= 10
-                            ? "text-emerald-600"
-                            : "text-amber-600"
-                        }
-                      />
-                    )}
+                  <div className="bg-muted/30 rounded-lg px-3 py-1.5">
+                    {accuracy.overallPredictedWinRate !== null &&
+                      accuracy.overallActualWinRate !== null && (
+                        <InlineStat
+                          label={`AI predicted ${accuracy.overallPredictedWinRate}% win chance`}
+                          value={`${accuracy.overallActualWinRate}% actual`}
+                          className={
+                            Math.abs(
+                              accuracy.overallPredictedWinRate - accuracy.overallActualWinRate,
+                            ) <= 10
+                              ? "text-emerald-600"
+                              : "text-amber-600"
+                          }
+                        />
+                      )}
                     {accuracy.followedWinRate !== null && (
                       <InlineStat
                         label="Followed AI advice"
                         value={`${accuracy.followedWinRate}% win rate`}
-                        className={accuracy.followedWinRate >= 50 ? "text-emerald-600" : "text-red-500"}
+                        className={
+                          accuracy.followedWinRate >= 50 ? "text-emerald-600" : "text-red-500"
+                        }
                       />
                     )}
                     {accuracy.ignoredWinRate !== null && (
                       <InlineStat
                         label="Ignored AI advice"
                         value={`${accuracy.ignoredWinRate}% win rate`}
-                        className={accuracy.ignoredWinRate >= 50 ? "text-emerald-600" : "text-red-500"}
+                        className={
+                          accuracy.ignoredWinRate >= 50 ? "text-emerald-600" : "text-red-500"
+                        }
                       />
                     )}
                     <InlineStat
@@ -393,15 +453,18 @@ export function AiInsightsCard() {
                   {accuracy.calibration.length > 0 && (
                     <div className="space-y-0.5">
                       {accuracy.calibration.map((b) => (
-                        <div key={b.bucket} className="flex items-center gap-2 text-[10px] text-muted-foreground px-1">
+                        <div
+                          key={b.bucket}
+                          className="text-muted-foreground flex items-center gap-2 px-1 text-[10px]"
+                        >
                           <span className="w-16 shrink-0 tabular-nums">{b.bucket}</span>
-                          <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                          <div className="bg-muted h-1 flex-1 overflow-hidden rounded-full">
                             <div
-                              className="h-full bg-primary rounded-full transition-all"
+                              className="bg-primary h-full rounded-full transition-all"
                               style={{ width: `${b.actualWinRate ?? 0}%` }}
                             />
                           </div>
-                          <span className="w-10 text-right tabular-nums shrink-0">
+                          <span className="w-10 shrink-0 text-right tabular-nums">
                             {b.actualWinRate !== null ? `${b.actualWinRate}%` : "—"}
                           </span>
                           <span className="text-muted-foreground/50 shrink-0">({b.count})</span>
@@ -418,23 +481,25 @@ export function AiInsightsCard() {
             {autoAnalysis && (
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="size-3.5 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground">Auto-Analysis</span>
+                  <TrendingUp className="text-muted-foreground size-3.5" />
+                  <span className="text-muted-foreground text-xs font-medium">Auto-Analysis</span>
                   {autoAnalysis.autoDisabledReason ? (
                     <Link
                       href="/settings/ai"
-                      className="ml-auto flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 transition-colors"
+                      className="ml-auto flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 transition-colors hover:bg-amber-500/20"
                     >
                       <AlertTriangle className="size-2.5" />
                       Auto-disabled
                     </Link>
                   ) : (
-                    <span className={cn(
-                      "ml-auto text-[10px] rounded px-1.5 py-0.5",
-                      autoAnalysis.enabled
-                        ? "bg-emerald-500/10 text-emerald-700"
-                        : "bg-muted text-muted-foreground",
-                    )}>
+                    <span
+                      className={cn(
+                        "ml-auto rounded px-1.5 py-0.5 text-[10px]",
+                        autoAnalysis.enabled
+                          ? "bg-emerald-500/10 text-emerald-700"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
                       {autoAnalysis.enabled ? "Enabled" : "Disabled"}
                     </span>
                   )}
@@ -442,16 +507,22 @@ export function AiInsightsCard() {
                 {autoAnalysis.enabled && (
                   <div className="flex flex-wrap gap-1 pl-5">
                     {autoAnalysis.onOrderFill && (
-                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">On Fill</Badge>
+                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                        On Fill
+                      </Badge>
                     )}
                     {autoAnalysis.onTradeClose && (
-                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">On Close</Badge>
+                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                        On Close
+                      </Badge>
                     )}
                     {autoAnalysis.onPendingCreate && (
-                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">On Pending</Badge>
+                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                        On Pending
+                      </Badge>
                     )}
                     {autoAnalysis.intervalEnabled && (
-                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5 gap-0.5">
+                      <Badge variant="secondary" className="h-4 gap-0.5 px-1.5 text-[10px]">
                         <Clock className="size-2.5" />
                         {autoAnalysis.intervalHours}h
                       </Badge>

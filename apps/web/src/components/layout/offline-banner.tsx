@@ -64,7 +64,7 @@ export function OfflineBanner() {
         <>
           <WifiOff className="size-4 shrink-0" aria-hidden="true" />
           <span>No internet connection</span>
-          <span className="hidden sm:inline text-white/80">
+          <span className="hidden text-white/80 sm:inline">
             &mdash; Some features may be unavailable
           </span>
         </>

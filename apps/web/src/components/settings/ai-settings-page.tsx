@@ -11,7 +11,18 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AI_MODEL_OPTIONS, type AiClaudeModel, type AiAnalysisDepth } from "@fxflow/types"
 import { useAiSettings } from "@/hooks/use-ai-settings"
-import { Eye, EyeOff, Trash2, CheckCircle2, Sparkles, AlertTriangle, Shield, Zap, GraduationCap, CalendarDays } from "lucide-react"
+import {
+  Eye,
+  EyeOff,
+  Trash2,
+  CheckCircle2,
+  Sparkles,
+  AlertTriangle,
+  Shield,
+  Zap,
+  GraduationCap,
+  CalendarDays,
+} from "lucide-react"
 
 // ─── Key Field ────────────────────────────────────────────────────────────────
 
@@ -65,18 +76,18 @@ function ApiKeyField({
   return (
     <div className="space-y-2">
       <Label className="text-sm">{label}</Label>
-      <p className="text-xs text-muted-foreground">{description}</p>
+      <p className="text-muted-foreground text-xs">{description}</p>
 
       {hasKey ? (
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-md border bg-muted px-3 py-1.5 text-xs">
+          <div className="bg-muted flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs">
             <CheckCircle2 className="size-3 text-emerald-500" />
             <span>Configured ••••{lastFour}</span>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs gap-1 text-muted-foreground hover:text-destructive"
+            className="text-muted-foreground hover:text-destructive h-7 gap-1 text-xs"
             onClick={() => void handleRemove()}
             disabled={saving}
           >
@@ -111,21 +122,34 @@ function ApiKeyField({
               placeholder="Paste API key…"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="h-8 text-xs pr-8"
+              className="h-8 pr-8 text-xs"
               autoComplete="off"
             />
             <button
               type="button"
               onClick={() => setShowValue(!showValue)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
             >
               {showValue ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
             </button>
           </div>
-          <Button size="sm" className="h-8 text-xs" onClick={() => void handleSave()} disabled={!value.trim() || saving}>
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => void handleSave()}
+            disabled={!value.trim() || saving}
+          >
             {saving ? "Saving…" : "Save"}
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setShowInput(false); setValue("") }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => {
+              setShowInput(false)
+              setValue("")
+            }}
+          >
             Cancel
           </Button>
         </div>
@@ -136,20 +160,25 @@ function ApiKeyField({
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}) {
   return (
     <button
       role="switch"
       aria-checked={checked}
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-        disabled:opacity-50 disabled:cursor-not-allowed
-        ${checked ? "bg-primary" : "bg-input"}`}
+      className={`focus-visible:ring-ring relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${checked ? "bg-primary" : "bg-input"}`}
     >
-      <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform
-        ${checked ? "translate-x-4" : "translate-x-0"}`}
+      <span
+        className={`bg-background pointer-events-none inline-block h-4 w-4 rounded-full shadow-lg ring-0 transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`}
       />
     </button>
   )
@@ -174,7 +203,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="text-sm">{label}</p>
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        {description && <p className="text-muted-foreground text-xs">{description}</p>}
       </div>
       <Toggle checked={checked} onChange={onChange} disabled={disabled} />
     </div>
@@ -183,12 +212,21 @@ function ToggleRow({
 
 // ─── Select styling ──────────────────────────────────────────────────────────
 
-const selectClass = "flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+const selectClass =
+  "flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function AiSettingsPage() {
-  const { settings, isLoading, saveClaudeKey, removeClaudeKey, saveFinnhubKey, removeFinnhubKey, savePreferences } = useAiSettings()
+  const {
+    settings,
+    isLoading,
+    saveClaudeKey,
+    removeClaudeKey,
+    saveFinnhubKey,
+    removeFinnhubKey,
+    savePreferences,
+  } = useAiSettings()
   const [saving, setSaving] = useState(false)
 
   if (isLoading) {
@@ -201,7 +239,7 @@ export function AiSettingsPage() {
   }
 
   if (!settings) {
-    return <p className="text-sm text-muted-foreground">Failed to load AI settings.</p>
+    return <p className="text-muted-foreground text-sm">Failed to load AI settings.</p>
   }
 
   const autoAnalysis = settings.autoAnalysis
@@ -215,7 +253,7 @@ export function AiSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "re-enable-auto" }),
       })
-      const json = await res.json() as { ok: boolean }
+      const json = (await res.json()) as { ok: boolean }
       if (json.ok) {
         toast.success("Auto-analysis re-enabled")
         window.location.reload()
@@ -244,7 +282,7 @@ export function AiSettingsPage() {
     if (enabled) {
       const confirmed = window.confirm(
         "Are you sure you want to enable auto-apply on your live account? " +
-        "AI-recommended actions will be executed automatically on real money trades.",
+          "AI-recommended actions will be executed automatically on real money trades.",
       )
       if (!confirmed) return
     }
@@ -257,7 +295,7 @@ export function AiSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" />
+            <Sparkles className="text-primary size-4" />
             API Keys
           </CardTitle>
           <CardDescription>
@@ -305,7 +343,9 @@ export function AiSettingsPage() {
               className={selectClass}
             >
               {AI_MODEL_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>{opt.name} — {opt.description}</option>
+                <option key={opt.id} value={opt.id}>
+                  {opt.name} — {opt.description}
+                </option>
               ))}
             </select>
           </div>
@@ -337,17 +377,18 @@ export function AiSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-
           {/* Auto-disabled warning */}
           {isAutoDisabled && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 space-y-2">
+            <div className="space-y-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="size-4 text-red-500 mt-0.5 shrink-0" />
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-500" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-red-600">Auto-analysis was disabled due to repeated failures</p>
-                  <p className="text-xs text-muted-foreground">{autoAnalysis.autoDisabledReason}</p>
+                  <p className="text-sm font-medium text-red-600">
+                    Auto-analysis was disabled due to repeated failures
+                  </p>
+                  <p className="text-muted-foreground text-xs">{autoAnalysis.autoDisabledReason}</p>
                   {autoAnalysis.autoDisabledAt && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       Disabled at: {new Date(autoAnalysis.autoDisabledAt).toLocaleString()}
                     </p>
                   )}
@@ -366,8 +407,10 @@ export function AiSettingsPage() {
           )}
 
           {/* ── Sub-section: Analysis Triggers ── */}
-          <div className="rounded-lg border bg-muted/5 p-4 space-y-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Analysis Triggers</p>
+          <div className="bg-muted/5 space-y-4 rounded-lg border p-4">
+            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+              Analysis Triggers
+            </p>
 
             <ToggleRow
               label="Enable Auto-Analysis"
@@ -384,14 +427,17 @@ export function AiSettingsPage() {
                 {/* Event triggers in compact grid */}
                 <div className="space-y-2">
                   <p className="text-xs font-medium">Event Triggers</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {([
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {[
                       { key: "onPendingCreate" as const, label: "New Pending Order" },
                       { key: "onOrderFill" as const, label: "Order Filled" },
                       { key: "onTradeClose" as const, label: "Trade Closed" },
                       { key: "notifyOnComplete" as const, label: "Notify on Complete" },
-                    ]).map(({ key, label }) => (
-                      <div key={key} className="flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2">
+                    ].map(({ key, label }) => (
+                      <div
+                        key={key}
+                        className="bg-background flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+                      >
                         <span className="text-xs">{label}</span>
                         <Toggle
                           checked={autoAnalysis[key]}
@@ -423,10 +469,12 @@ export function AiSettingsPage() {
                         step="1"
                         className="h-8 w-24 text-xs"
                         value={autoAnalysis.intervalHours}
-                        onChange={(e) => void updatePref({ intervalHours: parseInt(e.target.value) || 4 })}
+                        onChange={(e) =>
+                          void updatePref({ intervalHours: parseInt(e.target.value) || 4 })
+                        }
                         disabled={saving}
                       />
-                      <span className="text-xs text-muted-foreground">hours between analyses</span>
+                      <span className="text-muted-foreground text-xs">hours between analyses</span>
                     </div>
                   )}
                 </div>
@@ -435,10 +483,12 @@ export function AiSettingsPage() {
           </div>
 
           {/* ── Sub-section: Auto-Apply Conditions ── */}
-          <div className="rounded-lg border bg-muted/5 p-4 space-y-3">
+          <div className="bg-muted/5 space-y-3 rounded-lg border p-4">
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Auto-Apply Conditions</p>
-              <Shield className="size-3 text-muted-foreground" />
+              <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                Auto-Apply Conditions
+              </p>
+              <Shield className="text-muted-foreground size-3" />
             </div>
 
             <ToggleRow
@@ -449,8 +499,9 @@ export function AiSettingsPage() {
               disabled={saving}
             />
 
-            <p className="text-[11px] text-muted-foreground italic pl-0.5">
-              Applies to both automatic and manual analyses. Conditions only monitor — they do not trade until triggered.
+            <p className="text-muted-foreground pl-0.5 text-[11px] italic">
+              Applies to both automatic and manual analyses. Conditions only monitor — they do not
+              trade until triggered.
             </p>
 
             {autoAnalysis.autoApplyConditions && (
@@ -460,7 +511,14 @@ export function AiSettingsPage() {
                   <Label className="text-xs">Minimum Confidence for Conditions</Label>
                   <select
                     value={autoAnalysis.autoApplyMinConditionConfidence ?? "medium"}
-                    onChange={(e) => void updatePref({ autoApplyMinConditionConfidence: e.target.value as "high" | "medium" | "low" })}
+                    onChange={(e) =>
+                      void updatePref({
+                        autoApplyMinConditionConfidence: e.target.value as
+                          | "high"
+                          | "medium"
+                          | "low",
+                      })
+                    }
                     disabled={saving}
                     className={selectClass}
                   >
@@ -474,16 +532,22 @@ export function AiSettingsPage() {
           </div>
 
           {/* ── Sub-section: Auto-Apply Actions ── */}
-          <div className="rounded-lg border border-l-4 border-l-red-500/30 bg-muted/5 p-4 space-y-3">
+          <div className="bg-muted/5 space-y-3 rounded-lg border border-l-4 border-l-red-500/30 p-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Auto-Apply Actions</p>
-              <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600">Caution</Badge>
+              <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                Auto-Apply Actions
+              </p>
+              <Badge variant="outline" className="border-amber-500/50 text-[10px] text-amber-600">
+                Caution
+              </Badge>
             </div>
 
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <p className="text-sm">Practice Account</p>
-                <Badge variant="outline" className="text-[10px] h-4 px-1">Safe</Badge>
+                <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                  Safe
+                </Badge>
               </div>
               <Toggle
                 checked={autoAnalysis.practiceAutoApplyEnabled}
@@ -495,7 +559,12 @@ export function AiSettingsPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <p className="text-sm">Live Account</p>
-                <Badge variant="outline" className="text-[10px] h-4 px-1 border-red-500/50 text-red-600">Risk</Badge>
+                <Badge
+                  variant="outline"
+                  className="h-4 border-red-500/50 px-1 text-[10px] text-red-600"
+                >
+                  Risk
+                </Badge>
               </div>
               <Toggle
                 checked={autoAnalysis.liveAutoApplyEnabled}
@@ -509,12 +578,16 @@ export function AiSettingsPage() {
                 <Separator />
                 <div className="space-y-1.5">
                   <Label className="text-xs">Minimum Confidence for Actions</Label>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-muted-foreground text-[11px]">
                     Only auto-apply actions at or above this confidence level
                   </p>
                   <select
                     value={autoAnalysis.autoApplyMinConfidence ?? "high"}
-                    onChange={(e) => void updatePref({ autoApplyMinConfidence: e.target.value as "high" | "medium" | "low" })}
+                    onChange={(e) =>
+                      void updatePref({
+                        autoApplyMinConfidence: e.target.value as "high" | "medium" | "low",
+                      })
+                    }
                     disabled={saving}
                     className={selectClass}
                   >
@@ -526,11 +599,11 @@ export function AiSettingsPage() {
               </>
             )}
 
-            <p className="text-[11px] text-red-600/70 italic">
-              Auto-apply executes trade modifications automatically. Use with extreme caution on live accounts.
+            <p className="text-[11px] italic text-red-600/70">
+              Auto-apply executes trade modifications automatically. Use with extreme caution on
+              live accounts.
             </p>
           </div>
-
         </CardContent>
       </Card>
 
@@ -542,7 +615,8 @@ export function AiSettingsPage() {
             Learning Mode
           </CardTitle>
           <CardDescription>
-            Get educational explanations alongside every analysis to help you learn trading concepts.
+            Get educational explanations alongside every analysis to help you learn trading
+            concepts.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -564,7 +638,8 @@ export function AiSettingsPage() {
             Performance Digest
           </CardTitle>
           <CardDescription>
-            Get periodic AI-generated reports analyzing your trading patterns, mistakes, and improvements.
+            Get periodic AI-generated reports analyzing your trading patterns, mistakes, and
+            improvements.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -583,7 +658,11 @@ export function AiSettingsPage() {
                 <Label className="text-xs">Frequency</Label>
                 <select
                   value={autoAnalysis.digestFrequency ?? "weekly"}
-                  onChange={(e) => void updatePref({ digestFrequency: e.target.value as "weekly" | "monthly" | "both" })}
+                  onChange={(e) =>
+                    void updatePref({
+                      digestFrequency: e.target.value as "weekly" | "monthly" | "both",
+                    })
+                  }
                   disabled={saving}
                   className={selectClass}
                 >

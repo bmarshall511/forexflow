@@ -26,25 +26,29 @@ function Tile({
   variant?: "default" | "positive" | "negative" | "muted"
 }) {
   return (
-    <div className={cn(
-      "rounded-xl border p-4 space-y-2 transition-colors",
-      variant === "positive" && "border-green-500/20 bg-green-500/[0.03]",
-      variant === "negative" && "border-red-500/20 bg-red-500/[0.03]",
-      variant === "muted" && "border-border/40 bg-muted/20",
-      variant === "default" && "border-border/60 bg-card",
-    )}>
-      <div className="flex items-center gap-1.5 text-muted-foreground">
+    <div
+      className={cn(
+        "space-y-2 rounded-xl border p-4 transition-colors",
+        variant === "positive" && "border-green-500/20 bg-green-500/[0.03]",
+        variant === "negative" && "border-red-500/20 bg-red-500/[0.03]",
+        variant === "muted" && "border-border/40 bg-muted/20",
+        variant === "default" && "border-border/60 bg-card",
+      )}
+    >
+      <div className="text-muted-foreground flex items-center gap-1.5">
         {icon}
         <span className="text-[11px] font-medium uppercase tracking-wider">{label}</span>
       </div>
-      <div className={cn(
-        "text-xl font-bold tracking-tight font-mono tabular-nums",
-        variant === "positive" && "text-green-500",
-        variant === "negative" && "text-red-500",
-      )}>
+      <div
+        className={cn(
+          "font-mono text-xl font-bold tabular-nums tracking-tight",
+          variant === "positive" && "text-green-500",
+          variant === "negative" && "text-red-500",
+        )}
+      >
         {value}
       </div>
-      <div className="text-[11px] text-muted-foreground leading-tight">{subtitle}</div>
+      <div className="text-muted-foreground text-[11px] leading-tight">{subtitle}</div>
     </div>
   )
 }
@@ -52,9 +56,9 @@ function Tile({
 export function OverviewCards({ positions, openWithPrices, currency = "USD" }: OverviewCardsProps) {
   if (!positions) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-xl border bg-card p-4 space-y-2">
+          <div key={i} className="bg-card space-y-2 rounded-xl border p-4">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-6 w-16" />
             <Skeleton className="h-3 w-24" />
@@ -82,11 +86,17 @@ export function OverviewCards({ positions, openWithPrices, currency = "USD" }: O
   const latestClose = closed.length > 0 ? closed[0] : null
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
       <Tile
         label="Open P/L"
         value={formatCurrency(totalUnrealizedPL, currency)}
-        variant={totalUnrealizedPL >= 0.005 ? "positive" : totalUnrealizedPL <= -0.005 ? "negative" : "default"}
+        variant={
+          totalUnrealizedPL >= 0.005
+            ? "positive"
+            : totalUnrealizedPL <= -0.005
+              ? "negative"
+              : "default"
+        }
         subtitle={`${open.length} trade${open.length !== 1 ? "s" : ""} open · ${formatCurrency(totalMarginUsed, currency)} margin`}
         icon={<BarChart3 className="size-3.5" />}
       />
@@ -94,7 +104,11 @@ export function OverviewCards({ positions, openWithPrices, currency = "USD" }: O
       <Tile
         label="Pending"
         value={nearestPending ? nearestPending.instrument.replace("_", "/") : "—"}
-        subtitle={nearestPending ? `${nearestPending.direction === "long" ? "Buy" : "Sell"} ${nearestPending.orderType}` : "No orders waiting"}
+        subtitle={
+          nearestPending
+            ? `${nearestPending.direction === "long" ? "Buy" : "Sell"} ${nearestPending.orderType}`
+            : "No orders waiting"
+        }
         icon={<Target className="size-3.5" />}
         variant="muted"
       />
@@ -119,7 +133,11 @@ export function OverviewCards({ positions, openWithPrices, currency = "USD" }: O
         label="Today"
         value={closed.length > 0 ? `${todayWins}W / ${todayLosses}L` : "—"}
         variant={closed.length > 0 ? (todayNetPL >= 0 ? "positive" : "negative") : "muted"}
-        subtitle={closed.length > 0 ? `${winRate}% win rate · ${formatCurrency(todayNetPL, currency)}` : "No trades closed today"}
+        subtitle={
+          closed.length > 0
+            ? `${winRate}% win rate · ${formatCurrency(todayNetPL, currency)}`
+            : "No trades closed today"
+        }
         icon={<Clock className="size-3.5" />}
       />
 
@@ -127,7 +145,11 @@ export function OverviewCards({ positions, openWithPrices, currency = "USD" }: O
         label="Last Close"
         value={latestClose ? latestClose.instrument.replace("_", "/") : "—"}
         variant={latestClose ? (latestClose.realizedPL >= 0 ? "positive" : "negative") : "muted"}
-        subtitle={latestClose ? `${latestClose.outcome === "win" ? "+" : ""}${formatCurrency(latestClose.realizedPL, currency)}` : "No trades closed today"}
+        subtitle={
+          latestClose
+            ? `${latestClose.outcome === "win" ? "+" : ""}${formatCurrency(latestClose.realizedPL, currency)}`
+            : "No trades closed today"
+        }
         icon={<History className="size-3.5" />}
       />
     </div>

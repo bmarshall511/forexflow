@@ -110,7 +110,11 @@ export function useChartTradeEditor({
       }
     }
 
-    if (draftSL !== null && draftTP !== null && draftSL.toFixed(decimals) === draftTP.toFixed(decimals)) {
+    if (
+      draftSL !== null &&
+      draftTP !== null &&
+      draftSL.toFixed(decimals) === draftTP.toFixed(decimals)
+    ) {
       errors.sl = "SL and TP cannot be the same"
       errors.tp = "SL and TP cannot be the same"
     }

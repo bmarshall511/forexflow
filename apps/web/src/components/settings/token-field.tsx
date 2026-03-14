@@ -34,9 +34,7 @@ export function TokenField({
 
   const isEditing = value !== ""
   const hasStoredToken = hasToken && !isEditing
-  const maskedDisplay = hasStoredToken
-    ? `${"•".repeat(20)}${tokenLastFour}`
-    : ""
+  const maskedDisplay = hasStoredToken ? `${"•".repeat(20)}${tokenLastFour}` : ""
 
   const fetchFullToken = useCallback(async (): Promise<string | null> => {
     if (revealedToken) return revealedToken
@@ -122,10 +120,7 @@ export function TokenField({
             placeholder={hasStoredToken ? undefined : "Enter your OANDA API token"}
             readOnly={isReadonly}
             disabled={disabled}
-            className={cn(
-              "pr-10 font-mono text-sm",
-              isReadonly && "cursor-default bg-muted/50",
-            )}
+            className={cn("pr-10 font-mono text-sm", isReadonly && "bg-muted/50 cursor-default")}
             aria-describedby={`${fieldId}-hint`}
           />
           {hasStoredToken && (
@@ -138,11 +133,7 @@ export function TokenField({
               disabled={disabled || isRevealing}
               aria-label={isRevealed ? "Hide token" : "Show token"}
             >
-              {isRevealed ? (
-                <EyeOff className="size-3.5" />
-              ) : (
-                <Eye className="size-3.5" />
-              )}
+              {isRevealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             </Button>
           )}
         </div>
@@ -174,7 +165,7 @@ export function TokenField({
           </Button>
         )}
       </div>
-      <p id={`${fieldId}-hint`} className="text-xs text-muted-foreground">
+      <p id={`${fieldId}-hint`} className="text-muted-foreground text-xs">
         {hasStoredToken
           ? "Token is securely stored and encrypted."
           : "Your token will be encrypted before storage."}

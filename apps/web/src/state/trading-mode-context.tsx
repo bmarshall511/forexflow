@@ -33,9 +33,7 @@ interface TradingModeProviderProps {
 }
 
 export function TradingModeProvider({ children, initialSettings }: TradingModeProviderProps) {
-  const [mode, setModeState] = useState<TradingMode>(
-    initialSettings?.tradingMode ?? "practice",
-  )
+  const [mode, setModeState] = useState<TradingMode>(initialSettings?.tradingMode ?? "practice")
   const [isLoading, setIsLoading] = useState(false)
   const [hasLiveCredentials, setHasLiveCredentials] = useState(
     initialSettings?.oanda.live.hasToken ?? false,

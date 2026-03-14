@@ -39,9 +39,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse<unknown>>> {
+export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<unknown>>> {
   try {
     const body = await request.json()
     const { action } = body as { action: string }
@@ -72,10 +70,7 @@ export async function POST(
         return NextResponse.json({ ok: true, data: notification })
       }
       default:
-        return NextResponse.json(
-          { ok: false, error: `Unknown action: ${action}` },
-          { status: 400 },
-        )
+        return NextResponse.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 })
     }
   } catch (error) {
     console.error("[POST /api/notifications]", error)

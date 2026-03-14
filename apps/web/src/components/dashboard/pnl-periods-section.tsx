@@ -22,13 +22,7 @@ const PERIOD_LABELS: Record<PnLPeriod, string> = {
 }
 
 /** Only the historical periods — today has its own dedicated section */
-const PERIOD_ORDER: PnLPeriod[] = [
-  "yesterday",
-  "thisWeek",
-  "thisMonth",
-  "thisYear",
-  "allTime",
-]
+const PERIOD_ORDER: PnLPeriod[] = ["yesterday", "thisWeek", "thisMonth", "thisYear", "allTime"]
 
 const NET_COLOR: Record<PnLColorIntent, string> = {
   positive: "text-status-connected",
@@ -64,11 +58,7 @@ function PnLPeriodRow({
   const [expanded, setExpanded] = useState(false)
   const netPnl = formatPnL(data.net, currency)
   const tradeLabel =
-    data.tradeCount < 0
-      ? ""
-      : data.tradeCount === 1
-        ? "1 trade"
-        : `${data.tradeCount} trades`
+    data.tradeCount < 0 ? "" : data.tradeCount === 1 ? "1 trade" : `${data.tradeCount} trades`
 
   return (
     <div
@@ -101,16 +91,14 @@ function PnLPeriodRow({
 
         {/* Trade count */}
         {tradeLabel && (
-          <span className="shrink-0 text-[11px] text-muted-foreground">
-            {tradeLabel}
-          </span>
+          <span className="text-muted-foreground shrink-0 text-[11px]">{tradeLabel}</span>
         )}
 
         {/* Net P&L */}
         <AnimatedNumber
           value={netPnl.formatted}
           className={cn(
-            "w-24 shrink-0 text-right font-mono tabular-nums font-semibold",
+            "w-24 shrink-0 text-right font-mono font-semibold tabular-nums",
             NET_COLOR[netPnl.colorIntent],
           )}
         />
@@ -118,7 +106,7 @@ function PnLPeriodRow({
         {/* Chevron */}
         <ChevronDown
           className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
+            "text-muted-foreground size-3.5 shrink-0 transition-transform duration-200",
             expanded && "rotate-180",
           )}
         />
@@ -126,23 +114,11 @@ function PnLPeriodRow({
 
       {/* Expanded breakdown */}
       {expanded && (
-        <div className="mx-3 mb-2.5 space-y-1 border-t border-border/50 pt-2">
-          <BreakdownRow
-            label="Realized P&L"
-            value={data.realizedPL}
-            currency={currency}
-          />
-          <BreakdownRow
-            label="Financing"
-            value={data.financing}
-            currency={currency}
-          />
+        <div className="border-border/50 mx-3 mb-2.5 space-y-1 border-t pt-2">
+          <BreakdownRow label="Realized P&L" value={data.realizedPL} currency={currency} />
+          <BreakdownRow label="Financing" value={data.financing} currency={currency} />
           {showCommission && (
-            <BreakdownRow
-              label="Commission"
-              value={data.commission}
-              currency={currency}
-            />
+            <BreakdownRow label="Commission" value={data.commission} currency={currency} />
           )}
         </div>
       )}
@@ -163,9 +139,7 @@ function BreakdownRow({
   return (
     <div className="flex items-center justify-between py-0.5 text-xs">
       <span className="text-muted-foreground">{label}</span>
-      <span
-        className={cn("font-mono tabular-nums", NET_COLOR[formatted.colorIntent])}
-      >
+      <span className={cn("font-mono tabular-nums", NET_COLOR[formatted.colorIntent])}>
         {formatted.formatted}
       </span>
     </div>
@@ -187,7 +161,7 @@ export function PnLPeriodsSection({ pnl, currency }: PnLPeriodsSectionProps) {
 
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
         Historical P&L
       </h3>
       <div className="space-y-1">

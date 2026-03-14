@@ -83,31 +83,33 @@ export function TradeFinderDashboard() {
   const approachingCount = setups.filter((s) => s.status === "approaching").length
   const totalActiveSetups = activeCount + approachingCount
 
-  const autoTradeConfig = config ? {
-    autoTradeEnabled: config.autoTradeEnabled,
-    autoTradeMinScore: config.autoTradeMinScore,
-    autoTradeMinRR: config.autoTradeMinRR,
-  } : undefined
+  const autoTradeConfig = config
+    ? {
+        autoTradeEnabled: config.autoTradeEnabled,
+        autoTradeMinScore: config.autoTradeMinScore,
+        autoTradeMinRR: config.autoTradeMinRR,
+      }
+    : undefined
 
   return (
     <div className="min-h-screen">
       {/* ─── Hero Header ─── */}
-      <div className="px-4 md:px-6 pt-6 pb-8 border-b">
-        <div className="flex items-start justify-between gap-4 mb-6">
+      <div className="border-b px-4 pb-8 pt-6 md:px-6">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Trade Finder</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               Scans the market for high-probability trade setups across multiple timeframes
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             {config && (
               <Button
                 variant={config.autoTradeEnabled ? "default" : "outline"}
                 size="sm"
                 className={cn(
-                  "h-8 text-xs gap-1.5",
-                  config.autoTradeEnabled && "bg-teal-600 hover:bg-teal-700 text-white",
+                  "h-8 gap-1.5 text-xs",
+                  config.autoTradeEnabled && "bg-teal-600 text-white hover:bg-teal-700",
                 )}
                 onClick={handleToggleAutoTrade}
                 disabled={togglingAutoTrade}
@@ -119,19 +121,14 @@ export function TradeFinderDashboard() {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs gap-1.5"
+              className="h-8 gap-1.5 text-xs"
               onClick={handleScan}
               disabled={scanStatus?.isScanning}
             >
               <Scan className={cn("size-3.5", scanStatus?.isScanning && "animate-spin")} />
               {scanStatus?.isScanning ? "Scanning..." : "Scan Now"}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs gap-1.5"
-              asChild
-            >
+            <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" asChild>
               <Link href="/settings/trade-finder">
                 <Settings2 className="size-3.5" />
                 <span className="hidden sm:inline">Settings</span>
@@ -141,7 +138,7 @@ export function TradeFinderDashboard() {
         </div>
 
         {/* Status tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatusTile
             label="Scanner"
             value={config?.enabled ? "Active" : "Off"}
@@ -161,7 +158,11 @@ export function TradeFinderDashboard() {
           <StatusTile
             label="Last Scan"
             value={scanStatus?.lastScanAt ? formatRelativeTime(scanStatus.lastScanAt) : "Never"}
-            subtitle={scanStatus?.isScanning ? `${scanStatus.pairsScanned}/${scanStatus.totalPairs} pairs` : undefined}
+            subtitle={
+              scanStatus?.isScanning
+                ? `${scanStatus.pairsScanned}/${scanStatus.totalPairs} pairs`
+                : undefined
+            }
             variant={scanStatus?.isScanning ? "warning" : "default"}
           />
         </div>
@@ -196,15 +197,15 @@ export function TradeFinderDashboard() {
       </TabNav>
 
       {/* ─── Tab Content ─── */}
-      <div className="px-4 md:px-6 py-6 space-y-4">
+      <div className="space-y-4 px-4 py-6 md:px-6">
         {tab === "active" && (
           <>
             {isLoading ? (
-              <div className="py-12 text-center text-sm text-muted-foreground animate-pulse">
+              <div className="text-muted-foreground animate-pulse py-12 text-center text-sm">
                 Loading setups...
               </div>
             ) : setups.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground py-12 text-center text-sm">
                 {config?.enabled
                   ? "No setups found yet — the scanner will find them on the next cycle"
                   : "Enable the Trade Finder in settings to start scanning"}
@@ -225,7 +226,7 @@ export function TradeFinderDashboard() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-1.5 text-destructive hover:text-destructive shrink-0"
+                        className="text-destructive hover:text-destructive shrink-0 gap-1.5"
                       >
                         <Trash2 className="size-3.5" />
                         <span className="hidden sm:inline">Clear All</span>
@@ -235,7 +236,8 @@ export function TradeFinderDashboard() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Clear all active setups?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will remove all currently active setups. New ones will appear on the next scan.
+                          This will remove all currently active setups. New ones will appear on the
+                          next scan.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -245,7 +247,9 @@ export function TradeFinderDashboard() {
                             try {
                               const count = await clearActive()
                               toast.success(`Cleared ${count} active setup(s)`)
-                            } catch { toast.error("Failed to clear setups") }
+                            } catch {
+                              toast.error("Failed to clear setups")
+                            }
                           }}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
@@ -260,8 +264,8 @@ export function TradeFinderDashboard() {
                 {approachingCount > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-amber-500 animate-pulse" />
-                      <span className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
+                      <div className="size-2 animate-pulse rounded-full bg-amber-500" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-amber-500">
                         Approaching ({approachingCount})
                       </span>
                     </div>
@@ -284,7 +288,7 @@ export function TradeFinderDashboard() {
                     {approachingCount > 0 && (
                       <div className="flex items-center gap-2 pt-2">
                         <div className="size-2 rounded-full bg-blue-500" />
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
                           Watching ({activeCount})
                         </span>
                       </div>
@@ -309,7 +313,7 @@ export function TradeFinderDashboard() {
         {tab === "history" && (
           <>
             {history.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground py-12 text-center text-sm">
                 No past setups to show yet
               </div>
             ) : (
@@ -320,7 +324,7 @@ export function TradeFinderDashboard() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-1.5 text-destructive hover:text-destructive shrink-0"
+                        className="text-destructive hover:text-destructive shrink-0 gap-1.5"
                       >
                         <Trash2 className="size-3.5" />
                         <span className="hidden sm:inline">Clear History</span>
@@ -330,7 +334,8 @@ export function TradeFinderDashboard() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Clear setup history?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently delete all past setups. This action cannot be undone.
+                          This will permanently delete all past setups. This action cannot be
+                          undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -340,7 +345,9 @@ export function TradeFinderDashboard() {
                             try {
                               const count = await clearHistory()
                               toast.success(`Cleared ${count} history item(s)`)
-                            } catch { toast.error("Failed to clear history") }
+                            } catch {
+                              toast.error("Failed to clear history")
+                            }
                           }}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
@@ -369,7 +376,7 @@ export function TradeFinderDashboard() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-destructive hover:text-destructive shrink-0"
+                      className="text-destructive hover:text-destructive shrink-0 gap-1.5"
                     >
                       <Trash2 className="size-3.5" />
                       <span className="hidden sm:inline">Clear Activity</span>
@@ -389,7 +396,9 @@ export function TradeFinderDashboard() {
                           try {
                             await clearActivity()
                             toast.success("Activity log cleared")
-                          } catch { toast.error("Failed to clear activity") }
+                          } catch {
+                            toast.error("Failed to clear activity")
+                          }
                         }}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
@@ -443,16 +452,12 @@ function StatusTile({
   }[variant]
 
   return (
-    <div className={cn("rounded-lg border border-border/50 bg-card p-3 space-y-1", borderColor)}>
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+    <div className={cn("border-border/50 bg-card space-y-1 rounded-lg border p-3", borderColor)}>
+      <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
         {label}
       </span>
-      <p className={cn("text-sm font-semibold font-mono tabular-nums", valueColor)}>
-        {value}
-      </p>
-      {subtitle && (
-        <p className="text-[10px] text-muted-foreground truncate">{subtitle}</p>
-      )}
+      <p className={cn("font-mono text-sm font-semibold tabular-nums", valueColor)}>{value}</p>
+      {subtitle && <p className="text-muted-foreground truncate text-[10px]">{subtitle}</p>}
     </div>
   )
 }

@@ -175,10 +175,7 @@ export class AccountDataCollector {
         }),
       ])
 
-      const allPageUrls = [
-        ...(fillPages.pages ?? []),
-        ...(financingPages.pages ?? []),
-      ]
+      const allPageUrls = [...(fillPages.pages ?? []), ...(financingPages.pages ?? [])]
 
       // If no transactions of either type, return zeros
       if (allPageUrls.length === 0) {

@@ -17,10 +17,10 @@ src/
 
 ## Routes
 
-| Method | Path               | Purpose                        |
-|--------|--------------------|---------------------------------|
-| POST   | `/webhook/{token}` | TradingView webhook ingestion   |
-| GET    | `/ws/{secret}`     | Daemon WebSocket connection     |
+| Method | Path               | Purpose                       |
+| ------ | ------------------ | ----------------------------- |
+| POST   | `/webhook/{token}` | TradingView webhook ingestion |
+| GET    | `/ws/{secret}`     | Daemon WebSocket connection   |
 
 ## Webhook Flow
 

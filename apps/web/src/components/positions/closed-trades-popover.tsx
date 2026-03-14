@@ -17,7 +17,7 @@ export function ClosedTradesPopover({ trades, currency = "USD" }: ClosedTradesPo
     return (
       <div className="space-y-2">
         <h4 className="text-sm font-semibold">Closed Today</h4>
-        <p className="text-xs text-muted-foreground">No trades closed today</p>
+        <p className="text-muted-foreground text-xs">No trades closed today</p>
       </div>
     )
   }
@@ -33,28 +33,39 @@ export function ClosedTradesPopover({ trades, currency = "USD" }: ClosedTradesPo
       <h4 className="text-sm font-semibold">Closed Today</h4>
 
       {/* Summary banner */}
-      <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-xs">
-        <span className="font-medium">{wins}W / {losses}L</span>
+      <div className="bg-muted/50 rounded-md px-2.5 py-1.5 text-xs">
+        <span className="font-medium">
+          {wins}W / {losses}L
+        </span>
         <span className="text-muted-foreground"> · {winRate}% WR · </span>
-        <span className={cn("font-semibold font-mono tabular-nums", netPL >= 0 ? "text-status-connected" : "text-status-disconnected")}>
-          {netPL >= 0 ? "+" : ""}{formatCurrency(netPL, currency)}
+        <span
+          className={cn(
+            "font-mono font-semibold tabular-nums",
+            netPL >= 0 ? "text-status-connected" : "text-status-disconnected",
+          )}
+        >
+          {netPL >= 0 ? "+" : ""}
+          {formatCurrency(netPL, currency)}
         </span>
       </div>
 
       {/* Recent trades */}
       <div className="space-y-2">
         {recent.map((trade) => {
-          const plColor = trade.realizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
+          const plColor =
+            trade.realizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
           return (
             <div key={trade.id} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-medium truncate">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-xs font-medium">
                   {trade.instrument.replace("_", "/")}
                 </span>
                 <DirectionBadge direction={trade.direction} />
                 <OutcomeBadge outcome={trade.outcome} />
               </div>
-              <span className={cn("text-xs font-mono tabular-nums font-semibold shrink-0", plColor)}>
+              <span
+                className={cn("shrink-0 font-mono text-xs font-semibold tabular-nums", plColor)}
+              >
                 {formatCurrency(trade.realizedPL, currency)}
               </span>
             </div>
@@ -64,7 +75,7 @@ export function ClosedTradesPopover({ trades, currency = "USD" }: ClosedTradesPo
 
       <Link
         href="/positions?tab=history"
-        className="block text-xs text-primary hover:underline pt-1 border-t border-border"
+        className="text-primary border-border block border-t pt-1 text-xs hover:underline"
       >
         View all history &rarr;
       </Link>

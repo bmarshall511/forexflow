@@ -1,7 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type { AiSettingsData, AiAutoAnalysisSettings, AiClaudeModel, AiAnalysisDepth } from "@fxflow/types"
+import type {
+  AiSettingsData,
+  AiAutoAnalysisSettings,
+  AiClaudeModel,
+  AiAnalysisDepth,
+} from "@fxflow/types"
 
 export interface UseAiSettingsReturn {
   settings: AiSettingsData | null
@@ -10,7 +15,13 @@ export interface UseAiSettingsReturn {
   removeClaudeKey: () => Promise<void>
   saveFinnhubKey: (key: string) => Promise<void>
   removeFinnhubKey: () => Promise<void>
-  savePreferences: (prefs: Partial<AiAutoAnalysisSettings> & { defaultModel?: AiClaudeModel; defaultDepth?: AiAnalysisDepth; liveAutoApplyEnabled?: boolean }) => Promise<void>
+  savePreferences: (
+    prefs: Partial<AiAutoAnalysisSettings> & {
+      defaultModel?: AiClaudeModel
+      defaultDepth?: AiAnalysisDepth
+      liveAutoApplyEnabled?: boolean
+    },
+  ) => Promise<void>
   refetch: () => void
 }
 
@@ -31,10 +42,16 @@ export function useAiSettings(): UseAiSettingsReturn {
         if (cancelled || !json.ok || !json.data) return
         setSettings(json.data)
       })
-      .catch(() => { if (!cancelled) setSettings(null) })
-      .finally(() => { if (!cancelled) setIsLoading(false) })
+      .catch(() => {
+        if (!cancelled) setSettings(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [fetchKey])
 
   const put = useCallback(async (body: Record<string, unknown>): Promise<void> => {
@@ -43,7 +60,7 @@ export function useAiSettings(): UseAiSettingsReturn {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     })
-    const json = await res.json() as { ok: boolean; data?: AiSettingsData; error?: string }
+    const json = (await res.json()) as { ok: boolean; data?: AiSettingsData; error?: string }
     if (!json.ok) throw new Error(json.error ?? "Failed to save")
     if (json.data) setSettings(json.data)
   }, [])

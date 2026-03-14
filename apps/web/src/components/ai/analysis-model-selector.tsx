@@ -17,7 +17,9 @@ function estimateCost(model: AiClaudeModel, depth: AiAnalysisDepth): string {
   if (!opt) return "—"
   const inputTokens = depth === "quick" ? 3_000 : depth === "standard" ? 8_000 : 18_000
   const outputTokens = depth === "quick" ? 800 : depth === "standard" ? 1_500 : 3_000
-  const cost = (inputTokens / 1_000_000) * opt.inputCostPer1M + (outputTokens / 1_000_000) * opt.outputCostPer1M
+  const cost =
+    (inputTokens / 1_000_000) * opt.inputCostPer1M +
+    (outputTokens / 1_000_000) * opt.outputCostPer1M
   if (cost < 0.01) return "<$0.01"
   return `~$${cost.toFixed(3)}`
 }
@@ -47,7 +49,9 @@ export function AnalysisModelSelector({
         className={selectClass}
       >
         {AI_MODEL_OPTIONS.map((opt) => (
-          <option key={opt.id} value={opt.id}>{opt.name}</option>
+          <option key={opt.id} value={opt.id}>
+            {opt.name}
+          </option>
         ))}
       </select>
 
@@ -63,12 +67,12 @@ export function AnalysisModelSelector({
         <option value="deep">Deep</option>
       </select>
 
-      <Badge variant="outline" className="h-6 text-[10px] text-muted-foreground font-normal">
+      <Badge variant="outline" className="text-muted-foreground h-6 text-[10px] font-normal">
         Est. {estimateCost(model, depth)}
       </Badge>
 
       {selectedOpt && (
-        <Badge variant="outline" className="h-6 text-[10px] text-muted-foreground font-normal">
+        <Badge variant="outline" className="text-muted-foreground h-6 text-[10px] font-normal">
           ~{selectedOpt.estimatedDurationSec}s
         </Badge>
       )}

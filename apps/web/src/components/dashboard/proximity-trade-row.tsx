@@ -39,7 +39,7 @@ export function ProximityTradeRow({
       aria-label={ariaLabel}
       className={cn(
         "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors",
-        "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "hover:bg-muted/60 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
       )}
     >
       {/* Left: pair + direction */}
@@ -50,21 +50,12 @@ export function ProximityTradeRow({
 
       {/* Center: detail + optional children (progress bar) */}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        {detail && (
-          <span className={cn("text-[10px] font-medium", detailClassName)}>
-            {detail}
-          </span>
-        )}
+        {detail && <span className={cn("text-[10px] font-medium", detailClassName)}>{detail}</span>}
         {children}
       </div>
 
       {/* Right: value */}
-      <span
-        className={cn(
-          "shrink-0 text-xs font-semibold font-mono tabular-nums",
-          valueClassName,
-        )}
-      >
+      <span className={cn("shrink-0 font-mono text-xs font-semibold tabular-nums", valueClassName)}>
         {value}
       </span>
     </button>

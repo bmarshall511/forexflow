@@ -41,13 +41,16 @@ class TradeLevelPaneRenderer implements IPrimitivePaneRenderer {
     this._source = source
   }
 
-  draw(target: { useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T }): void {
+  draw(target: {
+    useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T
+  }): void {
     const { chart, series, levels } = this._source
     if (!chart || !series || levels.length === 0) return
 
     target.useMediaCoordinateSpace(({ context }) => {
       const timeScale = chart.timeScale()
-      const barSpacing: number = (timeScale as unknown as { options(): { barSpacing: number } }).options().barSpacing ?? 6
+      const barSpacing: number =
+        (timeScale as unknown as { options(): { barSpacing: number } }).options().barSpacing ?? 6
       const halfBar = Math.max(barSpacing * 0.45, 5)
 
       for (const level of levels) {

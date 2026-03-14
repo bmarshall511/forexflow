@@ -7,9 +7,7 @@ import type {
   TradingMode,
 } from "@fxflow/types"
 
-export async function PUT(
-  request: Request,
-): Promise<NextResponse<ApiResponse<OandaCredentials>>> {
+export async function PUT(request: Request): Promise<NextResponse<ApiResponse<OandaCredentials>>> {
   try {
     const body = (await request.json()) as SaveCredentialsRequest
 
@@ -21,10 +19,7 @@ export async function PUT(
     }
 
     if (!body.accountId?.trim()) {
-      return NextResponse.json(
-        { ok: false, error: "Account ID is required" },
-        { status: 400 },
-      )
+      return NextResponse.json({ ok: false, error: "Account ID is required" }, { status: 400 })
     }
 
     const result = await saveCredentials(body)

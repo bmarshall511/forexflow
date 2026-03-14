@@ -19,13 +19,7 @@ import {
   Shield,
 } from "lucide-react"
 import Link from "next/link"
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardAction,
-  CardContent,
-} from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardAction, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AnimatedNumber } from "@/components/ui/animated-number"
@@ -104,7 +98,7 @@ function PeriodPnLRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-sm hover:bg-muted/20",
+        "hover:bg-muted/20 flex items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-sm",
         ACCENT_LEFT[pnl.colorIntent],
       )}
     >
@@ -112,21 +106,22 @@ function PeriodPnLRow({
 
       <div className="flex flex-1 items-center">
         <div
-          className={cn("h-1.5 rounded-full transition-all duration-500", BAR_COLOR[pnl.colorIntent])}
+          className={cn(
+            "h-1.5 rounded-full transition-all duration-500",
+            BAR_COLOR[pnl.colorIntent],
+          )}
           style={{ width: `${Math.max(barWidth, 2)}%` }}
         />
       </div>
 
       {data.signalCount > 0 && (
-        <span className="shrink-0 text-[11px] text-muted-foreground">
-          {tradeLabel}
-        </span>
+        <span className="text-muted-foreground shrink-0 text-[11px]">{tradeLabel}</span>
       )}
 
       <AnimatedNumber
         value={pnl.formatted}
         className={cn(
-          "w-24 shrink-0 text-right font-mono tabular-nums font-semibold",
+          "w-24 shrink-0 text-right font-mono font-semibold tabular-nums",
           PNL_COLOR[pnl.colorIntent],
         )}
       />
@@ -134,7 +129,11 @@ function PeriodPnLRow({
   )
 }
 
-function PnLPeriodsSection({ periodPnL }: { periodPnL: ReturnType<typeof useTVAlertsPeriodPnL>["data"] }) {
+function PnLPeriodsSection({
+  periodPnL,
+}: {
+  periodPnL: ReturnType<typeof useTVAlertsPeriodPnL>["data"]
+}) {
   const maxAbsNet = useMemo(() => {
     if (!periodPnL) return 1
     const values = PERIOD_ORDER.map((p) => Math.abs(periodPnL[p].net))
@@ -143,7 +142,7 @@ function PnLPeriodsSection({ periodPnL }: { periodPnL: ReturnType<typeof useTVAl
 
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
         Signal P&L
       </h3>
       {periodPnL ? (
@@ -181,7 +180,7 @@ function TVAlertsCardSkeleton() {
           ))}
         </div>
       </div>
-      <div className="border-t border-border" />
+      <div className="border-border border-t" />
       <div className="space-y-2">
         <Skeleton className="h-3 w-12" />
         <div className="grid grid-cols-3 gap-2">
@@ -214,16 +213,16 @@ export function TVAlertsDashboardCard() {
       <Card>
         <CardContent className="py-12">
           <div className="flex flex-col items-center justify-center text-center">
-            <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-muted">
-              <Radio className="size-5 text-muted-foreground" />
+            <div className="bg-muted mb-4 flex size-12 items-center justify-center rounded-full">
+              <Radio className="text-muted-foreground size-5" />
             </div>
             <p className="text-sm font-medium">TradingView Alerts</p>
-            <p className="mt-1 max-w-[240px] text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-1 max-w-[240px] text-xs">
               Auto-trade from TradingView signals. Set up the CF Worker to get started.
             </p>
             <Link
               href="/settings/tv-alerts"
-              className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4 inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-medium transition-colors"
             >
               <Settings2 className="size-3.5" />
               Configure
@@ -285,7 +284,7 @@ export function TVAlertsDashboardCard() {
       <CardContent className="space-y-6">
         {/* ── System Status ── */}
         <div>
-          <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
             System Status
           </h3>
           <div className="grid grid-cols-3 gap-2">
@@ -305,16 +304,22 @@ export function TVAlertsDashboardCard() {
               label="Circuit Breaker"
               value={circuitTripped ? "TRIPPED" : "OK"}
               variant={circuitTripped ? "negative" : "positive"}
-              icon={circuitTripped ? <AlertTriangle className="size-3.5" /> : <Shield className="size-3.5" />}
+              icon={
+                circuitTripped ? (
+                  <AlertTriangle className="size-3.5" />
+                ) : (
+                  <Shield className="size-3.5" />
+                )
+              }
             />
           </div>
         </div>
 
-        <div className="border-t border-border" />
+        <div className="border-border border-t" />
 
         {/* ── Today ── */}
         <div>
-          <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
             Today
           </h3>
           <div className="grid grid-cols-3 gap-2">
@@ -339,16 +344,16 @@ export function TVAlertsDashboardCard() {
           </div>
         </div>
 
-        <div className="border-t border-border" />
+        <div className="border-border border-t" />
 
         {/* ── P&L by Period ── */}
         <PnLPeriodsSection periodPnL={periodPnL} />
 
-        <div className="border-t border-border" />
+        <div className="border-border border-t" />
 
         {/* ── All-Time Performance ── */}
         <div>
-          <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
             All-Time Performance
           </h3>
           {stats && stats.totalSignals > 0 ? (
@@ -402,30 +407,40 @@ export function TVAlertsDashboardCard() {
               <div className="mt-4">
                 <ProportionBar
                   segments={[
-                    { value: stats.executedSignals, color: "var(--color-status-connected)", label: "Executed" },
-                    { value: stats.rejectedSignals, color: "var(--color-status-warning)", label: "Rejected" },
-                    { value: stats.failedSignals, color: "var(--color-status-disconnected)", label: "Failed" },
+                    {
+                      value: stats.executedSignals,
+                      color: "var(--color-status-connected)",
+                      label: "Executed",
+                    },
+                    {
+                      value: stats.rejectedSignals,
+                      color: "var(--color-status-warning)",
+                      label: "Rejected",
+                    },
+                    {
+                      value: stats.failedSignals,
+                      color: "var(--color-status-disconnected)",
+                      label: "Failed",
+                    },
                   ]}
                 />
               </div>
             </>
           ) : (
-            <p className="py-3 text-center text-xs text-muted-foreground">
-              No signal data yet
-            </p>
+            <p className="text-muted-foreground py-3 text-center text-xs">No signal data yet</p>
           )}
         </div>
 
-        <div className="border-t border-border" />
+        <div className="border-border border-t" />
 
         {/* ── Configuration ── */}
         {config && (
           <>
             <div>
-              <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
                 Configuration
               </h3>
-              <div className="rounded-lg bg-muted/30 px-3 py-2 space-y-0.5">
+              <div className="bg-muted/30 space-y-0.5 rounded-lg px-3 py-2">
                 <InlineStat label="Position Size" value={`${config.positionSizePercent}%`} />
                 <InlineStat label="Cooldown" value={`${config.cooldownSeconds}s`} />
                 <InlineStat label="Max Positions" value={String(config.maxOpenPositions)} />
@@ -435,13 +450,15 @@ export function TVAlertsDashboardCard() {
                 />
                 <InlineStat
                   label="Pair Whitelist"
-                  value={config.pairWhitelist.length > 0 ? `${config.pairWhitelist.length} pairs` : "All"}
+                  value={
+                    config.pairWhitelist.length > 0 ? `${config.pairWhitelist.length} pairs` : "All"
+                  }
                 />
                 <InlineStat label="Market Hours" value={config.marketHoursFilter ? "On" : "Off"} />
               </div>
             </div>
 
-            <div className="border-t border-border" />
+            <div className="border-border border-t" />
           </>
         )}
 
@@ -449,14 +466,14 @@ export function TVAlertsDashboardCard() {
         <div className="flex items-center justify-between">
           <Link
             href="/tv-alerts"
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-primary text-xs font-medium hover:underline"
             aria-label="View full TV alerts dashboard"
           >
             View full dashboard &rarr;
           </Link>
           <Link
             href="/settings/tv-alerts"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
             aria-label="TV alerts settings"
           >
             <Settings2 className="size-3" />

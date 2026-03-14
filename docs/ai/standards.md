@@ -17,12 +17,12 @@
 
 ## File Size Limits (lines of code)
 
-| Type | Max LOC |
-|------|---------|
-| UI component | 150 |
-| Hook / utility | 200 |
-| API handler / service | 250 |
-| Orchestration (scanner, syncer) | 350 |
+| Type                            | Max LOC |
+| ------------------------------- | ------- |
+| UI component                    | 150     |
+| Hook / utility                  | 200     |
+| API handler / service           | 250     |
+| Orchestration (scanner, syncer) | 350     |
 
 Split when approaching limits. Extract sub-components, helper functions, or dedicated services.
 

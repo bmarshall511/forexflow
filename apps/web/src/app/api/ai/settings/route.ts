@@ -1,5 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { getAiSettings, saveClaudeApiKey, saveFinnhubApiKey, deleteClaudeApiKey, deleteFinnhubApiKey, saveAiPreferences, clearAutoDisableReason } from "@fxflow/db"
+import {
+  getAiSettings,
+  saveClaudeApiKey,
+  saveFinnhubApiKey,
+  deleteClaudeApiKey,
+  deleteFinnhubApiKey,
+  saveAiPreferences,
+  clearAutoDisableReason,
+} from "@fxflow/db"
 import type { ApiResponse, AiSettingsData } from "@fxflow/types"
 
 export async function GET(): Promise<NextResponse<ApiResponse<AiSettingsData>>> {
@@ -15,9 +23,11 @@ export async function GET(): Promise<NextResponse<ApiResponse<AiSettingsData>>> 
   }
 }
 
-export async function PUT(request: NextRequest): Promise<NextResponse<ApiResponse<AiSettingsData>>> {
+export async function PUT(
+  request: NextRequest,
+): Promise<NextResponse<ApiResponse<AiSettingsData>>> {
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       action?: string
       claudeApiKey?: string | null
       finnhubApiKey?: string | null

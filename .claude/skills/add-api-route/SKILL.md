@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     console.error("[API] /api/{path} error:", error)
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

@@ -14,28 +14,43 @@ export function registerSchemaTools(server: McpServer) {
     {},
     async () => {
       try {
-        const schema = readFileSync(resolve(PROJECT_ROOT, "packages/db/prisma/schema.prisma"), "utf-8")
+        const schema = readFileSync(
+          resolve(PROJECT_ROOT, "packages/db/prisma/schema.prisma"),
+          "utf-8",
+        )
         return {
           content: [{ type: "text" as const, text: schema }],
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error reading schema: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error reading schema: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
     "query_types",
     "Search the shared types file (packages/types/src/index.ts) for specific type definitions",
     {
-      search: z.string().describe("Search term to find in the types file (e.g., 'TradeStatus', 'AiAnalysis', 'WebSocket')"),
+      search: z
+        .string()
+        .describe(
+          "Search term to find in the types file (e.g., 'TradeStatus', 'AiAnalysis', 'WebSocket')",
+        ),
     },
     async ({ search }) => {
       try {
-        const typesFile = readFileSync(resolve(PROJECT_ROOT, "packages/types/src/index.ts"), "utf-8")
+        const typesFile = readFileSync(
+          resolve(PROJECT_ROOT, "packages/types/src/index.ts"),
+          "utf-8",
+        )
         const lines = typesFile.split("\n")
         const matches: string[] = []
         const searchLower = search.toLowerCase()
@@ -54,23 +69,32 @@ export function registerSchemaTools(server: McpServer) {
 
         if (matches.length === 0) {
           return {
-            content: [{ type: "text" as const, text: `No matches found for "${search}" in types file` }],
+            content: [
+              { type: "text" as const, text: `No matches found for "${search}" in types file` },
+            ],
           }
         }
 
         return {
-          content: [{
-            type: "text" as const,
-            text: `Found ${matches.length} matches for "${search}":\n\n${matches.slice(0, 10).join("\n\n")}${matches.length > 10 ? `\n\n... and ${matches.length - 10} more matches` : ""}`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Found ${matches.length} matches for "${search}":\n\n${matches.slice(0, 10).join("\n\n")}${matches.length > 10 ? `\n\n... and ${matches.length - 10} more matches` : ""}`,
+            },
+          ],
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
@@ -90,7 +114,10 @@ export function registerSchemaTools(server: McpServer) {
           const content = readFileSync(resolve(dbSrcDir, file), "utf-8")
           const exports = content
             .split("\n")
-            .filter((line: string) => line.startsWith("export async function") || line.startsWith("export function"))
+            .filter(
+              (line: string) =>
+                line.startsWith("export async function") || line.startsWith("export function"),
+            )
             .map((line: string) => {
               const match = line.match(/export (?:async )?function (\w+)/)
               return match ? match[1] : null
@@ -104,10 +131,15 @@ export function registerSchemaTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 }

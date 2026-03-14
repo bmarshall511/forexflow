@@ -1,13 +1,6 @@
 "use client"
 
-import {
-  Shield,
-  X,
-  Wrench,
-  Eye,
-  AlertTriangle,
-  TrendingDown,
-} from "lucide-react"
+import { Shield, X, Wrench, Eye, AlertTriangle, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface TldrCardProps {
@@ -22,12 +15,9 @@ interface TldrCardProps {
 
 export function TldrCard({ tldr, winProbability, qualityScore }: TldrCardProps) {
   const isPositive =
-    (tldr.action === "hold" || tldr.action === "watch") &&
-    (winProbability ?? 50) >= 60
+    (tldr.action === "hold" || tldr.action === "watch") && (winProbability ?? 50) >= 60
   const isDanger =
-    tldr.action === "close" ||
-    tldr.action === "exit_now" ||
-    (winProbability ?? 50) < 40
+    tldr.action === "close" || tldr.action === "exit_now" || (winProbability ?? 50) < 40
   const isWarning = !isPositive && !isDanger
   // isWarning kept for clarity — borderColor/bgColor fall through to amber when neither positive nor danger
   void isWarning
@@ -37,11 +27,7 @@ export function TldrCard({ tldr, winProbability, qualityScore }: TldrCardProps) 
     : isDanger
       ? "border-red-500/50"
       : "border-amber-500/50"
-  const bgColor = isPositive
-    ? "bg-emerald-500/5"
-    : isDanger
-      ? "bg-red-500/5"
-      : "bg-amber-500/5"
+  const bgColor = isPositive ? "bg-emerald-500/5" : isDanger ? "bg-red-500/5" : "bg-amber-500/5"
 
   const actionIcons: Record<string, React.ElementType> = {
     hold: Shield,
@@ -54,11 +40,7 @@ export function TldrCard({ tldr, winProbability, qualityScore }: TldrCardProps) 
   const Icon = actionIcons[tldr.action] ?? Eye
 
   const urgencyLabel =
-    tldr.urgency === "now"
-      ? "Act Now"
-      : tldr.urgency === "soon"
-        ? "Soon"
-        : "Monitor"
+    tldr.urgency === "now" ? "Act Now" : tldr.urgency === "soon" ? "Soon" : "Monitor"
   const urgencyColor =
     tldr.urgency === "now"
       ? "bg-red-500 text-white animate-pulse"
@@ -81,35 +63,28 @@ export function TldrCard({ tldr, winProbability, qualityScore }: TldrCardProps) 
         >
           <Icon className="h-5 w-5" />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-semibold text-sm uppercase tracking-wide">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-sm font-semibold uppercase tracking-wide">
               {tldr.action.replace("_", " ")}
             </span>
-            <span
-              className={cn(
-                "text-xs font-medium px-2 py-0.5 rounded-full",
-                urgencyColor,
-              )}
-            >
+            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", urgencyColor)}>
               {urgencyLabel}
             </span>
           </div>
           <p className="text-sm leading-relaxed">{tldr.sentence}</p>
           {(winProbability != null || qualityScore != null) && (
-            <div className="flex flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
+            <div className="text-muted-foreground mt-2 flex flex-wrap gap-4 text-xs">
               {winProbability != null && (
                 <div className="flex items-center gap-1.5">
                   <span>Win Probability:</span>
-                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="bg-muted h-1.5 w-16 overflow-hidden rounded-full">
                     <div
                       className="h-full rounded-full bg-current"
                       style={{ width: `${Math.round(winProbability)}%` }}
                     />
                   </div>
-                  <span className="font-medium">
-                    {Math.round(winProbability)}%
-                  </span>
+                  <span className="font-medium">{Math.round(winProbability)}%</span>
                 </div>
               )}
               {qualityScore != null && (

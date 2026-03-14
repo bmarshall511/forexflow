@@ -36,11 +36,7 @@ export function LiveModeConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={onConfirm}
-            disabled={isLoading}
-          >
+          <AlertDialogAction variant="destructive" onClick={onConfirm} disabled={isLoading}>
             {isLoading ? "Switching..." : "Switch to Live"}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { getTradeWithDetails, updateTradeNotes, updateTradeTimeframe, deleteTrade } from "@fxflow/db"
+import {
+  getTradeWithDetails,
+  updateTradeNotes,
+  updateTradeTimeframe,
+  deleteTrade,
+} from "@fxflow/db"
 import type { ApiResponse, TradeDetailData } from "@fxflow/types"
 
 export async function GET(

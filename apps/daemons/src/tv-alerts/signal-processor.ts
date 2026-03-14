@@ -62,21 +62,24 @@ export class SignalProcessor {
       this.alertsState.initializeFromDB(summary)
       console.log(
         `[signal-processor] Restored state: ${summary.activeAutoPositions} active positions, ` +
-        `${summary.signalCountToday} signals today, $${summary.todayAutoPL.toFixed(2)} daily P&L`,
+          `${summary.signalCountToday} signals today, $${summary.todayAutoPL.toFixed(2)} daily P&L`,
       )
     } catch (err) {
       console.error("[signal-processor] Failed to restore state from DB:", err)
     }
 
     // Cleanup old signals + audit events every 24 hours
-    this.cleanupTimer = setInterval(() => {
-      void cleanupOldSignals(30).catch((err) => {
-        console.error("[signal-processor] Cleanup error:", err)
-      })
-      void cleanupOldAuditEvents(30).catch((err) => {
-        console.error("[signal-processor] Audit cleanup error:", err)
-      })
-    }, 24 * 60 * 60 * 1000)
+    this.cleanupTimer = setInterval(
+      () => {
+        void cleanupOldSignals(30).catch((err) => {
+          console.error("[signal-processor] Cleanup error:", err)
+        })
+        void cleanupOldAuditEvents(30).catch((err) => {
+          console.error("[signal-processor] Audit cleanup error:", err)
+        })
+      },
+      24 * 60 * 60 * 1000,
+    )
 
     // Initial cleanup + sync closed signal results for P&L tracking
     void cleanupOldSignals(30).catch(() => {})
@@ -132,9 +135,11 @@ export class SignalProcessor {
   async processSignal(payload: TVWebhookPayload, instrument: string): Promise<void> {
     // Serialize per instrument
     const prev = this.instrumentMutex.get(instrument) ?? Promise.resolve()
-    const current = prev.then(() => this.processSignalInner(payload, instrument)).catch((err) => {
-      console.error(`[signal-processor] Unhandled error for ${instrument}:`, err)
-    })
+    const current = prev
+      .then(() => this.processSignalInner(payload, instrument))
+      .catch((err) => {
+        console.error(`[signal-processor] Unhandled error for ${instrument}:`, err)
+      })
     this.instrumentMutex.set(instrument, current)
   }
 
@@ -173,7 +178,9 @@ export class SignalProcessor {
           rawPayload: payload,
           duration_ms: Date.now() - t0,
         })
-        console.log(`[signal-processor] Signal ${dup.id} rejected: duplicate_signal (within ${config.dedupWindowSeconds}s of ${recent.id})`)
+        console.log(
+          `[signal-processor] Signal ${dup.id} rejected: duplicate_signal (within ${config.dedupWindowSeconds}s of ${recent.id})`,
+        )
         return
       }
     }
@@ -292,7 +299,12 @@ export class SignalProcessor {
   }
 
   /** Shared post-execution housekeeping: sync P&L, update position count, start cooldown. */
-  private async postExecution(instrument: string, config: TVAlertsConfig, signalId?: string, t0?: number): Promise<void> {
+  private async postExecution(
+    instrument: string,
+    config: TVAlertsConfig,
+    signalId?: string,
+    t0?: number,
+  ): Promise<void> {
     await syncClosedSignalResults().catch(() => {})
 
     const autoCount = await getActiveAutoTradeCount()
@@ -339,9 +351,9 @@ export class SignalProcessor {
     // Bypassed for reversals: a reversal closes one position and opens one — net-zero change
     // against the cap. Counting the trade-to-be-closed would incorrectly block the flip.
     if (!isReversal) {
-      const autoTrades = this.positionManager.getPositions().open.filter(
-        (t) => this.alertsState.isAutoTrade(t.sourceTradeId),
-      )
+      const autoTrades = this.positionManager
+        .getPositions()
+        .open.filter((t) => this.alertsState.isAutoTrade(t.sourceTradeId))
       if (autoTrades.length >= config.maxOpenPositions) return "max_positions_reached"
     }
 
@@ -350,18 +362,21 @@ export class SignalProcessor {
     if (this.alertsState.isCircuitBreakerTripped()) return "daily_loss_limit"
 
     // 7. Pair whitelist check
-    const whitelist: string[] = typeof config.pairWhitelist === "string"
-      ? JSON.parse(config.pairWhitelist || "[]")
-      : config.pairWhitelist
+    const whitelist: string[] =
+      typeof config.pairWhitelist === "string"
+        ? JSON.parse(config.pairWhitelist || "[]")
+        : config.pairWhitelist
     if (whitelist.length > 0 && !whitelist.includes(instrument)) return "pair_not_whitelisted"
 
     // 8. Manual position conflict (any non-auto trade on this instrument)
     // Bypassed for reversals: reversals close ALL positions on the pair (auto + manual)
     // then open a new auto-trade position.
     if (!isReversal) {
-      const manualPosition = this.positionManager.getPositions().open.find(
-        (t) => t.instrument === instrument && !this.alertsState.isAutoTrade(t.sourceTradeId),
-      )
+      const manualPosition = this.positionManager
+        .getPositions()
+        .open.find(
+          (t) => t.instrument === instrument && !this.alertsState.isAutoTrade(t.sourceTradeId),
+        )
       if (manualPosition) return "manual_position_conflict"
     }
 
@@ -402,7 +417,10 @@ export class SignalProcessor {
         closedIds.push(tradeId)
       } catch (err) {
         failedIds.push(tradeId)
-        console.error(`[signal-processor] Protective close failed for ${tradeId}:`, (err as Error).message)
+        console.error(
+          `[signal-processor] Protective close failed for ${tradeId}:`,
+          (err as Error).message,
+        )
       }
     }
 
@@ -413,7 +431,10 @@ export class SignalProcessor {
         failedTradeIds: failedIds,
         duration_ms: Date.now() - t0,
       })
-      await this.failSignal(signalId, `Protective close failed for all ${failedIds.length} position(s)`)
+      await this.failSignal(
+        signalId,
+        `Protective close failed for all ${failedIds.length} position(s)`,
+      )
       await this.emitNotification(
         "Signal Failed (Protective Close)",
         `${instrument.replace("_", "/")} — failed to close ${failedIds.length} position(s). Manual intervention may be needed.`,

@@ -46,7 +46,7 @@ export function TradingModeToggle() {
       <div
         role="radiogroup"
         aria-label="Trading mode"
-        className="flex h-7 items-center rounded-full bg-muted/60 p-0.5"
+        className="bg-muted/60 flex h-7 items-center rounded-full p-0.5"
       >
         <button
           role="radio"
@@ -54,8 +54,8 @@ export function TradingModeToggle() {
           onClick={handleLiveClick}
           disabled={isLoading}
           className={cn(
-            "relative rounded-full px-2 @5xl/header:px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition-all duration-200",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "@5xl/header:px-3 relative rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide transition-all duration-200",
+            "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
             "disabled:pointer-events-none disabled:opacity-50",
             mode === "live"
               ? "bg-status-connected text-white shadow-sm"
@@ -63,7 +63,7 @@ export function TradingModeToggle() {
           )}
         >
           <span className="@5xl/header:hidden">L</span>
-          <span className="hidden @5xl/header:inline">Live</span>
+          <span className="@5xl/header:inline hidden">Live</span>
         </button>
         <button
           role="radio"
@@ -71,8 +71,8 @@ export function TradingModeToggle() {
           onClick={handlePracticeClick}
           disabled={isLoading}
           className={cn(
-            "relative rounded-full px-2 @5xl/header:px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition-all duration-200",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "@5xl/header:px-3 relative rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide transition-all duration-200",
+            "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
             "disabled:pointer-events-none disabled:opacity-50",
             mode === "practice"
               ? "bg-status-warning text-white shadow-sm"
@@ -80,7 +80,7 @@ export function TradingModeToggle() {
           )}
         >
           <span className="@5xl/header:hidden">P</span>
-          <span className="hidden @5xl/header:inline">Practice</span>
+          <span className="@5xl/header:inline hidden">Practice</span>
         </button>
       </div>
 

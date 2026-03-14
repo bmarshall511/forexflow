@@ -18,7 +18,7 @@ export function TVAlertsStatusCards() {
   const circuitTripped = s?.circuitBreakerTripped ?? false
 
   return (
-    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
       <DataTile
         label="Module Status"
         value={moduleEnabled ? "Active" : "Disabled"}

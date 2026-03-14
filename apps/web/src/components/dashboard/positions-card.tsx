@@ -2,13 +2,7 @@
 
 import { useState, useMemo } from "react"
 import type { OpenTradeData, PendingOrderData, ClosedTradeData } from "@fxflow/types"
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardAction,
-  CardContent,
-} from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardAction, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Settings2, Crosshair, AlertCircle, WifiOff } from "lucide-react"
@@ -45,7 +39,7 @@ function PositionsCardSkeleton() {
           <Skeleton className="h-14 w-full rounded-lg" />
         </div>
       </div>
-      <div className="border-t border-border" />
+      <div className="border-border border-t" />
       {/* Near closing skeleton */}
       <div className="space-y-2">
         <Skeleton className="h-3 w-24" />
@@ -53,7 +47,7 @@ function PositionsCardSkeleton() {
           <Skeleton key={i} className="h-12 w-full rounded-lg" />
         ))}
       </div>
-      <div className="border-t border-border" />
+      <div className="border-border border-t" />
       {/* Best/worst skeleton */}
       <div className="space-y-2">
         <Skeleton className="h-3 w-20" />
@@ -62,7 +56,7 @@ function PositionsCardSkeleton() {
           <Skeleton className="h-20 w-full rounded-lg" />
         </div>
       </div>
-      <div className="border-t border-border" />
+      <div className="border-border border-t" />
       {/* Today results skeleton */}
       <div className="space-y-2">
         <Skeleton className="h-3 w-28" />
@@ -122,12 +116,9 @@ export function PositionsDashboardCard() {
   }, [drawerTrade, pricesByInstrument])
 
   // Selection callbacks
-  const selectOpen = (trade: OpenTradeData) =>
-    setDrawerTrade({ ...trade, _type: "open" })
-  const selectPending = (order: PendingOrderData) =>
-    setDrawerTrade({ ...order, _type: "pending" })
-  const selectClosed = (trade: ClosedTradeData) =>
-    setDrawerTrade({ ...trade, _type: "closed" })
+  const selectOpen = (trade: OpenTradeData) => setDrawerTrade({ ...trade, _type: "open" })
+  const selectPending = (order: PendingOrderData) => setDrawerTrade({ ...order, _type: "pending" })
+  const selectClosed = (trade: ClosedTradeData) => setDrawerTrade({ ...trade, _type: "closed" })
 
   const handleCloseTrade = async (units?: number) => {
     if (!closeTarget) return
@@ -144,16 +135,16 @@ export function PositionsDashboardCard() {
       <Card>
         <CardContent className="py-12">
           <div className="flex flex-col items-center justify-center text-center">
-            <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-muted">
-              <Settings2 className="size-5 text-muted-foreground" />
+            <div className="bg-muted mb-4 flex size-12 items-center justify-center rounded-full">
+              <Settings2 className="text-muted-foreground size-5" />
             </div>
             <p className="text-sm font-medium">No Position Data</p>
-            <p className="mt-1 max-w-[240px] text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-1 max-w-[240px] text-xs">
               Connect your OANDA account to see live positions.
             </p>
             <Link
               href="/settings/oanda"
-              className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4 inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-medium transition-colors"
             >
               <Settings2 className="size-3.5" />
               Connect Account
@@ -174,10 +165,7 @@ export function PositionsDashboardCard() {
             Positions
           </CardTitle>
           <CardAction>
-            <Badge
-              variant="outline"
-              className="gap-1 text-[10px] font-medium text-destructive"
-            >
+            <Badge variant="outline" className="text-destructive gap-1 text-[10px] font-medium">
               <WifiOff className="size-3" />
               Error
             </Badge>
@@ -185,23 +173,21 @@ export function PositionsDashboardCard() {
         </CardHeader>
         <CardContent className="py-8">
           <div className="flex flex-col items-center justify-center text-center">
-            <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-destructive/10">
-              <AlertCircle className="size-5 text-destructive" />
+            <div className="bg-destructive/10 mb-4 flex size-12 items-center justify-center rounded-full">
+              <AlertCircle className="text-destructive size-5" />
             </div>
-            <p className="text-sm font-medium text-destructive">
-              Connection Failed
-            </p>
-            <p className="mt-1 max-w-[280px] text-xs text-muted-foreground">
+            <p className="text-destructive text-sm font-medium">Connection Failed</p>
+            <p className="text-muted-foreground mt-1 max-w-[280px] text-xs">
               Unable to load positions from OANDA. Please verify your credentials.
             </p>
             {errorMessage && (
-              <p className="mt-2 max-w-[320px] rounded-md bg-destructive/5 px-3 py-2 text-[11px] font-mono text-destructive/80">
+              <p className="bg-destructive/5 text-destructive/80 mt-2 max-w-[320px] rounded-md px-3 py-2 font-mono text-[11px]">
                 {errorMessage}
               </p>
             )}
             <Link
               href="/settings/oanda"
-              className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4 inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-medium transition-colors"
             >
               Check Settings
             </Link>
@@ -240,7 +226,7 @@ export function PositionsDashboardCard() {
           <CardAction>
             <Badge
               variant="outline"
-              className="gap-1 text-[10px] font-medium text-muted-foreground"
+              className="text-muted-foreground gap-1 text-[10px] font-medium"
             >
               {summary.openCount + summary.pendingCount} active
             </Badge>
@@ -253,7 +239,7 @@ export function PositionsDashboardCard() {
             currency={currency}
           />
 
-          <div className="border-t border-border" />
+          <div className="border-border border-t" />
 
           <ProximityClosingSection
             trades={tradesNearClosing}
@@ -261,14 +247,11 @@ export function PositionsDashboardCard() {
             onSelectTrade={selectOpen}
           />
 
-          <div className="border-t border-border" />
+          <div className="border-border border-t" />
 
-          <ProximityFillingSection
-            orders={ordersNearFilling}
-            onSelectTrade={selectPending}
-          />
+          <ProximityFillingSection orders={ordersNearFilling} onSelectTrade={selectPending} />
 
-          <div className="border-t border-border" />
+          <div className="border-border border-t" />
 
           <BestWorstSection
             best={bestPerformer}
@@ -277,7 +260,7 @@ export function PositionsDashboardCard() {
             onSelectTrade={selectOpen}
           />
 
-          <div className="border-t border-border" />
+          <div className="border-border border-t" />
 
           <TodayResultsSection
             wins={todayWins}
@@ -287,7 +270,7 @@ export function PositionsDashboardCard() {
             currency={currency}
           />
 
-          <div className="border-t border-border" />
+          <div className="border-border border-t" />
 
           <RecentActivitySection
             trades={recentClosed}

@@ -77,15 +77,22 @@ export class DigestGenerator {
     }
   }
 
-  async generateDigest(period: "weekly" | "monthly", periodStart: Date, periodEnd: Date): Promise<void> {
+  async generateDigest(
+    period: "weekly" | "monthly",
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<void> {
     this.running = true
     const startTime = Date.now()
     let digestId: string | null = null
 
     try {
-      console.log(`[digest-generator] Generating ${period} digest for ${periodStart.toISOString()} - ${periodEnd.toISOString()}`)
+      console.log(
+        `[digest-generator] Generating ${period} digest for ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
+      )
 
-      const { createDigest, saveDigestResult, db, getDecryptedClaudeKey, calculateCost } = await import("@fxflow/db")
+      const { createDigest, saveDigestResult, db, getDecryptedClaudeKey, calculateCost } =
+        await import("@fxflow/db")
 
       digestId = await createDigest({ period, periodStart, periodEnd })
 
@@ -269,10 +276,18 @@ Rules:
       sections.winRate = winRate
       sections.totalPnl = totalPnl
       sections.bestPair = bestPairEntry
-        ? { instrument: bestPairEntry[0], pnl: bestPairEntry[1].pnl, trades: bestPairEntry[1].trades }
+        ? {
+            instrument: bestPairEntry[0],
+            pnl: bestPairEntry[1].pnl,
+            trades: bestPairEntry[1].trades,
+          }
         : null
       sections.worstPair = worstPairEntry
-        ? { instrument: worstPairEntry[0], pnl: worstPairEntry[1].pnl, trades: worstPairEntry[1].trades }
+        ? {
+            instrument: worstPairEntry[0],
+            pnl: worstPairEntry[1].pnl,
+            trades: worstPairEntry[1].trades,
+          }
         : null
       sections.bestSession = bestSessionEntry?.[0] ?? null
       sections.worstSession = worstSessionEntry?.[0] ?? null

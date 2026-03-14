@@ -80,11 +80,7 @@ export function createExitLevel(
  * Shows ~30 candles before and ~20 after the target.
  * Falls back to fitContent() if the range is invalid.
  */
-export function scrollToEntry(
-  chart: IChartApi,
-  targetTime: number,
-  timeframe: string,
-): void {
+export function scrollToEntry(chart: IChartApi, targetTime: number, timeframe: string): void {
   const interval = TIMEFRAME_SECONDS[timeframe] ?? 3600
   const from = (targetTime - interval * 30) as Time
   const to = (targetTime + interval * 20) as Time

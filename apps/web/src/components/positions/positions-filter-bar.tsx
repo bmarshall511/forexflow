@@ -37,12 +37,12 @@ export function PositionsFilterBar({
   onTagIdsChange,
 }: PositionsFilterBarProps) {
   return (
-    <div className="flex items-center gap-2.5 overflow-x-auto pb-1 -mb-1">
-      <SlidersHorizontal className="size-3.5 text-muted-foreground shrink-0" />
+    <div className="-mb-1 flex items-center gap-2.5 overflow-x-auto pb-1">
+      <SlidersHorizontal className="text-muted-foreground size-3.5 shrink-0" />
 
       {/* Instrument filter */}
       <select
-        className="h-8 rounded-lg border border-border/60 bg-muted/30 px-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors hover:bg-muted/50"
+        className="border-border/60 bg-muted/30 focus:ring-ring/30 hover:bg-muted/50 h-8 rounded-lg border px-2.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2"
         value={tab === "history" ? (filters?.instrument ?? "") : instrumentFilter}
         onChange={(e) => {
           if (tab === "history") {
@@ -82,7 +82,9 @@ export function PositionsFilterBar({
       {tab === "history" && (
         <PillGroup
           value={filters?.outcome ?? ""}
-          onChange={(val) => onFiltersChange?.({ ...filters, outcome: (val as TradeOutcome) || undefined })}
+          onChange={(val) =>
+            onFiltersChange?.({ ...filters, outcome: (val as TradeOutcome) || undefined })
+          }
           options={[
             { label: "All", value: "" },
             { label: "Win", value: "win" },
@@ -94,7 +96,7 @@ export function PositionsFilterBar({
 
       {/* Tag filter pills */}
       {tags && tags.length > 0 && (
-        <div className="flex items-center gap-1.5 border-l border-border/40 pl-2.5 ml-0.5">
+        <div className="border-border/40 ml-0.5 flex items-center gap-1.5 border-l pl-2.5">
           {tags.map((tag) => {
             const activeTagIds = tab === "history" ? (filters?.tagIds ?? []) : (tagIds ?? [])
             const active = activeTagIds.includes(tag.id)
@@ -141,13 +143,13 @@ function PillGroup({
   options: { label: string; value: string }[]
 }) {
   return (
-    <div className="inline-flex h-8 rounded-lg bg-muted/40 p-0.5 gap-0.5" role="group">
+    <div className="bg-muted/40 inline-flex h-8 gap-0.5 rounded-lg p-0.5" role="group">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
           className={cn(
-            "px-2.5 text-xs font-medium rounded-md transition-all",
+            "rounded-md px-2.5 text-xs font-medium transition-all",
             value === opt.value
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",

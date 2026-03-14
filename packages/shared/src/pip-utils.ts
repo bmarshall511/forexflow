@@ -3,9 +3,19 @@ import type { TradeDirection, TradeOutcome } from "@fxflow/types"
 // ─── JPY pair detection ─────────────────────────────────────────────────────
 
 const JPY_PAIRS = new Set([
-  "USD_JPY", "EUR_JPY", "GBP_JPY", "AUD_JPY", "CAD_JPY",
-  "CHF_JPY", "NZD_JPY", "SGD_JPY", "HKD_JPY", "ZAR_JPY",
-  "TRY_JPY", "MXN_JPY", "CNH_JPY",
+  "USD_JPY",
+  "EUR_JPY",
+  "GBP_JPY",
+  "AUD_JPY",
+  "CAD_JPY",
+  "CHF_JPY",
+  "NZD_JPY",
+  "SGD_JPY",
+  "HKD_JPY",
+  "ZAR_JPY",
+  "TRY_JPY",
+  "MXN_JPY",
+  "CNH_JPY",
 ])
 
 /** Returns the pip size for an instrument (0.01 for JPY pairs, 0.0001 for standard). */
@@ -65,16 +75,12 @@ export function calculateRiskReward(
   let rewardPips: number | null = null
 
   if (stopLoss !== null) {
-    const riskDistance = direction === "long"
-      ? entryPrice - stopLoss
-      : stopLoss - entryPrice
+    const riskDistance = direction === "long" ? entryPrice - stopLoss : stopLoss - entryPrice
     riskPips = Math.abs(riskDistance) / pipSize
   }
 
   if (takeProfit !== null) {
-    const rewardDistance = direction === "long"
-      ? takeProfit - entryPrice
-      : entryPrice - takeProfit
+    const rewardDistance = direction === "long" ? takeProfit - entryPrice : entryPrice - takeProfit
     rewardPips = Math.abs(rewardDistance) / pipSize
   }
 

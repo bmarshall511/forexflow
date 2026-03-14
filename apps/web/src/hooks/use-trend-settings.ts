@@ -24,7 +24,9 @@ interface UseTrendSettingsReturn {
 export function useTrendSettings(
   initialOverrides?: ChartPanelTrendOverrides,
 ): UseTrendSettingsReturn {
-  const [globalSettings, setGlobalSettings] = useState<TrendDisplaySettings>(DEFAULT_TREND_DISPLAY_SETTINGS)
+  const [globalSettings, setGlobalSettings] = useState<TrendDisplaySettings>(
+    DEFAULT_TREND_DISPLAY_SETTINGS,
+  )
   const [overrides, setOverrides] = useState<ChartPanelTrendOverrides>(initialOverrides ?? {})
   const fetchedRef = useRef(false)
 

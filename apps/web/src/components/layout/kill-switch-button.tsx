@@ -47,7 +47,11 @@ export function KillSwitchButton() {
           )}
           onClick={handleToggle}
           disabled={isToggling}
-          aria-label={enabled ? "TradingView Alerts Active — Click to disable" : "TradingView Alerts Disabled — Click to enable"}
+          aria-label={
+            enabled
+              ? "TradingView Alerts Active — Click to disable"
+              : "TradingView Alerts Disabled — Click to enable"
+          }
         >
           {isToggling ? (
             <Loader2 className="size-3.5 animate-spin" />
@@ -55,17 +59,19 @@ export function KillSwitchButton() {
             <>
               <Radio className="size-3.5" />
               {enabled && (
-                <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="absolute -right-0.5 -top-0.5 size-2 animate-pulse rounded-full bg-green-500" />
               )}
             </>
           )}
-          <span className="hidden @5xl/header:inline @7xl/header:hidden whitespace-nowrap">TV Alerts</span>
-          <span className="hidden @7xl/header:inline whitespace-nowrap">TradingView Alerts</span>
+          <span className="@5xl/header:inline @7xl/header:hidden hidden whitespace-nowrap">
+            TV Alerts
+          </span>
+          <span className="@7xl/header:inline hidden whitespace-nowrap">TradingView Alerts</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <p>{enabled ? "TradingView Alerts: Active" : "TradingView Alerts: Disabled"}</p>
-        <p className="text-xs text-muted-foreground">Ctrl+Shift+K</p>
+        <p className="text-muted-foreground text-xs">Ctrl+Shift+K</p>
       </TooltipContent>
     </Tooltip>
   )

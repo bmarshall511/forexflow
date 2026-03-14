@@ -51,11 +51,7 @@ export function TestConnectionButton({ mode, disabled }: TestConnectionButtonPro
       onClick={handleTest}
       disabled={disabled || isTesting}
     >
-      {isTesting ? (
-        <Loader2 className="size-4 animate-spin" />
-      ) : (
-        <Wifi className="size-4" />
-      )}
+      {isTesting ? <Loader2 className="size-4 animate-spin" /> : <Wifi className="size-4" />}
       {isTesting ? "Testing..." : "Test Connection"}
     </Button>
   )

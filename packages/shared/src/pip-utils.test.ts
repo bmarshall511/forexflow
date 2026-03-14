@@ -27,11 +27,11 @@ describe("getDecimalPlaces", () => {
 
 describe("priceToPips", () => {
   it("should convert price distance to pips for standard pairs", () => {
-    expect(priceToPips("EUR_USD", 0.0050)).toBeCloseTo(50)
+    expect(priceToPips("EUR_USD", 0.005)).toBeCloseTo(50)
   })
 
   it("should convert price distance to pips for JPY pairs", () => {
-    expect(priceToPips("USD_JPY", 0.50)).toBeCloseTo(50)
+    expect(priceToPips("USD_JPY", 0.5)).toBeCloseTo(50)
   })
 
   it("should return absolute value regardless of sign", () => {

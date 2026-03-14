@@ -41,11 +41,9 @@ export function PositionPicker({ value, onChange, assignedIds }: PositionPickerP
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors",
+          "flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors",
           "hover:bg-muted hover:text-foreground border border-transparent",
-          value
-            ? "bg-primary/10 text-primary border-primary/30"
-            : "text-muted-foreground",
+          value ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground",
           open && "bg-muted text-foreground border-border",
         )}
         aria-label="Select position to overlay"
@@ -65,7 +63,7 @@ export function PositionPicker({ value, onChange, assignedIds }: PositionPickerP
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 rounded-lg border bg-popover shadow-lg min-w-[240px] max-w-[300px]">
+        <div className="bg-popover absolute left-0 top-full z-50 mt-1 min-w-[240px] max-w-[300px] rounded-lg border shadow-lg">
           {/* Clear button when a trade is selected */}
           {value && (
             <button
@@ -74,7 +72,7 @@ export function PositionPicker({ value, onChange, assignedIds }: PositionPickerP
                 onChange(null)
                 setOpen(false)
               }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-muted-foreground hover:bg-muted border-b transition-colors"
+              className="text-muted-foreground hover:bg-muted flex w-full items-center gap-2 border-b px-3 py-2 text-xs transition-colors"
             >
               <X className="h-3 w-3" />
               Clear selection
@@ -83,7 +81,7 @@ export function PositionPicker({ value, onChange, assignedIds }: PositionPickerP
 
           <div className="max-h-72 overflow-y-auto py-1">
             {!hasPositions && (
-              <p className="px-3 py-4 text-xs text-muted-foreground text-center">No positions</p>
+              <p className="text-muted-foreground px-3 py-4 text-center text-xs">No positions</p>
             )}
 
             {/* Open trades */}
@@ -158,7 +156,7 @@ export function PositionPicker({ value, onChange, assignedIds }: PositionPickerP
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+      <div className="text-muted-foreground px-3 py-1 text-[10px] font-medium uppercase tracking-wider">
         {label}
       </div>
       {children}
@@ -193,33 +191,35 @@ function TradeItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 w-full px-3 py-1.5 text-xs transition-colors",
-        isSelected
-          ? "bg-primary text-primary-foreground"
-          : "hover:bg-muted",
+        "flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors",
+        isSelected ? "bg-primary text-primary-foreground" : "hover:bg-muted",
       )}
     >
       {direction === "long" ? (
-        <ArrowUp className="h-3 w-3 text-green-500 shrink-0" />
+        <ArrowUp className="h-3 w-3 shrink-0 text-green-500" />
       ) : (
-        <ArrowDown className="h-3 w-3 text-red-500 shrink-0" />
+        <ArrowDown className="h-3 w-3 shrink-0 text-red-500" />
       )}
       <span className="font-medium">{formatInstrument(instrument)}</span>
-      <span className="text-muted-foreground font-mono tabular-nums ml-auto">
+      <span className="text-muted-foreground ml-auto font-mono tabular-nums">
         {entryPrice.toFixed(decimals)}
       </span>
       {pnl != null && (
         <span
           className={cn(
-            "font-mono tabular-nums ml-1",
+            "ml-1 font-mono tabular-nums",
             outcome === "win" || (outcome == null && pnl >= 0) ? "text-green-500" : "text-red-500",
           )}
         >
-          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
+          {pnl >= 0 ? "+" : ""}
+          {pnl.toFixed(2)}
         </span>
       )}
       {isAssigned && !isSelected && (
-        <span className="h-1.5 w-1.5 rounded-full bg-primary/50 shrink-0 ml-1" aria-label="Assigned to a panel" />
+        <span
+          className="bg-primary/50 ml-1 h-1.5 w-1.5 shrink-0 rounded-full"
+          aria-label="Assigned to a panel"
+        />
       )}
     </button>
   )

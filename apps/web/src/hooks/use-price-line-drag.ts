@@ -62,7 +62,10 @@ export function usePriceLineDrag({
     (y: number, hitPx: number): { lineType: LineType; line: IPriceLine } | null => {
       let closest: { lineType: LineType; line: IPriceLine; dist: number } | null = null
 
-      for (const [type, line] of Object.entries(lines) as [LineType, IPriceLine | null | undefined][]) {
+      for (const [type, line] of Object.entries(lines) as [
+        LineType,
+        IPriceLine | null | undefined,
+      ][]) {
         if (!line) continue
         const lineY = getLineYCoord(line)
         if (lineY === null) continue

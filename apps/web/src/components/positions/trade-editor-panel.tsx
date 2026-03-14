@@ -1,7 +1,12 @@
 "use client"
 
 import { useCallback } from "react"
-import type { OpenTradeData, PendingOrderData, ClosedTradeData, PositionPriceTick } from "@fxflow/types"
+import type {
+  OpenTradeData,
+  PendingOrderData,
+  ClosedTradeData,
+  PositionPriceTick,
+} from "@fxflow/types"
 import { useChartTradeEditor } from "@/hooks/use-chart-trade-editor"
 import { useTradeActions } from "@/hooks/use-trade-actions"
 import { DraggableTradeChart } from "@/components/charts/draggable-trade-chart"
@@ -14,9 +19,7 @@ export type TradeEditorTrade =
   | (OpenTradeData & { _type: "open" })
   | (PendingOrderData & { _type: "pending" })
 
-export type TradeUnion =
-  | TradeEditorTrade
-  | (ClosedTradeData & { _type: "closed" })
+export type TradeUnion = TradeEditorTrade | (ClosedTradeData & { _type: "closed" })
 
 interface TradeEditorPanelProps {
   trade: TradeEditorTrade
@@ -48,9 +51,7 @@ export function TradeEditorPanel({
 }: TradeEditorPanelProps) {
   const { modifyTrade, modifyPendingOrder } = useTradeActions()
 
-  const livePrice = trade._type === "open"
-    ? trade.currentPrice
-    : externalCurrentPrice ?? null
+  const livePrice = trade._type === "open" ? trade.currentPrice : (externalCurrentPrice ?? null)
 
   const saveFn = useCallback(
     async (stopLoss: number | null, takeProfit: number | null): Promise<boolean> => {

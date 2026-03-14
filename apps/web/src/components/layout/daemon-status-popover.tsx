@@ -38,7 +38,7 @@ export function DaemonStatusPopover({ snapshot, isConnected }: DaemonStatusPopov
     return (
       <div className="space-y-2">
         <h4 className="text-sm font-semibold">Daemon Service</h4>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Daemon not connected. Ensure the daemon process is running on the configured port.
         </p>
       </div>
@@ -53,17 +53,17 @@ export function DaemonStatusPopover({ snapshot, isConnected }: DaemonStatusPopov
           <span className={cn("size-2 rounded-full", "bg-status-connected")} aria-hidden="true" />
           <h4 className="text-sm font-semibold">Daemon Service</h4>
         </div>
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-status-connected">
+        <Badge variant="outline" className="text-status-connected px-1.5 py-0 text-[10px]">
           Connected
         </Badge>
       </div>
 
       {/* Details */}
-      <div className="space-y-1.5 border-t border-border pt-2">
+      <div className="border-border space-y-1.5 border-t pt-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">WebSocket</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium text-status-connected">{"\u2713"}</span>
+            <span className="text-status-connected text-xs font-medium">{"\u2713"}</span>
             <span>Connected</span>
           </div>
         </div>
@@ -74,8 +74,8 @@ export function DaemonStatusPopover({ snapshot, isConnected }: DaemonStatusPopov
       </div>
 
       {/* Uptime */}
-      <div className="space-y-1.5 border-t border-border pt-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="border-border space-y-1.5 border-t pt-2">
+        <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
           Process
         </span>
         <div className="space-y-1">

@@ -1,7 +1,13 @@
 "use client"
 
 import { ArrowUp, ArrowDown, X, Plus, Loader2 } from "lucide-react"
-import { getDecimalPlaces, getPipSize, formatPips, formatInstrument, priceToPips } from "@fxflow/shared"
+import {
+  getDecimalPlaces,
+  getPipSize,
+  formatPips,
+  formatInstrument,
+  priceToPips,
+} from "@fxflow/shared"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -23,9 +29,9 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
   const isEditable = trade._type !== "closed"
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1 border-t shrink-0 min-h-[36px] overflow-x-auto scrollbar-none">
+    <div className="scrollbar-none flex min-h-[36px] shrink-0 items-center gap-2 overflow-x-auto border-t px-3 py-1">
       {/* Trade identity */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex shrink-0 items-center gap-1.5">
         {trade.direction === "long" ? (
           <ArrowUp className="h-3.5 w-3.5 text-green-500" />
         ) : (
@@ -34,7 +40,7 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
         <span className="text-xs font-semibold">{formatInstrument(trade.instrument)}</span>
         <span
           className={cn(
-            "px-1 py-0.5 text-[10px] font-medium rounded",
+            "rounded px-1 py-0.5 text-[10px] font-medium",
             trade.direction === "long"
               ? "bg-green-500/10 text-green-500"
               : "bg-red-500/10 text-red-500",
@@ -44,21 +50,21 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
         </span>
       </div>
 
-      <div className="w-px h-5 bg-border shrink-0" />
+      <div className="bg-border h-5 w-px shrink-0" />
 
       {/* Entry (read-only) */}
-      <div className="flex items-center gap-1 shrink-0">
-        <span className="text-[10px] text-muted-foreground">Entry</span>
-        <span className="text-xs font-mono tabular-nums">{trade.entryPrice.toFixed(decimals)}</span>
+      <div className="flex shrink-0 items-center gap-1">
+        <span className="text-muted-foreground text-[10px]">Entry</span>
+        <span className="font-mono text-xs tabular-nums">{trade.entryPrice.toFixed(decimals)}</span>
       </div>
 
-      <div className="w-px h-5 bg-border shrink-0" />
+      <div className="bg-border h-5 w-px shrink-0" />
 
       {isEditable ? (
         <>
           {/* SL input */}
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
               SL
               {editor.isSLDirty && <span className="size-1.5 rounded-full bg-amber-500" />}
             </span>
@@ -73,7 +79,7 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
                     if (!isNaN(val)) editor.setDraftSL(val)
                   }}
                   className={cn(
-                    "h-6 w-24 text-xs font-mono tabular-nums",
+                    "h-6 w-24 font-mono text-xs tabular-nums",
                     editor.validationErrors.sl && "border-destructive",
                   )}
                   aria-label="Stop Loss price"
@@ -81,14 +87,17 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
                   onClick={(e) => e.stopPropagation()}
                 />
                 {editor.slPips !== null && (
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  <span className="text-muted-foreground whitespace-nowrap text-[10px]">
                     {formatPips(editor.slPips)}p
                   </span>
                 )}
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); editor.setDraftSL(null) }}
-                  className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    editor.setDraftSL(null)
+                  }}
+                  className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
                   aria-label="Remove stop loss"
                 >
                   <X className="size-3" />
@@ -97,8 +106,11 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
             ) : (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); editor.setDraftSL(editor.defaultSL) }}
-                className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  editor.setDraftSL(editor.defaultSL)
+                }}
+                className="text-muted-foreground hover:text-foreground flex items-center gap-0.5 text-[10px] transition-colors"
               >
                 <Plus className="size-3" />
                 Add
@@ -106,11 +118,11 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
             )}
           </div>
 
-          <div className="w-px h-5 bg-border shrink-0" />
+          <div className="bg-border h-5 w-px shrink-0" />
 
           {/* TP input */}
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
               TP
               {editor.isTPDirty && <span className="size-1.5 rounded-full bg-amber-500" />}
             </span>
@@ -125,7 +137,7 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
                     if (!isNaN(val)) editor.setDraftTP(val)
                   }}
                   className={cn(
-                    "h-6 w-24 text-xs font-mono tabular-nums",
+                    "h-6 w-24 font-mono text-xs tabular-nums",
                     editor.validationErrors.tp && "border-destructive",
                   )}
                   aria-label="Take Profit price"
@@ -133,14 +145,17 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
                   onClick={(e) => e.stopPropagation()}
                 />
                 {editor.tpPips !== null && (
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  <span className="text-muted-foreground whitespace-nowrap text-[10px]">
                     {formatPips(editor.tpPips)}p
                   </span>
                 )}
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); editor.setDraftTP(null) }}
-                  className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    editor.setDraftTP(null)
+                  }}
+                  className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
                   aria-label="Remove take profit"
                 >
                   <X className="size-3" />
@@ -149,8 +164,11 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
             ) : (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); editor.setDraftTP(editor.defaultTP) }}
-                className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  editor.setDraftTP(editor.defaultTP)
+                }}
+                className="text-muted-foreground hover:text-foreground flex items-center gap-0.5 text-[10px] transition-colors"
               >
                 <Plus className="size-3" />
                 Add
@@ -158,7 +176,7 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
             )}
           </div>
 
-          <div className="w-px h-5 bg-border shrink-0" />
+          <div className="bg-border h-5 w-px shrink-0" />
 
           {/* Inline progress bar */}
           {trade._type === "open" && (
@@ -173,21 +191,27 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
           )}
 
           {/* Save/Cancel */}
-          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <Button
               variant="outline"
               size="sm"
-              onClick={(e) => { e.stopPropagation(); editor.cancel() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                editor.cancel()
+              }}
               disabled={!editor.isDirty || editor.isSaving}
-              className="h-6 text-[10px] px-2"
+              className="h-6 px-2 text-[10px]"
             >
               Cancel
             </Button>
             <Button
               size="sm"
-              onClick={(e) => { e.stopPropagation(); editor.save() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                editor.save()
+              }}
               disabled={!editor.isDirty || hasErrors || editor.isSaving}
-              className="h-6 text-[10px] px-2 gap-1"
+              className="h-6 gap-1 px-2 text-[10px]"
             >
               {editor.isSaving && <Loader2 className="size-3 animate-spin" />}
               {editor.isSaving ? "Saving..." : "Save"}
@@ -200,39 +224,48 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
           {trade._type === "closed" && (
             <>
               {trade.stopLoss != null && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] text-muted-foreground">SL</span>
-                  <span className="text-xs font-mono tabular-nums">{trade.stopLoss.toFixed(decimals)}</span>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="text-muted-foreground text-[10px]">SL</span>
+                  <span className="font-mono text-xs tabular-nums">
+                    {trade.stopLoss.toFixed(decimals)}
+                  </span>
                 </div>
               )}
               {trade.takeProfit != null && (
                 <>
-                  <div className="w-px h-5 bg-border shrink-0" />
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] text-muted-foreground">TP</span>
-                    <span className="text-xs font-mono tabular-nums">{trade.takeProfit.toFixed(decimals)}</span>
+                  <div className="bg-border h-5 w-px shrink-0" />
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="text-muted-foreground text-[10px]">TP</span>
+                    <span className="font-mono text-xs tabular-nums">
+                      {trade.takeProfit.toFixed(decimals)}
+                    </span>
                   </div>
                 </>
               )}
               {trade.exitPrice != null && (
                 <>
-                  <div className="w-px h-5 bg-border shrink-0" />
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] text-muted-foreground">Exit</span>
-                    <span className="text-xs font-mono tabular-nums">{trade.exitPrice.toFixed(decimals)}</span>
+                  <div className="bg-border h-5 w-px shrink-0" />
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="text-muted-foreground text-[10px]">Exit</span>
+                    <span className="font-mono text-xs tabular-nums">
+                      {trade.exitPrice.toFixed(decimals)}
+                    </span>
                   </div>
                 </>
               )}
-              <div className="w-px h-5 bg-border shrink-0" />
+              <div className="bg-border h-5 w-px shrink-0" />
               <span
                 className={cn(
                   "text-xs font-medium",
-                  trade.outcome === "win" ? "text-green-500"
-                    : trade.outcome === "loss" ? "text-red-500"
+                  trade.outcome === "win"
+                    ? "text-green-500"
+                    : trade.outcome === "loss"
+                      ? "text-red-500"
                       : "text-muted-foreground",
                 )}
               >
-                {trade.realizedPL >= 0 ? "+" : ""}{trade.realizedPL.toFixed(2)}
+                {trade.realizedPL >= 0 ? "+" : ""}
+                {trade.realizedPL.toFixed(2)}
               </span>
             </>
           )}
@@ -243,8 +276,11 @@ export function TradeControlBar({ trade, editor, currentPrice, onClear }: TradeC
       {/* Dismiss */}
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); onClear() }}
-        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        onClick={(e) => {
+          e.stopPropagation()
+          onClear()
+        }}
+        className="hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 rounded p-1 transition-colors"
         aria-label="Dismiss trade"
       >
         <X className="h-3.5 w-3.5" />
@@ -287,22 +323,22 @@ function InlineProgressBar({
   const clampedProgress = Math.max(0, Math.min(100, progress))
 
   return (
-    <div className="relative w-24 h-2 rounded-full bg-muted overflow-hidden shrink-0">
+    <div className="bg-muted relative h-2 w-24 shrink-0 overflow-hidden rounded-full">
       {slPips !== null && (
         <div
-          className="absolute inset-y-0 left-0 bg-red-500/20 rounded-l-full"
+          className="absolute inset-y-0 left-0 rounded-l-full bg-red-500/20"
           style={{ width: `${(slPips / totalRange) * 100}%` }}
         />
       )}
       {tpPips !== null && (
         <div
-          className="absolute inset-y-0 right-0 bg-green-500/20 rounded-r-full"
+          className="absolute inset-y-0 right-0 rounded-r-full bg-green-500/20"
           style={{ width: `${(tpPips / totalRange) * 100}%` }}
         />
       )}
       {slPips !== null && (
         <div
-          className="absolute inset-y-0 w-px bg-foreground/30"
+          className="bg-foreground/30 absolute inset-y-0 w-px"
           style={{ left: `${(slPips / totalRange) * 100}%` }}
         />
       )}

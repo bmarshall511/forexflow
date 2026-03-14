@@ -3,8 +3,24 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react"
 import { useTheme } from "next-themes"
 import { createChart, CandlestickSeries, LineStyle, createSeriesMarkers } from "lightweight-charts"
-import type { IChartApi, ISeriesApi, IPriceLine, ISeriesMarkersPluginApi, CandlestickData, Time, SeriesMarker } from "lightweight-charts"
-import type { PositionPriceTick, TradeDirection, PlaceableOrderType, ZoneData, CurveData, TrendData, TrendVisualSettings } from "@fxflow/types"
+import type {
+  IChartApi,
+  ISeriesApi,
+  IPriceLine,
+  ISeriesMarkersPluginApi,
+  CandlestickData,
+  Time,
+  SeriesMarker,
+} from "lightweight-charts"
+import type {
+  PositionPriceTick,
+  TradeDirection,
+  PlaceableOrderType,
+  ZoneData,
+  CurveData,
+  TrendData,
+  TrendVisualSettings,
+} from "@fxflow/types"
 import { getDecimalPlaces } from "@fxflow/shared"
 import { ZonePrimitive } from "./zone-primitive"
 import { CurvePrimitive } from "./curve-primitive"
@@ -13,11 +29,7 @@ import { useDynamicCandles } from "@/hooks/use-dynamic-candles"
 import { useRealtimeCandles } from "@/hooks/use-realtime-candles"
 import { usePriceLineDrag } from "@/hooks/use-price-line-drag"
 import type { LineType } from "@/hooks/use-price-line-drag"
-import {
-  getChartOptions,
-  getCandlestickOptions,
-  fetchCandles,
-} from "./chart-utils"
+import { getChartOptions, getCandlestickOptions, fetchCandles } from "./chart-utils"
 
 export interface OrderOverlayConfig {
   direction: TradeDirection
@@ -59,7 +71,24 @@ interface StandaloneChartProps {
   className?: string
 }
 
-function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, orderOverlay, markers, zones, higherTfZones, currentPrice, curveData, trendData, higherTfTrendData, trendVisuals, onZoneClick, onCandleCountChange, className }: StandaloneChartProps) {
+function StandaloneChartInner({
+  instrument,
+  timeframe,
+  lastTick,
+  loadDelay = 0,
+  orderOverlay,
+  markers,
+  zones,
+  higherTfZones,
+  currentPrice,
+  curveData,
+  trendData,
+  higherTfTrendData,
+  trendVisuals,
+  onZoneClick,
+  onCandleCountChange,
+  className,
+}: StandaloneChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
@@ -77,7 +106,11 @@ function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, 
   const decimals = getDecimalPlaces(instrument)
   const minMove = decimals === 3 ? 0.001 : 0.00001
 
-  const { setInitialData, setup: setupDynamic, candleCount } = useDynamicCandles(instrument, timeframe)
+  const {
+    setInitialData,
+    setup: setupDynamic,
+    candleCount,
+  } = useDynamicCandles(instrument, timeframe)
 
   // Notify parent when candle count changes (initial load + dynamic scroll)
   const onCandleCountChangeRef = useRef(onCandleCountChange)
@@ -117,7 +150,10 @@ function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, 
     })
     chartRef.current = chart
 
-    const series = chart.addSeries(CandlestickSeries, getCandlestickOptions(isDark, decimals, minMove))
+    const series = chart.addSeries(
+      CandlestickSeries,
+      getCandlestickOptions(isDark, decimals, minMove),
+    )
     seriesRef.current = series
 
     // Attach zone rendering primitive
@@ -161,7 +197,9 @@ function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, 
     // Stagger initial load to avoid concurrent API calls
     let delayTimer: ReturnType<typeof setTimeout> | null = null
     if (loadDelay > 0) {
-      delayTimer = setTimeout(() => { if (!disposed) load() }, loadDelay)
+      delayTimer = setTimeout(() => {
+        if (!disposed) load()
+      }, loadDelay)
     } else {
       load()
     }
@@ -185,7 +223,7 @@ function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, 
       chart.remove()
       chartRef.current = null
       seriesRef.current = null
-      lastCandleRef.current = null  // reset hook's ref on chart dispose
+      lastCandleRef.current = null // reset hook's ref on chart dispose
       priceLineRef.current = null
       entryLineRef.current = null
       slLineRef.current = null
@@ -293,9 +331,18 @@ function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, 
     const series = seriesRef.current
     if (!series) return
 
-    if (entryLineRef.current) { series.removePriceLine(entryLineRef.current); entryLineRef.current = null }
-    if (slLineRef.current) { series.removePriceLine(slLineRef.current); slLineRef.current = null }
-    if (tpLineRef.current) { series.removePriceLine(tpLineRef.current); tpLineRef.current = null }
+    if (entryLineRef.current) {
+      series.removePriceLine(entryLineRef.current)
+      entryLineRef.current = null
+    }
+    if (slLineRef.current) {
+      series.removePriceLine(slLineRef.current)
+      slLineRef.current = null
+    }
+    if (tpLineRef.current) {
+      series.removePriceLine(tpLineRef.current)
+      tpLineRef.current = null
+    }
   }, [orderOverlay])
 
   // ─── Markers (signal arrows, trade entry/exit arrows) ──────────────────
@@ -385,11 +432,14 @@ function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, 
 
   // ─── Order overlay: drag interaction ─────────────────────────────────────
   const noopDraftChange = useCallback(() => {}, [])
-  const dragLines = useMemo(() => ({
-    entry: overlayIsLimit ? entryLineRef.current : null,
-    sl: slLineRef.current,
-    tp: tpLineRef.current,
-  }), [overlayIsLimit, overlayEntry, overlaySL, overlayTP])
+  const dragLines = useMemo(
+    () => ({
+      entry: overlayIsLimit ? entryLineRef.current : null,
+      sl: slLineRef.current,
+      tp: tpLineRef.current,
+    }),
+    [overlayIsLimit, overlayEntry, overlaySL, overlayTP],
+  )
   const { isDragging } = usePriceLineDrag({
     containerRef,
     seriesRef,
@@ -401,15 +451,15 @@ function StandaloneChartInner({ instrument, timeframe, lastTick, loadDelay = 0, 
   })
 
   return (
-    <div className={`w-full h-full relative ${className ?? ""}`}>
+    <div className={`relative h-full w-full ${className ?? ""}`}>
       <div
         ref={containerRef}
-        className="w-full h-full"
+        className="h-full w-full"
         style={{ touchAction: isDragging ? "none" : undefined }}
       />
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-          <p className="text-xs text-muted-foreground">{error}</p>
+        <div className="bg-muted/50 absolute inset-0 flex items-center justify-center">
+          <p className="text-muted-foreground text-xs">{error}</p>
         </div>
       )}
     </div>

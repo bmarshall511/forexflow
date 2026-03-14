@@ -8,10 +8,7 @@ import { NotificationProvider } from "@/state/notification-context"
 import { AppShell } from "@/components/layout/app-shell"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, initialSettings] = await Promise.all([
-    getSidebarCookieValue(),
-    getSettings(),
-  ])
+  const [sidebarOpen, initialSettings] = await Promise.all([getSidebarCookieValue(), getSettings()])
 
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>

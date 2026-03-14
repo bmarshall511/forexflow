@@ -2,9 +2,7 @@ import { NextResponse } from "next/server"
 import { revealToken } from "@fxflow/db"
 import type { ApiResponse, TradingMode } from "@fxflow/types"
 
-export async function GET(
-  request: Request,
-): Promise<NextResponse<ApiResponse<{ token: string }>>> {
+export async function GET(request: Request): Promise<NextResponse<ApiResponse<{ token: string }>>> {
   try {
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get("mode") as TradingMode | null

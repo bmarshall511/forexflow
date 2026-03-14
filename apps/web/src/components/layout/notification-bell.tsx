@@ -24,7 +24,7 @@ export function NotificationBell() {
             <span
               className={cn(
                 "absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center",
-                "rounded-full bg-status-disconnected text-[10px] font-medium text-white",
+                "bg-status-disconnected rounded-full text-[10px] font-medium text-white",
               )}
               aria-hidden="true"
             >
@@ -33,7 +33,7 @@ export function NotificationBell() {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" showCloseButton={false} className="p-0 gap-0">
+      <SheetContent side="right" showCloseButton={false} className="gap-0 p-0">
         <SheetTitle className="sr-only">Notifications</SheetTitle>
         <NotificationPanel />
       </SheetContent>

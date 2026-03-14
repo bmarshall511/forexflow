@@ -5,7 +5,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { formatRelativeTime } from "@fxflow/shared"
-import { ChevronRight, AlertCircle, CheckCircle2, Clock, XCircle, AlertTriangle } from "lucide-react"
+import {
+  ChevronRight,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  AlertTriangle,
+} from "lucide-react"
 
 interface AnalysisHistoryProps {
   history: AiAnalysisData[]
@@ -37,18 +44,22 @@ function StatusIcon({ analysis }: { analysis: AiAnalysisData }) {
     return <AlertTriangle className="size-3 text-amber-500" />
   }
   switch (analysis.status) {
-    case "completed": return <CheckCircle2 className="size-3 text-emerald-500" />
-    case "failed": return <AlertCircle className="size-3 text-red-500" />
-    case "cancelled": return <XCircle className="size-3 text-muted-foreground" />
+    case "completed":
+      return <CheckCircle2 className="size-3 text-emerald-500" />
+    case "failed":
+      return <AlertCircle className="size-3 text-red-500" />
+    case "cancelled":
+      return <XCircle className="text-muted-foreground size-3" />
     case "running":
-    case "pending": return <Clock className="size-3 text-blue-500 animate-pulse" />
+    case "pending":
+      return <Clock className="size-3 animate-pulse text-blue-500" />
   }
 }
 
 export function AnalysisHistory({ history, selectedId, onSelect }: AnalysisHistoryProps) {
   if (history.length === 0) {
     return (
-      <p className="text-center text-sm text-muted-foreground py-8">
+      <p className="text-muted-foreground py-8 text-center text-sm">
         No analyses yet. Run your first analysis above.
       </p>
     )
@@ -63,50 +74,52 @@ export function AnalysisHistory({ history, selectedId, onSelect }: AnalysisHisto
             key={analysis.id}
             variant="ghost"
             className={cn(
-              "w-full justify-between h-auto py-2 px-3 text-left",
+              "h-auto w-full justify-between px-3 py-2 text-left",
               selectedId === analysis.id && "bg-muted",
             )}
             onClick={() => onSelect(analysis)}
           >
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <StatusIcon analysis={analysis} />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-xs font-medium">
-                    {MODEL_LABELS[analysis.model] ?? analysis.model} — {DEPTH_LABELS[analysis.depth] ?? analysis.depth}
+                    {MODEL_LABELS[analysis.model] ?? analysis.model} —{" "}
+                    {DEPTH_LABELS[analysis.depth] ?? analysis.depth}
                   </span>
-                  <Badge variant="outline" className="h-4 text-[9px] px-1 font-normal capitalize">
+                  <Badge variant="outline" className="h-4 px-1 text-[9px] font-normal capitalize">
                     {analysis.triggeredBy.replace("_", " ")}
                   </Badge>
                   {stuck && (
-                    <Badge variant="outline" className="h-4 text-[9px] px-1 font-normal text-amber-600 border-amber-300">
+                    <Badge
+                      variant="outline"
+                      className="h-4 border-amber-300 px-1 text-[9px] font-normal text-amber-600"
+                    >
                       Stuck
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <div className="text-muted-foreground flex items-center gap-2 text-[10px]">
                   <span>{formatRelativeTime(analysis.createdAt)}</span>
-                  {analysis.costUsd > 0 && (
-                    <span>${analysis.costUsd.toFixed(4)}</span>
-                  )}
+                  {analysis.costUsd > 0 && <span>${analysis.costUsd.toFixed(4)}</span>}
                   {analysis.durationMs > 0 && (
                     <span>{(analysis.durationMs / 1000).toFixed(1)}s</span>
                   )}
                 </div>
                 {/* Show error message preview for failed analyses */}
                 {analysis.status === "failed" && analysis.errorMessage && (
-                  <p className="text-[10px] text-red-500/80 truncate mt-0.5 max-w-[300px]">
+                  <p className="mt-0.5 max-w-[300px] truncate text-[10px] text-red-500/80">
                     {analysis.errorMessage}
                   </p>
                 )}
                 {stuck && (
-                  <p className="text-[10px] text-amber-500/80 mt-0.5">
+                  <p className="mt-0.5 text-[10px] text-amber-500/80">
                     May have been interrupted — click to retry
                   </p>
                 )}
               </div>
             </div>
-            <ChevronRight className="size-3 text-muted-foreground shrink-0" />
+            <ChevronRight className="text-muted-foreground size-3 shrink-0" />
           </Button>
         )
       })}

@@ -56,7 +56,8 @@ function BreakEvenTrailForm({ trade, onCreated }: ConditionPresetsProps) {
         }),
       })
       const beJson = (await beRes.json()) as { ok: boolean; data?: { id: string }; error?: string }
-      if (!beJson.ok || !beJson.data) throw new Error(beJson.error ?? "Failed to create break-even condition")
+      if (!beJson.ok || !beJson.data)
+        throw new Error(beJson.error ?? "Failed to create break-even condition")
 
       // Step 2: Create trailing stop condition (waiting, chained to break-even)
       const trailRes = await fetch(`/api/ai/conditions/${trade.id}`, {
@@ -73,7 +74,8 @@ function BreakEvenTrailForm({ trade, onCreated }: ConditionPresetsProps) {
         }),
       })
       const trailJson = (await trailRes.json()) as { ok: boolean; error?: string }
-      if (!trailJson.ok) throw new Error(trailJson.error ?? "Failed to create trailing stop condition")
+      if (!trailJson.ok)
+        throw new Error(trailJson.error ?? "Failed to create trailing stop condition")
 
       toast.success("Break-even + trail conditions created")
       onCreated()
@@ -97,7 +99,9 @@ function BreakEvenTrailForm({ trade, onCreated }: ConditionPresetsProps) {
           value={breakevenPips}
           onChange={(e) => setBreakevenPips(e.target.value)}
         />
-        <p className="text-[10px] text-muted-foreground">How many pips in profit before moving SL to entry</p>
+        <p className="text-muted-foreground text-[10px]">
+          How many pips in profit before moving SL to entry
+        </p>
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Trail distance (pips)</Label>
@@ -110,17 +114,19 @@ function BreakEvenTrailForm({ trade, onCreated }: ConditionPresetsProps) {
           value={trailDistancePips}
           onChange={(e) => setTrailDistancePips(e.target.value)}
         />
-        <p className="text-[10px] text-muted-foreground">How far behind price to trail after break-even</p>
+        <p className="text-muted-foreground text-[10px]">
+          How far behind price to trail after break-even
+        </p>
       </div>
       <Button
         size="sm"
-        className="h-7 text-xs w-full"
+        className="h-7 w-full text-xs"
         onClick={() => void handleSubmit()}
         disabled={!isValid || isSubmitting}
       >
         {isSubmitting ? (
           <>
-            <Loader2 className="size-3 animate-spin mr-1" />
+            <Loader2 className="mr-1 size-3 animate-spin" />
             Creating...
           </>
         ) : (
@@ -212,11 +218,11 @@ function ScaleOutLadderForm({ trade, onCreated }: ConditionPresetsProps) {
       <div className="space-y-2">
         {levels.map((level, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground w-6 shrink-0">TP{i + 1}</span>
+            <span className="text-muted-foreground w-6 shrink-0 text-[10px]">TP{i + 1}</span>
             <Input
               type="number"
               step="any"
-              className="h-7 text-xs flex-1"
+              className="h-7 flex-1 text-xs"
               placeholder="Price"
               value={level.price}
               onChange={(e) => updateLevel(i, "price", e.target.value)}
@@ -227,21 +233,23 @@ function ScaleOutLadderForm({ trade, onCreated }: ConditionPresetsProps) {
                 step="1"
                 min="1"
                 max="100"
-                className="h-7 text-xs pr-5"
+                className="h-7 pr-5 text-xs"
                 placeholder="%"
                 value={level.percentage}
                 onChange={(e) => updateLevel(i, "percentage", e.target.value)}
               />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">%</span>
+              <span className="text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 text-[10px]">
+                %
+              </span>
             </div>
             {levels.length > 2 && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 shrink-0"
+                className="h-7 w-7 shrink-0 p-0"
                 onClick={() => removeLevel(i)}
               >
-                <span className="text-xs text-muted-foreground">&times;</span>
+                <span className="text-muted-foreground text-xs">&times;</span>
                 <span className="sr-only">Remove level</span>
               </Button>
             )}
@@ -251,13 +259,13 @@ function ScaleOutLadderForm({ trade, onCreated }: ConditionPresetsProps) {
 
       <div className="flex items-center justify-between">
         {levels.length < 5 && (
-          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={addLevel}>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={addLevel}>
             + Add level
           </Button>
         )}
         <p
           className={cn(
-            "text-[10px] ml-auto",
+            "ml-auto text-[10px]",
             Math.abs(totalPercentage - 100) < 0.01 ? "text-emerald-600" : "text-amber-600",
           )}
         >
@@ -266,20 +274,20 @@ function ScaleOutLadderForm({ trade, onCreated }: ConditionPresetsProps) {
         </p>
       </div>
 
-      <p className="text-[10px] text-muted-foreground">
-        Direction: {trade.direction === "long" ? "Price breaks above" : "Price breaks below"} each level.
-        Units auto-calculated from {trade.currentUnits.toLocaleString()} total.
+      <p className="text-muted-foreground text-[10px]">
+        Direction: {trade.direction === "long" ? "Price breaks above" : "Price breaks below"} each
+        level. Units auto-calculated from {trade.currentUnits.toLocaleString()} total.
       </p>
 
       <Button
         size="sm"
-        className="h-7 text-xs w-full"
+        className="h-7 w-full text-xs"
         onClick={() => void handleSubmit()}
         disabled={!isValid || isSubmitting}
       >
         {isSubmitting ? (
           <>
-            <Loader2 className="size-3 animate-spin mr-1" />
+            <Loader2 className="mr-1 size-3 animate-spin" />
             Creating...
           </>
         ) : (
@@ -296,27 +304,31 @@ export function ConditionPresets({ trade, onCreated }: ConditionPresetsProps) {
   const [expanded, setExpanded] = useState<"be-trail" | "scale-out" | null>(null)
 
   return (
-    <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Quick Presets</p>
+    <div className="bg-muted/20 space-y-2 rounded-lg border p-3">
+      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+        Quick Presets
+      </p>
 
       {/* Break-Even + Trail */}
-      <div className="rounded-md border bg-background">
+      <div className="bg-background rounded-md border">
         <button
           type="button"
-          className="flex items-center justify-between w-full p-2.5 text-left"
+          className="flex w-full items-center justify-between p-2.5 text-left"
           onClick={() => setExpanded(expanded === "be-trail" ? null : "be-trail")}
         >
           <div className="flex items-center gap-2">
             <Shield className="size-3.5 text-blue-500" />
             <div>
               <p className="text-xs font-medium">Break-even + Trail</p>
-              <p className="text-[10px] text-muted-foreground">Move SL to entry, then trail behind price</p>
+              <p className="text-muted-foreground text-[10px]">
+                Move SL to entry, then trail behind price
+              </p>
             </div>
           </div>
           {expanded === "be-trail" ? (
-            <ChevronUp className="size-3.5 text-muted-foreground" />
+            <ChevronUp className="text-muted-foreground size-3.5" />
           ) : (
-            <ChevronDown className="size-3.5 text-muted-foreground" />
+            <ChevronDown className="text-muted-foreground size-3.5" />
           )}
         </button>
         {expanded === "be-trail" && (
@@ -327,23 +339,25 @@ export function ConditionPresets({ trade, onCreated }: ConditionPresetsProps) {
       </div>
 
       {/* Scale-Out Ladder */}
-      <div className="rounded-md border bg-background">
+      <div className="bg-background rounded-md border">
         <button
           type="button"
-          className="flex items-center justify-between w-full p-2.5 text-left"
+          className="flex w-full items-center justify-between p-2.5 text-left"
           onClick={() => setExpanded(expanded === "scale-out" ? null : "scale-out")}
         >
           <div className="flex items-center gap-2">
             <Layers className="size-3.5 text-purple-500" />
             <div>
               <p className="text-xs font-medium">Scale-Out Ladder</p>
-              <p className="text-[10px] text-muted-foreground">Partial close at multiple take-profit levels</p>
+              <p className="text-muted-foreground text-[10px]">
+                Partial close at multiple take-profit levels
+              </p>
             </div>
           </div>
           {expanded === "scale-out" ? (
-            <ChevronUp className="size-3.5 text-muted-foreground" />
+            <ChevronUp className="text-muted-foreground size-3.5" />
           ) : (
-            <ChevronDown className="size-3.5 text-muted-foreground" />
+            <ChevronDown className="text-muted-foreground size-3.5" />
           )}
         </button>
         {expanded === "scale-out" && (

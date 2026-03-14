@@ -42,8 +42,7 @@ export function InstrumentSelector({ value, onChange, className }: InstrumentSel
     ...group,
     pairs: group.pairs.filter(
       (p) =>
-        p.label.toLowerCase().includes(lowerSearch) ||
-        p.value.toLowerCase().includes(lowerSearch),
+        p.label.toLowerCase().includes(lowerSearch) || p.value.toLowerCase().includes(lowerSearch),
     ),
   })).filter((g) => g.pairs.length > 0)
 
@@ -52,33 +51,33 @@ export function InstrumentSelector({ value, onChange, className }: InstrumentSel
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded hover:bg-muted transition-colors"
+        className="hover:bg-muted flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold transition-colors"
         aria-label="Select currency pair"
         aria-expanded={open}
       >
         {formatInstrument(value)}
-        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        <ChevronDown className="text-muted-foreground h-3 w-3" />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-48 rounded-md border bg-popover shadow-md">
+        <div className="bg-popover absolute left-0 top-full z-50 mt-1 w-48 rounded-md border shadow-md">
           <div className="p-1.5">
-            <div className="flex items-center gap-1.5 px-1.5 py-1 rounded border bg-background">
-              <Search className="h-3 w-3 text-muted-foreground shrink-0" />
+            <div className="bg-background flex items-center gap-1.5 rounded border px-1.5 py-1">
+              <Search className="text-muted-foreground h-3 w-3 shrink-0" />
               <input
                 ref={inputRef}
                 type="text"
                 placeholder="Search pairs..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+                className="placeholder:text-muted-foreground w-full bg-transparent text-xs outline-none"
               />
             </div>
           </div>
           <div className="max-h-56 overflow-y-auto px-1 pb-1">
             {filteredGroups.map((group) => (
               <div key={group.label}>
-                <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="text-muted-foreground px-2 py-1 text-[10px] font-medium uppercase tracking-wider">
                   {group.label}
                 </div>
                 {group.pairs.map((pair) => (
@@ -90,7 +89,7 @@ export function InstrumentSelector({ value, onChange, className }: InstrumentSel
                       setOpen(false)
                     }}
                     className={cn(
-                      "w-full text-left px-2 py-1 text-xs rounded transition-colors",
+                      "w-full rounded px-2 py-1 text-left text-xs transition-colors",
                       pair.value === value
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-muted",
@@ -102,7 +101,7 @@ export function InstrumentSelector({ value, onChange, className }: InstrumentSel
               </div>
             ))}
             {filteredGroups.length === 0 && (
-              <p className="px-2 py-3 text-xs text-muted-foreground text-center">No pairs found</p>
+              <p className="text-muted-foreground px-2 py-3 text-center text-xs">No pairs found</p>
             )}
           </div>
         </div>

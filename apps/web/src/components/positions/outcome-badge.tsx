@@ -29,17 +29,17 @@ const reasonLabels: Record<string, string> = {
 
 export function OutcomeBadge({ outcome, closeReason, className }: OutcomeBadgeProps) {
   const reasonLabel = closeReason ? reasonLabels[closeReason] : ""
-  const label = reasonLabel
-    ? `${outcomeLabels[outcome]} (${reasonLabel})`
-    : outcomeLabels[outcome]
+  const label = reasonLabel ? `${outcomeLabels[outcome]} (${reasonLabel})` : outcomeLabels[outcome]
 
   return (
     <Badge
       variant="outline"
       className={cn(
-        "text-[10px] px-1.5 py-0 font-medium",
-        outcome === "win" && "border-status-connected/30 bg-status-connected/10 text-status-connected",
-        outcome === "loss" && "border-status-disconnected/30 bg-status-disconnected/10 text-status-disconnected",
+        "px-1.5 py-0 text-[10px] font-medium",
+        outcome === "win" &&
+          "border-status-connected/30 bg-status-connected/10 text-status-connected",
+        outcome === "loss" &&
+          "border-status-disconnected/30 bg-status-disconnected/10 text-status-disconnected",
         outcome === "breakeven" && "border-border text-muted-foreground",
         className,
       )}

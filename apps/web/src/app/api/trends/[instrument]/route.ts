@@ -18,17 +18,15 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     // Fetch candles from OANDA
     const candles = await fetchCandles(instrument, timeframe, lookback)
     if (!candles || candles.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "No candle data available" },
-        { status: 404 },
-      )
+      return NextResponse.json({ ok: false, error: "No candle data available" }, { status: 404 })
     }
 
     const currentPrice = candles[candles.length - 1]!.close
 
     // Build config from query params
     const config: TrendDetectionConfig = {
-      swingStrength: parseInt(sp.get("swingStrength") ?? "0", 10) || getDefaultSwingStrength(timeframe),
+      swingStrength:
+        parseInt(sp.get("swingStrength") ?? "0", 10) || getDefaultSwingStrength(timeframe),
       minSegmentAtr: parseFloat(sp.get("minSegmentAtr") ?? "0.5"),
       maxSwingPoints: parseInt(sp.get("maxSwingPoints") ?? "20", 10),
       lookbackCandles: lookback,

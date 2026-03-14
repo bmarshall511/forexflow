@@ -81,13 +81,13 @@ export default function ChartsPage() {
           if (trade) restored[Number(key)] = trade as TradeUnion
         }
       }
-    } catch { /* ignore corrupted storage */ }
+    } catch {
+      /* ignore corrupted storage */
+    }
 
     // Step 2: Auto-assign open/pending trades to unassigned panels matching instrument
     const assignedIds = new Set(Object.values(restored).map((t) => t.id))
-    const autoAssignable = allTrades.filter(
-      (t) => t._type !== "closed" && !assignedIds.has(t.id),
-    )
+    const autoAssignable = allTrades.filter((t) => t._type !== "closed" && !assignedIds.has(t.id))
 
     for (let i = 0; i < layout.panels.length; i++) {
       if (restored[i]) continue // already assigned
@@ -118,7 +118,9 @@ export default function ChartsPage() {
       } else {
         localStorage.removeItem(STORAGE_KEY)
       }
-    } catch { /* storage full or unavailable */ }
+    } catch {
+      /* storage full or unavailable */
+    }
   }, [tradesByPanel])
 
   // Reactive auto-assign: runs whenever positions or panel instruments change.
@@ -244,9 +246,7 @@ export default function ChartsPage() {
       const index = Number(key)
       const tick = priceMap.get(trade.instrument)
       // Use mid price to match candle data (OANDA candles use mid OHLC)
-      const price = tick
-        ? (tick.bid + tick.ask) / 2
-        : null
+      const price = tick ? (tick.bid + tick.ask) / 2 : null
 
       if (index === activeIndex) {
         // Active panel: use editor draft values + drag callbacks
@@ -272,7 +272,15 @@ export default function ChartsPage() {
       }
     }
     return result
-  }, [tradesByPanel, priceMap, activeIndex, editor.draftSL, editor.draftTP, editor.setDraftSL, editor.setDraftTP])
+  }, [
+    tradesByPanel,
+    priceMap,
+    activeIndex,
+    editor.draftSL,
+    editor.draftTP,
+    editor.setDraftSL,
+    editor.setDraftTP,
+  ])
 
   // Clear a specific panel's trade (e.g. when user changes instrument)
   const clearPanelTrade = useCallback((index: number) => {
@@ -295,7 +303,11 @@ export default function ChartsPage() {
       setTradesByPanel({})
       setActiveIndex(0)
       setOrderTicket(null)
-      try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        /* ignore */
+      }
     },
     [setLayout],
   )
@@ -333,7 +345,9 @@ export default function ChartsPage() {
   )
 
   // Active panel's live tick for the order ticket
-  const orderTicketInstrument = orderTicket ? (layout.panels[orderTicket.panelIndex]?.instrument ?? "EUR_USD") : "EUR_USD"
+  const orderTicketInstrument = orderTicket
+    ? (layout.panels[orderTicket.panelIndex]?.instrument ?? "EUR_USD")
+    : "EUR_USD"
   const orderTicketTick = useMemo(() => {
     if (!orderTicket) return null
     return priceMap.get(orderTicketInstrument) ?? null
@@ -348,21 +362,32 @@ export default function ChartsPage() {
     accountBalance: accountOverview?.summary.balance ?? 0,
     accountCurrency: accountOverview?.summary.currency ?? "USD",
     initialTimeframe: orderTicket
-      ? (layout.panels[orderTicket.panelIndex]?.timeframe ?? null) as Timeframe | null
+      ? ((layout.panels[orderTicket.panelIndex]?.timeframe ?? null) as Timeframe | null)
       : null,
   })
 
   // Sync chart line drags → ticket form state
-  const handleOrderDraftChange = useCallback((lineType: LineType, price: number) => {
-    if (lineType === "entry") ticket.setEntryPrice(price)
-    else if (lineType === "sl") {
-      if (!ticket.slEnabled) ticket.setSlEnabled(true)
-      ticket.setStopLoss(price)
-    } else if (lineType === "tp") {
-      if (!ticket.tpEnabled) ticket.setTpEnabled(true)
-      ticket.setTakeProfit(price)
-    }
-  }, [ticket.setEntryPrice, ticket.slEnabled, ticket.setSlEnabled, ticket.setStopLoss, ticket.tpEnabled, ticket.setTpEnabled, ticket.setTakeProfit])
+  const handleOrderDraftChange = useCallback(
+    (lineType: LineType, price: number) => {
+      if (lineType === "entry") ticket.setEntryPrice(price)
+      else if (lineType === "sl") {
+        if (!ticket.slEnabled) ticket.setSlEnabled(true)
+        ticket.setStopLoss(price)
+      } else if (lineType === "tp") {
+        if (!ticket.tpEnabled) ticket.setTpEnabled(true)
+        ticket.setTakeProfit(price)
+      }
+    },
+    [
+      ticket.setEntryPrice,
+      ticket.slEnabled,
+      ticket.setSlEnabled,
+      ticket.setStopLoss,
+      ticket.tpEnabled,
+      ticket.setTpEnabled,
+      ticket.setTakeProfit,
+    ],
+  )
 
   // Build order overlay config from ticket hook state
   const orderOverlay: OrderOverlayConfig | null = useMemo(() => {
@@ -375,29 +400,30 @@ export default function ChartsPage() {
       takeProfit: ticket.takeProfit,
       onDraftChange: handleOrderDraftChange,
     }
-  }, [orderTicket, ticket.orderType, ticket.entryPrice, ticket.stopLoss, ticket.takeProfit, handleOrderDraftChange])
+  }, [
+    orderTicket,
+    ticket.orderType,
+    ticket.entryPrice,
+    ticket.stopLoss,
+    ticket.takeProfit,
+    handleOrderDraftChange,
+  ])
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading charts...</p>
+      <div className="flex flex-1 items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading charts...</p>
       </div>
     )
   }
 
   return (
-    <div className="h-[calc(100vh-var(--header-height))] flex flex-col overflow-hidden">
+    <div className="flex h-[calc(100vh-var(--header-height))] flex-col overflow-hidden">
       {/* Header */}
-      <header className="flex items-center gap-2 px-3 py-1.5 border-b shrink-0">
+      <header className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
         <h1 className="text-sm font-semibold">Charts</h1>
-        {!isMobile && (
-          <LayoutSelector value={layout.layout} onChange={handleLayoutChange} />
-        )}
-        <PositionPicker
-          value={activeTrade}
-          onChange={assignTrade}
-          assignedIds={assignedTradeIds}
-        />
+        {!isMobile && <LayoutSelector value={layout.layout} onChange={handleLayoutChange} />}
+        <PositionPicker value={activeTrade} onChange={assignTrade} assignedIds={assignedTradeIds} />
       </header>
 
       {/* Trade control bar — shows editor for the active panel's trade */}
@@ -411,8 +437,8 @@ export default function ChartsPage() {
       )}
 
       {/* Chart grid + order ticket */}
-      <div className="flex flex-1 min-h-0">
-        <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
           {isMobile ? (
             <MobileChartSwiper
               panels={layout.panels}

@@ -11,4 +11,4 @@ paths:
 - enrichSource(source, metadata) pattern: source always "oanda", true origin from metadata.placedVia.
 - Upsert pattern: unique constraints on [source, sourceTradeId].
 - Notification dedup: 5-sec window prevents duplicates.
-- Cleanup methods: most services have cleanupOld*() for old records.
+- Cleanup methods: most services have cleanupOld\*() for old records.

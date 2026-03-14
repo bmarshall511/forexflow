@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
-import {
-  formatCountdown,
-  isMarketExpectedOpen,
-  getNextExpectedChange,
-} from "@fxflow/shared"
+import { formatCountdown, isMarketExpectedOpen, getNextExpectedChange } from "@fxflow/shared"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 
 function formatDateTime(date: Date): string {
@@ -65,9 +61,9 @@ export function MarketStatus() {
           role="status"
           aria-label={`${fullStatusLabel}, ${actionLabel.toLowerCase()} ${dateTimeStr}`}
           className={cn(
-            "hidden @lg/header:flex items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1",
+            "@lg/header:flex bg-muted/50 hidden items-center gap-1.5 rounded-md px-2.5 py-1",
             "hover:bg-accent/50 transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
           )}
         >
           <span
@@ -77,13 +73,13 @@ export function MarketStatus() {
             )}
             aria-hidden="true"
           />
-          <span className="hidden @7xl/header:inline text-xs font-semibold text-foreground whitespace-nowrap">
+          <span className="@7xl/header:inline text-foreground hidden whitespace-nowrap text-xs font-semibold">
             {shortLabel}
           </span>
-          <span className="hidden @5xl/header:inline @7xl/header:hidden text-xs font-semibold text-foreground whitespace-nowrap">
+          <span className="@5xl/header:inline @7xl/header:hidden text-foreground hidden whitespace-nowrap text-xs font-semibold">
             {open ? "Open" : "Closed"}
           </span>
-          <span className="font-mono text-xs tabular-nums font-semibold text-foreground whitespace-nowrap">
+          <span className="text-foreground whitespace-nowrap font-mono text-xs font-semibold tabular-nums">
             {mounted ? countdown : "--:--:--"}
           </span>
         </button>
@@ -110,7 +106,7 @@ export function MarketStatus() {
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Countdown</span>
-              <span className="font-mono tabular-nums font-semibold">
+              <span className="font-mono font-semibold tabular-nums">
                 {mounted ? countdown : "--:--:--"}
               </span>
             </div>

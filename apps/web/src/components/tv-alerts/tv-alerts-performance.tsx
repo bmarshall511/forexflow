@@ -3,8 +3,14 @@
 import { Skeleton } from "@/components/ui/skeleton"
 import { DataTile, DonutChart, ProportionBar } from "@/components/ui/data-tile"
 import {
-  Trophy, Percent, BarChart3, TrendingUp, TrendingDown,
-  CheckCircle2, XCircle, Zap,
+  Trophy,
+  Percent,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  CheckCircle2,
+  XCircle,
+  Zap,
 } from "lucide-react"
 import type { TVSignalPerformanceStats } from "@fxflow/types"
 
@@ -26,7 +32,7 @@ export function TVAlertsPerformance({ stats, isLoading }: TVAlertsPerformancePro
 
   if (!stats || stats.totalSignals === 0) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
+      <div className="text-muted-foreground py-12 text-center text-sm">
         No signal data yet — performance metrics will appear after signals are processed
       </div>
     )
@@ -37,7 +43,7 @@ export function TVAlertsPerformance({ stats, isLoading }: TVAlertsPerformancePro
       {/* Hero row: Win rate donut + key metrics */}
       <div className="flex items-center gap-4">
         <DonutChart value={stats.winRate} size={56} strokeWidth={5} />
-        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3">
           <DataTile
             label="W / L"
             value={
@@ -71,7 +77,13 @@ export function TVAlertsPerformance({ stats, isLoading }: TVAlertsPerformancePro
           label="Total P&L"
           value={`$${stats.totalPL.toFixed(2)}`}
           variant={stats.totalPL >= 0 ? "positive" : "negative"}
-          icon={stats.totalPL >= 0 ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+          icon={
+            stats.totalPL >= 0 ? (
+              <TrendingUp className="size-3.5" />
+            ) : (
+              <TrendingDown className="size-3.5" />
+            )
+          }
         />
         <DataTile
           label="Avg Win"
@@ -89,15 +101,27 @@ export function TVAlertsPerformance({ stats, isLoading }: TVAlertsPerformancePro
 
       {/* Signal breakdown bar */}
       <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider">
           <Zap className="size-3" />
           Signal Breakdown ({stats.totalSignals} total)
         </div>
         <ProportionBar
           segments={[
-            { value: stats.executedSignals, color: "var(--color-status-connected)", label: "Executed" },
-            { value: stats.rejectedSignals, color: "var(--color-status-warning)", label: "Rejected" },
-            { value: stats.failedSignals, color: "var(--color-status-disconnected)", label: "Failed" },
+            {
+              value: stats.executedSignals,
+              color: "var(--color-status-connected)",
+              label: "Executed",
+            },
+            {
+              value: stats.rejectedSignals,
+              color: "var(--color-status-warning)",
+              label: "Rejected",
+            },
+            {
+              value: stats.failedSignals,
+              color: "var(--color-status-disconnected)",
+              label: "Failed",
+            },
           ]}
         />
       </div>

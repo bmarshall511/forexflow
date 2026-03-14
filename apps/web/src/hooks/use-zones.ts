@@ -1,7 +1,15 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import type { ZoneCandle, ZoneData, ZoneDisplaySettings, ZoneDetectionResult, CurveAlignment, CurveData, CurvePosition } from "@fxflow/types"
+import type {
+  ZoneCandle,
+  ZoneData,
+  ZoneDisplaySettings,
+  ZoneDetectionResult,
+  CurveAlignment,
+  CurveData,
+  CurvePosition,
+} from "@fxflow/types"
 import { detectZones, getHigherTimeframe } from "@fxflow/shared"
 import { fetchCandles } from "@/components/charts/chart-utils"
 
@@ -98,11 +106,14 @@ export function useZones({
         lastFetchCountRef.current = data.length
       }
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [enabled, instrument, timeframe, chartCandleCount])
 
   // Derive effective price: prefer live price, fall back to last candle close
-  const effectivePrice = currentPrice ?? (candles && candles.length > 0 ? candles[candles.length - 1]!.close : null)
+  const effectivePrice =
+    currentPrice ?? (candles && candles.length > 0 ? candles[candles.length - 1]!.close : null)
   const effectivePriceRef = useRef(effectivePrice)
   effectivePriceRef.current = effectivePrice
 
@@ -150,9 +161,16 @@ export function useZones({
             if (computeId !== computeIdRef.current) return
             if (htfCandles && htfCandles.length > 0) {
               const htfPrice = htfCandles[htfCandles.length - 1]!.close
-              const htfResult = detectZones(htfCandles, instrument, htf, s.algorithmConfig, htfPrice)
+              const htfResult = detectZones(
+                htfCandles,
+                instrument,
+                htf,
+                s.algorithmConfig,
+                htfPrice,
+              )
               let htfFiltered = htfResult.zones.filter((z) => z.scores.total >= s.minScore)
-              if (!s.showInvalidated) htfFiltered = htfFiltered.filter((z) => z.status !== "invalidated")
+              if (!s.showInvalidated)
+                htfFiltered = htfFiltered.filter((z) => z.status !== "invalidated")
               setHigherTfZones(htfFiltered.slice(0, s.maxZonesPerType * 2))
 
               // Compute curve alignment
@@ -198,12 +216,28 @@ export function useZones({
         if (curveTimeframe) {
           try {
             // Fetch and detect for the curve timeframe
-            const curveCandles = await fetchCandles(instrument, curveTimeframe, Math.min(s.lookbackCandles, 300))
+            const curveCandles = await fetchCandles(
+              instrument,
+              curveTimeframe,
+              Math.min(s.lookbackCandles, 300),
+            )
             if (computeId !== computeIdRef.current) return
             if (curveCandles && curveCandles.length > 0) {
               const curvePrice = price
-              const curveResult = detectZones(curveCandles, instrument, curveTimeframe, s.algorithmConfig, curvePrice)
-              const computed = buildCurveData(curveResult.zones, curvePrice, curveTimeframe, s.curve.opacity, s.curve.showAxisLabel)
+              const curveResult = detectZones(
+                curveCandles,
+                instrument,
+                curveTimeframe,
+                s.algorithmConfig,
+                curvePrice,
+              )
+              const computed = buildCurveData(
+                curveResult.zones,
+                curvePrice,
+                curveTimeframe,
+                s.curve.opacity,
+                s.curve.showAxisLabel,
+              )
               setCurveData(computed)
             } else {
               setCurveData(null)
@@ -295,8 +329,7 @@ export function useZones({
 
 /** Fire-and-forget zone persistence to the API. */
 function persistZones(instrument: string, timeframe: string, zones: ZoneData[]): void {
-  fetch(`/api/zones/${instrument}?timeframe=${timeframe}&lookback=1&minScore=0`)
-    .catch(() => {})
+  fetch(`/api/zones/${instrument}?timeframe=${timeframe}&lookback=1&minScore=0`).catch(() => {})
 }
 
 /** Build CurveData from best supply + demand zones */
@@ -359,8 +392,10 @@ function computeAlignment(
 
   if (!htfDemand && !htfSupply) return "neutral"
 
-  const priceNearHtfDemand = htfDemand && currentPrice - htfDemand.proximalLine < htfDemand.width * 3
-  const priceNearHtfSupply = htfSupply && htfSupply.proximalLine - currentPrice < htfSupply.width * 3
+  const priceNearHtfDemand =
+    htfDemand && currentPrice - htfDemand.proximalLine < htfDemand.width * 3
+  const priceNearHtfSupply =
+    htfSupply && htfSupply.proximalLine - currentPrice < htfSupply.width * 3
 
   const hasPrimaryDemand = primary.nearestDemand !== null
   const hasPrimarySupply = primary.nearestSupply !== null

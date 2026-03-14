@@ -35,9 +35,9 @@ export function TimeframeSelect({ value, onChange, className }: TimeframeSelectP
       disabled={saving}
       aria-label="Timeframe"
       className={cn(
-        "bg-transparent border-0 text-xs font-mono tabular-nums cursor-pointer",
+        "cursor-pointer border-0 bg-transparent font-mono text-xs tabular-nums",
         "hover:bg-muted focus:bg-muted rounded px-1 py-0.5 outline-none",
-        "appearance-none text-center min-w-[3rem]",
+        "min-w-[3rem] appearance-none text-center",
         saving && "opacity-50",
         !value && "text-muted-foreground",
         className,
@@ -45,7 +45,9 @@ export function TimeframeSelect({ value, onChange, className }: TimeframeSelectP
     >
       <option value="">—</option>
       {TIMEFRAME_OPTIONS.map(({ value: v, label: l }) => (
-        <option key={v} value={v}>{l}</option>
+        <option key={v} value={v}>
+          {l}
+        </option>
       ))}
     </select>
   )

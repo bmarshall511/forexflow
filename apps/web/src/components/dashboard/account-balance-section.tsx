@@ -32,11 +32,14 @@ function getMarginBarColor(pct: number): string {
   return "bg-status-disconnected"
 }
 
-export function AccountBalanceSection({ summary, currency, liveUnrealizedPL }: AccountBalanceSectionProps) {
+export function AccountBalanceSection({
+  summary,
+  currency,
+  liveUnrealizedPL,
+}: AccountBalanceSectionProps) {
   const unrealized = formatPnL(liveUnrealizedPL ?? summary.unrealizedPL, currency)
   const UnrealizedIcon = PNL_ICON[unrealized.colorIntent]
-  const marginPct =
-    summary.nav > 0 ? (summary.marginUsed / summary.nav) * 100 : 0
+  const marginPct = summary.nav > 0 ? (summary.marginUsed / summary.nav) * 100 : 0
 
   return (
     <div className="space-y-5">
@@ -44,7 +47,7 @@ export function AccountBalanceSection({ summary, currency, liveUnrealizedPL }: A
       <div className="grid grid-cols-2 gap-4">
         {/* Balance — hero metric */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider">
             <Wallet className="size-3" />
             Balance
           </div>
@@ -56,14 +59,14 @@ export function AccountBalanceSection({ summary, currency, liveUnrealizedPL }: A
 
         {/* Unrealized P&L */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider">
             <UnrealizedIcon className="size-3" />
             Unrealized P&L
           </div>
           <AnimatedNumber
             value={unrealized.formatted}
             className={cn(
-              "block text-2xl font-semibold font-mono tabular-nums tracking-tight",
+              "block font-mono text-2xl font-semibold tabular-nums tracking-tight",
               PNL_COLOR[unrealized.colorIntent],
             )}
           />
@@ -74,11 +77,13 @@ export function AccountBalanceSection({ summary, currency, liveUnrealizedPL }: A
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Margin Utilization</span>
-          <span className={cn(
-            "font-mono tabular-nums font-medium",
-            marginPct >= 60 && "text-status-disconnected",
-            marginPct >= 30 && marginPct < 60 && "text-status-warning",
-          )}>
+          <span
+            className={cn(
+              "font-mono font-medium tabular-nums",
+              marginPct >= 60 && "text-status-disconnected",
+              marginPct >= 30 && marginPct < 60 && "text-status-warning",
+            )}
+          >
             {marginPct.toFixed(1)}%
           </span>
         </div>
@@ -89,12 +94,18 @@ export function AccountBalanceSection({ summary, currency, liveUnrealizedPL }: A
           indicatorClassName={getMarginBarColor(marginPct)}
           aria-label={`Margin utilization: ${marginPct.toFixed(1)}%`}
         />
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="text-muted-foreground flex items-center justify-between text-[11px]">
           <span>
-            Used: <span className="font-mono tabular-nums">{formatCurrency(summary.marginUsed, currency)}</span>
+            Used:{" "}
+            <span className="font-mono tabular-nums">
+              {formatCurrency(summary.marginUsed, currency)}
+            </span>
           </span>
           <span>
-            Available: <span className="font-mono tabular-nums">{formatCurrency(summary.marginAvailable, currency)}</span>
+            Available:{" "}
+            <span className="font-mono tabular-nums">
+              {formatCurrency(summary.marginAvailable, currency)}
+            </span>
           </span>
         </div>
       </div>

@@ -34,7 +34,7 @@ function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low"
     low: "bg-muted text-muted-foreground",
   }
   return (
-    <Badge variant="outline" className={cn("text-[10px] h-5", map[confidence])}>
+    <Badge variant="outline" className={cn("h-5 text-[10px]", map[confidence])}>
       {confidence} confidence
     </Badge>
   )
@@ -42,7 +42,15 @@ function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low"
 
 // ─── Action Card ──────────────────────────────────────────────────────────────
 
-function ActionButtonCard({ action, onApply, isApplied, isAutoApplied, isBelowThreshold, canUndo, onUndo }: {
+function ActionButtonCard({
+  action,
+  onApply,
+  isApplied,
+  isAutoApplied,
+  isBelowThreshold,
+  canUndo,
+  onUndo,
+}: {
   action: AiActionButton
   onApply: () => void
   isApplied?: boolean
@@ -52,45 +60,50 @@ function ActionButtonCard({ action, onApply, isApplied, isAutoApplied, isBelowTh
   onUndo?: () => void
 }) {
   return (
-    <div className={cn("rounded-lg border p-3 space-y-2", isBelowThreshold && "opacity-70")}>
+    <div className={cn("space-y-2 rounded-lg border p-3", isBelowThreshold && "opacity-70")}>
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-0.5">
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-medium">{action.label}</span>
             <ConfidenceBadge confidence={action.confidence} />
             {isBelowThreshold && (
-              <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground">
+              <Badge variant="outline" className="text-muted-foreground h-5 text-[10px]">
                 Below threshold
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">{action.description}</p>
+          <p className="text-muted-foreground text-xs">{action.description}</p>
         </div>
         {isAutoApplied ? (
-          <div className="flex items-center gap-1 text-xs text-purple-600 shrink-0">
+          <div className="flex shrink-0 items-center gap-1 text-xs text-purple-600">
             <Sparkles className="size-3" />
             Auto-applied
           </div>
         ) : isApplied ? (
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
             <div className="flex items-center gap-1 text-xs text-emerald-600">
               <CheckCircle2 className="size-3" />
               Applied
             </div>
             {canUndo && onUndo && (
-              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground" onClick={onUndo}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground h-6 gap-1 px-1.5 text-[10px]"
+                onClick={onUndo}
+              >
                 <Undo2 className="size-3" />
                 Undo
               </Button>
             )}
           </div>
         ) : (
-          <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={onApply}>
+          <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" onClick={onApply}>
             Apply
           </Button>
         )}
       </div>
-      <p className="text-xs text-muted-foreground italic border-l-2 pl-2">{action.rationale}</p>
+      <p className="text-muted-foreground border-l-2 pl-2 text-xs italic">{action.rationale}</p>
     </div>
   )
 }
@@ -114,10 +127,10 @@ export function ActionsPanel({
   if (!sections) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <Zap className="size-10 text-muted-foreground/30" />
+        <Zap className="text-muted-foreground/30 size-10" />
         <div className="space-y-1">
           <p className="text-sm font-medium">No analysis yet</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Run an analysis to get suggested actions for this trade.
           </p>
         </div>
@@ -128,10 +141,10 @@ export function ActionsPanel({
   if (!hasActions) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <Zap className="size-10 text-muted-foreground/30" />
+        <Zap className="text-muted-foreground/30 size-10" />
         <div className="space-y-1">
           <p className="text-sm font-medium">No actions suggested</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             {tradeStatus === "closed"
               ? "Actions are not available for closed trades."
               : "The AI did not suggest any immediate actions for this trade."}
@@ -143,16 +156,17 @@ export function ActionsPanel({
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-muted-foreground text-[11px]">
         One-time trade modifications you can apply now
       </p>
 
       {/* Auto-apply threshold info bar */}
       {autoApplyMinConfidence && (sections.autoAppliedActionIds?.length ?? 0) > 0 && (
-        <div className="flex items-center gap-1.5 rounded-md bg-purple-500/5 border border-purple-500/20 px-3 py-1.5 text-[11px] text-purple-700">
+        <div className="flex items-center gap-1.5 rounded-md border border-purple-500/20 bg-purple-500/5 px-3 py-1.5 text-[11px] text-purple-700">
           <Sparkles className="size-3 shrink-0" />
           <span>
-            Actions at or above <strong>{autoApplyMinConfidence}</strong> confidence were auto-applied.
+            Actions at or above <strong>{autoApplyMinConfidence}</strong> confidence were
+            auto-applied.
           </span>
         </div>
       )}

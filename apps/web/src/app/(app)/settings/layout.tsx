@@ -5,9 +5,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     <div className="h-full w-full p-4 sm:p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Platform configuration and preferences
-        </p>
+        <p className="text-muted-foreground mt-1 text-sm">Platform configuration and preferences</p>
       </div>
 
       <div className="flex flex-col gap-6 md:flex-row">

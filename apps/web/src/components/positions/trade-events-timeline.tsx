@@ -14,12 +14,42 @@ interface EventConfig {
 }
 
 const EVENT_CONFIG: Record<string, EventConfig> = {
-  SL_TP_MODIFIED: { icon: Shield, label: "SL/TP Modified", iconColor: "text-amber-500", bgColor: "bg-amber-500/10" },
-  SL_MODIFIED: { icon: Shield, label: "Stop Loss Modified", iconColor: "text-amber-500", bgColor: "bg-amber-500/10" },
-  TP_MODIFIED: { icon: Target, label: "Take Profit Modified", iconColor: "text-blue-500", bgColor: "bg-blue-500/10" },
-  PARTIAL_CLOSE: { icon: Scissors, label: "Partial Close", iconColor: "text-purple-500", bgColor: "bg-purple-500/10" },
-  ORDER_CANCELLED: { icon: XCircle, label: "Order Cancelled", iconColor: "text-destructive", bgColor: "bg-destructive/10" },
-  TRADE_CLOSED: { icon: XCircle, label: "Trade Closed", iconColor: "text-destructive", bgColor: "bg-destructive/10" },
+  SL_TP_MODIFIED: {
+    icon: Shield,
+    label: "SL/TP Modified",
+    iconColor: "text-amber-500",
+    bgColor: "bg-amber-500/10",
+  },
+  SL_MODIFIED: {
+    icon: Shield,
+    label: "Stop Loss Modified",
+    iconColor: "text-amber-500",
+    bgColor: "bg-amber-500/10",
+  },
+  TP_MODIFIED: {
+    icon: Target,
+    label: "Take Profit Modified",
+    iconColor: "text-blue-500",
+    bgColor: "bg-blue-500/10",
+  },
+  PARTIAL_CLOSE: {
+    icon: Scissors,
+    label: "Partial Close",
+    iconColor: "text-purple-500",
+    bgColor: "bg-purple-500/10",
+  },
+  ORDER_CANCELLED: {
+    icon: XCircle,
+    label: "Order Cancelled",
+    iconColor: "text-destructive",
+    bgColor: "bg-destructive/10",
+  },
+  TRADE_CLOSED: {
+    icon: XCircle,
+    label: "Trade Closed",
+    iconColor: "text-destructive",
+    bgColor: "bg-destructive/10",
+  },
 }
 
 const DEFAULT_CONFIG: EventConfig = {
@@ -57,9 +87,7 @@ function parseGenericDetail(detail: string): string {
     const obj = JSON.parse(detail)
     if (obj.message) return obj.message
     // Filter out internal fields
-    const filtered = Object.entries(obj).filter(
-      ([k]) => !["time", "modifiedBy"].includes(k),
-    )
+    const filtered = Object.entries(obj).filter(([k]) => !["time", "modifiedBy"].includes(k))
     if (filtered.length === 0) return ""
     return filtered.map(([k, v]) => `${formatKey(k)}: ${v}`).join(" · ")
   } catch {
@@ -102,7 +130,11 @@ function formatTime(iso: string): string {
 
 // ─── SL/TP change display ───────────────────────────────────────────────────
 
-function SltpChange({ label, oldVal, newVal }: {
+function SltpChange({
+  label,
+  oldVal,
+  newVal,
+}: {
   label: string
   oldVal: number | null | undefined
   newVal: number | null | undefined
@@ -114,11 +146,9 @@ function SltpChange({ label, oldVal, newVal }: {
   return (
     <div className="flex items-center gap-1.5 text-xs">
       <span className="text-muted-foreground w-5">{label}</span>
-      <span className="font-mono tabular-nums text-muted-foreground">
-        {formatPrice(oldVal)}
-      </span>
-      <ArrowRight className="size-3 text-muted-foreground/50 shrink-0" />
-      <span className="font-mono tabular-nums text-foreground font-medium">
+      <span className="text-muted-foreground font-mono tabular-nums">{formatPrice(oldVal)}</span>
+      <ArrowRight className="text-muted-foreground/50 size-3 shrink-0" />
+      <span className="text-foreground font-mono font-medium tabular-nums">
         {formatPrice(newVal)}
       </span>
     </div>
@@ -133,9 +163,7 @@ interface TradeEventsTimelineProps {
 
 export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
   if (events.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground py-2">No events recorded yet.</p>
-    )
+    return <p className="text-muted-foreground py-2 text-xs">No events recorded yet.</p>
   }
 
   return (
@@ -144,7 +172,8 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
         const config = EVENT_CONFIG[event.eventType] ?? DEFAULT_CONFIG
         const Icon = config.icon
         const isLast = idx === events.length - 1
-        const isSltpEvent = event.eventType === "SL_TP_MODIFIED" ||
+        const isSltpEvent =
+          event.eventType === "SL_TP_MODIFIED" ||
           event.eventType === "SL_MODIFIED" ||
           event.eventType === "TP_MODIFIED"
         const sltpDetail = isSltpEvent ? parseSltpDetail(event.detail) : null
@@ -154,27 +183,29 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
           <div key={event.id} className="flex gap-3">
             {/* Timeline connector */}
             <div className="flex flex-col items-center">
-              <div className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full",
-                config.bgColor,
-              )}>
+              <div
+                className={cn(
+                  "flex size-7 shrink-0 items-center justify-center rounded-full",
+                  config.bgColor,
+                )}
+              >
                 <Icon className={cn("size-3.5", config.iconColor)} />
               </div>
-              {!isLast && <div className="w-px flex-1 bg-border/50" />}
+              {!isLast && <div className="bg-border/50 w-px flex-1" />}
             </div>
 
             {/* Content */}
-            <div className={cn("pb-4 min-w-0 flex-1", isLast && "pb-0")}>
+            <div className={cn("min-w-0 flex-1 pb-4", isLast && "pb-0")}>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium">{config.label}</span>
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                <span className="text-muted-foreground whitespace-nowrap text-[10px]">
                   {formatTime(event.createdAt)}
                 </span>
               </div>
 
               {/* SL/TP structured detail */}
               {sltpDetail && (
-                <div className="mt-1.5 space-y-0.5 rounded-md bg-muted/40 px-2.5 py-1.5">
+                <div className="bg-muted/40 mt-1.5 space-y-0.5 rounded-md px-2.5 py-1.5">
                   <SltpChange label="SL" oldVal={sltpDetail.oldSL} newVal={sltpDetail.newSL} />
                   <SltpChange label="TP" oldVal={sltpDetail.oldTP} newVal={sltpDetail.newTP} />
                 </div>
@@ -182,7 +213,7 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
 
               {/* Generic detail text */}
               {genericText && (
-                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
                   {genericText}
                 </p>
               )}

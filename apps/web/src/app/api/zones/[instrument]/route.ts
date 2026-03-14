@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { revealToken, getSettings, upsertZones } from "@fxflow/db"
 import { detectZones, getHigherTimeframe } from "@fxflow/shared"
-import type { TradingMode, ZoneDetectionConfig, ZoneDetectionResult, MultiTimeframeZoneResult, CurveAlignment, ZoneCandle } from "@fxflow/types"
+import type {
+  TradingMode,
+  ZoneDetectionConfig,
+  ZoneDetectionResult,
+  MultiTimeframeZoneResult,
+  CurveAlignment,
+  ZoneCandle,
+} from "@fxflow/types"
 import { ZONE_PRESETS } from "@fxflow/shared"
 
 const OANDA_URLS: Record<TradingMode, string> = {
@@ -51,8 +58,10 @@ function computeCurveAlignment(
   if (!htfDemand && !htfSupply) return "neutral"
 
   // Check if price is near a higher-TF zone
-  const priceNearHtfDemand = htfDemand && primary.currentPrice - htfDemand.proximalLine < htfDemand.width * 3
-  const priceNearHtfSupply = htfSupply && htfSupply.proximalLine - primary.currentPrice < htfSupply.width * 3
+  const priceNearHtfDemand =
+    htfDemand && primary.currentPrice - htfDemand.proximalLine < htfDemand.width * 3
+  const priceNearHtfSupply =
+    htfSupply && htfSupply.proximalLine - primary.currentPrice < htfSupply.width * 3
 
   const primaryHasDemand = primary.nearestDemand !== null
   const primaryHasSupply = primary.nearestSupply !== null
@@ -102,7 +111,24 @@ export async function GET(
     // Fetch primary timeframe candles
     const candles = await fetchOandaCandles(instrument, timeframe, lookback, baseUrl, token)
     if (candles.length === 0) {
-      return NextResponse.json({ ok: true, data: { primary: { instrument, timeframe, zones: [], nearestDemand: null, nearestSupply: null, currentPrice: 0, candlesAnalyzed: 0, computedAt: new Date().toISOString() }, higher: null, additional: [], curveAlignment: "neutral" } })
+      return NextResponse.json({
+        ok: true,
+        data: {
+          primary: {
+            instrument,
+            timeframe,
+            zones: [],
+            nearestDemand: null,
+            nearestSupply: null,
+            currentPrice: 0,
+            candlesAnalyzed: 0,
+            computedAt: new Date().toISOString(),
+          },
+          higher: null,
+          additional: [],
+          curveAlignment: "neutral",
+        },
+      })
     }
 
     const currentPrice = candles[candles.length - 1]!.close
@@ -139,12 +165,19 @@ export async function GET(
       const htf = getHigherTimeframe(timeframe)
       if (htf) {
         try {
-          const htfCandles = await fetchOandaCandles(instrument, htf, Math.min(lookback, 200), baseUrl, token)
+          const htfCandles = await fetchOandaCandles(
+            instrument,
+            htf,
+            Math.min(lookback, 200),
+            baseUrl,
+            token,
+          )
           if (htfCandles.length > 0) {
             const htfPrice = htfCandles[htfCandles.length - 1]!.close
             higherResult = detectZones(htfCandles, instrument, htf, config, htfPrice)
             let htfFiltered = higherResult.zones.filter((z) => z.scores.total >= minScore)
-            if (!showInvalidated) htfFiltered = htfFiltered.filter((z) => z.status !== "invalidated")
+            if (!showInvalidated)
+              htfFiltered = htfFiltered.filter((z) => z.status !== "invalidated")
             higherResult = { ...higherResult, zones: htfFiltered.slice(0, maxPerType * 2) }
             await upsertZones(instrument, htf, higherResult.zones).catch(() => {})
           }
@@ -158,7 +191,13 @@ export async function GET(
     const additionalResults: ZoneDetectionResult[] = []
     for (const tf of additionalTfs) {
       try {
-        const tfCandles = await fetchOandaCandles(instrument, tf, Math.min(lookback, 200), baseUrl, token)
+        const tfCandles = await fetchOandaCandles(
+          instrument,
+          tf,
+          Math.min(lookback, 200),
+          baseUrl,
+          token,
+        )
         if (tfCandles.length > 0) {
           const tfPrice = tfCandles[tfCandles.length - 1]!.close
           let result = detectZones(tfCandles, instrument, tf, config, tfPrice)

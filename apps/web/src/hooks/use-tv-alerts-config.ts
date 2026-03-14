@@ -88,7 +88,14 @@ export function useTVAlertsConfig() {
   }, [])
 
   return {
-    config, isLoading, update, regenerateToken, reconnectCF,
-    deployCFWorker, sendTestSignal, closeTestTrade, refresh: fetchConfig,
+    config,
+    isLoading,
+    update,
+    regenerateToken,
+    reconnectCF,
+    deployCFWorker,
+    sendTestSignal,
+    closeTestTrade,
+    refresh: fetchConfig,
   }
 }

@@ -19,6 +19,7 @@ Enforce file size limits: UI ≤150 LOC, hooks/utils ≤200, handlers/services �
 4. Run `/verify` to confirm no regressions.
 
 ## Output
+
 - Files split (old → new) with line counts
 - What was extracted and why
 - Verification results

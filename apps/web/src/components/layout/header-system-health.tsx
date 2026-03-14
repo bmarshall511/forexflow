@@ -38,9 +38,7 @@ const statusLabels: Record<StatusState, string> = {
 }
 
 function getWorstStatus(statuses: StatusState[]): StatusState {
-  return statuses.reduce((worst, s) =>
-    STATUS_PRIORITY[s] > STATUS_PRIORITY[worst] ? s : worst,
-  )
+  return statuses.reduce((worst, s) => (STATUS_PRIORITY[s] > STATUS_PRIORITY[worst] ? s : worst))
 }
 
 function getHealthSummary(statuses: StatusState[]): string {
@@ -67,13 +65,18 @@ function SystemHealthRow({ label, status, expandable, isOpen }: SystemHealthRowP
         <span className="text-xs font-medium">{label}</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className={cn("text-[11px]", status === "connected" ? "text-muted-foreground" : "text-foreground font-medium")}>
+        <span
+          className={cn(
+            "text-[11px]",
+            status === "connected" ? "text-muted-foreground" : "text-foreground font-medium",
+          )}
+        >
           {statusLabels[status]}
         </span>
         {expandable && (
           <ChevronDown
             className={cn(
-              "size-3 text-muted-foreground transition-transform duration-200",
+              "text-muted-foreground size-3 transition-transform duration-200",
               isOpen && "rotate-180",
             )}
             aria-hidden="true"
@@ -111,7 +114,12 @@ export function HeaderSystemHealth() {
         : "unconfigured"
     : "unconfigured"
 
-  const allStatuses: StatusState[] = [internetStatus, tvAlertsHealthStatus, oandaStatus, daemonStatus]
+  const allStatuses: StatusState[] = [
+    internetStatus,
+    tvAlertsHealthStatus,
+    oandaStatus,
+    daemonStatus,
+  ]
   const worstStatus = getWorstStatus(allStatuses)
   const healthSummary = getHealthSummary(allStatuses)
   const currency = accountOverview?.summary.currency
@@ -121,21 +129,21 @@ export function HeaderSystemHealth() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1.5 rounded-full px-2 py-1 hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="hover:bg-accent/50 focus-visible:ring-ring flex items-center gap-1.5 rounded-full px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2"
           aria-label={`System health: ${healthSummary}`}
         >
           <span
             className={cn("size-2.5 shrink-0 rounded-full", dotStyles[worstStatus])}
             aria-hidden="true"
           />
-          <span className="hidden @5xl/header:inline text-[11px] font-medium text-muted-foreground whitespace-nowrap">
+          <span className="@5xl/header:inline text-muted-foreground hidden whitespace-nowrap text-[11px] font-medium">
             System Health
           </span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80">
         <div className="space-y-1">
-          <h4 className="text-sm font-semibold mb-2">System Health</h4>
+          <h4 className="mb-2 text-sm font-semibold">System Health</h4>
 
           {/* Internet */}
           <SystemHealthRow label="Internet" status={internetStatus} />
@@ -145,14 +153,19 @@ export function HeaderSystemHealth() {
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="w-full rounded-sm hover:bg-accent/50 transition-colors px-1 -mx-1"
+                className="hover:bg-accent/50 -mx-1 w-full rounded-sm px-1 transition-colors"
                 aria-label={`TradingView Alerts: ${statusLabels[tvAlertsHealthStatus]}. Click to ${tvAlertsOpen ? "collapse" : "expand"} details.`}
               >
-                <SystemHealthRow label="TradingView Alerts" status={tvAlertsHealthStatus} expandable isOpen={tvAlertsOpen} />
+                <SystemHealthRow
+                  label="TradingView Alerts"
+                  status={tvAlertsHealthStatus}
+                  expandable
+                  isOpen={tvAlertsOpen}
+                />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="mt-1 rounded-md border border-border bg-muted/30 p-3">
+              <div className="border-border bg-muted/30 mt-1 rounded-md border p-3">
                 <TVAlertsStatusPopover tvAlerts={tvAlertsStatus} isConnected={isConnected} />
               </div>
             </CollapsibleContent>
@@ -163,14 +176,14 @@ export function HeaderSystemHealth() {
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="w-full rounded-sm hover:bg-accent/50 transition-colors px-1 -mx-1"
+                className="hover:bg-accent/50 -mx-1 w-full rounded-sm px-1 transition-colors"
                 aria-label={`OANDA: ${statusLabels[oandaStatus]}. Click to ${oandaOpen ? "collapse" : "expand"} details.`}
               >
                 <SystemHealthRow label="OANDA" status={oandaStatus} expandable isOpen={oandaOpen} />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="mt-1 rounded-md border border-border bg-muted/30 p-3">
+              <div className="border-border bg-muted/30 mt-1 rounded-md border p-3">
                 <OandaStatusPopover oanda={oanda} isConnected={isConnected} currency={currency} />
               </div>
             </CollapsibleContent>
@@ -181,14 +194,19 @@ export function HeaderSystemHealth() {
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="w-full rounded-sm hover:bg-accent/50 transition-colors px-1 -mx-1"
+                className="hover:bg-accent/50 -mx-1 w-full rounded-sm px-1 transition-colors"
                 aria-label={`Daemons: ${statusLabels[daemonStatus]}. Click to ${daemonOpen ? "collapse" : "expand"} details.`}
               >
-                <SystemHealthRow label="Daemons" status={daemonStatus} expandable isOpen={daemonOpen} />
+                <SystemHealthRow
+                  label="Daemons"
+                  status={daemonStatus}
+                  expandable
+                  isOpen={daemonOpen}
+                />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="mt-1 rounded-md border border-border bg-muted/30 p-3">
+              <div className="border-border bg-muted/30 mt-1 rounded-md border p-3">
                 <DaemonStatusPopover snapshot={snapshot} isConnected={isConnected} />
               </div>
             </CollapsibleContent>

@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { updateCondition, deleteCondition } from "@fxflow/db"
-import type { ApiResponse, TradeConditionData, TradeConditionTriggerType, TradeConditionActionType } from "@fxflow/types"
+import type {
+  ApiResponse,
+  TradeConditionData,
+  TradeConditionTriggerType,
+  TradeConditionActionType,
+} from "@fxflow/types"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
@@ -25,12 +30,15 @@ export async function PATCH(
 
     // Validate condition belongs to the specified trade
     const { db } = await import("@fxflow/db")
-    const existing = await db.tradeCondition.findUnique({ where: { id: conditionId }, select: { tradeId: true } })
+    const existing = await db.tradeCondition.findUnique({
+      where: { id: conditionId },
+      select: { tradeId: true },
+    })
     if (!existing || existing.tradeId !== tradeId) {
       return NextResponse.json({ ok: false, error: "Condition not found" }, { status: 404 })
     }
 
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       triggerType?: TradeConditionTriggerType
       triggerValue?: Record<string, unknown>
       actionType?: TradeConditionActionType
@@ -65,7 +73,10 @@ export async function DELETE(
 
     // Validate condition belongs to the specified trade
     const { db } = await import("@fxflow/db")
-    const existing = await db.tradeCondition.findUnique({ where: { id: conditionId }, select: { tradeId: true } })
+    const existing = await db.tradeCondition.findUnique({
+      where: { id: conditionId },
+      select: { tradeId: true },
+    })
     if (!existing || existing.tradeId !== tradeId) {
       return NextResponse.json({ ok: false, error: "Condition not found" }, { status: 404 })
     }

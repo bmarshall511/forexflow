@@ -38,9 +38,7 @@ export function OandaSettingsPage({ initialSettings }: OandaSettingsPageProps) {
   }, [liveCredentials, setHasLiveCredentials])
 
   useEffect(() => {
-    setHasPracticeCredentials(
-      practiceCredentials.hasToken && practiceCredentials.accountId !== "",
-    )
+    setHasPracticeCredentials(practiceCredentials.hasToken && practiceCredentials.accountId !== "")
   }, [practiceCredentials, setHasPracticeCredentials])
 
   const handleModeSwitch = async (newMode: "live" | "practice") => {
@@ -76,19 +74,13 @@ export function OandaSettingsPage({ initialSettings }: OandaSettingsPageProps) {
     }
   }
 
-  const handlePracticeCredentialsChange = useCallback(
-    (creds: OandaCredentials) => {
-      setPracticeCredentials(creds)
-    },
-    [],
-  )
+  const handlePracticeCredentialsChange = useCallback((creds: OandaCredentials) => {
+    setPracticeCredentials(creds)
+  }, [])
 
-  const handleLiveCredentialsChange = useCallback(
-    (creds: OandaCredentials) => {
-      setLiveCredentials(creds)
-    },
-    [],
-  )
+  const handleLiveCredentialsChange = useCallback((creds: OandaCredentials) => {
+    setLiveCredentials(creds)
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -102,11 +94,7 @@ export function OandaSettingsPage({ initialSettings }: OandaSettingsPageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div
-            role="radiogroup"
-            aria-label="Account mode"
-            className="flex gap-3"
-          >
+          <div role="radiogroup" aria-label="Account mode" className="flex gap-3">
             <button
               role="radio"
               aria-checked={mode === "practice"}
@@ -114,11 +102,11 @@ export function OandaSettingsPage({ initialSettings }: OandaSettingsPageProps) {
               disabled={isLoading}
               className={cn(
                 "flex-1 rounded-lg border-2 px-4 py-3 text-left transition-all",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
                 "disabled:pointer-events-none disabled:opacity-50",
                 mode === "practice"
                   ? "border-status-warning bg-status-warning/5"
-                  : "border-transparent bg-muted/30 hover:bg-muted/50",
+                  : "bg-muted/30 hover:bg-muted/50 border-transparent",
               )}
             >
               <div className="flex items-center gap-2">
@@ -131,9 +119,7 @@ export function OandaSettingsPage({ initialSettings }: OandaSettingsPageProps) {
                 />
                 <span className="text-sm font-semibold">Practice</span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Paper trading with virtual funds
-              </p>
+              <p className="text-muted-foreground mt-1 text-xs">Paper trading with virtual funds</p>
             </button>
 
             <button
@@ -143,11 +129,11 @@ export function OandaSettingsPage({ initialSettings }: OandaSettingsPageProps) {
               disabled={isLoading}
               className={cn(
                 "flex-1 rounded-lg border-2 px-4 py-3 text-left transition-all",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
                 "disabled:pointer-events-none disabled:opacity-50",
                 mode === "live"
                   ? "border-status-connected bg-status-connected/5"
-                  : "border-transparent bg-muted/30 hover:bg-muted/50",
+                  : "bg-muted/30 hover:bg-muted/50 border-transparent",
               )}
             >
               <div className="flex items-center gap-2">
@@ -160,9 +146,7 @@ export function OandaSettingsPage({ initialSettings }: OandaSettingsPageProps) {
                 />
                 <span className="text-sm font-semibold">Live</span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Real trading with actual funds
-              </p>
+              <p className="text-muted-foreground mt-1 text-xs">Real trading with actual funds</p>
             </button>
           </div>
         </CardContent>

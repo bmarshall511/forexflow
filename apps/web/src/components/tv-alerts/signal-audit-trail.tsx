@@ -8,18 +8,35 @@ import type { SignalAuditEventData } from "@fxflow/db"
 
 const STAGE_CONFIG: Record<string, { label: string; color: string }> = {
   received: { label: "Received", color: "text-blue-500 bg-blue-500/10 border-blue-500/30" },
-  config_loaded: { label: "Config Loaded", color: "text-slate-400 bg-slate-500/10 border-slate-500/30" },
-  dedup_checked: { label: "Dedup Checked", color: "text-slate-400 bg-slate-500/10 border-slate-500/30" },
-  validated: { label: "Validated", color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/30" },
+  config_loaded: {
+    label: "Config Loaded",
+    color: "text-slate-400 bg-slate-500/10 border-slate-500/30",
+  },
+  dedup_checked: {
+    label: "Dedup Checked",
+    color: "text-slate-400 bg-slate-500/10 border-slate-500/30",
+  },
+  validated: {
+    label: "Validated",
+    color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/30",
+  },
   executing: { label: "Executing", color: "text-amber-500 bg-amber-500/10 border-amber-500/30" },
   executed: { label: "Executed", color: "text-green-500 bg-green-500/10 border-green-500/30" },
   rejected: { label: "Rejected", color: "text-yellow-500 bg-yellow-500/10 border-yellow-500/30" },
   failed: { label: "Failed", color: "text-red-500 bg-red-500/10 border-red-500/30" },
-  post_execution: { label: "Post-Execution", color: "text-slate-400 bg-slate-500/10 border-slate-500/30" },
+  post_execution: {
+    label: "Post-Execution",
+    color: "text-slate-400 bg-slate-500/10 border-slate-500/30",
+  },
 }
 
 function getStageConfig(stage: string) {
-  return STAGE_CONFIG[stage] ?? { label: stage, color: "text-slate-400 bg-slate-500/10 border-slate-500/30" }
+  return (
+    STAGE_CONFIG[stage] ?? {
+      label: stage,
+      color: "text-slate-400 bg-slate-500/10 border-slate-500/30",
+    }
+  )
 }
 
 interface SignalAuditTrailProps {
@@ -55,12 +72,14 @@ export function SignalAuditTrail({ signalId }: SignalAuditTrailProps) {
         if (!cancelled) setIsLoading(false)
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [signalId])
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex items-center gap-2 py-3 text-xs">
         <Loader2 className="size-3 animate-spin" />
         Loading audit trail...
       </div>
@@ -72,7 +91,7 @@ export function SignalAuditTrail({ signalId }: SignalAuditTrailProps) {
   }
 
   if (events.length === 0) {
-    return <p className="py-3 text-xs text-muted-foreground">No audit events recorded.</p>
+    return <p className="text-muted-foreground py-3 text-xs">No audit events recorded.</p>
   }
 
   return (
@@ -93,22 +112,24 @@ export function SignalAuditTrail({ signalId }: SignalAuditTrailProps) {
           <div key={event.id} className="relative">
             {/* Timeline connector */}
             {!isLast && (
-              <div className="absolute left-[11px] top-[22px] h-[calc(100%-10px)] w-px bg-border" />
+              <div className="bg-border absolute left-[11px] top-[22px] h-[calc(100%-10px)] w-px" />
             )}
 
             {/* Event header */}
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-muted/50"
+              className="hover:bg-muted/50 flex w-full items-center gap-2 rounded px-1 py-1 text-left"
               onClick={() => setExpandedEvent(isExpanded ? null : event.id)}
               aria-expanded={isExpanded}
               aria-label={`${config.label} audit event details`}
             >
               {/* Timeline dot */}
-              <div className={cn(
-                "size-[22px] flex-shrink-0 rounded-full border flex items-center justify-center",
-                config.color,
-              )}>
+              <div
+                className={cn(
+                  "flex size-[22px] flex-shrink-0 items-center justify-center rounded-full border",
+                  config.color,
+                )}
+              >
                 {isExpanded ? (
                   <ChevronDown className="size-3" />
                 ) : (
@@ -120,15 +141,13 @@ export function SignalAuditTrail({ signalId }: SignalAuditTrailProps) {
                 {config.label}
               </Badge>
 
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
                 <Clock className="size-2.5" />
                 {time}
               </span>
 
               {durationMs !== undefined && (
-                <span className="text-[10px] text-muted-foreground">
-                  +{durationMs}ms
-                </span>
+                <span className="text-muted-foreground text-[10px]">+{durationMs}ms</span>
               )}
 
               {/* Inline summary */}
@@ -137,8 +156,8 @@ export function SignalAuditTrail({ signalId }: SignalAuditTrailProps) {
 
             {/* Expanded detail */}
             {isExpanded && (
-              <div className="ml-[30px] mt-1 mb-2 rounded border bg-muted/30 p-3">
-                <pre className="overflow-x-auto text-[11px] leading-relaxed text-muted-foreground">
+              <div className="bg-muted/30 mb-2 ml-[30px] mt-1 rounded border p-3">
+                <pre className="text-muted-foreground overflow-x-auto text-[11px] leading-relaxed">
                   {JSON.stringify(event.detail, null, 2)}
                 </pre>
               </div>
@@ -157,7 +176,7 @@ function EventSummary({ event }: { event: SignalAuditEventData }) {
   switch (event.stage) {
     case "received":
       return (
-        <span className="truncate text-[10px] text-muted-foreground">
+        <span className="text-muted-foreground truncate text-[10px]">
           {d.instrument as string} {(d.direction as string)?.toUpperCase()}
         </span>
       )
@@ -180,7 +199,7 @@ function EventSummary({ event }: { event: SignalAuditEventData }) {
 
     case "executing":
       return (
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-muted-foreground text-[10px]">
           {d.type as string} — {d.units as number} units
         </span>
       )
@@ -194,11 +213,7 @@ function EventSummary({ event }: { event: SignalAuditEventData }) {
       )
 
     case "failed":
-      return (
-        <span className="truncate text-[10px] text-red-500">
-          {d.error as string}
-        </span>
-      )
+      return <span className="truncate text-[10px] text-red-500">{d.error as string}</span>
 
     case "rejected":
       return (

@@ -30,13 +30,7 @@ interface TagEditorProps {
   onCreate: (name: string, color: string) => Promise<TagData | null>
 }
 
-export function TagEditor({
-  assignedTags,
-  allTags,
-  onAssign,
-  onRemove,
-  onCreate,
-}: TagEditorProps) {
+export function TagEditor({ assignedTags, allTags, onAssign, onRemove, onCreate }: TagEditorProps) {
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [selectedColor, setSelectedColor] = useState(TAG_COLORS[0]?.hex ?? "#3B82F6")
@@ -45,14 +39,10 @@ export function TagEditor({
   const assignedIds = new Set(assignedTags.map((t) => t.tagId))
 
   const filteredTags = allTags.filter(
-    (tag) =>
-      !assignedIds.has(tag.id) &&
-      tag.name.toLowerCase().includes(search.toLowerCase()),
+    (tag) => !assignedIds.has(tag.id) && tag.name.toLowerCase().includes(search.toLowerCase()),
   )
 
-  const exactMatch = allTags.some(
-    (tag) => tag.name.toLowerCase() === search.trim().toLowerCase(),
-  )
+  const exactMatch = allTags.some((tag) => tag.name.toLowerCase() === search.trim().toLowerCase())
 
   const handleCreate = async () => {
     if (!search.trim() || isCreating) return
@@ -113,7 +103,7 @@ export function TagEditor({
               }}
             />
 
-            <div className="max-h-36 overflow-y-auto space-y-0.5">
+            <div className="max-h-36 space-y-0.5 overflow-y-auto">
               {filteredTags.map((tag) => (
                 <button
                   key={tag.id}
@@ -123,10 +113,10 @@ export function TagEditor({
                     setSearch("")
                     setPopoverOpen(false)
                   }}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                  className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors"
                 >
                   <span
-                    className="size-3 rounded-full shrink-0"
+                    className="size-3 shrink-0 rounded-full"
                     style={{ backgroundColor: tag.color }}
                   />
                   {tag.name}
@@ -135,8 +125,8 @@ export function TagEditor({
             </div>
 
             {search.trim() && !exactMatch && (
-              <div className="border-t mt-1 pt-1">
-                <div className="flex flex-wrap gap-1 mb-2 px-1">
+              <div className="mt-1 border-t pt-1">
+                <div className="mb-2 flex flex-wrap gap-1 px-1">
                   {TAG_COLORS.map((c) => (
                     <button
                       key={c.hex}
@@ -145,13 +135,15 @@ export function TagEditor({
                       className={cn(
                         "size-5 rounded-full transition-all",
                         selectedColor === c.hex
-                          ? "ring-2 ring-offset-2 ring-offset-background"
+                          ? "ring-offset-background ring-2 ring-offset-2"
                           : "hover:scale-110",
                       )}
-                      style={{
-                        backgroundColor: c.hex,
-                        "--tw-ring-color": c.hex,
-                      } as React.CSSProperties}
+                      style={
+                        {
+                          backgroundColor: c.hex,
+                          "--tw-ring-color": c.hex,
+                        } as React.CSSProperties
+                      }
                       aria-label={c.label}
                     />
                   ))}
@@ -160,7 +152,7 @@ export function TagEditor({
                   type="button"
                   onClick={handleCreate}
                   disabled={isCreating}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                  className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors"
                 >
                   <Plus className="size-3" />
                   Create &ldquo;{search.trim()}&rdquo;

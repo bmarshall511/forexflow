@@ -96,7 +96,7 @@ export function LayoutSelector({ value, onChange }: LayoutSelectorProps) {
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors text-muted-foreground",
+          "text-muted-foreground flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors",
           "hover:bg-muted hover:text-foreground border border-transparent",
           open && "bg-muted text-foreground border-border",
         )}
@@ -108,7 +108,7 @@ export function LayoutSelector({ value, onChange }: LayoutSelectorProps) {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 rounded-lg border bg-popover shadow-lg p-1.5 min-w-[180px]">
+        <div className="bg-popover absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border p-1.5 shadow-lg">
           {LAYOUTS.map((opt) => (
             <button
               key={opt.value}
@@ -118,7 +118,7 @@ export function LayoutSelector({ value, onChange }: LayoutSelectorProps) {
                 setOpen(false)
               }}
               className={cn(
-                "flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-xs transition-colors",
+                "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors",
                 opt.value === value
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",

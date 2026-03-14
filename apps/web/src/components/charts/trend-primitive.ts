@@ -13,11 +13,11 @@ import type { TrendData, TrendVisualSettings, SwingPoint, TrendSegment } from "@
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 
-const UPTREND_COLOR = "#3b82f6"     // blue
-const DOWNTREND_COLOR = "#f97316"   // orange
-const RANGE_COLOR = "#94a3b8"       // slate
-const UP_SEG_COLOR = "#3b82f6"      // blue — impulsion in uptrend
-const DOWN_SEG_COLOR = "#f97316"    // orange — correction in uptrend (reversed for downtrend)
+const UPTREND_COLOR = "#3b82f6" // blue
+const DOWNTREND_COLOR = "#f97316" // orange
+const RANGE_COLOR = "#94a3b8" // slate
+const UP_SEG_COLOR = "#3b82f6" // blue — impulsion in uptrend
+const DOWN_SEG_COLOR = "#f97316" // orange — correction in uptrend (reversed for downtrend)
 
 // ─── Price Axis View ─────────────────────────────────────────────────────────
 
@@ -28,7 +28,13 @@ class TrendAxisView implements ISeriesPrimitiveAxisView {
   private _textColor: string
   private _backColor: string
 
-  constructor(series: ISeriesApi<SeriesType, Time>, price: number, text: string, textColor: string, backColor: string) {
+  constructor(
+    series: ISeriesApi<SeriesType, Time>,
+    price: number,
+    text: string,
+    textColor: string,
+    backColor: string,
+  ) {
     this._series = series
     this._price = price
     this._text = text
@@ -40,9 +46,15 @@ class TrendAxisView implements ISeriesPrimitiveAxisView {
     return (this._series.priceToCoordinate(this._price) as number | null) ?? -1000
   }
 
-  text(): string { return this._text }
-  textColor(): string { return this._textColor }
-  backColor(): string { return this._backColor }
+  text(): string {
+    return this._text
+  }
+  textColor(): string {
+    return this._textColor
+  }
+  backColor(): string {
+    return this._backColor
+  }
 }
 
 // ─── Pane View & Renderer ────────────────────────────────────────────────────
@@ -70,7 +82,9 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     this._source = source
   }
 
-  draw(target: { useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T }): void {
+  draw(target: {
+    useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T
+  }): void {
     const { trendData, visuals, series, timeScale, isDark, htfTrendData } = this._source
     if (!series || !timeScale) return
 
@@ -99,9 +113,12 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     dpr: number,
     opacityScale: number,
   ): void {
-    const trendColor = data.direction === "up" ? UPTREND_COLOR
-      : data.direction === "down" ? DOWNTREND_COLOR
-      : RANGE_COLOR
+    const trendColor =
+      data.direction === "up"
+        ? UPTREND_COLOR
+        : data.direction === "down"
+          ? DOWNTREND_COLOR
+          : RANGE_COLOR
 
     ctx.save()
 
@@ -127,7 +144,14 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
 
     // ─── Controlling Swing Line ──────────────────────────────────
     if (visuals.showControllingSwing && data.controllingSwing) {
-      this._drawControllingSwing(ctx, data.controllingSwing, trendColor, series, isDark, opacityScale)
+      this._drawControllingSwing(
+        ctx,
+        data.controllingSwing,
+        trendColor,
+        series,
+        isDark,
+        opacityScale,
+      )
     }
 
     ctx.restore()
@@ -155,8 +179,9 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       if (fromX == null || toX == null || topY == null || bottomY == null) continue
 
       // Color based on segment direction and trend
-      const isWithTrend = (data.direction === "up" && seg.direction === "up") ||
-                          (data.direction === "down" && seg.direction === "down")
+      const isWithTrend =
+        (data.direction === "up" && seg.direction === "up") ||
+        (data.direction === "down" && seg.direction === "down")
       const color = isWithTrend ? UP_SEG_COLOR : DOWN_SEG_COLOR
 
       ctx.fillStyle = hexToRgba(color, opacity)
@@ -367,12 +392,24 @@ export class TrendPrimitive implements ISeriesPrimitive<Time> {
   }
 
   // Public getters for the renderer
-  get trendData(): TrendData | null { return this._trendData }
-  get htfTrendData(): TrendData | null { return this._htfTrendData }
-  get visuals(): TrendVisualSettings { return this._visuals }
-  get isDark(): boolean { return this._isDark }
-  get series(): ISeriesApi<SeriesType, Time> | null { return this._series }
-  get timeScale(): ITimeScaleApi<Time> | null { return this._timeScale }
+  get trendData(): TrendData | null {
+    return this._trendData
+  }
+  get htfTrendData(): TrendData | null {
+    return this._htfTrendData
+  }
+  get visuals(): TrendVisualSettings {
+    return this._visuals
+  }
+  get isDark(): boolean {
+    return this._isDark
+  }
+  get series(): ISeriesApi<SeriesType, Time> | null {
+    return this._series
+  }
+  get timeScale(): ITimeScaleApi<Time> | null {
+    return this._timeScale
+  }
 
   attached(params: SeriesAttachedParameter<Time>): void {
     this._series = params.series
@@ -432,17 +469,22 @@ export class TrendPrimitive implements ISeriesPrimitive<Time> {
     }
 
     const isDark = this._isDark
-    const trendColor = data.direction === "up" ? UPTREND_COLOR
-      : data.direction === "down" ? DOWNTREND_COLOR
-      : RANGE_COLOR
+    const trendColor =
+      data.direction === "up"
+        ? UPTREND_COLOR
+        : data.direction === "down"
+          ? DOWNTREND_COLOR
+          : RANGE_COLOR
 
-    views.push(new TrendAxisView(
-      series,
-      data.controllingSwing.price,
-      "CTRL",
-      trendColor,
-      isDark ? "rgba(20, 20, 30, 0.9)" : "rgba(240, 240, 250, 0.9)",
-    ))
+    views.push(
+      new TrendAxisView(
+        series,
+        data.controllingSwing.price,
+        "CTRL",
+        trendColor,
+        isDark ? "rgba(20, 20, 30, 0.9)" : "rgba(240, 240, 250, 0.9)",
+      ),
+    )
 
     this._priceAxisViews = views
   }

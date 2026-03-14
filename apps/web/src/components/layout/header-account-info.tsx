@@ -39,8 +39,14 @@ function SummaryRow({ label, value, colored, numericValue }: SummaryRowProps) {
       <span
         className={cn(
           "font-mono tabular-nums",
-          colored && numericValue !== undefined && numericValue >= 0.005 && "text-status-connected font-semibold",
-          colored && numericValue !== undefined && numericValue <= -0.005 && "text-status-disconnected font-semibold",
+          colored &&
+            numericValue !== undefined &&
+            numericValue >= 0.005 &&
+            "text-status-connected font-semibold",
+          colored &&
+            numericValue !== undefined &&
+            numericValue <= -0.005 &&
+            "text-status-disconnected font-semibold",
         )}
       >
         {value}
@@ -66,22 +72,19 @@ export function HeaderAccountInfo() {
 
   const hasData = accountOverview !== null
 
-  const uplColor = totalUnrealized >= 0.005
-    ? "text-status-connected"
-    : totalUnrealized <= -0.005
-      ? "text-status-disconnected"
-      : "text-muted-foreground"
+  const uplColor =
+    totalUnrealized >= 0.005
+      ? "text-status-connected"
+      : totalUnrealized <= -0.005
+        ? "text-status-disconnected"
+        : "text-muted-foreground"
 
   const balanceDisplay = !hasData ? "\u2014" : formatCurrency(balance, currency)
   const uplDisplay = !hasData ? "\u2014" : formatSignedCurrency(totalUnrealized, currency)
 
-  const compactBalance = !hasData
-    ? "\u2014"
-    : formatCompactCurrency(balance, currency)
+  const compactBalance = !hasData ? "\u2014" : formatCompactCurrency(balance, currency)
 
-  const compactUpl = !hasData
-    ? "\u2014"
-    : formatSignedCurrency(totalUnrealized, currency)
+  const compactUpl = !hasData ? "\u2014" : formatSignedCurrency(totalUnrealized, currency)
 
   return (
     <Popover>
@@ -89,9 +92,9 @@ export function HeaderAccountInfo() {
         <button
           type="button"
           className={cn(
-            "flex items-center gap-1 rounded-md bg-muted/50 px-1.5 py-1 whitespace-nowrap",
+            "bg-muted/50 flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1",
             "hover:bg-accent/50 transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
           )}
           aria-label={
             hasData
@@ -100,21 +103,36 @@ export function HeaderAccountInfo() {
           }
         >
           {/* Balance */}
-          <span className="hidden @7xl/header:inline text-[11px] text-muted-foreground">Balance</span>
-          <span className="hidden @5xl/header:inline @7xl/header:hidden text-[11px] text-muted-foreground">Bal</span>
-          <span className="text-xs font-mono tabular-nums font-semibold text-foreground">
+          <span className="@7xl/header:inline text-muted-foreground hidden text-[11px]">
+            Balance
+          </span>
+          <span className="@5xl/header:inline @7xl/header:hidden text-muted-foreground hidden text-[11px]">
+            Bal
+          </span>
+          <span className="text-foreground font-mono text-xs font-semibold tabular-nums">
             <span className="@5xl/header:hidden">{compactBalance}</span>
-            <span className="hidden @5xl/header:inline">{balanceDisplay}</span>
+            <span className="@5xl/header:inline hidden">{balanceDisplay}</span>
           </span>
 
-          <span className="text-border" aria-hidden="true">&middot;</span>
+          <span className="text-border" aria-hidden="true">
+            &middot;
+          </span>
 
           {/* Unrealized P/L */}
-          <span className="hidden @7xl/header:inline text-[11px] text-muted-foreground">Unrealized P/L</span>
-          <span className="hidden @5xl/header:inline @7xl/header:hidden text-[11px] text-muted-foreground">UPL</span>
-          <span className={cn("text-xs font-mono tabular-nums font-semibold", hasData ? uplColor : "text-muted-foreground")}>
+          <span className="@7xl/header:inline text-muted-foreground hidden text-[11px]">
+            Unrealized P/L
+          </span>
+          <span className="@5xl/header:inline @7xl/header:hidden text-muted-foreground hidden text-[11px]">
+            UPL
+          </span>
+          <span
+            className={cn(
+              "font-mono text-xs font-semibold tabular-nums",
+              hasData ? uplColor : "text-muted-foreground",
+            )}
+          >
             <span className="@5xl/header:hidden">{compactUpl}</span>
-            <span className="hidden @5xl/header:inline">{uplDisplay}</span>
+            <span className="@5xl/header:inline hidden">{uplDisplay}</span>
           </span>
         </button>
       </PopoverTrigger>
@@ -123,7 +141,7 @@ export function HeaderAccountInfo() {
           <h4 className="text-sm font-semibold">Account Overview</h4>
 
           {!hasData ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Account data unavailable. Check daemon connection.
             </p>
           ) : (
@@ -148,7 +166,7 @@ export function HeaderAccountInfo() {
 
           <Link
             href="/"
-            className="block text-xs text-primary hover:underline pt-1 border-t border-border"
+            className="text-primary border-border block border-t pt-1 text-xs hover:underline"
           >
             View Dashboard &rarr;
           </Link>

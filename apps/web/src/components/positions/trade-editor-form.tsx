@@ -61,11 +61,11 @@ export function TradeEditorForm({
   const hasErrors = Object.keys(validationErrors).length > 0
 
   return (
-    <div className="space-y-3 pt-3 border-t border-border/50">
+    <div className="border-border/50 space-y-3 border-t pt-3">
       {/* Entry (read-only) */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">Entry</span>
-        <span className="text-xs font-mono tabular-nums text-muted-foreground">
+        <span className="text-muted-foreground text-xs">Entry</span>
+        <span className="text-muted-foreground font-mono text-xs tabular-nums">
           {entryPrice.toFixed(decimals)}
         </span>
       </div>
@@ -74,9 +74,9 @@ export function TradeEditorForm({
       {draftSL !== null ? (
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground w-6 shrink-0 flex items-center gap-1">
+            <span className="text-muted-foreground flex w-6 shrink-0 items-center gap-1 text-xs">
               SL
-              {isSLDirty && <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />}
+              {isSLDirty && <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />}
             </span>
             <Input
               type="number"
@@ -87,35 +87,35 @@ export function TradeEditorForm({
                 if (!isNaN(val)) onSLChange(val)
               }}
               className={cn(
-                "h-7 text-xs font-mono tabular-nums flex-1",
+                "h-7 flex-1 font-mono text-xs tabular-nums",
                 validationErrors.sl && "border-destructive",
               )}
               aria-label="Stop Loss price"
               aria-invalid={!!validationErrors.sl}
             />
             {slPips !== null && (
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap w-12 text-right">
+              <span className="text-muted-foreground w-12 whitespace-nowrap text-right text-[10px]">
                 {formatPips(slPips)}p
               </span>
             )}
             <button
               type="button"
               onClick={() => onSLChange(null)}
-              className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+              className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
               aria-label="Remove stop loss"
             >
               <X className="size-3.5" />
             </button>
           </div>
           {validationErrors.sl && (
-            <p className="text-[10px] text-destructive pl-8">{validationErrors.sl}</p>
+            <p className="text-destructive pl-8 text-[10px]">{validationErrors.sl}</p>
           )}
         </div>
       ) : (
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground w-full justify-start"
+          className="text-muted-foreground h-7 w-full justify-start gap-1 px-2 text-xs"
           onClick={() => onSLChange(defaultSL)}
         >
           <Plus className="size-3" />
@@ -127,9 +127,9 @@ export function TradeEditorForm({
       {draftTP !== null ? (
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground w-6 shrink-0 flex items-center gap-1">
+            <span className="text-muted-foreground flex w-6 shrink-0 items-center gap-1 text-xs">
               TP
-              {isTPDirty && <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />}
+              {isTPDirty && <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />}
             </span>
             <Input
               type="number"
@@ -140,35 +140,35 @@ export function TradeEditorForm({
                 if (!isNaN(val)) onTPChange(val)
               }}
               className={cn(
-                "h-7 text-xs font-mono tabular-nums flex-1",
+                "h-7 flex-1 font-mono text-xs tabular-nums",
                 validationErrors.tp && "border-destructive",
               )}
               aria-label="Take Profit price"
               aria-invalid={!!validationErrors.tp}
             />
             {tpPips !== null && (
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap w-12 text-right">
+              <span className="text-muted-foreground w-12 whitespace-nowrap text-right text-[10px]">
                 {formatPips(tpPips)}p
               </span>
             )}
             <button
               type="button"
               onClick={() => onTPChange(null)}
-              className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+              className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
               aria-label="Remove take profit"
             >
               <X className="size-3.5" />
             </button>
           </div>
           {validationErrors.tp && (
-            <p className="text-[10px] text-destructive pl-8">{validationErrors.tp}</p>
+            <p className="text-destructive pl-8 text-[10px]">{validationErrors.tp}</p>
           )}
         </div>
       ) : (
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground w-full justify-start"
+          className="text-muted-foreground h-7 w-full justify-start gap-1 px-2 text-xs"
           onClick={() => onTPChange(defaultTP)}
         >
           <Plus className="size-3" />
@@ -191,7 +191,7 @@ export function TradeEditorForm({
           size="sm"
           onClick={onSave}
           disabled={!isDirty || hasErrors || isSaving}
-          className="text-xs gap-1.5"
+          className="gap-1.5 text-xs"
         >
           {isSaving && <Loader2 className="size-3 animate-spin" />}
           {isSaving ? "Updating..." : variant === "pending" ? "Update Order" : "Update Trade"}
@@ -203,7 +203,7 @@ export function TradeEditorForm({
             size="sm"
             onClick={onCloseTrade}
             disabled={isSaving}
-            className="text-xs gap-1.5"
+            className="gap-1.5 text-xs"
           >
             <XCircle className="size-3.5" />
             {variant === "pending" ? "Cancel Order" : "Close Trade"}

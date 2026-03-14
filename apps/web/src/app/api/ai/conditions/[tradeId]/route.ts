@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { listConditionsForTrade, createCondition } from "@fxflow/db"
-import type { ApiResponse, TradeConditionData, TradeConditionTriggerType, TradeConditionActionType } from "@fxflow/types"
+import type {
+  ApiResponse,
+  TradeConditionData,
+  TradeConditionTriggerType,
+  TradeConditionActionType,
+} from "@fxflow/types"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
@@ -27,7 +32,7 @@ export async function POST(
 ): Promise<NextResponse<ApiResponse<TradeConditionData>>> {
   try {
     const { tradeId } = await params
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       triggerType: TradeConditionTriggerType
       triggerValue: Record<string, unknown>
       actionType: TradeConditionActionType

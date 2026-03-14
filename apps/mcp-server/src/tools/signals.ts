@@ -7,7 +7,10 @@ export function registerSignalTools(server: McpServer) {
     "get_tv_signals",
     "Get TradingView alert signals with optional filters",
     {
-      status: z.string().optional().describe("Filter by status: received, executing, executed, skipped, rejected, failed"),
+      status: z
+        .string()
+        .optional()
+        .describe("Filter by status: received, executing, executed, skipped, rejected, failed"),
       instrument: z.string().optional().describe("Filter by instrument (e.g., EUR_USD)"),
       page: z.number().optional().describe("Page number (default 1)"),
       pageSize: z.number().optional().describe("Results per page (default 20)"),
@@ -25,11 +28,16 @@ export function registerSignalTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
@@ -46,11 +54,16 @@ export function registerSignalTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 
   server.tool(
@@ -65,10 +78,15 @@ export function registerSignalTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         }
       }
-    }
+    },
   )
 }

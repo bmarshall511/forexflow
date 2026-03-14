@@ -16,6 +16,7 @@ Create a new Prisma service file following established patterns.
 ## Steps
 
 1. **packages/db/prisma/schema.prisma** — Add the Prisma model:
+
    ```prisma
    model AlertRule {
      id        String   @id @default(uuid())
@@ -29,6 +30,7 @@ Create a new Prisma service file following established patterns.
 2. **Run migration**: `cd packages/db && npx prisma migrate dev --name add-alert-rule`
 
 3. **packages/db/src/alert-rule-service.ts** — Create service file:
+
    ```typescript
    import { getDb } from "./client"
    // Follow patterns from existing services:
@@ -44,6 +46,7 @@ Create a new Prisma service file following established patterns.
 5. Run `/verify`.
 
 ## Conventions
+
 - One file per domain
 - Export functions, not classes
 - Use getDb() (lazy-init Prisma client)

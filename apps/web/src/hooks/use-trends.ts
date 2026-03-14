@@ -64,7 +64,8 @@ export function useTrends({
   candlesRef.current = candles
 
   // Derive effective price
-  const effectivePrice = currentPrice ?? (candles && candles.length > 0 ? candles[candles.length - 1]!.close : null)
+  const effectivePrice =
+    currentPrice ?? (candles && candles.length > 0 ? candles[candles.length - 1]!.close : null)
   const effectivePriceRef = useRef(effectivePrice)
   effectivePriceRef.current = effectivePrice
 
@@ -86,7 +87,9 @@ export function useTrends({
         lastFetchCountRef.current = data.length
       }
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [enabled, instrument, timeframe, chartCandleCount])
 
   // Stable compute function
@@ -121,12 +124,22 @@ export function useTrends({
         const htf = s.higherTimeframe ?? getHigherTimeframe(timeframe)
         if (htf) {
           try {
-            const htfCandles = await fetchCandles(instrument, htf, Math.min(s.config.lookbackCandles, 300))
+            const htfCandles = await fetchCandles(
+              instrument,
+              htf,
+              Math.min(s.config.lookbackCandles, 300),
+            )
             if (computeId !== computeIdRef.current) return
             if (htfCandles && htfCandles.length > 0) {
               const htfPrice = price
               const htfConfig = { ...config, swingStrength: getDefaultSwingStrength(htf) }
-              const htfResult = detectTrend(htfCandles as ZoneCandle[], instrument, htf, htfConfig, htfPrice)
+              const htfResult = detectTrend(
+                htfCandles as ZoneCandle[],
+                instrument,
+                htf,
+                htfConfig,
+                htfPrice,
+              )
               setHigherTfTrendData(htfResult)
               persistTrend(instrument, htf, htfResult)
             }
@@ -202,6 +215,5 @@ export function useTrends({
 
 /** Fire-and-forget trend persistence to the API. */
 function persistTrend(instrument: string, timeframe: string, data: TrendData): void {
-  fetch(`/api/trends/${instrument}?timeframe=${timeframe}`)
-    .catch(() => {})
+  fetch(`/api/trends/${instrument}?timeframe=${timeframe}`).catch(() => {})
 }

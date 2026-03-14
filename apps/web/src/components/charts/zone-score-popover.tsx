@@ -62,21 +62,21 @@ export function ZoneScorePopover({ zone, children }: ZoneScorePopoverProps) {
         </div>
 
         {/* Formation & total score */}
-        <div className="flex items-center justify-between px-3 py-2 border-b">
+        <div className="flex items-center justify-between border-b px-3 py-2">
           <div>
             <span className="text-xs font-medium">{zone.formation}</span>
-            <span className="text-[10px] text-muted-foreground ml-1.5">
+            <span className="text-muted-foreground ml-1.5 text-[10px]">
               {FORMATION_LABELS[zone.formation]}
             </span>
           </div>
           <span className={cn("text-lg font-bold tabular-nums", getTotalColor(scores.total))}>
             {scores.total.toFixed(1)}
-            <span className="text-xs font-normal text-muted-foreground">/5</span>
+            <span className="text-muted-foreground text-xs font-normal">/5</span>
           </span>
         </div>
 
         {/* Score breakdown */}
-        <div className="px-3 py-2 space-y-3">
+        <div className="space-y-3 px-3 py-2">
           <ScoreRow
             label={scores.strength.label}
             value={scores.strength.value}
@@ -98,7 +98,7 @@ export function ZoneScorePopover({ zone, children }: ZoneScorePopoverProps) {
         </div>
 
         {/* Zone details */}
-        <div className="border-t px-3 py-2 space-y-1.5">
+        <div className="space-y-1.5 border-t px-3 py-2">
           <DetailRow label="Proximal (entry)" value={zone.proximalLine.toFixed(5)} />
           <DetailRow label="Distal (stop)" value={zone.distalLine.toFixed(5)} />
           <DetailRow label="Width" value={`${zone.widthPips.toFixed(1)} pips`} />
@@ -110,7 +110,6 @@ export function ZoneScorePopover({ zone, children }: ZoneScorePopoverProps) {
           <DetailRow label="Distance" value={`${zone.distanceFromPricePips.toFixed(1)} pips`} />
           <DetailRow label="Age" value={`${zone.ageInCandles} candles`} />
         </div>
-
       </PopoverContent>
     </Popover>
   )
@@ -133,7 +132,7 @@ function ScoreRow({
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium">{label}</span>
-        <span className="text-xs tabular-nums font-mono">
+        <span className="font-mono text-xs tabular-nums">
           {value.toFixed(1)}/{max}
         </span>
       </div>
@@ -143,7 +142,7 @@ function ScoreRow({
         indicatorClassName={getScoreColor(value, max)}
         className="h-1.5"
       />
-      <p className="text-[10px] text-muted-foreground leading-tight">{explanation}</p>
+      <p className="text-muted-foreground text-[10px] leading-tight">{explanation}</p>
     </div>
   )
 }
@@ -151,8 +150,8 @@ function ScoreRow({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className="text-xs tabular-nums font-mono">{value}</span>
+      <span className="text-muted-foreground text-[10px]">{label}</span>
+      <span className="font-mono text-xs tabular-nums">{value}</span>
     </div>
   )
 }

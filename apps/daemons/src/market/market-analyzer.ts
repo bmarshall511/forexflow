@@ -34,7 +34,9 @@ export class MarketAnalyzer {
         isOpen: true,
         closeReason: null,
         closeLabel: null,
-        lastStatusChange: changed ? now.toISOString() : this.stateManager.getMarket().lastStatusChange,
+        lastStatusChange: changed
+          ? now.toISOString()
+          : this.stateManager.getMarket().lastStatusChange,
         nextExpectedChange: getNextExpectedChange(now).toISOString(),
       })
     } else {
@@ -43,7 +45,9 @@ export class MarketAnalyzer {
         isOpen: false,
         closeReason: reason,
         closeLabel: CLOSE_LABELS[reason],
-        lastStatusChange: changed ? now.toISOString() : this.stateManager.getMarket().lastStatusChange,
+        lastStatusChange: changed
+          ? now.toISOString()
+          : this.stateManager.getMarket().lastStatusChange,
         nextExpectedChange: getNextExpectedChange(now).toISOString(),
       })
     }
@@ -56,8 +60,7 @@ export class MarketAnalyzer {
     if (isRolloverWindow(now)) return "rollover"
 
     // If non-tradeable for > 10 minutes outside rollover on a weekday, infer holiday
-    const minutesSinceChange =
-      (now.getTime() - this.lastTradeableChangeTime.getTime()) / 60_000
+    const minutesSinceChange = (now.getTime() - this.lastTradeableChangeTime.getTime()) / 60_000
     if (minutesSinceChange > 10) {
       return "holiday"
     }

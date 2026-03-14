@@ -36,7 +36,7 @@ export function TodayResultsSection({
 
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
         Today&apos;s Results
       </h3>
       <div className="grid grid-cols-3 gap-2">

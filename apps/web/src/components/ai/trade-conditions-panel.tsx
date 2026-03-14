@@ -1,14 +1,30 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import type { TradeConditionData, AiConditionSuggestion, TradeConditionTriggerType, TradeConditionActionType } from "@fxflow/types"
+import type {
+  TradeConditionData,
+  AiConditionSuggestion,
+  TradeConditionTriggerType,
+  TradeConditionActionType,
+} from "@fxflow/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Plus, Trash2, Clock, TrendingUp, TrendingDown, Target, Bell, CheckCircle2, Sparkles, MoveUpRight } from "lucide-react"
+import {
+  Plus,
+  Trash2,
+  Clock,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Bell,
+  CheckCircle2,
+  Sparkles,
+  MoveUpRight,
+} from "lucide-react"
 import type { CreateConditionInput, UseTradeConditionsReturn } from "@/hooks/use-trade-conditions"
 import { ConditionBuilder } from "./condition-builder"
 import { ConditionPresets } from "./condition-presets"
@@ -117,29 +133,31 @@ function ConditionCard({
     <div className={cn("relative", isChild && "ml-5")}>
       {/* Chain connector line */}
       {isChild && (
-        <div className="absolute -left-3 top-0 bottom-0 flex flex-col items-center">
-          <div className="w-px h-3 bg-border" />
-          <div className="w-2 h-px bg-border" />
+        <div className="absolute -left-3 bottom-0 top-0 flex flex-col items-center">
+          <div className="bg-border h-3 w-px" />
+          <div className="bg-border h-px w-2" />
         </div>
       )}
 
-      <div className={cn(
-        "rounded-lg border p-3 space-y-1.5",
-        !isActive && !isWaiting && "opacity-60",
-        isTrailingStop && "border-l-2 border-l-blue-500",
-      )}>
+      <div
+        className={cn(
+          "space-y-1.5 rounded-lg border p-3",
+          !isActive && !isWaiting && "opacity-60",
+          isTrailingStop && "border-l-2 border-l-blue-500",
+        )}
+      >
         <div className="flex items-start justify-between gap-2">
-          <div className="space-y-0.5 min-w-0">
+          <div className="min-w-0 space-y-0.5">
             {condition.label && (
-              <p className="text-xs font-medium truncate flex items-center gap-1">
-                {isTrailingStop && <MoveUpRight className="size-3 text-blue-500 shrink-0" />}
+              <p className="flex items-center gap-1 truncate text-xs font-medium">
+                {isTrailingStop && <MoveUpRight className="size-3 shrink-0 text-blue-500" />}
                 {condition.label}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <div className="text-muted-foreground flex flex-wrap items-center gap-1 text-xs">
               <Clock className="size-3" />
               <span>{TRIGGER_LABELS[condition.triggerType] ?? condition.triggerType}</span>
-              <span className="font-mono font-medium text-foreground">
+              <span className="text-foreground font-mono font-medium">
                 {formatTriggerValue(condition.triggerType, condition.triggerValue)}
               </span>
               <span>&rarr;</span>
@@ -149,35 +167,41 @@ function ConditionCard({
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             {isWaiting ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge variant="outline" className={cn("text-[9px] h-4 px-1 capitalize", STATUS_STYLES.waiting)}>
+                    <Badge
+                      variant="outline"
+                      className={cn("h-4 px-1 text-[9px] capitalize", STATUS_STYLES.waiting)}
+                    >
                       Waiting
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs max-w-48">
+                  <TooltipContent side="top" className="max-w-48 text-xs">
                     Activates after: {parentLabel ?? "parent condition"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             ) : (
-              <Badge variant="outline" className={cn("text-[9px] h-4 px-1 capitalize", STATUS_STYLES[condition.status])}>
+              <Badge
+                variant="outline"
+                className={cn("h-4 px-1 text-[9px] capitalize", STATUS_STYLES[condition.status])}
+              >
                 {condition.status}
               </Badge>
             )}
             {(isActive || isWaiting) && (
               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onDelete}>
-                <Trash2 className="size-3 text-muted-foreground" />
+                <Trash2 className="text-muted-foreground size-3" />
                 <span className="sr-only">Delete condition</span>
               </Button>
             )}
           </div>
         </div>
         {condition.expiresAt && (
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-muted-foreground text-[10px]">
             Expires {new Date(condition.expiresAt).toLocaleString()}
           </p>
         )}
@@ -205,24 +229,29 @@ function ConditionSuggestionCard({
   isAutoApplied?: boolean
 }) {
   return (
-    <div className="rounded-lg border p-3 space-y-2">
+    <div className="space-y-2 rounded-lg border p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-0.5">
           <span className="text-sm font-medium">{suggestion.label}</span>
-          <p className="text-xs text-muted-foreground">{suggestion.rationale}</p>
+          <p className="text-muted-foreground text-xs">{suggestion.rationale}</p>
         </div>
         {isAutoApplied ? (
-          <div className="flex items-center gap-1 text-xs text-purple-600 shrink-0">
+          <div className="flex shrink-0 items-center gap-1 text-xs text-purple-600">
             <Sparkles className="size-3" />
             Auto-applied
           </div>
         ) : isAdded ? (
-          <div className="flex items-center gap-1 text-xs text-emerald-600 shrink-0">
+          <div className="flex shrink-0 items-center gap-1 text-xs text-emerald-600">
             <CheckCircle2 className="size-3" />
             Added
           </div>
         ) : (
-          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 shrink-0" onClick={onAdd}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0 gap-1 text-xs"
+            onClick={onAdd}
+          >
             <Plus className="size-3" />
             Add
           </Button>
@@ -239,8 +268,13 @@ interface ConditionGroup {
   children: TradeConditionData[]
 }
 
-function groupConditions(conditions: TradeConditionData[]): { groups: ConditionGroup[]; standalone: TradeConditionData[] } {
-  const parentIds = new Set(conditions.filter((c) => c.parentConditionId).map((c) => c.parentConditionId!))
+function groupConditions(conditions: TradeConditionData[]): {
+  groups: ConditionGroup[]
+  standalone: TradeConditionData[]
+} {
+  const parentIds = new Set(
+    conditions.filter((c) => c.parentConditionId).map((c) => c.parentConditionId!),
+  )
   const childMap = new Map<string, TradeConditionData[]>()
 
   for (const c of conditions) {
@@ -275,13 +309,24 @@ function groupConditions(conditions: TradeConditionData[]): { groups: ConditionG
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
-export function TradeConditionsPanel({ conditions, tradeStatus, hooks, conditionSuggestions, analysisId, trade }: TradeConditionsPanelProps) {
+export function TradeConditionsPanel({
+  conditions,
+  tradeStatus,
+  hooks,
+  conditionSuggestions,
+  analysisId,
+  trade,
+}: TradeConditionsPanelProps) {
   const [showBuilder, setShowBuilder] = useState(false)
   const [addedSuggestionIndices, setAddedSuggestionIndices] = useState<Set<number>>(new Set())
   const canAdd = tradeStatus === "open" || tradeStatus === "pending"
 
-  const activeConditions = conditions.filter((c) => c.status === "active" || c.status === "executing" || c.status === "waiting")
-  const historicConditions = conditions.filter((c) => c.status !== "active" && c.status !== "executing" && c.status !== "waiting")
+  const activeConditions = conditions.filter(
+    (c) => c.status === "active" || c.status === "executing" || c.status === "waiting",
+  )
+  const historicConditions = conditions.filter(
+    (c) => c.status !== "active" && c.status !== "executing" && c.status !== "waiting",
+  )
 
   const activeGrouped = useMemo(() => groupConditions(activeConditions), [activeConditions])
   const historicGrouped = useMemo(() => groupConditions(historicConditions), [historicConditions])
@@ -292,12 +337,12 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
   }
 
   /** Check if a suggestion already exists as a condition */
-  const getSuggestionState = (suggestion: AiConditionSuggestion): "auto-applied" | "user-added" | null => {
+  const getSuggestionState = (
+    suggestion: AiConditionSuggestion,
+  ): "auto-applied" | "user-added" | null => {
     if (!conditions.length) return null
-    const match = conditions.find((c) =>
-      c.status === "active" &&
-      c.analysisId === analysisId &&
-      c.label === suggestion.label
+    const match = conditions.find(
+      (c) => c.status === "active" && c.analysisId === analysisId && c.label === suggestion.label,
     )
     if (!match) return null
     return match.createdBy === "ai" ? "auto-applied" : "user-added"
@@ -330,10 +375,7 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
 
   const renderConditionGroup = (group: ConditionGroup, onDelete: (id: string) => void) => (
     <div key={group.parent.id} className="space-y-1">
-      <ConditionCard
-        condition={group.parent}
-        onDelete={() => onDelete(group.parent.id)}
-      />
+      <ConditionCard condition={group.parent} onDelete={() => onDelete(group.parent.id)} />
       {group.children.map((child) => (
         <ConditionCard
           key={child.id}
@@ -346,7 +388,10 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
     </div>
   )
 
-  const renderStandaloneCondition = (condition: TradeConditionData, onDelete: (id: string) => void) => (
+  const renderStandaloneCondition = (
+    condition: TradeConditionData,
+    onDelete: (id: string) => void,
+  ) => (
     <ConditionCard
       key={condition.id}
       condition={condition}
@@ -363,7 +408,7 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs gap-1"
+            className="h-7 gap-1 text-xs"
             onClick={() => setShowBuilder(!showBuilder)}
           >
             <Plus className="size-3" />
@@ -392,8 +437,12 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
       {/* AI Suggested Conditions */}
       {hasSuggestions && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested by AI</p>
-          <p className="text-[11px] text-muted-foreground -mt-1">Automated rules that trigger when market conditions are met</p>
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            Suggested by AI
+          </p>
+          <p className="text-muted-foreground -mt-1 text-[11px]">
+            Automated rules that trigger when market conditions are met
+          </p>
           {conditionSuggestions!.map((suggestion, i) => {
             const state = getSuggestionState(suggestion)
             return (
@@ -412,7 +461,9 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
 
       {activeConditions.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active</p>
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            Active
+          </p>
           {activeGrouped.groups.map((group) =>
             renderConditionGroup(group, (id) => void hooks.deleteCondition(id)),
           )}
@@ -424,7 +475,9 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
 
       {historicConditions.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">History</p>
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            History
+          </p>
           {historicGrouped.groups.map((group) =>
             renderConditionGroup(group, (id) => void hooks.deleteCondition(id)),
           )}
@@ -435,8 +488,10 @@ export function TradeConditionsPanel({ conditions, tradeStatus, hooks, condition
       )}
 
       {isEmpty && (
-        <p className="text-center text-sm text-muted-foreground py-6">
-          {canAdd ? "No conditions set. Add one to automate trade management." : "No conditions were set for this trade."}
+        <p className="text-muted-foreground py-6 text-center text-sm">
+          {canAdd
+            ? "No conditions set. Add one to automate trade management."
+            : "No conditions were set for this trade."}
         </p>
       )}
     </div>

@@ -21,7 +21,14 @@ interface SortableHeadProps {
   title?: string
 }
 
-export function SortableHead({ label, sortKey, currentSort, onSort, className, title }: SortableHeadProps) {
+export function SortableHead({
+  label,
+  sortKey,
+  currentSort,
+  onSort,
+  className,
+  title,
+}: SortableHeadProps) {
   const isActive = currentSort.key === sortKey
   const direction = isActive ? currentSort.direction : null
 
@@ -29,7 +36,7 @@ export function SortableHead({ label, sortKey, currentSort, onSort, className, t
     <TableHead className={cn("text-xs", className)}>
       <button
         type="button"
-        className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer select-none"
+        className="hover:text-foreground inline-flex cursor-pointer select-none items-center gap-1 transition-colors"
         onClick={() => onSort(sortKey)}
         aria-label={`Sort by ${title ?? label}`}
         title={title}
@@ -48,7 +55,11 @@ export function SortableHead({ label, sortKey, currentSort, onSort, className, t
 }
 
 /** Cycle sort: null → desc → asc → desc (no null reset, always sorted) */
-export function nextSort(currentSort: SortState, key: string, defaultDir: SortDirection = "desc"): SortState {
+export function nextSort(
+  currentSort: SortState,
+  key: string,
+  defaultDir: SortDirection = "desc",
+): SortState {
   if (currentSort.key !== key) {
     return { key, direction: defaultDir }
   }

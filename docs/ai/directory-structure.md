@@ -38,14 +38,14 @@ packages/
 
 ## Import Boundaries
 
-| From | To | Allowed |
-|------|----|---------|
-| `apps/*` | `packages/*` | Yes |
-| `packages/*` | `apps/*` | **Never** |
-| `apps/web` | `apps/daemons` | **Never** (communicate via HTTP/WS) |
-| `packages/db` | `packages/types` | Yes |
-| `packages/shared` | `packages/types` | Yes |
-| `packages/types` | other packages | **Never** (leaf dependency) |
+| From              | To               | Allowed                             |
+| ----------------- | ---------------- | ----------------------------------- |
+| `apps/*`          | `packages/*`     | Yes                                 |
+| `packages/*`      | `apps/*`         | **Never**                           |
+| `apps/web`        | `apps/daemons`   | **Never** (communicate via HTTP/WS) |
+| `packages/db`     | `packages/types` | Yes                                 |
+| `packages/shared` | `packages/types` | Yes                                 |
+| `packages/types`  | other packages   | **Never** (leaf dependency)         |
 
 ## Where New Code Goes
 

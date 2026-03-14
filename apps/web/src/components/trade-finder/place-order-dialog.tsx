@@ -12,7 +12,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Target, ShieldAlert, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Loader2 } from "lucide-react"
+import {
+  Target,
+  ShieldAlert,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PlaceOrderDialogProps {
@@ -34,7 +42,14 @@ function computeDollarAmount(positionSize: number, pips: number, instrument: str
   return positionSize * pips * pipSize
 }
 
-export function PlaceOrderDialog({ setup, orderType, open, onOpenChange, onConfirm, isPlacing }: PlaceOrderDialogProps) {
+export function PlaceOrderDialog({
+  setup,
+  orderType,
+  open,
+  onOpenChange,
+  onConfirm,
+  isPlacing,
+}: PlaceOrderDialogProps) {
   const isLong = setup.direction === "long"
   const isMarket = orderType === "MARKET"
   const riskDollars = computeDollarAmount(setup.positionSize, setup.riskPips, setup.instrument)
@@ -57,15 +72,17 @@ export function PlaceOrderDialog({ setup, orderType, open, onOpenChange, onConfi
 
         <div className="space-y-4 py-2">
           {/* Pair + Direction header */}
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-            <div className={cn(
-              "size-10 rounded-full flex items-center justify-center",
-              isLong ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500",
-            )}>
+          <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+            <div
+              className={cn(
+                "flex size-10 items-center justify-center rounded-full",
+                isLong ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500",
+              )}
+            >
               {isLong ? <TrendingUp className="size-5" /> : <TrendingDown className="size-5" />}
             </div>
             <div>
-              <p className="font-semibold text-base">{formatInstrument(setup.instrument)}</p>
+              <p className="text-base font-semibold">{formatInstrument(setup.instrument)}</p>
               <p className={cn("text-sm font-medium", isLong ? "text-green-500" : "text-red-500")}>
                 {isLong ? "Buying" : "Selling"} · {isMarket ? "Market" : "Limit"} Order
               </p>
@@ -98,26 +115,33 @@ export function PlaceOrderDialog({ setup, orderType, open, onOpenChange, onConfi
           </div>
 
           {/* Risk / Reward summary */}
-          <div className="rounded-lg border p-3 space-y-2">
-            <div className="flex gap-1 h-6 rounded overflow-hidden">
+          <div className="space-y-2 rounded-lg border p-3">
+            <div className="flex h-6 gap-1 overflow-hidden rounded">
               <div
-                className="bg-red-500/20 flex items-center justify-center text-[11px] text-red-500 font-semibold"
-                style={{ width: `${Math.min(45, (1 / (1 + parseFloat(setup.rrRatio))) * 100)}%`, minWidth: "18%" }}
+                className="flex items-center justify-center bg-red-500/20 text-[11px] font-semibold text-red-500"
+                style={{
+                  width: `${Math.min(45, (1 / (1 + parseFloat(setup.rrRatio))) * 100)}%`,
+                  minWidth: "18%",
+                }}
               >
                 -{fmtDollar(riskDollars)}
               </div>
-              <div className="bg-green-500/20 flex items-center justify-center text-[11px] text-green-500 font-semibold flex-1">
+              <div className="flex flex-1 items-center justify-center bg-green-500/20 text-[11px] font-semibold text-green-500">
                 +{fmtDollar(rewardDollars)}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">If you lose</span>
-                <span className="text-red-500 font-medium">-{fmtDollar(riskDollars)} ({setup.riskPips.toFixed(1)}p)</span>
+                <span className="font-medium text-red-500">
+                  -{fmtDollar(riskDollars)} ({setup.riskPips.toFixed(1)}p)
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">If you win</span>
-                <span className="text-green-500 font-medium">+{fmtDollar(rewardDollars)} ({setup.rewardPips.toFixed(1)}p)</span>
+                <span className="font-medium text-green-500">
+                  +{fmtDollar(rewardDollars)} ({setup.rewardPips.toFixed(1)}p)
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Risk:Reward</span>
@@ -125,50 +149,51 @@ export function PlaceOrderDialog({ setup, orderType, open, onOpenChange, onConfi
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Trade Size</span>
-                <span className="font-mono font-medium">{setup.positionSize.toLocaleString()} units</span>
+                <span className="font-mono font-medium">
+                  {setup.positionSize.toLocaleString()} units
+                </span>
               </div>
             </div>
           </div>
 
           {/* Extra context */}
-          <div className="grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
+          <div className="text-muted-foreground grid grid-cols-2 gap-x-4 text-xs">
             <div className="flex justify-between">
               <span>Timeframe</span>
               <span className="text-foreground font-medium">{tfSet?.ltf ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span>Score</span>
-              <span className="text-foreground font-medium">{setup.scores.total}/{setup.scores.maxPossible}</span>
+              <span className="text-foreground font-medium">
+                {setup.scores.total}/{setup.scores.maxPossible}
+              </span>
             </div>
           </div>
 
           {/* Market order warning */}
           {isMarket && (
-            <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               <span>
-                Market orders execute immediately. The actual fill price may differ slightly from the expected entry due to spread and slippage.
+                Market orders execute immediately. The actual fill price may differ slightly from
+                the expected entry due to spread and slippage.
               </span>
             </div>
           )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isPlacing}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPlacing}>
             Cancel
           </Button>
           <Button
             onClick={onConfirm}
             disabled={isPlacing}
             className={cn(
-              "gap-1.5 min-w-[140px]",
+              "min-w-[140px] gap-1.5",
               isLong
-                ? "bg-green-600 hover:bg-green-700 text-white"
-                : "bg-red-600 hover:bg-red-700 text-white",
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : "bg-red-600 text-white hover:bg-red-700",
             )}
           >
             {isPlacing ? (
@@ -186,7 +211,13 @@ export function PlaceOrderDialog({ setup, orderType, open, onOpenChange, onConfi
   )
 }
 
-function PriceBox({ icon, label, sublabel, value, color }: {
+function PriceBox({
+  icon,
+  label,
+  sublabel,
+  value,
+  color,
+}: {
   icon: React.ReactNode
   label: string
   sublabel: string
@@ -194,15 +225,20 @@ function PriceBox({ icon, label, sublabel, value, color }: {
   color: string
 }) {
   return (
-    <div className="rounded-md border p-2 text-center space-y-0.5">
+    <div className="space-y-0.5 rounded-md border p-2 text-center">
       <div className={cn("flex items-center justify-center gap-1", color)}>
         {icon}
         <span className="text-[10px] font-medium">{label}</span>
       </div>
-      <div className={cn("text-sm font-mono tabular-nums font-semibold", value === "Market" ? "text-amber-500" : color)}>
+      <div
+        className={cn(
+          "font-mono text-sm font-semibold tabular-nums",
+          value === "Market" ? "text-amber-500" : color,
+        )}
+      >
         {value}
       </div>
-      <div className="text-[9px] text-muted-foreground">{sublabel}</div>
+      <div className="text-muted-foreground text-[9px]">{sublabel}</div>
     </div>
   )
 }

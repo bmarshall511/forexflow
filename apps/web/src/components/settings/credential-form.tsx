@@ -16,11 +16,7 @@ interface CredentialFormProps {
   onCredentialsChange: (credentials: OandaCredentials) => void
 }
 
-export function CredentialForm({
-  mode,
-  credentials,
-  onCredentialsChange,
-}: CredentialFormProps) {
+export function CredentialForm({ mode, credentials, onCredentialsChange }: CredentialFormProps) {
   const [token, setToken] = useState("")
   const [accountId, setAccountId] = useState(credentials.accountId)
   const [isSaving, setIsSaving] = useState(false)
@@ -32,8 +28,7 @@ export function CredentialForm({
     setToken("")
   }, [credentials])
 
-  const isDirty =
-    token !== "" || accountId !== credentials.accountId
+  const isDirty = token !== "" || accountId !== credentials.accountId
 
   const canSave =
     isDirty && accountId.trim() !== "" && (credentials.hasToken || token.trim() !== "")
@@ -169,19 +164,13 @@ export function CredentialForm({
 
       <div className="flex items-center gap-2 pt-2">
         {isDirty && (
-          <Button
-            onClick={handleSave}
-            disabled={!canSave || isBusy}
-            size="sm"
-          >
+          <Button onClick={handleSave} disabled={!canSave || isBusy} size="sm">
             {isSaving && <Loader2 className="size-4 animate-spin" />}
             {isSaving ? "Saving..." : "Save Credentials"}
           </Button>
         )}
 
-        {hasCredentials && (
-          <TestConnectionButton mode={mode} disabled={isBusy || isDirty} />
-        )}
+        {hasCredentials && <TestConnectionButton mode={mode} disabled={isBusy || isDirty} />}
       </div>
     </div>
   )

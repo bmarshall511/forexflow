@@ -23,7 +23,7 @@ export function ProximityClosingSection({
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <h3 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <h3 className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
           Near Closing
         </h3>
         {trades.length > 0 && (
@@ -34,7 +34,7 @@ export function ProximityClosingSection({
       </div>
 
       {trades.length === 0 ? (
-        <p className="py-3 text-center text-xs text-muted-foreground">
+        <p className="text-muted-foreground py-3 text-center text-xs">
           No trades near closing threshold
         </p>
       ) : (
@@ -51,9 +51,7 @@ export function ProximityClosingSection({
                 direction={trade.direction}
                 value={formatCurrency(trade.unrealizedPL, currency)}
                 valueClassName={cn(
-                  trade.unrealizedPL >= 0
-                    ? "text-status-connected"
-                    : "text-status-disconnected",
+                  trade.unrealizedPL >= 0 ? "text-status-connected" : "text-status-disconnected",
                 )}
                 detail={isNearSL ? "Near SL" : "Near TP"}
                 detailClassName={cn(
@@ -77,7 +75,7 @@ export function ProximityClosingSection({
 
           <Link
             href="/positions?tab=open"
-            className="mt-1 block text-center text-[10px] font-medium text-primary hover:underline"
+            className="text-primary mt-1 block text-center text-[10px] font-medium hover:underline"
             aria-label="View all open trades"
           >
             View all open trades

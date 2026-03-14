@@ -40,7 +40,11 @@ export function AutoTradeButton() {
           )}
           onClick={handleToggle}
           disabled={toggling}
-          aria-label={config.autoTradeEnabled ? "Auto-Trade Active — Click to disable" : "Auto-Trade Disabled — Click to enable"}
+          aria-label={
+            config.autoTradeEnabled
+              ? "Auto-Trade Active — Click to disable"
+              : "Auto-Trade Disabled — Click to enable"
+          }
         >
           {toggling ? (
             <Loader2 className="size-3.5 animate-spin" />
@@ -48,16 +52,16 @@ export function AutoTradeButton() {
             <>
               <Zap className="size-3.5" />
               {config.autoTradeEnabled && (
-                <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-teal-500 animate-pulse" />
+                <span className="absolute -right-0.5 -top-0.5 size-2 animate-pulse rounded-full bg-teal-500" />
               )}
             </>
           )}
-          <span className="hidden @5xl/header:inline whitespace-nowrap">Auto-Trade</span>
+          <span className="@5xl/header:inline hidden whitespace-nowrap">Auto-Trade</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <p>{config.autoTradeEnabled ? "Auto-Trade: Active" : "Auto-Trade: Disabled"}</p>
-        <p className="text-xs text-muted-foreground">Trade Finder auto-placement</p>
+        <p className="text-muted-foreground text-xs">Trade Finder auto-placement</p>
       </TooltipContent>
     </Tooltip>
   )

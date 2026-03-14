@@ -12,9 +12,9 @@ import type { CurveData } from "@fxflow/types"
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 
-const HIGH_COLOR = "#ef4444"   // red — near supply
-const MID_COLOR = "#94a3b8"    // slate — equilibrium
-const LOW_COLOR = "#22c55e"    // green — near demand
+const HIGH_COLOR = "#ef4444" // red — near supply
+const MID_COLOR = "#94a3b8" // slate — equilibrium
+const LOW_COLOR = "#22c55e" // green — near demand
 const LINE_COLOR_DARK = "rgba(148, 163, 184, 0.35)"
 const LINE_COLOR_LIGHT = "rgba(100, 116, 139, 0.35)"
 
@@ -27,7 +27,13 @@ class CurveAxisView implements ISeriesPrimitiveAxisView {
   private _textColor: string
   private _backColor: string
 
-  constructor(series: ISeriesApi<SeriesType, Time>, price: number, text: string, textColor: string, backColor: string) {
+  constructor(
+    series: ISeriesApi<SeriesType, Time>,
+    price: number,
+    text: string,
+    textColor: string,
+    backColor: string,
+  ) {
     this._series = series
     this._price = price
     this._text = text
@@ -39,9 +45,15 @@ class CurveAxisView implements ISeriesPrimitiveAxisView {
     return (this._series.priceToCoordinate(this._price) as number | null) ?? -1000
   }
 
-  text(): string { return this._text }
-  textColor(): string { return this._textColor }
-  backColor(): string { return this._backColor }
+  text(): string {
+    return this._text
+  }
+  textColor(): string {
+    return this._textColor
+  }
+  backColor(): string {
+    return this._backColor
+  }
 }
 
 // ─── Pane View & Renderer ────────────────────────────────────────────────────
@@ -69,7 +81,9 @@ class CurvePaneRenderer implements IPrimitivePaneRenderer {
     this._source = source
   }
 
-  draw(target: { useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T }): void {
+  draw(target: {
+    useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T
+  }): void {
     const { curveData, series, isDark } = this._source
     if (!curveData || !series) return
 
@@ -210,9 +224,15 @@ export class CurvePrimitive implements ISeriesPrimitive<Time> {
   }
 
   // Public getters for the renderer
-  get curveData(): CurveData | null { return this._curveData }
-  get isDark(): boolean { return this._isDark }
-  get series(): ISeriesApi<SeriesType, Time> | null { return this._series }
+  get curveData(): CurveData | null {
+    return this._curveData
+  }
+  get isDark(): boolean {
+    return this._isDark
+  }
+  get series(): ISeriesApi<SeriesType, Time> | null {
+    return this._series
+  }
 
   attached(params: SeriesAttachedParameter<Time>): void {
     this._series = params.series
@@ -264,22 +284,26 @@ export class CurvePrimitive implements ISeriesPrimitive<Time> {
     const isDark = this._isDark
 
     // High threshold label
-    views.push(new CurveAxisView(
-      series,
-      data.highThreshold,
-      "HIGH",
-      HIGH_COLOR,
-      isDark ? "rgba(30, 10, 10, 0.9)" : "rgba(254, 226, 226, 0.9)",
-    ))
+    views.push(
+      new CurveAxisView(
+        series,
+        data.highThreshold,
+        "HIGH",
+        HIGH_COLOR,
+        isDark ? "rgba(30, 10, 10, 0.9)" : "rgba(254, 226, 226, 0.9)",
+      ),
+    )
 
     // Low threshold label
-    views.push(new CurveAxisView(
-      series,
-      data.lowThreshold,
-      "LOW",
-      LOW_COLOR,
-      isDark ? "rgba(10, 30, 10, 0.9)" : "rgba(220, 252, 231, 0.9)",
-    ))
+    views.push(
+      new CurveAxisView(
+        series,
+        data.lowThreshold,
+        "LOW",
+        LOW_COLOR,
+        isDark ? "rgba(10, 30, 10, 0.9)" : "rgba(220, 252, 231, 0.9)",
+      ),
+    )
 
     this._priceAxisViews = views
   }

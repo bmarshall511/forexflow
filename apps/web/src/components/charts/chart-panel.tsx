@@ -3,7 +3,13 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { ArrowUp, ArrowDown, Eye, EyeOff, Layers } from "lucide-react"
 import type { SeriesMarker, Time } from "lightweight-charts"
-import type { ChartPanelConfig, PositionPriceTick, TradeCloseReason, TradeDirection, ZoneData } from "@fxflow/types"
+import type {
+  ChartPanelConfig,
+  PositionPriceTick,
+  TradeCloseReason,
+  TradeDirection,
+  ZoneData,
+} from "@fxflow/types"
 import { TIMEFRAME_OPTIONS, getDecimalPlaces } from "@fxflow/shared"
 import { cn } from "@/lib/utils"
 import type { TradeUnion } from "@/components/positions/trade-editor-panel"
@@ -76,11 +82,20 @@ function ChartPanelInner({
   const effectiveTimeframe = hasTrade
     ? (tradeChart.trade.timeframe ?? config.timeframe)
     : config.timeframe
-  const { markers: signalMarkers } = useChartSignals(displayInstrument, showSignals, effectiveTimeframe)
+  const { markers: signalMarkers } = useChartSignals(
+    displayInstrument,
+    showSignals,
+    effectiveTimeframe,
+  )
 
   // ─── Zone detection ──────────────────────────────────────────────────
-  const { settings: zoneSettings, globalSettings, saveGlobal, overrides: zoneOverrides, setOverrides: setZoneOverrides } =
-    useZoneSettings(config.zoneOverrides)
+  const {
+    settings: zoneSettings,
+    globalSettings,
+    saveGlobal,
+    overrides: zoneOverrides,
+    setOverrides: setZoneOverrides,
+  } = useZoneSettings(config.zoneOverrides)
 
   // Track chart candle count — zones re-fetch when chart loads more candles
   const [chartCandleCount, setChartCandleCount] = useState(0)
@@ -158,7 +173,16 @@ function ChartPanelInner({
       result.push(createEntryLevel(trade.openedAt, trade.direction, trade.entryPrice, tf, decimals))
     } else if (trade._type === "closed") {
       result.push(createEntryLevel(trade.openedAt, trade.direction, trade.entryPrice, tf, decimals))
-      result.push(createExitLevel(trade.closedAt, trade.direction, trade.closeReason as TradeCloseReason, trade.exitPrice ?? trade.entryPrice, tf, decimals))
+      result.push(
+        createExitLevel(
+          trade.closedAt,
+          trade.direction,
+          trade.closeReason as TradeCloseReason,
+          trade.exitPrice ?? trade.entryPrice,
+          tf,
+          decimals,
+        ),
+      )
     }
     // Pending orders: no candle indicators
     return result
@@ -199,10 +223,7 @@ function ChartPanelInner({
 
   return (
     <div
-      className={cn(
-        "relative flex flex-col overflow-hidden bg-background group",
-        className,
-      )}
+      className={cn("bg-background group relative flex flex-col overflow-hidden", className)}
       onClick={onActivate}
       role="button"
       tabIndex={0}
@@ -215,7 +236,7 @@ function ChartPanelInner({
       {/* Active indicator — top accent bar (direction-colored when trade assigned) */}
       <div
         className={cn(
-          "absolute top-0 inset-x-0 z-10 h-0.5 transition-all duration-200",
+          "absolute inset-x-0 top-0 z-10 h-0.5 transition-all duration-200",
           hasTrade
             ? tradeChart.trade.direction === "long"
               ? "bg-green-500 opacity-100"
@@ -226,7 +247,7 @@ function ChartPanelInner({
         )}
       />
       {/* Chart toolbar — always visible; changing instrument clears any trade overlay */}
-      <div className="flex items-center gap-1 px-1.5 py-1 border-b shrink-0 min-h-[32px]">
+      <div className="flex min-h-[32px] shrink-0 items-center gap-1 border-b px-1.5 py-1">
         <InstrumentSelector
           value={hasTrade ? tradeChart.trade.instrument : config.instrument}
           onChange={(instrument) => {
@@ -237,7 +258,7 @@ function ChartPanelInner({
         {hasTrade && (
           <span
             className={cn(
-              "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase",
+              "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
               tradeChart.trade.direction === "long"
                 ? "bg-green-500/15 text-green-500"
                 : "bg-red-500/15 text-red-500",
@@ -260,10 +281,12 @@ function ChartPanelInner({
             }}
             onClick={(e) => e.stopPropagation()}
             aria-label="Timeframe"
-            className="ml-1 bg-transparent border-0 text-xs font-mono cursor-pointer hover:bg-muted focus:bg-muted rounded px-1 py-0.5 outline-none appearance-none min-w-[3rem] text-center"
+            className="hover:bg-muted focus:bg-muted ml-1 min-w-[3rem] cursor-pointer appearance-none rounded border-0 bg-transparent px-1 py-0.5 text-center font-mono text-xs outline-none"
           >
             {TIMEFRAME_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
         )}
@@ -274,7 +297,7 @@ function ChartPanelInner({
             setShowSignals((v) => !v)
           }}
           className={cn(
-            "ml-1 p-0.5 rounded transition-colors",
+            "ml-1 rounded p-0.5 transition-colors",
             showSignals
               ? "text-primary hover:text-primary/80"
               : "text-muted-foreground hover:text-foreground",
@@ -306,7 +329,7 @@ function ChartPanelInner({
             type="button"
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "ml-0.5 p-0.5 rounded transition-colors",
+              "ml-0.5 rounded p-0.5 transition-colors",
               zoneSettings.enabled || trendSettings.enabled
                 ? "text-emerald-500 hover:text-emerald-400"
                 : "text-muted-foreground hover:text-foreground",
@@ -319,25 +342,25 @@ function ChartPanelInner({
         </ZoneControlsPopover>
         <div className="ml-auto shrink-0">
           {displayBidAsk ? (
-            <div className="flex items-center gap-1 text-[10px] font-mono tabular-nums">
-              <span className="text-[8px] text-muted-foreground/60 uppercase">Bid</span>
-              <span className={cn("text-red-500 text-right", priceMinW)}>
+            <div className="flex items-center gap-1 font-mono text-[10px] tabular-nums">
+              <span className="text-muted-foreground/60 text-[8px] uppercase">Bid</span>
+              <span className={cn("text-right text-red-500", priceMinW)}>
                 {displayBidAsk.bid.toFixed(priceDecimals)}
               </span>
               <span className="text-muted-foreground">/</span>
-              <span className="text-[8px] text-muted-foreground/60 uppercase">Ask</span>
-              <span className={cn("text-green-500 text-right", priceMinW)}>
+              <span className="text-muted-foreground/60 text-[8px] uppercase">Ask</span>
+              <span className={cn("text-right text-green-500", priceMinW)}>
                 {displayBidAsk.ask.toFixed(priceDecimals)}
               </span>
             </div>
           ) : (
-            <span className="text-[10px] text-muted-foreground">--</span>
+            <span className="text-muted-foreground text-[10px]">--</span>
           )}
         </div>
       </div>
 
       {/* Chart area — fills all available space */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="relative min-h-0 flex-1">
         {hasTrade ? (
           tradeChart.trade._type === "closed" ? (
             <TradingViewChart
@@ -446,11 +469,7 @@ function ChartPanelInner({
       )}
 
       {/* Zone detail sheet — opens when a zone is clicked */}
-      <ZoneDetailSheet
-        zone={selectedZone}
-        open={zoneSheetOpen}
-        onOpenChange={setZoneSheetOpen}
-      />
+      <ZoneDetailSheet zone={selectedZone} open={zoneSheetOpen} onOpenChange={setZoneSheetOpen} />
     </div>
   )
 }

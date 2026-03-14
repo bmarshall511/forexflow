@@ -19,7 +19,10 @@ export function useActiveAiAnalyses(): Record<string, ActiveAnalysisProgress> {
   useEffect(() => {
     if (!lastAiAnalysisStarted) return
     const { tradeId } = lastAiAnalysisStarted
-    mapRef.current = { ...mapRef.current, [tradeId]: { progress: 0, stage: "Starting analysis..." } }
+    mapRef.current = {
+      ...mapRef.current,
+      [tradeId]: { progress: 0, stage: "Starting analysis..." },
+    }
     update()
   }, [lastAiAnalysisStarted, update])
 

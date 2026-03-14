@@ -7,11 +7,12 @@ export function registerPrompts(server: McpServer) {
     "Generate a structured analysis prompt for a specific trade",
     { tradeId: z.string().describe("The trade ID to analyze") },
     async ({ tradeId }) => ({
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: `Analyze trade ${tradeId} in the FXFlow trading system.
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Analyze trade ${tradeId} in the FXFlow trading system.
 
 Use the following MCP tools to gather context:
 1. get_trade_details — Get full trade info (entry, SL, TP, events, tags)
@@ -24,17 +25,15 @@ Then provide:
 - Current risk analysis (distance to SL/TP, market conditions)
 - Recommendations (hold, adjust SL/TP, partial close, or full close)
 - Any correlated exposure concerns`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   )
 
-  server.prompt(
-    "daily-summary",
-    "Generate an end-of-day trading summary",
-    {},
-    async () => ({
-      messages: [{
+  server.prompt("daily-summary", "Generate an end-of-day trading summary", {}, async () => ({
+    messages: [
+      {
         role: "user" as const,
         content: {
           type: "text" as const,
@@ -55,20 +54,21 @@ Provide:
 - TradingView signal accuracy today
 - Recommendations for tomorrow`,
         },
-      }],
-    })
-  )
+      },
+    ],
+  }))
 
   server.prompt(
     "debug-signal",
     "Troubleshoot a TradingView alert signal that failed or was rejected",
     { signalId: z.string().describe("The signal ID to debug") },
     async ({ signalId }) => ({
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: `Debug TradingView alert signal ${signalId} in the FXFlow system.
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Debug TradingView alert signal ${signalId} in the FXFlow system.
 
 Use the following MCP tools:
 1. get_signal_audit — Get the full audit trail showing each processing stage
@@ -82,17 +82,15 @@ Analyze:
 - Was it a market condition (closed, existing position)?
 - Was it a technical failure (daemon disconnected, OANDA error)?
 - Recommend how to fix the issue`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   )
 
-  server.prompt(
-    "review-setups",
-    "Review and rank active Trade Finder setups",
-    {},
-    async () => ({
-      messages: [{
+  server.prompt("review-setups", "Review and rank active Trade Finder setups", {}, async () => ({
+    messages: [
+      {
         role: "user" as const,
         content: {
           type: "text" as const,
@@ -110,7 +108,7 @@ For each setup, evaluate:
 - Whether auto-trade should be enabled for it
 - Rank setups by overall attractiveness`,
         },
-      }],
-    })
-  )
+      },
+    ],
+  }))
 }

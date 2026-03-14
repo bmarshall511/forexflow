@@ -1,7 +1,19 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
-import { Copy, RefreshCw, Loader2, Check, X, Eye, EyeOff, ChevronDown, Rocket, Play, AlertTriangle } from "lucide-react"
+import {
+  Copy,
+  RefreshCw,
+  Loader2,
+  Check,
+  X,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  Rocket,
+  Play,
+  AlertTriangle,
+} from "lucide-react"
 import type { TVAlertsConfig, TVAlertSignal } from "@fxflow/types"
 import { TV_ALERTS_DEFAULT_CONFIG } from "@fxflow/types"
 import { FOREX_PAIR_GROUPS, formatInstrument } from "@fxflow/shared"
@@ -15,7 +27,16 @@ import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { cn } from "@/lib/utils"
 
 export function TVAlertsSettings() {
-  const { config, isLoading, update, regenerateToken, reconnectCF, deployCFWorker, sendTestSignal, closeTestTrade } = useTVAlertsConfig()
+  const {
+    config,
+    isLoading,
+    update,
+    regenerateToken,
+    reconnectCF,
+    deployCFWorker,
+    sendTestSignal,
+    closeTestTrade,
+  } = useTVAlertsConfig()
   const { tvAlertsStatus, isConnected } = useDaemonStatus()
   const data = config ?? TV_ALERTS_DEFAULT_CONFIG
 
@@ -30,16 +51,19 @@ export function TVAlertsSettings() {
   const [deployError, setDeployError] = useState<string | null>(null)
   const [deploySuccess, setDeploySuccess] = useState(false)
 
-  const handleSave = useCallback(async (partial: Partial<TVAlertsConfig>) => {
-    setSaving(true)
-    try {
-      await update(partial)
-    } catch (err) {
-      console.error("Failed to save:", err)
-    } finally {
-      setSaving(false)
-    }
-  }, [update])
+  const handleSave = useCallback(
+    async (partial: Partial<TVAlertsConfig>) => {
+      setSaving(true)
+      try {
+        await update(partial)
+      } catch (err) {
+        console.error("Failed to save:", err)
+      } finally {
+        setSaving(false)
+      }
+    },
+    [update],
+  )
 
   const handleRegenerate = useCallback(async () => {
     setRegenerating(true)
@@ -95,7 +119,7 @@ export function TVAlertsSettings() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground size-6 animate-spin" />
       </div>
     )
   }
@@ -112,8 +136,28 @@ export function TVAlertsSettings() {
     }
   }
 
-  const buyTemplate = JSON.stringify({ action: "buy", ticker: "{{ticker}}", price: "{{close}}", time: "{{timenow}}", interval: "{{interval}}" }, null, 2)
-  const sellTemplate = JSON.stringify({ action: "sell", ticker: "{{ticker}}", price: "{{close}}", time: "{{timenow}}", interval: "{{interval}}" }, null, 2)
+  const buyTemplate = JSON.stringify(
+    {
+      action: "buy",
+      ticker: "{{ticker}}",
+      price: "{{close}}",
+      time: "{{timenow}}",
+      interval: "{{interval}}",
+    },
+    null,
+    2,
+  )
+  const sellTemplate = JSON.stringify(
+    {
+      action: "sell",
+      ticker: "{{ticker}}",
+      price: "{{close}}",
+      time: "{{timenow}}",
+      interval: "{{interval}}",
+    },
+    null,
+    2,
+  )
 
   // Key forces uncontrolled inputs to re-mount when config changes
   const formKey = `${data.positionSizePercent}-${data.cooldownSeconds}-${data.maxOpenPositions}-${data.dailyLossLimit}-${data.dedupWindowSeconds}-${data.cfWorkerUrl}-${data.cfWorkerSecret}`
@@ -140,39 +184,42 @@ export function TVAlertsSettings() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>CF Worker Connection</CardTitle>
-              <CardDescription>Connect to your Cloudflare Worker for receiving TradingView webhook signals.</CardDescription>
+              <CardDescription>
+                Connect to your Cloudflare Worker for receiving TradingView webhook signals.
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <span className={cn("size-2 rounded-full", cfDotColor)} />
-              <span className="text-xs text-muted-foreground">{cfConnectionStatus}</span>
+              <span className="text-muted-foreground text-xs">{cfConnectionStatus}</span>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button
-            onClick={handleDeploy}
-            disabled={deploying || connecting}
-            className="w-full"
-          >
+          <Button onClick={handleDeploy} disabled={deploying || connecting} className="w-full">
+            {deploying ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : deploySuccess ? (
+              <Check className="mr-2 size-4" />
+            ) : (
+              <Rocket className="mr-2 size-4" />
+            )}
             {deploying
-              ? <Loader2 className="mr-2 size-4 animate-spin" />
+              ? "Deploying to Cloudflare..."
               : deploySuccess
-                ? <Check className="mr-2 size-4" />
-                : <Rocket className="mr-2 size-4" />}
-            {deploying ? "Deploying to Cloudflare..." : deploySuccess ? "Deployed!" : "Deploy Worker"}
+                ? "Deployed!"
+                : "Deploy Worker"}
           </Button>
 
-          {deployError && (
-            <p className="text-xs text-red-500">{deployError}</p>
-          )}
+          {deployError && <p className="text-xs text-red-500">{deployError}</p>}
           {deploySuccess && (
             <p className="text-xs text-green-500">
               Worker deployed, secrets set, and connection configured automatically.
             </p>
           )}
 
-          <p className="text-xs text-muted-foreground">
-            Requires a free Cloudflare account. If you&apos;re not logged in, a browser window will open automatically.
+          <p className="text-muted-foreground text-xs">
+            Requires a free Cloudflare account. If you&apos;re not logged in, a browser window will
+            open automatically.
           </p>
 
           <ManualConfiguration
@@ -201,13 +248,15 @@ export function TVAlertsSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Module Status</CardTitle>
-          <CardDescription>Enable or disable the TradingView Alerts auto-trading module.</CardDescription>
+          <CardDescription>
+            Enable or disable the TradingView Alerts auto-trading module.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Auto-Trading</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 {data.enabled ? "Module is active and processing signals" : "Module is disabled"}
               </p>
             </div>
@@ -235,14 +284,22 @@ export function TVAlertsSettings() {
             <Label>Webhook URL</Label>
             <div className="flex gap-2">
               <Input readOnly value={webhookUrl} className="font-mono text-xs" />
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(webhookUrl, "url")}>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => copyToClipboard(webhookUrl, "url")}
+              >
                 {copied === "url" ? <Check className="size-4" /> : <Copy className="size-4" />}
               </Button>
             </div>
           </div>
 
           <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={regenerating}>
-            {regenerating ? <Loader2 className="mr-2 size-3 animate-spin" /> : <RefreshCw className="mr-2 size-3" />}
+            {regenerating ? (
+              <Loader2 className="mr-2 size-3 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 size-3" />
+            )}
             Regenerate Token
           </Button>
 
@@ -250,7 +307,9 @@ export function TVAlertsSettings() {
             <div className="space-y-2">
               <Label>Buy Alert Template</Label>
               <div className="relative">
-                <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-32">{buyTemplate}</pre>
+                <pre className="bg-muted max-h-32 overflow-auto rounded-md p-3 text-xs">
+                  {buyTemplate}
+                </pre>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -264,7 +323,9 @@ export function TVAlertsSettings() {
             <div className="space-y-2">
               <Label>Sell Alert Template</Label>
               <div className="relative">
-                <pre className="rounded-md bg-muted p-3 text-xs overflow-auto max-h-32">{sellTemplate}</pre>
+                <pre className="bg-muted max-h-32 overflow-auto rounded-md p-3 text-xs">
+                  {sellTemplate}
+                </pre>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -287,7 +348,9 @@ export function TVAlertsSettings() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <Label htmlFor="positionSize" className="shrink-0">Size (%)</Label>
+            <Label htmlFor="positionSize" className="shrink-0">
+              Size (%)
+            </Label>
             <Input
               id="positionSize"
               type="number"
@@ -303,7 +366,7 @@ export function TVAlertsSettings() {
                 }
               }}
             />
-            <span className="text-xs text-muted-foreground">of account balance</span>
+            <span className="text-muted-foreground text-xs">of account balance</span>
           </div>
         </CardContent>
       </Card>
@@ -361,7 +424,7 @@ export function TVAlertsSettings() {
                   if (!isNaN(val) && val >= 0) void handleSave({ dailyLossLimit: val })
                 }}
               />
-              <p className="text-xs text-muted-foreground">0 = no limit</p>
+              <p className="text-muted-foreground text-xs">0 = no limit</p>
             </div>
 
             <div className="space-y-2">
@@ -386,7 +449,7 @@ export function TVAlertsSettings() {
                 type="checkbox"
                 checked={data.marketHoursFilter}
                 onChange={(e) => void handleSave({ marketHoursFilter: e.target.checked })}
-                className="rounded border-border"
+                className="border-border rounded"
               />
               Market hours filter
             </label>
@@ -396,7 +459,7 @@ export function TVAlertsSettings() {
                 type="checkbox"
                 checked={data.showChartMarkers}
                 onChange={(e) => void handleSave({ showChartMarkers: e.target.checked })}
-                className="rounded border-border"
+                className="border-border rounded"
               />
               Show chart markers
             </label>
@@ -406,7 +469,7 @@ export function TVAlertsSettings() {
                 type="checkbox"
                 checked={data.soundEnabled}
                 onChange={(e) => void handleSave({ soundEnabled: e.target.checked })}
-                className="rounded border-border"
+                className="border-border rounded"
               />
               Sound notifications
             </label>
@@ -445,7 +508,7 @@ function ManualConfiguration({
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+          className="border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors"
         >
           <ChevronDown
             className={cn(
@@ -457,7 +520,7 @@ function ManualConfiguration({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-3 space-y-4 rounded-md border border-border bg-muted/20 p-4">
+        <div className="border-border bg-muted/20 mt-3 space-y-4 rounded-md border p-4">
           <div className="space-y-2">
             <Label htmlFor="cfWorkerUrl">WebSocket URL</Label>
             <Input
@@ -549,7 +612,10 @@ function TestSignalCard({
   cfWorkerConnected: boolean
   moduleEnabled: boolean
   isConnected: boolean
-  sendTestSignal: (action: "buy" | "sell", ticker: string) => Promise<{
+  sendTestSignal: (
+    action: "buy" | "sell",
+    ticker: string,
+  ) => Promise<{
     cfWorkerResponse: { status: string; reason?: string }
     signalResult: TVAlertSignal | null
     timedOut?: boolean
@@ -569,26 +635,33 @@ function TestSignalCard({
   }, [])
 
   /** Start client-side polling to show intermediate signal status while the API call is in-flight. */
-  const startIntermediatePolling = useCallback((stepIndex: number, action: "buy" | "sell", since: Date) => {
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+  const startIntermediatePolling = useCallback(
+    (stepIndex: number, action: "buy" | "sell", since: Date) => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
 
-    pollIntervalRef.current = setInterval(() => {
-      void fetch(`/api/tv-alerts/signals?instrument=${instrument}&pageSize=3&page=1`)
-        .then((r) => r.json())
-        .then((json: { data?: { signals?: TVAlertSignal[] } }) => {
-          const signal = json.data?.signals?.find(
-            (s) => s.direction === action && new Date(s.receivedAt) >= since,
-          )
-          if (!signal) return
-          if (signal.status === "received") {
-            updateStep(stepIndex, { detail: "Signal received by daemon — placing order with OANDA..." })
-          } else if (signal.status === "executing") {
-            updateStep(stepIndex, { detail: "Order submitted — waiting for OANDA fill..." })
-          }
-        })
-        .catch(() => { /* best-effort */ })
-    }, 1500)
-  }, [instrument, updateStep])
+      pollIntervalRef.current = setInterval(() => {
+        void fetch(`/api/tv-alerts/signals?instrument=${instrument}&pageSize=3&page=1`)
+          .then((r) => r.json())
+          .then((json: { data?: { signals?: TVAlertSignal[] } }) => {
+            const signal = json.data?.signals?.find(
+              (s) => s.direction === action && new Date(s.receivedAt) >= since,
+            )
+            if (!signal) return
+            if (signal.status === "received") {
+              updateStep(stepIndex, {
+                detail: "Signal received by daemon — placing order with OANDA...",
+              })
+            } else if (signal.status === "executing") {
+              updateStep(stepIndex, { detail: "Order submitted — waiting for OANDA fill..." })
+            }
+          })
+          .catch(() => {
+            /* best-effort */
+          })
+      }, 1500)
+    },
+    [instrument, updateStep],
+  )
 
   const stopIntermediatePolling = useCallback(() => {
     if (pollIntervalRef.current) {
@@ -598,22 +671,27 @@ function TestSignalCard({
   }, [])
 
   /** Derive a user-friendly error string from the test signal result. */
-  const resolveError = useCallback((
-    result: { cfWorkerResponse: { status: string; reason?: string }; signalResult: TVAlertSignal | null; timedOut?: boolean },
-  ): string => {
-    if (result.timedOut) {
-      return "Signal received by daemon — order is still processing. Check Signal History for the result."
-    }
-    if (result.cfWorkerResponse.status === "queued") {
-      return "Signal queued — daemon isn't connected to CF Worker yet. Check the connection status above."
-    }
-    const raw =
-      result.signalResult?.rejectionReason ??
-      result.signalResult?.status ??
-      result.cfWorkerResponse.reason ??
-      "No response from daemon — check that it is running and connected."
-    return friendlyRejection(raw, instrument)
-  }, [instrument])
+  const resolveError = useCallback(
+    (result: {
+      cfWorkerResponse: { status: string; reason?: string }
+      signalResult: TVAlertSignal | null
+      timedOut?: boolean
+    }): string => {
+      if (result.timedOut) {
+        return "Signal received by daemon — order is still processing. Check Signal History for the result."
+      }
+      if (result.cfWorkerResponse.status === "queued") {
+        return "Signal queued — daemon isn't connected to CF Worker yet. Check the connection status above."
+      }
+      const raw =
+        result.signalResult?.rejectionReason ??
+        result.signalResult?.status ??
+        result.cfWorkerResponse.reason ??
+        "No response from daemon — check that it is running and connected."
+      return friendlyRejection(raw, instrument)
+    },
+    [instrument],
+  )
 
   const handleRunTest = useCallback(async () => {
     setRunning(true)
@@ -644,7 +722,10 @@ function TestSignalCard({
       }
     } catch (err) {
       stopIntermediatePolling()
-      updateStep(0, { status: "failed", error: err instanceof Error ? err.message : "Request failed" })
+      updateStep(0, {
+        status: "failed",
+        error: err instanceof Error ? err.message : "Request failed",
+      })
       failed = true
     }
 
@@ -664,14 +745,16 @@ function TestSignalCard({
       if (result.signalResult?.status === "executed") {
         const details = result.signalResult.executionDetails
         const fill = details?.fillPrice
-        const closedIds = details?.closedTradeIds ?? (details?.closedTradeId ? [details.closedTradeId] : [])
+        const closedIds =
+          details?.closedTradeIds ?? (details?.closedTradeId ? [details.closedTradeId] : [])
         const newId = result.signalResult.resultTradeId
         step2TradeId = newId
-        const closedLabel = closedIds.length > 1
-          ? `Closed ${closedIds.length} positions, o`
-          : closedIds.length === 1
-            ? `Closed #${closedIds[0]}, o`
-            : "O"
+        const closedLabel =
+          closedIds.length > 1
+            ? `Closed ${closedIds.length} positions, o`
+            : closedIds.length === 1
+              ? `Closed #${closedIds[0]}, o`
+              : "O"
         updateStep(1, {
           status: "success",
           detail: `${closedLabel}pened${newId ? ` #${newId}` : ""}${fill ? ` @ ${fill}` : ""}`,
@@ -682,7 +765,10 @@ function TestSignalCard({
       }
     } catch (err) {
       stopIntermediatePolling()
-      updateStep(1, { status: "failed", error: err instanceof Error ? err.message : "Request failed" })
+      updateStep(1, {
+        status: "failed",
+        error: err instanceof Error ? err.message : "Request failed",
+      })
       failed = true
     }
 
@@ -705,13 +791,24 @@ function TestSignalCard({
       await closeTestTrade(step2TradeId)
       updateStep(2, { status: "success", detail: `Trade #${step2TradeId} closed` })
     } catch (err) {
-      updateStep(2, { status: "failed", error: err instanceof Error ? err.message : "Close failed" })
+      updateStep(2, {
+        status: "failed",
+        error: err instanceof Error ? err.message : "Close failed",
+      })
       failed = true
     }
 
     setAllPassed(!failed)
     setRunning(false)
-  }, [instrument, sendTestSignal, closeTestTrade, updateStep, startIntermediatePolling, stopIntermediatePolling, resolveError])
+  }, [
+    instrument,
+    sendTestSignal,
+    closeTestTrade,
+    updateStep,
+    startIntermediatePolling,
+    stopIntermediatePolling,
+    resolveError,
+  ])
 
   return (
     <Card>
@@ -723,31 +820,33 @@ function TestSignalCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-3">
-          <Label htmlFor="testInstrument" className="shrink-0">Instrument</Label>
+          <Label htmlFor="testInstrument" className="shrink-0">
+            Instrument
+          </Label>
           <select
             id="testInstrument"
             value={instrument}
             onChange={(e) => setInstrument(e.target.value)}
             disabled={running}
-            className="h-9 rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="border-border bg-background focus:ring-ring h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2"
           >
             {FOREX_PAIR_GROUPS.map((group) => (
               <optgroup key={group.label} label={group.label}>
                 {group.pairs.map((pair) => (
-                  <option key={pair.value} value={pair.value}>{pair.label}</option>
+                  <option key={pair.value} value={pair.value}>
+                    {pair.label}
+                  </option>
                 ))}
               </optgroup>
             ))}
           </select>
 
-          <Button
-            onClick={handleRunTest}
-            disabled={!canRun}
-            size="sm"
-          >
-            {running
-              ? <Loader2 className="mr-2 size-4 animate-spin" />
-              : <Play className="mr-2 size-4" />}
+          <Button onClick={handleRunTest} disabled={!canRun} size="sm">
+            {running ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 size-4" />
+            )}
             {running ? "Running..." : "Run Test"}
           </Button>
         </div>
@@ -755,13 +854,13 @@ function TestSignalCard({
         <div className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
           <p className="text-xs text-amber-600">
-            This will execute real trades on your connected account.
-            Uses a 3-step sequence: open {formatInstrument(instrument)} BUY, flip to SELL, then close.
+            This will execute real trades on your connected account. Uses a 3-step sequence: open{" "}
+            {formatInstrument(instrument)} BUY, flip to SELL, then close.
           </p>
         </div>
 
         {!canRun && !running && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             {!isConnected
               ? "Daemon not connected."
               : !cfWorkerConnected
@@ -778,26 +877,28 @@ function TestSignalCard({
             {steps.map((step, i) => (
               <div key={i} className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">
-                  {step.status === "pending" && <div className="size-4 rounded-full border-2 border-muted" />}
-                  {step.status === "running" && <Loader2 className="size-4 animate-spin text-blue-500" />}
+                  {step.status === "pending" && (
+                    <div className="border-muted size-4 rounded-full border-2" />
+                  )}
+                  {step.status === "running" && (
+                    <Loader2 className="size-4 animate-spin text-blue-500" />
+                  )}
                   {step.status === "success" && <Check className="size-4 text-green-500" />}
                   {step.status === "failed" && <X className="size-4 text-red-500" />}
                 </div>
                 <div className="min-w-0">
-                  <p className={cn(
-                    "text-sm font-medium",
-                    step.status === "pending" && "text-muted-foreground",
-                    step.status === "success" && "text-green-600",
-                    step.status === "failed" && "text-red-600",
-                  )}>
+                  <p
+                    className={cn(
+                      "text-sm font-medium",
+                      step.status === "pending" && "text-muted-foreground",
+                      step.status === "success" && "text-green-600",
+                      step.status === "failed" && "text-red-600",
+                    )}
+                  >
                     Step {i + 1}: {step.label}
                   </p>
-                  {step.detail && (
-                    <p className="text-xs text-muted-foreground">{step.detail}</p>
-                  )}
-                  {step.error && (
-                    <p className="text-xs text-red-500">{step.error}</p>
-                  )}
+                  {step.detail && <p className="text-muted-foreground text-xs">{step.detail}</p>}
+                  {step.error && <p className="text-xs text-red-500">{step.error}</p>}
                 </div>
               </div>
             ))}
@@ -818,4 +919,3 @@ function TestSignalCard({
     </Card>
   )
 }
-

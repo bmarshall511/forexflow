@@ -9,36 +9,25 @@
         "src/app/api/**/route.ts"
       ],
       "project": ["src/**/*.{ts,tsx}"],
-      "ignore": ["src/components/ui/**"],
-      "ignoreDependencies": ["@tailwindcss/postcss", "tailwindcss", "sharp"]
+      "ignore": ["src/components/ui/**"]
     },
     "apps/daemons": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     },
     "apps/cf-worker": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@cloudflare/workers-types"]
+      "project": ["src/**/*.ts"]
     },
     "apps/mcp-server": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/types": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/shared": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/db": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["prisma"]
+      "project": ["src/**/*.ts"]
     }
-  },
-  "ignore": ["**/*.test.ts", "**/*.d.ts"],
-  "ignoreDependencies": ["prettier-plugin-tailwindcss"]
+  }
 }

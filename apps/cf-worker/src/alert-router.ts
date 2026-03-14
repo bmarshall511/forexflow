@@ -56,7 +56,7 @@ export class AlertRouter implements DurableObject {
   private async handleWebhook(request: Request): Promise<Response> {
     let body: Record<string, unknown>
     try {
-      body = await request.json() as Record<string, unknown>
+      body = (await request.json()) as Record<string, unknown>
     } catch {
       return jsonResponse({ status: "rejected", reason: "invalid_json" }, 200)
     }
@@ -95,9 +95,12 @@ export class AlertRouter implements DurableObject {
     // Build the typed webhook payload
     // P0.5: Handle price as string (TradingView sends {{close}} as a string)
     const rawPrice = body.price
-    const parsedPrice = typeof rawPrice === "number" ? rawPrice
-      : typeof rawPrice === "string" ? parseFloat(rawPrice) || undefined
-      : undefined
+    const parsedPrice =
+      typeof rawPrice === "number"
+        ? rawPrice
+        : typeof rawPrice === "string"
+          ? parseFloat(rawPrice) || undefined
+          : undefined
 
     const payload: TVWebhookPayload = {
       action: action as "buy" | "sell",
@@ -164,7 +167,11 @@ export class AlertRouter implements DurableObject {
           authenticated = true
           // Now that auth succeeded, close any existing connection and promote
           if (this.daemonWs && this.daemonWs !== server) {
-            try { this.daemonWs.close(1000, "Replaced by new connection") } catch { /* ignore */ }
+            try {
+              this.daemonWs.close(1000, "Replaced by new connection")
+            } catch {
+              /* ignore */
+            }
           }
           this.daemonWs = server
           server.send(JSON.stringify({ type: "authenticated" }))

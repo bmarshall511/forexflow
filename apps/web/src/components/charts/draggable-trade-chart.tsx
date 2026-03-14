@@ -3,10 +3,24 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react"
 import { useTheme } from "next-themes"
 import { createChart, CandlestickSeries, LineStyle, createSeriesMarkers } from "lightweight-charts"
-import type { IChartApi, ISeriesApi, IPriceLine, ISeriesMarkersPluginApi, CandlestickData, Time, SeriesMarker } from "lightweight-charts"
+import type {
+  IChartApi,
+  ISeriesApi,
+  IPriceLine,
+  ISeriesMarkersPluginApi,
+  CandlestickData,
+  Time,
+  SeriesMarker,
+} from "lightweight-charts"
 import { cn } from "@/lib/utils"
 import { getDecimalPlaces, TIMEFRAME_OPTIONS } from "@fxflow/shared"
-import type { PositionPriceTick, ZoneData, CurveData, TrendData, TrendVisualSettings } from "@fxflow/types"
+import type {
+  PositionPriceTick,
+  ZoneData,
+  CurveData,
+  TrendData,
+  TrendVisualSettings,
+} from "@fxflow/types"
 import { usePriceLineDrag } from "@/hooks/use-price-line-drag"
 import type { LineType } from "@/hooks/use-price-line-drag"
 import { useDynamicCandles } from "@/hooks/use-dynamic-candles"
@@ -110,8 +124,12 @@ function DraggableTradeChartInner({
   const minMove = decimals === 3 ? 0.001 : 0.00001
 
   // Determine if SL/TP are unsaved (draft differs from saved)
-  const isSLDraft = draftSL !== null && (savedSL === null || draftSL.toFixed(decimals) !== savedSL.toFixed(decimals))
-  const isTPDraft = draftTP !== null && (savedTP === null || draftTP.toFixed(decimals) !== savedTP.toFixed(decimals))
+  const isSLDraft =
+    draftSL !== null &&
+    (savedSL === null || draftSL.toFixed(decimals) !== savedSL.toFixed(decimals))
+  const isTPDraft =
+    draftTP !== null &&
+    (savedTP === null || draftTP.toFixed(decimals) !== savedTP.toFixed(decimals))
 
   // Dynamic candle loading on scroll/zoom
   const { setInitialData, setup: setupDynamic } = useDynamicCandles(instrument, granularity)
@@ -149,7 +167,10 @@ function DraggableTradeChartInner({
 
     chartRef.current = chart
 
-    const series = chart.addSeries(CandlestickSeries, getCandlestickOptions(isDark, decimals, minMove))
+    const series = chart.addSeries(
+      CandlestickSeries,
+      getCandlestickOptions(isDark, decimals, minMove),
+    )
     seriesRef.current = series
 
     // SL line
@@ -249,7 +270,17 @@ function DraggableTradeChartInner({
       trendPrimRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instrument, height, entryPrice, granularity, decimals, minMove, loadCandles, setInitialData, setupDynamic])
+  }, [
+    instrument,
+    height,
+    entryPrice,
+    granularity,
+    decimals,
+    minMove,
+    loadCandles,
+    setInitialData,
+    setupDynamic,
+  ])
 
   // Update theme without recreating the chart (preserves all price line refs)
   useEffect(() => {
@@ -403,9 +434,13 @@ function DraggableTradeChartInner({
   })
 
   return (
-    <div className={cn("w-full rounded-md overflow-hidden relative flex flex-col", className)}>
+    <div className={cn("relative flex w-full flex-col overflow-hidden rounded-md", className)}>
       {/* Timeframe selector pills */}
-      <div className="flex items-center gap-1 px-1 pb-1.5 shrink-0" role="radiogroup" aria-label="Chart timeframe">
+      <div
+        className="flex shrink-0 items-center gap-1 px-1 pb-1.5"
+        role="radiogroup"
+        aria-label="Chart timeframe"
+      >
         {TIMEFRAME_OPTIONS.map(({ value, label }) => (
           <button
             key={value}
@@ -414,7 +449,7 @@ function DraggableTradeChartInner({
             aria-checked={granularity === value}
             onClick={() => setGranularity(value)}
             className={cn(
-              "px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors",
+              "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
               granularity === value
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -426,12 +461,15 @@ function DraggableTradeChartInner({
       </div>
       <div
         ref={containerRef}
-        className="flex-1 min-h-0"
-        style={{ height: height !== undefined ? height : undefined, touchAction: isDragging ? "none" : undefined }}
+        className="min-h-0 flex-1"
+        style={{
+          height: height !== undefined ? height : undefined,
+          touchAction: isDragging ? "none" : undefined,
+        }}
       />
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-md">
-          <p className="text-xs text-muted-foreground">{error}</p>
+        <div className="bg-muted/50 absolute inset-0 flex items-center justify-center rounded-md">
+          <p className="text-muted-foreground text-xs">{error}</p>
         </div>
       )}
     </div>

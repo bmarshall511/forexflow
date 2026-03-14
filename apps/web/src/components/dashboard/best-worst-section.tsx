@@ -14,15 +14,10 @@ interface BestWorstSectionProps {
   onSelectTrade: (trade: OpenTradeData) => void
 }
 
-export function BestWorstSection({
-  best,
-  worst,
-  currency,
-  onSelectTrade,
-}: BestWorstSectionProps) {
+export function BestWorstSection({ best, worst, currency, onSelectTrade }: BestWorstSectionProps) {
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider">
         Performers
       </h3>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -72,21 +67,22 @@ function PerformerCard({
 }) {
   if (!trade) {
     return (
-      <div className="rounded-lg bg-muted/50 px-3 py-3">
-        <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="bg-muted/50 rounded-lg px-3 py-3">
+        <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider">
           <Icon className="size-3" />
           {label}
         </div>
-        <span className="mt-1.5 block text-sm text-muted-foreground">—</span>
+        <span className="text-muted-foreground mt-1.5 block text-sm">—</span>
       </div>
     )
   }
 
   const pair = trade.instrument.replace("_", "/")
   const decimals = getDecimalPlaces(trade.instrument)
-  const accentBorder = variant === "positive"
-    ? "border-l-2 border-l-status-connected"
-    : "border-l-2 border-l-status-disconnected"
+  const accentBorder =
+    variant === "positive"
+      ? "border-l-2 border-l-status-connected"
+      : "border-l-2 border-l-status-disconnected"
 
   const isProfit = trade.unrealizedPL >= 0
   const pipDistance = trade.currentPrice
@@ -102,12 +98,12 @@ function PerformerCard({
         "rounded-lg px-3 py-3 text-left transition-colors",
         bgClassName,
         accentBorder,
-        "hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "focus-visible:ring-ring hover:opacity-80 focus-visible:outline-none focus-visible:ring-2",
       )}
     >
       {/* Header: label + pair + direction */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider">
           <Icon className="size-3" />
           {label}
         </div>
@@ -118,17 +114,22 @@ function PerformerCard({
       {/* P&L amount */}
       <AnimatedNumber
         value={formatCurrency(trade.unrealizedPL, currency)}
-        className={cn("mt-1.5 block text-sm font-semibold font-mono tabular-nums", colorClassName)}
+        className={cn("mt-1.5 block font-mono text-sm font-semibold tabular-nums", colorClassName)}
       />
 
       {/* Price context with labels */}
-      <div className="mt-2 space-y-0.5 text-[10px] text-muted-foreground tabular-nums">
+      <div className="text-muted-foreground mt-2 space-y-0.5 text-[10px] tabular-nums">
         <div>Entry: {trade.entryPrice.toFixed(decimals)}</div>
         {trade.currentPrice && (
           <div>
             <span>Now: {trade.currentPrice.toFixed(decimals)}</span>
             {pipDistance !== null && (
-              <span className={cn("ml-1.5 font-medium", isProfit ? "text-status-connected" : "text-status-disconnected")}>
+              <span
+                className={cn(
+                  "ml-1.5 font-medium",
+                  isProfit ? "text-status-connected" : "text-status-disconnected",
+                )}
+              >
                 ({isProfit ? "up" : "down"} {formatPips(pipDistance)} pips)
               </span>
             )}

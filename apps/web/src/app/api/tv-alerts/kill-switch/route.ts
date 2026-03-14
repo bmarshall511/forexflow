@@ -4,11 +4,16 @@ import type { ApiResponse } from "@fxflow/types"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
-export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<{ enabled: boolean }>>> {
+export async function POST(
+  request: NextRequest,
+): Promise<NextResponse<ApiResponse<{ enabled: boolean }>>> {
   try {
-    const { enabled } = await request.json() as { enabled: boolean }
+    const { enabled } = (await request.json()) as { enabled: boolean }
     if (typeof enabled !== "boolean") {
-      return NextResponse.json({ ok: false, error: "enabled (boolean) is required" }, { status: 400 })
+      return NextResponse.json(
+        { ok: false, error: "enabled (boolean) is required" },
+        { status: 400 },
+      )
     }
 
     // Update DB

@@ -1,11 +1,22 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import type { PendingOrderData, PositionPriceTick, TradeDirection, TradeTagData, AiAnalysisData } from "@fxflow/types"
+import type {
+  PendingOrderData,
+  PositionPriceTick,
+  TradeDirection,
+  TradeTagData,
+  AiAnalysisData,
+} from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
 import { formatRelativeTime, formatCurrency } from "@fxflow/shared"
 import {
-  Table, TableHeader, TableHead, TableBody, TableRow, TableCell,
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
 } from "@/components/ui/table"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { AnimatedNumber } from "@/components/ui/animated-number"
@@ -62,16 +73,18 @@ function getGainLoss(order: PendingOrderData): { gain: number | null; loss: numb
   let loss: number | null = null
 
   if (order.takeProfit !== null) {
-    const dist = order.direction === "long"
-      ? order.takeProfit - order.entryPrice
-      : order.entryPrice - order.takeProfit
+    const dist =
+      order.direction === "long"
+        ? order.takeProfit - order.entryPrice
+        : order.entryPrice - order.takeProfit
     gain = dist * units
   }
 
   if (order.stopLoss !== null) {
-    const dist = order.direction === "long"
-      ? order.entryPrice - order.stopLoss
-      : order.stopLoss - order.entryPrice
+    const dist =
+      order.direction === "long"
+        ? order.entryPrice - order.stopLoss
+        : order.stopLoss - order.entryPrice
     loss = -(dist * units)
   }
 
@@ -96,7 +109,12 @@ export function PendingOrdersTable({
   const [drawerOrder, setDrawerOrder] = useState<PendingOrderData | null>(null)
   const [cancelOrder, setCancelOrder] = useState<PendingOrderData | null>(null)
   const [aiAnalysisOrder, setAiAnalysisOrder] = useState<PendingOrderData | null>(null)
-  const { cancelOrder: doCancelOrder, cancelAllOrders, refreshPositions, isLoading: actionLoading } = useTradeActions()
+  const {
+    cancelOrder: doCancelOrder,
+    cancelAllOrders,
+    refreshPositions,
+    isLoading: actionLoading,
+  } = useTradeActions()
   const [isCancellingAll, setIsCancellingAll] = useState(false)
 
   useEffect(() => {
@@ -122,14 +140,34 @@ export function PendingOrdersTable({
       let va: unknown, vb: unknown
 
       switch (key) {
-        case "instrument": va = a.instrument; vb = b.instrument; break
-        case "direction": va = a.direction; vb = b.direction; break
-        case "source": va = a.source; vb = b.source; break
-        case "timeframe": va = a.timeframe; vb = b.timeframe; break
-        case "orderType": va = a.orderType; vb = b.orderType; break
-        case "entryPrice": va = a.entryPrice; vb = b.entryPrice; break
+        case "instrument":
+          va = a.instrument
+          vb = b.instrument
+          break
+        case "direction":
+          va = a.direction
+          vb = b.direction
+          break
+        case "source":
+          va = a.source
+          vb = b.source
+          break
+        case "timeframe":
+          va = a.timeframe
+          vb = b.timeframe
+          break
+        case "orderType":
+          va = a.orderType
+          vb = b.orderType
+          break
+        case "entryPrice":
+          va = a.entryPrice
+          vb = b.entryPrice
+          break
         case "currentPrice": {
-          va = getCurrentPrice(a); vb = getCurrentPrice(b); break
+          va = getCurrentPrice(a)
+          vb = getCurrentPrice(b)
+          break
         }
         case "distance": {
           const pa = getCurrentPrice(a)
@@ -138,10 +176,22 @@ export function PendingOrdersTable({
           vb = pb !== null ? Math.abs(pb - b.entryPrice) : null
           break
         }
-        case "stopLoss": va = a.stopLoss; vb = b.stopLoss; break
-        case "takeProfit": va = a.takeProfit; vb = b.takeProfit; break
-        case "units": va = a.units; vb = b.units; break
-        case "createdAt": va = a.createdAt; vb = b.createdAt; break
+        case "stopLoss":
+          va = a.stopLoss
+          vb = b.stopLoss
+          break
+        case "takeProfit":
+          va = a.takeProfit
+          vb = b.takeProfit
+          break
+        case "units":
+          va = a.units
+          vb = b.units
+          break
+        case "createdAt":
+          va = a.createdAt
+          vb = b.createdAt
+          break
         case "tags": {
           va = (tagsByTradeId[a.id] ?? a.tags).length
           vb = (tagsByTradeId[b.id] ?? b.tags).length
@@ -150,14 +200,20 @@ export function PendingOrdersTable({
         case "potGain": {
           const ga = getGainLoss(a)
           const gb = getGainLoss(b)
-          va = ga.gain; vb = gb.gain; break
+          va = ga.gain
+          vb = gb.gain
+          break
         }
         case "potLoss": {
           const la = getGainLoss(a)
           const lb = getGainLoss(b)
-          va = la.loss; vb = lb.loss; break
+          va = la.loss
+          vb = lb.loss
+          break
         }
-        default: va = a.instrument; vb = b.instrument
+        default:
+          va = a.instrument
+          vb = b.instrument
       }
       return compareValues(va, vb, sort.direction)
     })
@@ -180,11 +236,7 @@ export function PendingOrdersTable({
   }
 
   if (filtered.length === 0) {
-    return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
-        No pending orders
-      </div>
-    )
+    return <div className="text-muted-foreground py-12 text-center text-sm">No pending orders</div>
   }
 
   if (isMobile) {
@@ -211,7 +263,7 @@ export function PendingOrdersTable({
           onOpenChange={(open) => !open && setDrawerOrder(null)}
           currency={currency}
           currentPrice={drawerOrder ? getCurrentPrice(drawerOrder) : null}
-          lastTick={drawerOrder ? pricesByInstrument.get(drawerOrder.instrument) ?? null : null}
+          lastTick={drawerOrder ? (pricesByInstrument.get(drawerOrder.instrument) ?? null) : null}
           onCancelOrder={() => {
             if (drawerOrder) {
               setDrawerOrder(null)
@@ -240,7 +292,7 @@ export function PendingOrdersTable({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive gap-1.5"
                 disabled={isCancellingAll || actionLoading}
               >
                 <Trash2 className="size-3.5" />
@@ -251,7 +303,8 @@ export function PendingOrdersTable({
               <AlertDialogHeader>
                 <AlertDialogTitle>Cancel all {filtered.length} pending orders?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will cancel every pending order currently shown. This action cannot be undone.
+                  This will cancel every pending order currently shown. This action cannot be
+                  undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -270,22 +323,116 @@ export function PendingOrdersTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <SortableHead label="Pair" sortKey="instrument" currentSort={sort} onSort={handleSort} />
-            <SortableHead label="Dir" sortKey="direction" currentSort={sort} onSort={handleSort} title="Direction (Long or Short)" />
+            <SortableHead
+              label="Pair"
+              sortKey="instrument"
+              currentSort={sort}
+              onSort={handleSort}
+            />
+            <SortableHead
+              label="Dir"
+              sortKey="direction"
+              currentSort={sort}
+              onSort={handleSort}
+              title="Direction (Long or Short)"
+            />
             <SortableHead label="Source" sortKey="source" currentSort={sort} onSort={handleSort} />
-            <SortableHead label="TF" sortKey="timeframe" currentSort={sort} onSort={handleSort} title="Timeframe" />
-            <SortableHead label="Type" sortKey="orderType" currentSort={sort} onSort={handleSort} title="Order Type" />
-            <SortableHead label="Entry" sortKey="entryPrice" currentSort={sort} onSort={handleSort} className="text-right" title="Entry Price" />
-            <SortableHead label="Current" sortKey="currentPrice" currentSort={sort} onSort={handleSort} className="text-right" title="Current Price" />
-            <SortableHead label="Distance" sortKey="distance" currentSort={sort} onSort={handleSort} title="Distance from current price to entry" />
-            <SortableHead label="SL" sortKey="stopLoss" currentSort={sort} onSort={handleSort} className="text-right" title="Stop Loss" />
-            <SortableHead label="TP" sortKey="takeProfit" currentSort={sort} onSort={handleSort} className="text-right" title="Take Profit" />
-            <SortableHead label="Units" sortKey="units" currentSort={sort} onSort={handleSort} className="text-right" />
-            <SortableHead label="R:R" sortKey="rr" currentSort={sort} onSort={handleSort} className="text-right" title="Risk / Reward Ratio" />
-            <SortableHead label="Pot. Gain" sortKey="potGain" currentSort={sort} onSort={handleSort} className="text-right" title="Potential Gain if Take Profit is hit" />
-            <SortableHead label="Pot. Loss" sortKey="potLoss" currentSort={sort} onSort={handleSort} className="text-right" title="Potential Loss if Stop Loss is hit" />
-            <SortableHead label="Placed" sortKey="createdAt" currentSort={sort} onSort={handleSort} />
-            <SortableHead label="Expires" sortKey="expires" currentSort={sort} onSort={handleSort} />
+            <SortableHead
+              label="TF"
+              sortKey="timeframe"
+              currentSort={sort}
+              onSort={handleSort}
+              title="Timeframe"
+            />
+            <SortableHead
+              label="Type"
+              sortKey="orderType"
+              currentSort={sort}
+              onSort={handleSort}
+              title="Order Type"
+            />
+            <SortableHead
+              label="Entry"
+              sortKey="entryPrice"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Entry Price"
+            />
+            <SortableHead
+              label="Current"
+              sortKey="currentPrice"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Current Price"
+            />
+            <SortableHead
+              label="Distance"
+              sortKey="distance"
+              currentSort={sort}
+              onSort={handleSort}
+              title="Distance from current price to entry"
+            />
+            <SortableHead
+              label="SL"
+              sortKey="stopLoss"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Stop Loss"
+            />
+            <SortableHead
+              label="TP"
+              sortKey="takeProfit"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Take Profit"
+            />
+            <SortableHead
+              label="Units"
+              sortKey="units"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+            />
+            <SortableHead
+              label="R:R"
+              sortKey="rr"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Risk / Reward Ratio"
+            />
+            <SortableHead
+              label="Pot. Gain"
+              sortKey="potGain"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Potential Gain if Take Profit is hit"
+            />
+            <SortableHead
+              label="Pot. Loss"
+              sortKey="potLoss"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Potential Loss if Stop Loss is hit"
+            />
+            <SortableHead
+              label="Placed"
+              sortKey="createdAt"
+              currentSort={sort}
+              onSort={handleSort}
+            />
+            <SortableHead
+              label="Expires"
+              sortKey="expires"
+              currentSort={sort}
+              onSort={handleSort}
+            />
             <SortableHead label="Tags" sortKey="tags" currentSort={sort} onSort={handleSort} />
             <TableHead className="w-10">AI</TableHead>
             <TableHead className="w-10" />
@@ -300,14 +447,23 @@ export function PendingOrdersTable({
               <TableRow
                 key={order.id}
                 className="cursor-pointer select-none"
-                onMouseDown={(e) => { if (e.button === 0) setDrawerOrder(order) }}
+                onMouseDown={(e) => {
+                  if (e.button === 0) setDrawerOrder(order)
+                }}
               >
                 <TableCell className="text-xs font-medium">
                   {order.instrument.replace("_", "/")}
                 </TableCell>
-                <TableCell><DirectionBadge direction={order.direction} /></TableCell>
-                <TableCell><SourceBadge source={order.source} /></TableCell>
-                <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                <TableCell>
+                  <DirectionBadge direction={order.direction} />
+                </TableCell>
+                <TableCell>
+                  <SourceBadge source={order.source} />
+                </TableCell>
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <TimeframeSelect
                     value={order.timeframe}
                     onChange={async (tf) => {
@@ -320,9 +476,11 @@ export function PendingOrdersTable({
                     }}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">{order.orderType}</TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">{order.entryPrice}</TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-muted-foreground text-xs">{order.orderType}</TableCell>
+                <TableCell className="text-right font-mono text-xs tabular-nums">
+                  {order.entryPrice}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   {currentPrice !== null ? (
                     <AnimatedNumber value={currentPrice.toString()} />
                   ) : (
@@ -336,13 +494,15 @@ export function PendingOrdersTable({
                     currentPrice={currentPrice}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums text-muted-foreground">
+                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                   {order.stopLoss ?? "—"}
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums text-muted-foreground">
+                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                   {order.takeProfit ?? "—"}
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">{order.units}</TableCell>
+                <TableCell className="text-right font-mono text-xs tabular-nums">
+                  {order.units}
+                </TableCell>
                 <TableCell className="text-right">
                   <RiskRewardDisplay
                     direction={order.direction}
@@ -353,17 +513,23 @@ export function PendingOrdersTable({
                     compact
                   />
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   {gain !== null ? (
                     <span className="text-status-connected">+{formatCurrency(gain, currency)}</span>
-                  ) : "—"}
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   {loss !== null ? (
-                    <span className="text-status-disconnected">{formatCurrency(loss, currency)}</span>
-                  ) : "—"}
+                    <span className="text-status-disconnected">
+                      {formatCurrency(loss, currency)}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="text-muted-foreground text-xs">
                   {formatRelativeTime(order.createdAt)}
                 </TableCell>
                 <TableCell className="text-xs">
@@ -383,7 +549,10 @@ export function PendingOrdersTable({
                 <TableCell>
                   <TagBadges tags={tagsByTradeId[order.id] ?? order.tags} />
                 </TableCell>
-                <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <AiAnalysisCell
                     latestAnalysis={latestAnalysisByTradeId?.[order.id]}
                     analysisCount={countByTradeId?.[order.id]}
@@ -391,7 +560,10 @@ export function PendingOrdersTable({
                     onClick={() => setAiAnalysisOrder(order)}
                   />
                 </TableCell>
-                <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="size-7 p-0">
@@ -408,10 +580,7 @@ export function PendingOrdersTable({
                         <Sparkles className="size-4" />
                         AI Analysis
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => setCancelOrder(order)}
-                      >
+                      <DropdownMenuItem variant="destructive" onClick={() => setCancelOrder(order)}>
                         <XCircle className="size-4" />
                         Cancel Order
                       </DropdownMenuItem>
@@ -430,7 +599,7 @@ export function PendingOrdersTable({
         onOpenChange={(open) => !open && setDrawerOrder(null)}
         currency={currency}
         currentPrice={drawerOrder ? getCurrentPrice(drawerOrder) : null}
-        lastTick={drawerOrder ? pricesByInstrument.get(drawerOrder.instrument) ?? null : null}
+        lastTick={drawerOrder ? (pricesByInstrument.get(drawerOrder.instrument) ?? null) : null}
         onTagMutated={onTagMutated}
         onCancelOrder={() => {
           if (drawerOrder) {

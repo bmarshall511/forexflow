@@ -5,7 +5,7 @@ const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:
 
 export async function POST(request: Request): Promise<NextResponse<ApiResponse<null>>> {
   try {
-    const body = await request.json() as { sourceTradeId?: string }
+    const body = (await request.json()) as { sourceTradeId?: string }
     const { sourceTradeId } = body
 
     if (!sourceTradeId) {
@@ -18,9 +18,12 @@ export async function POST(request: Request): Promise<NextResponse<ApiResponse<n
       body: JSON.stringify({ sourceTradeId }),
     })
 
-    const result = await res.json() as { ok: boolean; error?: string }
+    const result = (await res.json()) as { ok: boolean; error?: string }
     if (!result.ok) {
-      return NextResponse.json({ ok: false, error: result.error ?? "Failed to close trade" }, { status: 500 })
+      return NextResponse.json(
+        { ok: false, error: result.error ?? "Failed to close trade" },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ ok: true, data: null })

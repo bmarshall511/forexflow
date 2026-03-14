@@ -17,9 +17,7 @@ const LAYOUT_PANEL_COUNTS: Record<ChartGridLayout, number> = {
   "6-grid": 6,
 }
 
-const DEFAULT_INSTRUMENTS = [
-  "EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD", "NZD_USD",
-]
+const DEFAULT_INSTRUMENTS = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD", "NZD_USD"]
 
 function defaultPanel(index: number): ChartPanelConfig {
   return {
@@ -95,19 +93,22 @@ export function useChartLayout(): UseChartLayoutReturn {
   const extraInstrumentsRef = useRef<string[]>([])
 
   // Update chart subscriptions at daemon
-  const updateSubscriptions = useCallback((panels: ChartPanelConfig[], extra: string[] = extraInstrumentsRef.current) => {
-    if (subscriptionTimerRef.current) clearTimeout(subscriptionTimerRef.current)
-    subscriptionTimerRef.current = setTimeout(() => {
-      const instruments = [...new Set([...panels.map((p) => p.instrument), ...extra])]
-      if (DAEMON_REST_URL) {
-        fetch(`${DAEMON_REST_URL}/chart-subscriptions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ instruments }),
-        }).catch(() => {})
-      }
-    }, 300)
-  }, [])
+  const updateSubscriptions = useCallback(
+    (panels: ChartPanelConfig[], extra: string[] = extraInstrumentsRef.current) => {
+      if (subscriptionTimerRef.current) clearTimeout(subscriptionTimerRef.current)
+      subscriptionTimerRef.current = setTimeout(() => {
+        const instruments = [...new Set([...panels.map((p) => p.instrument), ...extra])]
+        if (DAEMON_REST_URL) {
+          fetch(`${DAEMON_REST_URL}/chart-subscriptions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ instruments }),
+          }).catch(() => {})
+        }
+      }, 300)
+    },
+    [],
+  )
 
   // Subscribe on initial load
   useEffect(() => {

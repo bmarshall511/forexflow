@@ -7,7 +7,17 @@ import { formatInstrument, getPipSize, formatRelativeTime } from "@fxflow/shared
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, LineChart, Target, ShieldAlert, DollarSign, Zap, AlertCircle, CheckCircle2, Clock } from "lucide-react"
+import {
+  ChevronDown,
+  LineChart,
+  Target,
+  ShieldAlert,
+  DollarSign,
+  Zap,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+} from "lucide-react"
 import { PriceCard, StatRow } from "@/components/ui/price-card"
 import { SetupScoreBreakdown } from "./setup-score-breakdown"
 import { PlaceOrderDialog } from "./place-order-dialog"
@@ -29,7 +39,10 @@ interface SetupCardProps {
 
 const STATUS_STYLES: Record<string, { className: string; label: string }> = {
   active: { className: "bg-blue-500/10 text-blue-500 border-blue-500/20", label: "Watching" },
-  approaching: { className: "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse", label: "Approaching" },
+  approaching: {
+    className: "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse",
+    label: "Approaching",
+  },
   placed: { className: "bg-teal-500/10 text-teal-500 border-teal-500/20", label: "Pending" },
   filled: { className: "bg-green-500/10 text-green-500 border-green-500/20", label: "Filled" },
   invalidated: { className: "bg-red-500/10 text-red-500 border-red-500/20", label: "Invalidated" },
@@ -54,7 +67,10 @@ function computeDollarAmount(positionSize: number, pips: number, instrument: str
 }
 
 /** Compute the first auto-trade gate that blocks this setup, or null if eligible */
-function getAutoTradeBlockReason(setup: TradeFinderSetupData, config: AutoTradeConfig): string | null {
+function getAutoTradeBlockReason(
+  setup: TradeFinderSetupData,
+  config: AutoTradeConfig,
+): string | null {
   if (!config.autoTradeEnabled) return null
   if (setup.status === "placed" || setup.status === "filled") return null
   if (setup.autoPlaced) return null
@@ -74,18 +90,17 @@ function getAutoTradeBlockReason(setup: TradeFinderSetupData, config: AutoTradeC
 export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
   const [open, setOpen] = useState(false)
   const [showChart, setShowChart] = useState(false)
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; orderType: "MARKET" | "LIMIT" }>({ open: false, orderType: "LIMIT" })
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    orderType: "MARKET" | "LIMIT"
+  }>({ open: false, orderType: "LIMIT" })
   const [isPlacing, setIsPlacing] = useState(false)
   const isLong = setup.direction === "long"
   const scorePct = Math.round((setup.scores.total / setup.scores.maxPossible) * 100)
   const scoreColor =
-    scorePct >= 75 ? "text-green-500" :
-    scorePct >= 58 ? "text-amber-500" :
-    "text-orange-500"
+    scorePct >= 75 ? "text-green-500" : scorePct >= 58 ? "text-amber-500" : "text-orange-500"
   const scoreBg =
-    scorePct >= 75 ? "bg-green-500/10" :
-    scorePct >= 58 ? "bg-amber-500/10" :
-    "bg-orange-500/10"
+    scorePct >= 75 ? "bg-green-500/10" : scorePct >= 58 ? "bg-amber-500/10" : "bg-orange-500/10"
 
   const { pricesByInstrument } = usePositions()
   const lastTick = pricesByInstrument.get(setup.instrument) ?? null
@@ -107,7 +122,9 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
   const statusInfo = STATUS_STYLES[setup.status] ?? { className: "", label: setup.status }
 
   // Auto-trade eligibility (client-side check for visibility — server has full gates including positions, caps)
-  const autoTradeBlockReason = autoTradeConfig ? getAutoTradeBlockReason(setup, autoTradeConfig) : null
+  const autoTradeBlockReason = autoTradeConfig
+    ? getAutoTradeBlockReason(setup, autoTradeConfig)
+    : null
 
   const handlePlaceClick = (orderType: "MARKET" | "LIMIT") => {
     setConfirmDialog({ open: true, orderType })
@@ -127,23 +144,31 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
   return (
     <>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <div className={cn(
-          "rounded-xl border border-border/60 bg-card overflow-hidden border-l-[3px]",
-          setup.autoPlaced && setup.status === "placed" ? "border-l-teal-500" :
-          setup.autoPlaced && setup.status === "filled" ? "border-l-green-500" :
-          isLong ? "border-l-green-500" : "border-l-red-500",
-        )}>
+        <div
+          className={cn(
+            "border-border/60 bg-card overflow-hidden rounded-xl border border-l-[3px]",
+            setup.autoPlaced && setup.status === "placed"
+              ? "border-l-teal-500"
+              : setup.autoPlaced && setup.status === "filled"
+                ? "border-l-green-500"
+                : isLong
+                  ? "border-l-green-500"
+                  : "border-l-red-500",
+          )}
+        >
           {/* ─── Collapsed Header ─── */}
           <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors">
+            <button className="hover:bg-muted/30 flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors">
               {/* Main info */}
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-base font-bold tracking-tight">{formatInstrument(setup.instrument)}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-base font-bold tracking-tight">
+                    {formatInstrument(setup.instrument)}
+                  </span>
                   <Badge
                     variant="outline"
                     className={cn(
-                      "text-[10px] px-1.5 py-0 font-semibold border-0",
+                      "border-0 px-1.5 py-0 text-[10px] font-semibold",
                       isLong ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500",
                     )}
                   >
@@ -151,88 +176,128 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                   </Badge>
                   {/* Status + auto-trade lifecycle badges */}
                   {setup.autoPlaced && setup.status === "placed" ? (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-teal-500/10 text-teal-500 border-teal-500/20 gap-0.5">
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-teal-500/20 bg-teal-500/10 px-1.5 py-0 text-[10px] text-teal-500"
+                    >
                       <Clock className="size-2.5" />
                       Order Pending
                     </Badge>
                   ) : setup.autoPlaced && setup.status === "filled" ? (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20 gap-0.5">
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-green-500/20 bg-green-500/10 px-1.5 py-0 text-[10px] text-green-500"
+                    >
                       <CheckCircle2 className="size-2.5" />
                       Trade Filled
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", statusInfo.className)}>
+                    <Badge
+                      variant="outline"
+                      className={cn("px-1.5 py-0 text-[10px]", statusInfo.className)}
+                    >
                       {statusInfo.label}
                     </Badge>
                   )}
                   {setup.autoPlaced && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-teal-500/10 text-teal-500 border-teal-500/20 gap-0.5">
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-teal-500/20 bg-teal-500/10 px-1.5 py-0 text-[10px] text-teal-500"
+                    >
                       <Zap className="size-2.5" />
                       Auto
                     </Badge>
                   )}
                   {/* "Eligible" badge when setup passes client-side auto-trade gates */}
-                  {autoTradeConfig?.autoTradeEnabled && !setup.autoPlaced && !autoTradeBlockReason && (setup.status === "active" || setup.status === "approaching") && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-teal-500/5 text-teal-600 dark:text-teal-400 border-teal-500/20 gap-0.5">
-                      <Zap className="size-2.5" />
-                      Eligible
-                    </Badge>
-                  )}
+                  {autoTradeConfig?.autoTradeEnabled &&
+                    !setup.autoPlaced &&
+                    !autoTradeBlockReason &&
+                    (setup.status === "active" || setup.status === "approaching") && (
+                      <Badge
+                        variant="outline"
+                        className="gap-0.5 border-teal-500/20 bg-teal-500/5 px-1.5 py-0 text-[10px] text-teal-600 dark:text-teal-400"
+                      >
+                        <Zap className="size-2.5" />
+                        Eligible
+                      </Badge>
+                    )}
                 </div>
                 {/* Auto-trade block reason (if applicable) */}
                 {autoTradeBlockReason && (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <AlertCircle className="size-3 text-amber-500 shrink-0" />
-                    <span className="text-[10px] text-amber-500 truncate">{autoTradeBlockReason}</span>
+                  <div className="mt-0.5 flex items-center gap-1">
+                    <AlertCircle className="size-3 shrink-0 text-amber-500" />
+                    <span className="truncate text-[10px] text-amber-500">
+                      {autoTradeBlockReason}
+                    </span>
                   </div>
                 )}
                 {/* Risk / Reward summary visible on header */}
-                <div className="flex items-center gap-3 mt-1 text-[11px]">
-                  <span className="text-red-500 font-medium">Risk {fmtDollar(riskDollars)}</span>
-                  <span className="text-green-500 font-medium">Reward {fmtDollar(rewardDollars)}</span>
+                <div className="mt-1 flex items-center gap-3 text-[11px]">
+                  <span className="font-medium text-red-500">Risk {fmtDollar(riskDollars)}</span>
+                  <span className="font-medium text-green-500">
+                    Reward {fmtDollar(rewardDollars)}
+                  </span>
                   <span className="text-muted-foreground">R:R {setup.rrRatio}</span>
-                  <span className="text-muted-foreground">{setup.distanceToEntryPips.toFixed(0)}p away</span>
+                  <span className="text-muted-foreground">
+                    {setup.distanceToEntryPips.toFixed(0)}p away
+                  </span>
                 </div>
               </div>
 
               {/* Score circle */}
-              <div className={cn("shrink-0 size-10 rounded-full flex flex-col items-center justify-center", scoreBg)}>
-                <span className={cn("text-sm font-bold font-mono tabular-nums leading-none", scoreColor)}>
+              <div
+                className={cn(
+                  "flex size-10 shrink-0 flex-col items-center justify-center rounded-full",
+                  scoreBg,
+                )}
+              >
+                <span
+                  className={cn(
+                    "font-mono text-sm font-bold tabular-nums leading-none",
+                    scoreColor,
+                  )}
+                >
                   {setup.scores.total}
                 </span>
-                <span className="text-[8px] text-muted-foreground leading-none mt-0.5">/{setup.scores.maxPossible}</span>
+                <span className="text-muted-foreground mt-0.5 text-[8px] leading-none">
+                  /{setup.scores.maxPossible}
+                </span>
               </div>
 
-              <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+              <ChevronDown
+                className={cn(
+                  "text-muted-foreground size-4 shrink-0 transition-transform",
+                  open && "rotate-180",
+                )}
+              />
             </button>
           </CollapsibleTrigger>
 
           {/* ─── Expanded Content ─── */}
           <CollapsibleContent>
-            <div className="px-4 pb-4 space-y-4 border-t border-border/40 pt-4">
-
+            <div className="border-border/40 space-y-4 border-t px-4 pb-4 pt-4">
               {/* Risk / Reward visual bar */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-medium">
                   <span>Risk vs Reward</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
                     {TF_LABELS[setup.timeframeSet] ?? setup.timeframeSet}
                   </Badge>
                 </div>
-                <div className="flex gap-0.5 h-6 rounded-lg overflow-hidden">
+                <div className="flex h-6 gap-0.5 overflow-hidden rounded-lg">
                   <div
-                    className="bg-red-500/15 flex items-center justify-center text-[10px] text-red-500 font-semibold rounded-l-lg"
-                    style={{ width: `${Math.max(25, Math.min(50, (1 / (1 + parseFloat(setup.rrRatio))) * 100))}%` }}
+                    className="flex items-center justify-center rounded-l-lg bg-red-500/15 text-[10px] font-semibold text-red-500"
+                    style={{
+                      width: `${Math.max(25, Math.min(50, (1 / (1 + parseFloat(setup.rrRatio))) * 100))}%`,
+                    }}
                   >
                     -{fmtDollar(riskDollars)}
                   </div>
-                  <div
-                    className="bg-green-500/15 flex items-center justify-center text-[10px] text-green-500 font-semibold flex-1 rounded-r-lg"
-                  >
+                  <div className="flex flex-1 items-center justify-center rounded-r-lg bg-green-500/15 text-[10px] font-semibold text-green-500">
                     +{fmtDollar(rewardDollars)}
                   </div>
                 </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground">
+                <div className="text-muted-foreground flex justify-between text-[10px]">
                   <span>Could lose {setup.riskPips.toFixed(1)} pips</span>
                   <span>Could gain {setup.rewardPips.toFixed(1)} pips</span>
                 </div>
@@ -264,11 +329,17 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
               </div>
 
               {/* Position details */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
-                <StatRow label="Trade Size" value={`${setup.positionSize.toLocaleString()} units`} />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+                <StatRow
+                  label="Trade Size"
+                  value={`${setup.positionSize.toLocaleString()} units`}
+                />
                 <StatRow label="Risk:Reward" value={setup.rrRatio} />
                 <StatRow label="Zone Type" value={setup.zone.formation.replace(/_/g, " ")} />
-                <StatRow label="Distance" value={`${setup.distanceToEntryPips.toFixed(1)} pips away`} />
+                <StatRow
+                  label="Distance"
+                  value={`${setup.distanceToEntryPips.toFixed(1)} pips away`}
+                />
                 {setup.placedAt && (
                   <StatRow label="Placed" value={formatRelativeTime(setup.placedAt)} />
                 )}
@@ -276,36 +347,52 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
 
               {/* Trend & Curve - plain language */}
               {(setup.trendData || setup.curveData) && (
-                <div className="rounded-md border p-2.5 space-y-1.5">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Market Context</p>
+                <div className="space-y-1.5 rounded-md border p-2.5">
+                  <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+                    Market Context
+                  </p>
                   {setup.trendData && (
                     <div className="flex items-center gap-2 text-xs">
-                      <div className={cn(
-                        "size-2 rounded-full",
-                        setup.trendData.direction === "up" ? "bg-green-500" :
-                        setup.trendData.direction === "down" ? "bg-red-500" : "bg-zinc-400",
-                      )} />
+                      <div
+                        className={cn(
+                          "size-2 rounded-full",
+                          setup.trendData.direction === "up"
+                            ? "bg-green-500"
+                            : setup.trendData.direction === "down"
+                              ? "bg-red-500"
+                              : "bg-zinc-400",
+                        )}
+                      />
                       <span>
                         Trend is going{" "}
                         <span className="font-medium">
-                          {setup.trendData.direction === "up" ? "up" :
-                           setup.trendData.direction === "down" ? "down" : "sideways"}
-                        </span>
-                        {" "}({setup.trendData.status})
+                          {setup.trendData.direction === "up"
+                            ? "up"
+                            : setup.trendData.direction === "down"
+                              ? "down"
+                              : "sideways"}
+                        </span>{" "}
+                        ({setup.trendData.status})
                       </span>
                     </div>
                   )}
                   {setup.curveData && (
                     <div className="flex items-center gap-2 text-xs">
-                      <div className={cn(
-                        "size-2 rounded-full",
-                        setup.curveData.position === "low" || setup.curveData.position === "below" ? "bg-green-500" :
-                        setup.curveData.position === "high" || setup.curveData.position === "above" ? "bg-red-500" : "bg-amber-500",
-                      )} />
+                      <div
+                        className={cn(
+                          "size-2 rounded-full",
+                          setup.curveData.position === "low" || setup.curveData.position === "below"
+                            ? "bg-green-500"
+                            : setup.curveData.position === "high" ||
+                                setup.curveData.position === "above"
+                              ? "bg-red-500"
+                              : "bg-amber-500",
+                        )}
+                      />
                       <span>
                         Price is in the{" "}
-                        <span className="font-medium">{setup.curveData.position}</span>
-                        {" "}zone of the bigger picture
+                        <span className="font-medium">{setup.curveData.position}</span> zone of the
+                        bigger picture
                       </span>
                     </div>
                   )}
@@ -317,19 +404,19 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                 <Button
                   variant={showChart ? "secondary" : "outline"}
                   size="sm"
-                  className="h-7 text-xs gap-1.5"
+                  className="h-7 gap-1.5 text-xs"
                   onClick={() => setShowChart(!showChart)}
                 >
                   <LineChart className="size-3.5" />
                   {showChart ? "Hide Chart" : "Show Chart"}
                 </Button>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-muted-foreground text-[10px]">
                   {chartTimeframe} timeframe
                 </span>
               </div>
 
               {showChart && (
-                <div className="h-[280px] rounded-md overflow-hidden border bg-background">
+                <div className="bg-background h-[280px] overflow-hidden rounded-md border">
                   <StandaloneChart
                     instrument={setup.instrument}
                     timeframe={chartTimeframe}
@@ -345,7 +432,7 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
 
               {/* Score Breakdown */}
               <Collapsible>
-                <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <CollapsibleTrigger className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors">
                   <ChevronDown className="size-3" />
                   <span>Score Breakdown</span>
                 </CollapsibleTrigger>
@@ -360,7 +447,7 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                   <Button
                     variant="default"
                     size="sm"
-                    className="h-8 text-xs gap-1.5 flex-1"
+                    className="h-8 flex-1 gap-1.5 text-xs"
                     onClick={() => handlePlaceClick("LIMIT")}
                   >
                     Place Limit Order
@@ -368,7 +455,7 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs gap-1.5"
+                    className="h-8 gap-1.5 text-xs"
                     onClick={() => handlePlaceClick("MARKET")}
                   >
                     Market Order
@@ -392,4 +479,3 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
     </>
   )
 }
-

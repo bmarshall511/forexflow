@@ -9,6 +9,7 @@
 ## Startup & Late-Binding
 
 Some subsystems are bound AFTER construction because they depend on each other:
+
 - `CFWorkerClient` — connected after server starts
 - `ConditionMonitor` — bound after AI services initialize
 - `TradeFinderScanner` — bound after position tracking is ready

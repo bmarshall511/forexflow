@@ -1,7 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import type { TradeFinderConfigData, TradeFinderPairConfig, TradeFinderTimeframeSet } from "@fxflow/types"
+import type {
+  TradeFinderConfigData,
+  TradeFinderPairConfig,
+  TradeFinderTimeframeSet,
+} from "@fxflow/types"
 import { ALL_FOREX_PAIRS, FOREX_PAIR_GROUPS, formatInstrument } from "@fxflow/shared"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -134,19 +138,19 @@ export function TradeFinderSettings({ config, onUpdate, onClose }: TradeFinderSe
             step={0.5}
             defaultValue={config.minScore}
             onBlur={(e) => handleMinScoreChange(e.target.value)}
-            className="w-16 h-7 text-xs px-2 border rounded bg-background text-right font-mono"
+            className="bg-background h-7 w-16 rounded border px-2 text-right font-mono text-xs"
           />
         </div>
 
         {/* Risk percent */}
         <div className="flex items-center justify-between">
           <label className="text-xs">Risk % per Trade</label>
-          <span className="text-xs font-mono text-muted-foreground">{config.riskPercent}%</span>
+          <span className="text-muted-foreground font-mono text-xs">{config.riskPercent}%</span>
         </div>
 
         {/* Pairs */}
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <label className="text-xs font-medium">
               Pairs ({enabledCount}/{config.maxEnabledPairs})
             </label>
@@ -154,7 +158,7 @@ export function TradeFinderSettings({ config, onUpdate, onClose }: TradeFinderSe
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 text-[10px] gap-1"
+                className="h-6 gap-1 text-[10px]"
                 onClick={() => setAddingPair(!addingPair)}
                 disabled={enabledCount >= config.maxEnabledPairs}
               >
@@ -165,31 +169,37 @@ export function TradeFinderSettings({ config, onUpdate, onClose }: TradeFinderSe
 
           {/* Add pair selector */}
           {addingPair && (
-            <div className="mb-2 p-2 border rounded bg-muted/50">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="bg-muted/50 mb-2 rounded border p-2">
+              <div className="mb-2 flex items-center gap-2">
                 <select
                   id="pair-select"
-                  className="flex-1 h-7 text-xs px-2 border rounded bg-background"
+                  className="bg-background h-7 flex-1 rounded border px-2 text-xs"
                   defaultValue=""
                 >
-                  <option value="" disabled>Select pair...</option>
+                  <option value="" disabled>
+                    Select pair...
+                  </option>
                   {FOREX_PAIR_GROUPS.map((group) => (
                     <optgroup key={group.label} label={group.label}>
                       {group.pairs
                         .filter((p) => !localPairs.some((lp) => lp.instrument === p.value))
                         .map((p) => (
-                          <option key={p.value} value={p.value}>{p.label}</option>
+                          <option key={p.value} value={p.value}>
+                            {p.label}
+                          </option>
                         ))}
                     </optgroup>
                   ))}
                 </select>
                 <select
                   id="tf-select"
-                  className="w-24 h-7 text-xs px-2 border rounded bg-background"
+                  className="bg-background h-7 w-24 rounded border px-2 text-xs"
                   defaultValue="daily"
                 >
                   {TF_SET_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
                   ))}
                 </select>
                 <Button
@@ -213,22 +223,33 @@ export function TradeFinderSettings({ config, onUpdate, onClose }: TradeFinderSe
           {/* Pair list */}
           <div className="space-y-1">
             {localPairs.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">No pairs configured. Add pairs to start scanning.</p>
+              <p className="text-muted-foreground py-2 text-xs">
+                No pairs configured. Add pairs to start scanning.
+              </p>
             ) : (
               localPairs.map((pair) => (
-                <div key={pair.instrument} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50">
+                <div
+                  key={pair.instrument}
+                  className="hover:bg-muted/50 flex items-center gap-2 rounded px-2 py-1.5"
+                >
                   <button
                     onClick={() => handleTogglePair(pair.instrument)}
                     className={`size-3 rounded-sm border ${pair.enabled ? "bg-primary border-primary" : "border-muted-foreground"}`}
                   />
-                  <span className="text-xs flex-1 font-mono">{formatInstrument(pair.instrument)}</span>
+                  <span className="flex-1 font-mono text-xs">
+                    {formatInstrument(pair.instrument)}
+                  </span>
                   <select
-                    className="h-6 text-[10px] px-1 border rounded bg-background"
+                    className="bg-background h-6 rounded border px-1 text-[10px]"
                     value={pair.timeframeSet}
-                    onChange={(e) => handleTfSetChange(pair.instrument, e.target.value as TradeFinderTimeframeSet)}
+                    onChange={(e) =>
+                      handleTfSetChange(pair.instrument, e.target.value as TradeFinderTimeframeSet)
+                    }
                   >
                     {TF_SET_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
                     ))}
                   </select>
                   <button

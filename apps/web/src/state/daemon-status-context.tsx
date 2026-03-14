@@ -1,10 +1,7 @@
 "use client"
 
 import { createContext, type ReactNode } from "react"
-import {
-  useDaemonConnection,
-  type DaemonConnectionState,
-} from "@/hooks/use-daemon-connection"
+import { useDaemonConnection, type DaemonConnectionState } from "@/hooks/use-daemon-connection"
 
 export const DaemonStatusContext = createContext<DaemonConnectionState | null>(null)
 

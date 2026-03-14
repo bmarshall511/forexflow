@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Skip to content link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+        className="focus:bg-primary focus:text-primary-foreground sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:px-4 focus:py-2"
       >
         Skip to content
       </a>
@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex flex-1">
           <Sidebar />
           <MobileSidebar />
-          <div className="flex flex-1 flex-col min-w-0">
+          <div className="flex min-w-0 flex-1 flex-col">
             <Header />
             <main id="main-content" className="flex-1" role="main">
               {children}

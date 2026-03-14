@@ -3,10 +3,24 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react"
 import { useTheme } from "next-themes"
 import { createChart, CandlestickSeries, LineStyle, createSeriesMarkers } from "lightweight-charts"
-import type { IChartApi, ISeriesApi, IPriceLine, ISeriesMarkersPluginApi, CandlestickData, Time, SeriesMarker } from "lightweight-charts"
+import type {
+  IChartApi,
+  ISeriesApi,
+  IPriceLine,
+  ISeriesMarkersPluginApi,
+  CandlestickData,
+  Time,
+  SeriesMarker,
+} from "lightweight-charts"
 import { cn } from "@/lib/utils"
 import { getDecimalPlaces, TIMEFRAME_OPTIONS } from "@fxflow/shared"
-import type { PositionPriceTick, ZoneData, CurveData, TrendData, TrendVisualSettings } from "@fxflow/types"
+import type {
+  PositionPriceTick,
+  ZoneData,
+  CurveData,
+  TrendData,
+  TrendVisualSettings,
+} from "@fxflow/types"
 import { useDynamicCandles } from "@/hooks/use-dynamic-candles"
 import { useRealtimeCandles } from "@/hooks/use-realtime-candles"
 import { getChartOptions, getCandlestickOptions, fetchCandles } from "./chart-utils"
@@ -142,7 +156,10 @@ function TradingViewChartInner({
 
     chartRef.current = chart
 
-    const series = chart.addSeries(CandlestickSeries, getCandlestickOptions(isDark, decimals, minMove))
+    const series = chart.addSeries(
+      CandlestickSeries,
+      getCandlestickOptions(isDark, decimals, minMove),
+    )
     seriesRef.current = series
 
     // Add price lines (SL, TP, Exit — entry is shown by the trade-level primitive)
@@ -241,7 +258,19 @@ function TradingViewChartInner({
       trendPrimRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instrument, height, entryPrice, stopLoss, takeProfit, granularity, decimals, minMove, loadCandles, setInitialData, setupDynamic])
+  }, [
+    instrument,
+    height,
+    entryPrice,
+    stopLoss,
+    takeProfit,
+    granularity,
+    decimals,
+    minMove,
+    loadCandles,
+    setInitialData,
+    setupDynamic,
+  ])
 
   // Update theme without recreating the chart
   useEffect(() => {
@@ -344,9 +373,13 @@ function TradingViewChartInner({
   }, [zones, higherTfZones])
 
   return (
-    <div className={cn("w-full rounded-md overflow-hidden relative", className)}>
+    <div className={cn("relative w-full overflow-hidden rounded-md", className)}>
       {/* Timeframe selector pills */}
-      <div className="flex items-center gap-1 px-1 pb-1.5" role="radiogroup" aria-label="Chart timeframe">
+      <div
+        className="flex items-center gap-1 px-1 pb-1.5"
+        role="radiogroup"
+        aria-label="Chart timeframe"
+      >
         {TIMEFRAME_OPTIONS.map(({ value, label }) => (
           <button
             key={value}
@@ -355,7 +388,7 @@ function TradingViewChartInner({
             aria-checked={granularity === value}
             onClick={() => setGranularity(value)}
             className={cn(
-              "px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors",
+              "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
               granularity === value
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -367,8 +400,8 @@ function TradingViewChartInner({
       </div>
       <div ref={containerRef} style={{ height }} />
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-md">
-          <p className="text-xs text-muted-foreground">{error}</p>
+        <div className="bg-muted/50 absolute inset-0 flex items-center justify-center rounded-md">
+          <p className="text-muted-foreground text-xs">{error}</p>
         </div>
       )}
     </div>

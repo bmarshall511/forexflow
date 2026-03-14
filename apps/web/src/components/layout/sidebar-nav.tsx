@@ -12,12 +12,15 @@ export function SidebarNav() {
   const badges = useSidebarBadges()
 
   return (
-    <nav aria-label="Main navigation" className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-4">
+    <nav
+      aria-label="Main navigation"
+      className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-4"
+    >
       {NAV_GROUPS.map((group, index) => (
         <div key={group.label}>
           {index > 0 && <Separator className="my-3" />}
           {isOpen ? (
-            <span className="mb-1 block px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            <span className="text-muted-foreground/60 mb-1 block px-3 text-[11px] font-semibold uppercase tracking-wider">
               {group.label}
             </span>
           ) : (

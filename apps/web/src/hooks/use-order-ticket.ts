@@ -2,12 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import type { PlaceableOrderType, TradeDirection, Timeframe } from "@fxflow/types"
-import {
-  getDecimalPlaces,
-  getPipSize,
-  priceToPips,
-  calculateRiskReward,
-} from "@fxflow/shared"
+import { getDecimalPlaces, getPipSize, priceToPips, calculateRiskReward } from "@fxflow/shared"
 
 export type UnitsMode = "units" | "lots" | "risk"
 
@@ -137,7 +132,9 @@ export function useOrderTicket({
     if (!effectiveEntryPrice) return 0
     const offset = 20 * pipSize
     return Number(
-      (direction === "long" ? effectiveEntryPrice - offset : effectiveEntryPrice + offset).toFixed(decimals),
+      (direction === "long" ? effectiveEntryPrice - offset : effectiveEntryPrice + offset).toFixed(
+        decimals,
+      ),
     )
   }, [direction, effectiveEntryPrice, pipSize, decimals])
 
@@ -145,7 +142,9 @@ export function useOrderTicket({
     if (!effectiveEntryPrice) return 0
     const offset = 20 * pipSize
     return Number(
-      (direction === "long" ? effectiveEntryPrice + offset : effectiveEntryPrice - offset).toFixed(decimals),
+      (direction === "long" ? effectiveEntryPrice + offset : effectiveEntryPrice - offset).toFixed(
+        decimals,
+      ),
     )
   }, [direction, effectiveEntryPrice, pipSize, decimals])
 
@@ -194,7 +193,14 @@ export function useOrderTicket({
 
   // Risk/Reward
   const riskReward = useMemo(() => {
-    if (!effectiveEntryPrice || !slEnabled || !tpEnabled || stopLoss === null || takeProfit === null) return null
+    if (
+      !effectiveEntryPrice ||
+      !slEnabled ||
+      !tpEnabled ||
+      stopLoss === null ||
+      takeProfit === null
+    )
+      return null
     return calculateRiskReward(direction, effectiveEntryPrice, stopLoss, takeProfit, instrument)
   }, [direction, effectiveEntryPrice, slEnabled, tpEnabled, stopLoss, takeProfit, instrument])
 
@@ -243,7 +249,20 @@ export function useOrderTicket({
     }
 
     return errors
-  }, [effectiveUnits, orderType, entryPrice, direction, ask, bid, slEnabled, stopLoss, tpEnabled, takeProfit, effectiveEntryPrice, unitsMode])
+  }, [
+    effectiveUnits,
+    orderType,
+    entryPrice,
+    direction,
+    ask,
+    bid,
+    slEnabled,
+    stopLoss,
+    tpEnabled,
+    takeProfit,
+    effectiveEntryPrice,
+    unitsMode,
+  ])
 
   const isValid = Object.keys(validationErrors).length === 0 && effectiveUnits > 0
 
@@ -278,7 +297,7 @@ export function useOrderTicket({
 
   // Tag handlers
   const addTag = useCallback((tagId: string) => {
-    setSelectedTagIds((prev) => prev.includes(tagId) ? prev : [...prev, tagId])
+    setSelectedTagIds((prev) => (prev.includes(tagId) ? prev : [...prev, tagId]))
   }, [])
 
   const removeTag = useCallback((tagId: string) => {

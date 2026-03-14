@@ -38,20 +38,29 @@ const dotColors: Record<ConnectionStatus, string> = {
 
 function CheckMark({ ok }: { ok: boolean }) {
   return (
-    <span className={cn("text-xs font-medium", ok ? "text-status-connected" : "text-status-disconnected")}>
+    <span
+      className={cn(
+        "text-xs font-medium",
+        ok ? "text-status-connected" : "text-status-disconnected",
+      )}
+    >
       {ok ? "\u2713" : "\u2717"}
     </span>
   )
 }
 
-export function OandaStatusPopover({ oanda, isConnected, currency = "USD" }: OandaStatusPopoverProps) {
+export function OandaStatusPopover({
+  oanda,
+  isConnected,
+  currency = "USD",
+}: OandaStatusPopoverProps) {
   const lastChecked = useRelativeTime(oanda?.lastHealthCheck ?? null)
 
   if (!isConnected || !oanda) {
     return (
       <div className="space-y-2">
         <h4 className="text-sm font-semibold">OANDA API</h4>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Daemon not connected. Start the daemon to monitor OANDA status.
         </p>
       </div>
@@ -60,9 +69,7 @@ export function OandaStatusPopover({ oanda, isConnected, currency = "USD" }: Oan
 
   const status = oanda.status
   const marginUsage =
-    oanda.balance > 0
-      ? ((1 - oanda.marginAvailable / oanda.balance) * 100).toFixed(1)
-      : "0.0"
+    oanda.balance > 0 ? ((1 - oanda.marginAvailable / oanda.balance) * 100).toFixed(1) : "0.0"
 
   return (
     <div className="space-y-3">
@@ -72,7 +79,7 @@ export function OandaStatusPopover({ oanda, isConnected, currency = "USD" }: Oan
           <span className={cn("size-2 rounded-full", dotColors[status])} aria-hidden="true" />
           <h4 className="text-sm font-semibold">OANDA API</h4>
         </div>
-        <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", statusColors[status])}>
+        <Badge variant="outline" className={cn("px-1.5 py-0 text-[10px]", statusColors[status])}>
           {statusLabels[status]}
         </Badge>
       </div>
@@ -84,8 +91,8 @@ export function OandaStatusPopover({ oanda, isConnected, currency = "USD" }: Oan
       </div>
 
       {/* Connection Details */}
-      <div className="space-y-1.5 border-t border-border pt-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="border-border space-y-1.5 border-t pt-2">
+        <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
           Connection
         </span>
         <div className="space-y-1">
@@ -115,22 +122,31 @@ export function OandaStatusPopover({ oanda, isConnected, currency = "USD" }: Oan
 
       {/* Account Details (only show when account is valid) */}
       {oanda.accountValid && (
-        <div className="space-y-1.5 border-t border-border pt-2">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="border-border space-y-1.5 border-t pt-2">
+          <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
             Account
           </span>
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Balance</span>
-              <span className="font-mono tabular-nums">{formatCurrency(oanda.balance, currency)}</span>
+              <span className="font-mono tabular-nums">
+                {formatCurrency(oanda.balance, currency)}
+              </span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Margin Avail.</span>
-              <span className="font-mono tabular-nums">{formatCurrency(oanda.marginAvailable, currency)}</span>
+              <span className="font-mono tabular-nums">
+                {formatCurrency(oanda.marginAvailable, currency)}
+              </span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Margin Usage</span>
-              <span className={cn("font-mono tabular-nums", oanda.marginCallActive && "text-status-warning font-semibold")}>
+              <span
+                className={cn(
+                  "font-mono tabular-nums",
+                  oanda.marginCallActive && "text-status-warning font-semibold",
+                )}
+              >
                 {marginUsage}%
               </span>
             </div>
@@ -139,13 +155,13 @@ export function OandaStatusPopover({ oanda, isConnected, currency = "USD" }: Oan
       )}
 
       {/* Footer */}
-      <div className="border-t border-border pt-2 text-[11px] text-muted-foreground">
+      <div className="border-border text-muted-foreground border-t pt-2 text-[11px]">
         Last checked {lastChecked}
       </div>
 
       {/* Error */}
       {oanda.errorMessage && (
-        <div className="rounded-md bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">
+        <div className="bg-destructive/10 text-destructive rounded-md px-2 py-1.5 text-[11px]">
           {oanda.errorMessage}
         </div>
       )}

@@ -38,18 +38,28 @@ export function ZoneLegend({ showHigherTf, showInvalidated, className }: ZoneLeg
     <div className={cn("inline-flex", className)}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted/50"
+        className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors"
         aria-expanded={expanded}
         aria-label="Toggle zone legend"
       >
-        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+        <svg
+          className="h-3 w-3"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+          />
         </svg>
         {!expanded && <span>Legend</span>}
       </button>
 
       {expanded && (
-        <div className="flex items-center gap-2.5 ml-1 animate-in fade-in slide-in-from-left-2 duration-150">
+        <div className="animate-in fade-in slide-in-from-left-2 ml-1 flex items-center gap-2.5 duration-150">
           {items.map((item) => (
             <LegendEntry key={item.label} item={item} />
           ))}
@@ -61,15 +71,16 @@ export function ZoneLegend({ showHigherTf, showInvalidated, className }: ZoneLeg
 
 function LegendEntry({ item }: { item: LegendItem }) {
   return (
-    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+    <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
       <span
-        className="inline-block h-2 w-4 rounded-sm shrink-0"
+        className="inline-block h-2 w-4 shrink-0 rounded-sm"
         style={{
           backgroundColor: `${item.color}20`,
           border: `1px ${item.style === "dashed" ? "dashed" : "solid"} ${item.color}80`,
-          backgroundImage: item.style === "hatched"
-            ? `repeating-linear-gradient(45deg, transparent, transparent 2px, ${item.color}15 2px, ${item.color}15 4px)`
-            : undefined,
+          backgroundImage:
+            item.style === "hatched"
+              ? `repeating-linear-gradient(45deg, transparent, transparent 2px, ${item.color}15 2px, ${item.color}15 4px)`
+              : undefined,
         }}
       />
       <span>{item.label}</span>

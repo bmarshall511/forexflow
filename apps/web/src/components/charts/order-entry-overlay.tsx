@@ -24,7 +24,7 @@ export function OrderEntryOverlay({ bid, ask, instrument, onBuy, onSell }: Order
   return (
     <div
       className={cn(
-        "absolute bottom-3 right-3 z-20 flex items-center gap-0 rounded-lg overflow-hidden shadow-lg border border-border/50 backdrop-blur-sm",
+        "border-border/50 absolute bottom-3 right-3 z-20 flex items-center gap-0 overflow-hidden rounded-lg border shadow-lg backdrop-blur-sm",
         !hasPrices && "opacity-50",
       )}
       onClick={(e) => e.stopPropagation()}
@@ -37,20 +37,22 @@ export function OrderEntryOverlay({ bid, ask, instrument, onBuy, onSell }: Order
         className={cn(
           "flex flex-col items-center px-3 py-1.5 transition-colors",
           "bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30",
-          "border-r border-border/30",
+          "border-border/30 border-r",
           "disabled:pointer-events-none",
         )}
-        aria-label={hasPrices ? `Sell ${instrument} at ${bid!.toFixed(decimals)}` : `Sell ${instrument}`}
+        aria-label={
+          hasPrices ? `Sell ${instrument} at ${bid!.toFixed(decimals)}` : `Sell ${instrument}`
+        }
       >
-        <span className="text-[9px] font-medium text-red-400 uppercase tracking-wide">Sell</span>
-        <span className="text-sm font-mono tabular-nums font-semibold text-red-500">
+        <span className="text-[9px] font-medium uppercase tracking-wide text-red-400">Sell</span>
+        <span className="font-mono text-sm font-semibold tabular-nums text-red-500">
           {hasPrices ? bid!.toFixed(decimals) : "—"}
         </span>
       </button>
 
       {/* Spread */}
-      <div className="flex flex-col items-center justify-center px-2 py-1.5 bg-background/80">
-        <span className="text-[9px] font-mono tabular-nums text-muted-foreground">
+      <div className="bg-background/80 flex flex-col items-center justify-center px-2 py-1.5">
+        <span className="text-muted-foreground font-mono text-[9px] tabular-nums">
           {spreadPips !== null ? formatPips(spreadPips) : "—"}
         </span>
       </div>
@@ -63,13 +65,15 @@ export function OrderEntryOverlay({ bid, ask, instrument, onBuy, onSell }: Order
         className={cn(
           "flex flex-col items-center px-3 py-1.5 transition-colors",
           "bg-blue-500/10 hover:bg-blue-500/20 active:bg-blue-500/30",
-          "border-l border-border/30",
+          "border-border/30 border-l",
           "disabled:pointer-events-none",
         )}
-        aria-label={hasPrices ? `Buy ${instrument} at ${ask!.toFixed(decimals)}` : `Buy ${instrument}`}
+        aria-label={
+          hasPrices ? `Buy ${instrument} at ${ask!.toFixed(decimals)}` : `Buy ${instrument}`
+        }
       >
-        <span className="text-[9px] font-medium text-blue-400 uppercase tracking-wide">Buy</span>
-        <span className="text-sm font-mono tabular-nums font-semibold text-blue-500">
+        <span className="text-[9px] font-medium uppercase tracking-wide text-blue-400">Buy</span>
+        <span className="font-mono text-sm font-semibold tabular-nums text-blue-500">
           {hasPrices ? ask!.toFixed(decimals) : "—"}
         </span>
       </button>

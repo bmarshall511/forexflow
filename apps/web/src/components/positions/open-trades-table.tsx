@@ -1,11 +1,22 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect } from "react"
-import type { OpenTradeData, PositionPriceTick, TradeDirection, TradeTagData, AiAnalysisData } from "@fxflow/types"
+import type {
+  OpenTradeData,
+  PositionPriceTick,
+  TradeDirection,
+  TradeTagData,
+  AiAnalysisData,
+} from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
 import { formatCurrency, formatPips } from "@fxflow/shared"
 import {
-  Table, TableHeader, TableHead, TableBody, TableRow, TableCell,
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
 } from "@/components/ui/table"
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { AnimatedNumber } from "@/components/ui/animated-number"
@@ -79,7 +90,12 @@ export function OpenTradesTable({
   const [drawerTrade, setDrawerTrade] = useState<OpenTradeData | null>(null)
   const [closeTrade, setCloseTrade] = useState<OpenTradeData | null>(null)
   const [aiAnalysisTrade, setAiAnalysisTrade] = useState<OpenTradeData | null>(null)
-  const { closeTrade: doCloseTrade, closeAllTrades, refreshPositions, isLoading: actionLoading } = useTradeActions()
+  const {
+    closeTrade: doCloseTrade,
+    closeAllTrades,
+    refreshPositions,
+    isLoading: actionLoading,
+  } = useTradeActions()
   const { positions, setPositions } = useDaemonStatus()
   const [isClosingAll, setIsClosingAll] = useState(false)
 
@@ -121,21 +137,65 @@ export function OpenTradesTable({
       const key = sort.key
       let va: unknown, vb: unknown
       switch (key) {
-        case "instrument": va = a.instrument; vb = b.instrument; break
-        case "direction": va = a.direction; vb = b.direction; break
-        case "source": va = a.source; vb = b.source; break
-        case "timeframe": va = a.timeframe; vb = b.timeframe; break
-        case "entryPrice": va = a.entryPrice; vb = b.entryPrice; break
-        case "currentPrice": va = a.currentPrice; vb = b.currentPrice; break
-        case "stopLoss": va = a.stopLoss; vb = b.stopLoss; break
-        case "takeProfit": va = a.takeProfit; vb = b.takeProfit; break
-        case "units": va = a.currentUnits; vb = b.currentUnits; break
-        case "unrealizedPL": va = a.unrealizedPL; vb = b.unrealizedPL; break
-        case "mfe": va = a.mfe; vb = b.mfe; break
-        case "mae": va = a.mae; vb = b.mae; break
-        case "openedAt": va = a.openedAt; vb = b.openedAt; break
-        case "tags": va = (tagsByTradeId[a.id] ?? a.tags).length; vb = (tagsByTradeId[b.id] ?? b.tags).length; break
-        default: va = a.instrument; vb = b.instrument
+        case "instrument":
+          va = a.instrument
+          vb = b.instrument
+          break
+        case "direction":
+          va = a.direction
+          vb = b.direction
+          break
+        case "source":
+          va = a.source
+          vb = b.source
+          break
+        case "timeframe":
+          va = a.timeframe
+          vb = b.timeframe
+          break
+        case "entryPrice":
+          va = a.entryPrice
+          vb = b.entryPrice
+          break
+        case "currentPrice":
+          va = a.currentPrice
+          vb = b.currentPrice
+          break
+        case "stopLoss":
+          va = a.stopLoss
+          vb = b.stopLoss
+          break
+        case "takeProfit":
+          va = a.takeProfit
+          vb = b.takeProfit
+          break
+        case "units":
+          va = a.currentUnits
+          vb = b.currentUnits
+          break
+        case "unrealizedPL":
+          va = a.unrealizedPL
+          vb = b.unrealizedPL
+          break
+        case "mfe":
+          va = a.mfe
+          vb = b.mfe
+          break
+        case "mae":
+          va = a.mae
+          vb = b.mae
+          break
+        case "openedAt":
+          va = a.openedAt
+          vb = b.openedAt
+          break
+        case "tags":
+          va = (tagsByTradeId[a.id] ?? a.tags).length
+          vb = (tagsByTradeId[b.id] ?? b.tags).length
+          break
+        default:
+          va = a.instrument
+          vb = b.instrument
       }
       return compareValues(va, vb, sort.direction)
     })
@@ -201,11 +261,7 @@ export function OpenTradesTable({
   }
 
   if (stableResult.length === 0) {
-    return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
-        No open trades
-      </div>
-    )
+    return <div className="text-muted-foreground py-12 text-center text-sm">No open trades</div>
   }
 
   if (isMobile) {
@@ -228,7 +284,9 @@ export function OpenTradesTable({
           open={!!drawerTrade}
           onOpenChange={(open) => !open && setDrawerTrade(null)}
           currency={currency}
-          lastTick={liveDrawerTrade ? pricesByInstrument?.get(liveDrawerTrade.instrument) ?? null : null}
+          lastTick={
+            liveDrawerTrade ? (pricesByInstrument?.get(liveDrawerTrade.instrument) ?? null) : null
+          }
           onCloseTrade={() => {
             if (liveDrawerTrade) {
               setDrawerTrade(null)
@@ -258,7 +316,7 @@ export function OpenTradesTable({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive gap-1.5"
                 disabled={isClosingAll || actionLoading}
               >
                 <Trash2 className="size-3.5" />
@@ -269,7 +327,8 @@ export function OpenTradesTable({
               <AlertDialogHeader>
                 <AlertDialogTitle>Close all {stableResult.length} open trades?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will close every open trade at the current market price. Realised P&amp;L will be applied immediately. This action cannot be undone.
+                  This will close every open trade at the current market price. Realised P&amp;L
+                  will be applied immediately. This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -288,21 +347,114 @@ export function OpenTradesTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <SortableHead label="Pair" sortKey="instrument" currentSort={sort} onSort={handleSort} />
-            <SortableHead label="Side" sortKey="direction" currentSort={sort} onSort={handleSort} title="Buy or Sell" />
+            <SortableHead
+              label="Pair"
+              sortKey="instrument"
+              currentSort={sort}
+              onSort={handleSort}
+            />
+            <SortableHead
+              label="Side"
+              sortKey="direction"
+              currentSort={sort}
+              onSort={handleSort}
+              title="Buy or Sell"
+            />
             <SortableHead label="Source" sortKey="source" currentSort={sort} onSort={handleSort} />
-            <SortableHead label="TF" sortKey="timeframe" currentSort={sort} onSort={handleSort} title="Chart Timeframe" />
-            <SortableHead label="Entry" sortKey="entryPrice" currentSort={sort} onSort={handleSort} className="text-right" title="Price you entered at" />
-            <SortableHead label="Now" sortKey="currentPrice" currentSort={sort} onSort={handleSort} className="text-right" title="Current market price" />
-            <SortableHead label="Stop" sortKey="stopLoss" currentSort={sort} onSort={handleSort} className="text-right" title="Stop Loss — auto-closes to limit losses" />
-            <SortableHead label="Target" sortKey="takeProfit" currentSort={sort} onSort={handleSort} className="text-right" title="Take Profit — auto-closes to lock in gains" />
-            <SortableHead label="Progress" sortKey="" currentSort={sort} onSort={() => {}} className="w-36" title="How close price is to your stop loss or target" />
-            <SortableHead label="Size" sortKey="units" currentSort={sort} onSort={handleSort} className="text-right" title="Position size in units" />
-            <SortableHead label="P/L" sortKey="unrealizedPL" currentSort={sort} onSort={handleSort} className="text-right" title="Current profit or loss (not yet closed)" />
-            <SortableHead label="R:R" sortKey="rr" currentSort={sort} onSort={handleSort} className="text-right" title="Risk to Reward — how much you could gain vs lose" />
-            <SortableHead label="Best" sortKey="mfe" currentSort={sort} onSort={handleSort} className="text-right" title="Best price reached in your favor (pips)" />
-            <SortableHead label="Worst" sortKey="mae" currentSort={sort} onSort={handleSort} className="text-right" title="Worst price dip against you (pips)" />
-            <SortableHead label="Open For" sortKey="openedAt" currentSort={sort} onSort={handleSort} title="How long this trade has been open" />
+            <SortableHead
+              label="TF"
+              sortKey="timeframe"
+              currentSort={sort}
+              onSort={handleSort}
+              title="Chart Timeframe"
+            />
+            <SortableHead
+              label="Entry"
+              sortKey="entryPrice"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Price you entered at"
+            />
+            <SortableHead
+              label="Now"
+              sortKey="currentPrice"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Current market price"
+            />
+            <SortableHead
+              label="Stop"
+              sortKey="stopLoss"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Stop Loss — auto-closes to limit losses"
+            />
+            <SortableHead
+              label="Target"
+              sortKey="takeProfit"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Take Profit — auto-closes to lock in gains"
+            />
+            <SortableHead
+              label="Progress"
+              sortKey=""
+              currentSort={sort}
+              onSort={() => {}}
+              className="w-36"
+              title="How close price is to your stop loss or target"
+            />
+            <SortableHead
+              label="Size"
+              sortKey="units"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Position size in units"
+            />
+            <SortableHead
+              label="P/L"
+              sortKey="unrealizedPL"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Current profit or loss (not yet closed)"
+            />
+            <SortableHead
+              label="R:R"
+              sortKey="rr"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Risk to Reward — how much you could gain vs lose"
+            />
+            <SortableHead
+              label="Best"
+              sortKey="mfe"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Best price reached in your favor (pips)"
+            />
+            <SortableHead
+              label="Worst"
+              sortKey="mae"
+              currentSort={sort}
+              onSort={handleSort}
+              className="text-right"
+              title="Worst price dip against you (pips)"
+            />
+            <SortableHead
+              label="Open For"
+              sortKey="openedAt"
+              currentSort={sort}
+              onSort={handleSort}
+              title="How long this trade has been open"
+            />
             <SortableHead label="Tags" sortKey="tags" currentSort={sort} onSort={handleSort} />
             <TableHead className="w-10">AI</TableHead>
             <TableHead className="w-10" />
@@ -310,20 +462,30 @@ export function OpenTradesTable({
         </TableHeader>
         <TableBody>
           {stableResult.map((trade) => {
-            const plColor = trade.unrealizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
+            const plColor =
+              trade.unrealizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
 
             return (
               <TableRow
                 key={trade.id}
                 className="cursor-pointer select-none"
-                onMouseDown={(e) => { if (e.button === 0) setDrawerTrade(trade) }}
+                onMouseDown={(e) => {
+                  if (e.button === 0) setDrawerTrade(trade)
+                }}
               >
                 <TableCell className="text-xs font-medium">
                   {trade.instrument.replace("_", "/")}
                 </TableCell>
-                <TableCell><DirectionBadge direction={trade.direction} /></TableCell>
-                <TableCell><SourceBadge source={trade.source} /></TableCell>
-                <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                <TableCell>
+                  <DirectionBadge direction={trade.direction} />
+                </TableCell>
+                <TableCell>
+                  <SourceBadge source={trade.source} />
+                </TableCell>
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <TimeframeSelect
                     value={trade.timeframe}
                     onChange={async (tf) => {
@@ -336,18 +498,20 @@ export function OpenTradesTable({
                     }}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">{trade.entryPrice}</TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-right font-mono text-xs tabular-nums">
+                  {trade.entryPrice}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   {trade.currentPrice ? (
                     <AnimatedNumber value={trade.currentPrice.toString()} className={plColor} />
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums text-muted-foreground">
+                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                   {trade.stopLoss ?? "—"}
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums text-muted-foreground">
+                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
                   {trade.takeProfit ?? "—"}
                 </TableCell>
                 <TableCell>
@@ -360,12 +524,12 @@ export function OpenTradesTable({
                     takeProfit={trade.takeProfit}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   {trade.currentUnits !== trade.initialUnits
                     ? `${trade.currentUnits}/${trade.initialUnits}`
                     : trade.currentUnits}
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   <AnimatedNumber
                     value={formatCurrency(trade.unrealizedPL, currency)}
                     className={cn("font-semibold", plColor)}
@@ -381,15 +545,21 @@ export function OpenTradesTable({
                     compact
                   />
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   {trade.mfe !== null ? (
                     <span className="text-status-connected">{formatPips(trade.mfe)}</span>
-                  ) : "—"}
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
-                <TableCell className="text-xs text-right font-mono tabular-nums">
+                <TableCell className="text-right font-mono text-xs tabular-nums">
                   {trade.mae !== null ? (
-                    <span className="text-status-disconnected">{formatPips(Math.abs(trade.mae))}</span>
-                  ) : "—"}
+                    <span className="text-status-disconnected">
+                      {formatPips(Math.abs(trade.mae))}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
                 <TableCell className="text-xs">
                   <DurationDisplay openedAt={trade.openedAt} className="font-mono tabular-nums" />
@@ -397,7 +567,10 @@ export function OpenTradesTable({
                 <TableCell>
                   <TagBadges tags={tagsByTradeId[trade.id] ?? trade.tags} />
                 </TableCell>
-                <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <AiAnalysisCell
                     latestAnalysis={latestAnalysisByTradeId?.[trade.id]}
                     analysisCount={countByTradeId?.[trade.id]}
@@ -405,7 +578,10 @@ export function OpenTradesTable({
                     onClick={() => setAiAnalysisTrade(trade)}
                   />
                 </TableCell>
-                <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="size-7 p-0">
@@ -423,10 +599,7 @@ export function OpenTradesTable({
                         AI Analysis
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => setCloseTrade(trade)}
-                      >
+                      <DropdownMenuItem variant="destructive" onClick={() => setCloseTrade(trade)}>
                         <XCircle className="size-4" />
                         Close Trade
                       </DropdownMenuItem>
@@ -444,7 +617,9 @@ export function OpenTradesTable({
         open={!!drawerTrade}
         onOpenChange={(open) => !open && setDrawerTrade(null)}
         currency={currency}
-        lastTick={liveDrawerTrade ? pricesByInstrument?.get(liveDrawerTrade.instrument) ?? null : null}
+        lastTick={
+          liveDrawerTrade ? (pricesByInstrument?.get(liveDrawerTrade.instrument) ?? null) : null
+        }
         onCloseTrade={() => {
           if (liveDrawerTrade) {
             setDrawerTrade(null)

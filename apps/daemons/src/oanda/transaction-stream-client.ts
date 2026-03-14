@@ -127,7 +127,13 @@ export class TransactionStreamClient {
     }
 
     // Forward trade-relevant events to TradeSyncer
-    const tradeEvents = ["ORDER_FILL", "ORDER_CANCEL", "STOP_LOSS_ORDER", "TAKE_PROFIT_ORDER", "TRAILING_STOP_LOSS_ORDER"]
+    const tradeEvents = [
+      "ORDER_FILL",
+      "ORDER_CANCEL",
+      "STOP_LOSS_ORDER",
+      "TAKE_PROFIT_ORDER",
+      "TRAILING_STOP_LOSS_ORDER",
+    ]
     if (this.tradeSyncer && tradeEvents.includes(msg.type)) {
       void this.tradeSyncer.handleTransactionEvent(msg)
     }

@@ -21,6 +21,7 @@ src/
 ## Service Pattern
 
 Each domain has a dedicated service file exporting pure functions that accept a DB client:
+
 - `trade-service.ts` — trades, enrichment, upsert
 - `notification-service.ts` — notifications with 5-sec dedup window
 - `settings-service.ts` — app settings CRUD
@@ -36,23 +37,28 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 ## Key Patterns
 
 ### enrichSource
+
 - `Trade.source` in DB is always `"oanda"` (OANDA is the canonical trade repository).
 - True origin is in `Trade.metadata` JSON: `{ placedVia: "ut_bot_alerts" | "fxflow" }`.
 - `enrichSource(source, metadata)` resolves display-friendly source labels.
 - Applied in `toClosedTradeData()`, `getTradeWithDetails()`, and at runtime in `reconcile()`.
 
 ### Upsert
+
 - `upsertTrade()` uses unique constraint `[source, sourceTradeId]`.
 - Metadata is pre-seeded before first reconcile for TV-alert orders.
 
 ### Encryption
+
 - `encryption.ts` — AES-256-GCM, format: `"iv:tag:ciphertext"`.
 - Used for sensitive settings (API keys, tokens).
 
 ### Cost Calculation
+
 - `calculateCost()` uses `AI_MODEL_OPTIONS` pricing from `@fxflow/types`.
 
 ### Cleanup
+
 - Most services have cleanup methods for pruning old records.
 - Call patterns vary (scheduled, on-startup, manual).
 

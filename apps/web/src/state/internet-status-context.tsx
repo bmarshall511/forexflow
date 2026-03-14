@@ -1,10 +1,7 @@
 "use client"
 
 import { createContext, type ReactNode } from "react"
-import {
-  useInternetStatusInternal,
-  type InternetStatusState,
-} from "@/hooks/use-internet-status"
+import { useInternetStatusInternal, type InternetStatusState } from "@/hooks/use-internet-status"
 
 export const InternetStatusContext = createContext<InternetStatusState | null>(null)
 

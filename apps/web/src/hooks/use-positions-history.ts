@@ -1,11 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type {
-  ClosedTradeData,
-  TradeDirection,
-  TradeOutcome,
-} from "@fxflow/types"
+import type { ClosedTradeData, TradeDirection, TradeOutcome } from "@fxflow/types"
 import { useDaemonStatus } from "./use-daemon-status"
 
 export interface TradeHistoryFilters {

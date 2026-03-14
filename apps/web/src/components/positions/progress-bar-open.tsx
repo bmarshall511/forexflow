@@ -26,7 +26,7 @@ export function OpenProgressBar({
 
   if (!stopLoss && !takeProfit) {
     return (
-      <div className={cn("text-[10px] text-muted-foreground/50 italic", className)}>
+      <div className={cn("text-muted-foreground/50 text-[10px] italic", className)}>
         No stop loss or target set
       </div>
     )
@@ -46,7 +46,7 @@ export function OpenProgressBar({
 
   if (!effectiveSlPips && !effectiveTpPips) {
     return (
-      <div className={cn("text-[10px] text-muted-foreground/50 italic", className)}>
+      <div className={cn("text-muted-foreground/50 text-[10px] italic", className)}>
         No stop loss or target set
       </div>
     )
@@ -75,31 +75,33 @@ export function OpenProgressBar({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {/* Bar */}
-      <div className="relative h-3 rounded-full bg-muted/60 overflow-hidden">
+      <div className="bg-muted/60 relative h-3 overflow-hidden rounded-full">
         {/* SL zone (red, left of entry) */}
         {effectiveSlPips !== null && (
           <div
-            className="absolute inset-y-0 left-0 bg-red-500/15 rounded-l-full"
+            className="absolute inset-y-0 left-0 rounded-l-full bg-red-500/15"
             style={{ width: `${entryPercent}%` }}
           />
         )}
         {/* TP zone (green, right of entry) */}
         {effectiveTpPips !== null && (
           <div
-            className="absolute inset-y-0 right-0 bg-green-500/15 rounded-r-full"
+            className="absolute inset-y-0 right-0 rounded-r-full bg-green-500/15"
             style={{ width: `${100 - entryPercent}%` }}
           />
         )}
         {/* Entry marker */}
         <div
-          className="absolute inset-y-0 w-[2px] bg-foreground/20 z-10"
+          className="bg-foreground/20 absolute inset-y-0 z-10 w-[2px]"
           style={{ left: `${entryPercent}%` }}
         />
         {/* Current price indicator */}
         <div
           className={cn(
-            "absolute top-0 h-full w-2.5 rounded-full transition-all duration-300 z-20",
-            isInProfit ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.4)]" : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.4)]",
+            "absolute top-0 z-20 h-full w-2.5 rounded-full transition-all duration-300",
+            isInProfit
+              ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+              : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.4)]",
           )}
           style={{ left: `calc(${clampedProgress}% - 5px)` }}
         />
@@ -111,7 +113,8 @@ export function OpenProgressBar({
           {effectiveSlPips !== null ? `Stop ${formatPips(effectiveSlPips)}p` : "No stop"}
         </span>
         <span className={cn("font-medium", isInProfit ? "text-green-500" : "text-red-500")}>
-          {currentPips >= 0 ? "+" : ""}{formatPips(currentPips)}p
+          {currentPips >= 0 ? "+" : ""}
+          {formatPips(currentPips)}p
         </span>
         <span className="text-green-500/70">
           {effectiveTpPips !== null ? `Target ${formatPips(effectiveTpPips)}p` : "No target"}
