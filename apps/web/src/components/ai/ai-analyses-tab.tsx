@@ -646,7 +646,7 @@ function AnalysisCard({
 
 const PAGE_SIZE = 20
 
-export function AiAnalysesTab() {
+export function AiAnalysesTab({ onStatsChanged }: { onStatsChanged?: () => void }) {
   const { lastAiAnalysisCompleted } = useDaemonStatus()
 
   const [rows, setRows] = useState<AnalysisSummary[]>([])
@@ -698,6 +698,7 @@ export function AiAnalysesTab() {
     try {
       await fetch("/api/ai/analyses/reset-stuck", { method: "POST" })
       await fetchData(page, triggeredBy, status)
+      onStatsChanged?.()
     } finally {
       setIsResetting(false)
     }
@@ -714,6 +715,7 @@ export function AiAnalysesTab() {
         toast.success(`Deleted ${json.data?.count ?? 0} analyses`)
         setRows([])
         setTotal(0)
+        onStatsChanged?.()
       } else {
         toast.error("Failed to clear analyses")
       }

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import type { AiUsageStats } from "@fxflow/types"
+import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { DataTile } from "@/components/ui/data-tile"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -20,10 +21,11 @@ function fmt(n: number) {
   return n < 0.001 ? "$0.00" : n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`
 }
 
-export function AiStatsBar() {
+export function AiStatsBar({ refreshKey }: { refreshKey?: number }) {
   const [stats, setStats] = useState<AiUsageStats | null>(null)
+  const { lastAiAnalysisStarted, lastAiAnalysisCompleted } = useDaemonStatus()
 
-  useEffect(() => {
+  const fetchStats = useCallback(() => {
     fetch("/api/ai/usage")
       .then((r) => r.json())
       .then((j: { ok: boolean; data?: AiUsageStats }) => {
@@ -31,6 +33,20 @@ export function AiStatsBar() {
       })
       .catch(() => {})
   }, [])
+
+  // Fetch on mount and when refreshKey changes (e.g. after reset-stuck)
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats, refreshKey])
+
+  // Refetch when analyses start or complete (real-time via WS)
+  useEffect(() => {
+    if (lastAiAnalysisStarted) fetchStats()
+  }, [lastAiAnalysisStarted, fetchStats])
+
+  useEffect(() => {
+    if (lastAiAnalysisCompleted) fetchStats()
+  }, [lastAiAnalysisCompleted, fetchStats])
 
   if (!stats) {
     return (

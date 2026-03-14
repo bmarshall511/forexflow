@@ -14,6 +14,7 @@ type Tab = "analyses" | "conditions"
 
 export function AiAnalysisDashboard() {
   const [tab, setTab] = useState<Tab>("analyses")
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0)
 
   return (
     <div className="min-h-screen">
@@ -32,7 +33,7 @@ export function AiAnalysisDashboard() {
           </Button>
         }
       >
-        <AiStatsBar />
+        <AiStatsBar refreshKey={statsRefreshKey} />
       </PageHeader>
 
       {/* ─── Tab Navigation ─── */}
@@ -55,7 +56,9 @@ export function AiAnalysisDashboard() {
 
       {/* ─── Tab Content ─── */}
       <div className="space-y-4 px-4 py-6 md:px-6">
-        {tab === "analyses" && <AiAnalysesTab />}
+        {tab === "analyses" && (
+          <AiAnalysesTab onStatsChanged={() => setStatsRefreshKey((k) => k + 1)} />
+        )}
         {tab === "conditions" && <AiConditionsTab />}
       </div>
     </div>
