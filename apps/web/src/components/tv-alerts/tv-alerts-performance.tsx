@@ -13,6 +13,7 @@ import { PerfDirectionComparison } from "./perf-direction-comparison"
 import { PerfDistribution } from "./perf-distribution"
 import { PerfSessionPerformance } from "./perf-session-performance"
 import { PerfRecentResults } from "./perf-recent-results"
+import { PerfSignalsByPair } from "./perf-signals-by-pair"
 
 const PERIODS: { value: PerfPeriod; label: string }[] = [
   { value: "7d", label: "7D" },
@@ -76,11 +77,14 @@ export function TVAlertsPerformance() {
       {/* Equity Curve */}
       <PerfEquityCurve data={perf.equityCurve} />
 
-      {/* Two-column grid: Pair Breakdown + Signal Funnel */}
+      {/* Two-column grid: Pair Breakdown + Signals by Pair */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <PerfPairBreakdown data={perf.byInstrument} />
-        <PerfSignalFunnel stats={perf.signalStats} />
+        <PerfSignalsByPair data={perf.detailed?.signalsByPair ?? []} />
       </div>
+
+      {/* Signal Funnel */}
+      <PerfSignalFunnel stats={perf.signalStats} />
 
       {/* Two-column grid: Streaks + Direction Comparison */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
