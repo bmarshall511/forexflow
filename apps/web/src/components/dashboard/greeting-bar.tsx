@@ -29,7 +29,8 @@ function formatCountdown(isoTimestamp: string): string {
 }
 
 export function GreetingBar() {
-  const { market, isConnected } = useDaemonStatus()
+  const { market, isConnected, isReachable } = useDaemonStatus()
+  const daemonUp = isConnected || isReachable
   const { summary } = usePositions()
   const { events } = useCalendar(48)
 
@@ -47,7 +48,7 @@ export function GreetingBar() {
   )
 
   const contextMessage = useMemo(() => {
-    if (!isConnected) return "Connecting to trading system…"
+    if (!daemonUp) return "Connecting to trading system…"
     if (!market) return "Loading market status…"
 
     if (market.isOpen) {
@@ -61,7 +62,7 @@ export function GreetingBar() {
       return `Markets closed — opens in ${formatCountdown(market.nextExpectedChange)}`
     }
     return `Markets closed${market.closeLabel ? ` — ${market.closeLabel}` : ""}`
-  }, [isConnected, market, summary.openCount])
+  }, [daemonUp, market, summary.openCount])
 
   return (
     <div

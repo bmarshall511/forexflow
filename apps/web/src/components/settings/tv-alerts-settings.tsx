@@ -37,7 +37,8 @@ export function TVAlertsSettings() {
     sendTestSignal,
     closeTestTrade,
   } = useTVAlertsConfig()
-  const { tvAlertsStatus, isConnected } = useDaemonStatus()
+  const { tvAlertsStatus, isConnected, isReachable } = useDaemonStatus()
+  const daemonUp = isConnected || isReachable
   const data = config ?? TV_ALERTS_DEFAULT_CONFIG
 
   const [saving, setSaving] = useState(false)
@@ -163,14 +164,14 @@ export function TVAlertsSettings() {
   const formKey = `${data.positionSizePercent}-${data.cooldownSeconds}-${data.maxOpenPositions}-${data.dailyLossLimit}-${data.dedupWindowSeconds}-${data.cfWorkerUrl}-${data.cfWorkerSecret}`
 
   const cfWorkerConnected = tvAlertsStatus?.cfWorkerConnected ?? false
-  const cfConnectionStatus = !isConnected
+  const cfConnectionStatus = !daemonUp
     ? "No daemon"
     : cfWorkerConnected
       ? "Connected"
       : data.cfWorkerUrl
         ? "Disconnected"
         : "Not configured"
-  const cfDotColor = !isConnected
+  const cfDotColor = !daemonUp
     ? "bg-muted-foreground"
     : cfWorkerConnected
       ? "bg-green-500"
@@ -239,7 +240,7 @@ export function TVAlertsSettings() {
       <TestSignalCard
         cfWorkerConnected={cfWorkerConnected}
         moduleEnabled={data.enabled}
-        isConnected={isConnected}
+        isConnected={daemonUp}
         sendTestSignal={sendTestSignal}
         closeTestTrade={closeTestTrade}
       />

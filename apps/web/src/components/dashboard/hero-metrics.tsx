@@ -65,7 +65,7 @@ const intentColor = {
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export function HeroMetrics() {
-  const { accountOverview, isConnected, oanda } = useDaemonStatus()
+  const { accountOverview, oanda } = useDaemonStatus()
   const { summary, openWithPrices } = usePositions()
 
   const isLoaded = accountOverview !== null

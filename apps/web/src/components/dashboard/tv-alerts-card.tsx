@@ -196,7 +196,8 @@ function TVAlertsCardSkeleton() {
 // ─── Component ────────────────────────────────────────────────────────────
 
 export function TVAlertsDashboardCard() {
-  const { tvAlertsStatus, isConnected } = useDaemonStatus()
+  const { tvAlertsStatus, isConnected, isReachable } = useDaemonStatus()
+  const daemonUp = isConnected || isReachable
   const { config, isLoading: configLoading } = useTVAlertsConfig()
   const { stats, isLoading: statsLoading } = useTVAlertsStats()
   const { data: periodPnL } = useTVAlertsPeriodPnL()
@@ -296,8 +297,8 @@ export function TVAlertsDashboardCard() {
             />
             <DataTile
               label="CF Worker"
-              value={!isConnected ? "No daemon" : cfConnected ? "Connected" : "Disconnected"}
-              variant={!isConnected ? "muted" : cfConnected ? "positive" : "negative"}
+              value={!daemonUp ? "No daemon" : cfConnected ? "Connected" : "Disconnected"}
+              variant={!daemonUp ? "muted" : cfConnected ? "positive" : "negative"}
               icon={<Radio className="size-3.5" />}
             />
             <DataTile

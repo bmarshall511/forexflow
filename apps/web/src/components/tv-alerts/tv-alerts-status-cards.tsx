@@ -6,14 +6,15 @@ import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { useTVAlertsConfig } from "@/hooks/use-tv-alerts-config"
 
 export function TVAlertsStatusCards() {
-  const { tvAlertsStatus, isConnected, accountOverview } = useDaemonStatus()
+  const { tvAlertsStatus, isConnected, isReachable, accountOverview } = useDaemonStatus()
+  const daemonUp = isConnected || isReachable
   const { config } = useTVAlertsConfig()
   const s = tvAlertsStatus
   const currency = accountOverview?.summary?.currency ?? "USD"
 
   const moduleEnabled = s?.enabled ?? config?.enabled ?? false
   const cfConnected = s?.cfWorkerConnected ?? false
-  const cfLabel = !isConnected ? "No daemon" : cfConnected ? "Connected" : "Disconnected"
+  const cfLabel = !daemonUp ? "No daemon" : cfConnected ? "Connected" : "Disconnected"
   const todayPL = s?.todayAutoPL ?? 0
   const circuitTripped = s?.circuitBreakerTripped ?? false
 
@@ -28,7 +29,7 @@ export function TVAlertsStatusCards() {
       <DataTile
         label="CF Worker"
         value={cfLabel}
-        variant={!isConnected ? "muted" : cfConnected ? "positive" : "negative"}
+        variant={!daemonUp ? "muted" : cfConnected ? "positive" : "negative"}
         icon={<Radio className="size-3.5" />}
       />
       <DataTile
