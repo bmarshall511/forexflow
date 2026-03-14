@@ -13,25 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  deploy-app:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd ${{ secrets.DEPLOY_PATH }}
-            git pull origin main
-            pnpm install --frozen-lockfile
-            pnpm --filter @fxflow/db db:generate
-            pnpm --filter @fxflow/db prisma migrate deploy
-            pnpm --filter @fxflow/web build
-            pm2 restart fxflow-web || true
-            pm2 restart fxflow-daemon || true
-
   deploy-cf-worker:
     runs-on: ubuntu-latest
     steps:
