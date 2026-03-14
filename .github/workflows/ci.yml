@@ -102,7 +102,7 @@ jobs:
       - run: pnpm --filter @fxflow/db db:generate
       - name: Check for Prisma schema drift
         working-directory: packages/db
-        run: pnpm prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --exit-code
+        run: pnpm prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code
 
   danger:
     runs-on: ubuntu-latest
