@@ -544,6 +544,21 @@ export async function startServer(port: number, deps: ServerDeps) {
       return
     }
 
+    if (req.method === "POST" && req.url === "/actions/ai/cancel-all-conditions") {
+      void (async () => {
+        try {
+          const { cancelAllActiveConditions } = await import("@fxflow/db")
+          const cancelled = await cancelAllActiveConditions()
+          if (_conditionMonitor) {
+            _conditionMonitor.clearAll()
+          }
+          sendJson(res, 200, { ok: true, data: { cancelled } })
+        } catch (err) {
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        }
+      })()
+      return
+    }
     if (req.method === "POST" && req.url === "/actions/ai/reload-condition") {
       if (!_conditionMonitor) {
         sendJson(res, 503, { ok: false, error: "Condition monitor not available" })

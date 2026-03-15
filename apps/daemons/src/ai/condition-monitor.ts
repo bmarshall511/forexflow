@@ -149,6 +149,11 @@ export class ConditionMonitor {
     this.conditions.delete(conditionId)
   }
 
+  /** Clear all in-memory conditions (used after bulk DB cancel). */
+  clearAll(): void {
+    this.conditions.clear()
+  }
+
   /**
    * Called when a trade is closed. Removes all in-memory conditions for the trade
    * and expires them in the DB (fire-and-forget) to prevent the race condition

@@ -38,7 +38,9 @@ export function PreflightChecks({
   const hasOpenTrades = merged.openTrades > 0
   const hasPendingOrders = merged.pendingOrders > 0
   const hasRunningAnalyses = merged.runningAnalyses > 0
-  const allClear = !hasOpenTrades && !hasPendingOrders && !hasRunningAnalyses
+  const hasActiveConditions = merged.activeConditions > 0
+  const allClear =
+    !hasOpenTrades && !hasPendingOrders && !hasRunningAnalyses && !hasActiveConditions
 
   async function handleCloseAllTrades() {
     setActionLoading("trades")
@@ -86,6 +88,26 @@ export function PreflightChecks({
     }
   }
 
+  async function handleCancelAllConditions() {
+    setActionLoading("conditions")
+    try {
+      const res = await fetch(`${DAEMON_URL}/actions/ai/cancel-all-conditions`, { method: "POST" })
+      if (!res.ok) {
+        toast.error("Failed to cancel active conditions")
+      } else {
+        const json = await res.json()
+        const count: number = json.data?.cancelled ?? 0
+        toast.success(`${count} ${count === 1 ? "condition" : "conditions"} cancelled`)
+        setOverrides((prev) => ({ ...prev, activeConditions: 0 }))
+      }
+      void onRefresh()
+    } catch {
+      toast.error("Failed to reach daemon")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const checks = [
     {
       key: "trades",
@@ -115,9 +137,9 @@ export function PreflightChecks({
       key: "conditions",
       label: "Active Conditions",
       count: merged.activeConditions,
-      passed: true, // Informational only
-      action: undefined,
-      actionLabel: undefined,
+      passed: !hasActiveConditions,
+      action: hasActiveConditions ? handleCancelAllConditions : undefined,
+      actionLabel: "Cancel All",
     },
   ]
 

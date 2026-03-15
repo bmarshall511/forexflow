@@ -139,6 +139,7 @@ export {
   listActiveConditions,
   expireOldConditions,
   cancelConditionsForTrade,
+  cancelAllActiveConditions,
   expireConditionsForTrade,
   getAllConditionSummaries,
   recoverExecutingConditions,

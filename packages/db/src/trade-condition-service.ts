@@ -293,6 +293,15 @@ export async function cancelConditionsForTrade(tradeId: string): Promise<number>
   return result.count
 }
 
+/** Cancel ALL active conditions across all trades (used by reset preflight). */
+export async function cancelAllActiveConditions(): Promise<number> {
+  const result = await db.tradeCondition.updateMany({
+    where: { status: { in: ["active", "executing"] } },
+    data: { status: "cancelled" },
+  })
+  return result.count
+}
+
 /** Expire all active/executing conditions for a trade (used when trade closes to prevent race conditions) */
 export async function expireConditionsForTrade(tradeId: string): Promise<number> {
   const result = await db.tradeCondition.updateMany({
