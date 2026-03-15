@@ -22,6 +22,7 @@ src/
   preload/
     index.ts              # contextBridge → window.fxflow API
 assets/
+  icon.icns               # macOS app icon (generated from PWA icon-512.png)
   tray-icon.png           # macOS template tray icon
 electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 ```
@@ -63,7 +64,8 @@ electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 - `pnpm electron:build` — compile main/preload via `tsc` (not electron-vite).
 - `pnpm electron:package` — build macOS DMG via electron-builder. In CI, `--publish never` is passed to prevent electron-builder from auto-publishing (uploads handled separately via `gh release upload`).
 - DMG is **unsigned** (no Apple Developer account) — users right-click → Open on first launch.
-- `electron-builder.yml` bundles daemon + web app as `extraResources`. No `assets/icon.icns` — uses default Electron icon.
+- `electron-builder.yml` bundles daemon + web app as `extraResources`. Custom app icon at `assets/icon.icns`.
+- Since the app is unsigned, macOS Gatekeeper may show "damaged" error on first launch. Users must run `xattr -cr /path/to/FXFlow.app` to remove the quarantine attribute.
 - GitHub Actions builds arm64 + x64 DMGs on each release, both on `macos-latest` (ARM); x64 is cross-compiled via `--x64` flag.
 
 ## Gotchas

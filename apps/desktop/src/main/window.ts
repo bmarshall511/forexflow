@@ -8,7 +8,7 @@
  */
 import { BrowserWindow, shell } from "electron"
 import path from "node:path"
-import { store } from "./store"
+import { store } from "./store.js"
 
 const WEB_APP_PORT = 3000
 const PRELOAD_PATH = path.join(__dirname, "..", "preload", "index.js")
