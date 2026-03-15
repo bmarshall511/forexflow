@@ -34,7 +34,7 @@ export function useAppReset(): UseAppResetReturn {
     setIsLoadingPreflight(true)
     setPreflightError(null)
     try {
-      const res = await fetch("/api/settings/reset/preflight")
+      const res = await fetch("/api/settings/reset/preflight", { cache: "no-store" })
       const json = (await res.json()) as ApiResponse<PreflightStatus>
       if (!json.ok || !json.data) {
         setPreflightError(json.error ?? "Failed to fetch preflight status")

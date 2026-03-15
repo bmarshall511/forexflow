@@ -1,6 +1,8 @@
 import { getResetPreflightStatus } from "@fxflow/db"
 import { apiSuccess, apiError } from "@/lib/api-validation"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const status = await getResetPreflightStatus()
