@@ -24,21 +24,36 @@ You are an expert TypeScript/Next.js engineer writing production-quality code fo
 apps/
   web/           — Next.js 15 App Router (frontend + API routes)
   daemons/       — Node.js daemon (trade syncing, signals, AI analysis, port 4100)
+  desktop/       — Electron macOS app (wraps web + daemon for non-technical users)
   cf-worker/     — Cloudflare Worker + Durable Objects (TradingView webhook relay)
   mcp-server/    — MCP server (Claude Code ↔ live trading data bridge)
 
 packages/
   types/         — Shared TypeScript contracts (event envelopes, DTOs)
   shared/        — Shared utilities (pure TS, no runtime-specific imports)
-  db/            — Prisma schema + SQLite, service files per domain, encryption
+  db/            — Prisma schema + SQLite/Turso, service files per domain, encryption
 ```
 
 ## Import Boundaries (strict)
 
 - `apps/*` may import from `packages/*`.
 - `apps/web` must NOT import from `apps/daemons` or `apps/cf-worker` (and vice versa).
+- `apps/desktop` may import from `packages/*`. It does NOT import from other apps.
 - `packages/*` must NOT import from `apps/*`.
 - Keep runtime-specific code out of `packages/shared` and `packages/types`.
+
+## Deployment Modes
+
+FXFlow supports three ways to run:
+
+1. **Developer mode** (`pnpm dev`) — standard development workflow, all apps via Turbo.
+2. **Desktop app** (Electron) — macOS DMG for non-technical users. Bundles web app + daemon as child process.
+3. **Cloud mode** — daemon deployed to Railway/Fly.io (Docker), DB on Turso (cloud LibSQL). Web app connects to remote daemon.
+
+- Deployment config: `packages/shared/src/deployment.ts` (`DeploymentMode`, `resolveDeploymentConfig()`).
+- DB settings: `deploymentMode` + `cloudDaemonUrl` on `Settings` model.
+- Desktop app is excluded from turbo `dev`/`build`/`typecheck`/`lint` — uses `electron:*` scripts.
+- Cloud DB: `packages/db/src/client.ts` supports both local SQLite and remote Turso via `@prisma/adapter-libsql`.
 
 ## Build / Test / Lint Commands
 
@@ -67,7 +82,7 @@ packages/
 
 - `Trade.source` in the DB is always `"oanda"` (the trade repository).
 - True origin is stored in `Trade.metadata = JSON.stringify({ placedVia: "..." })`.
-- `placedVia` values: `"fxflow"` | `"ut_bot_alerts"` | `"trade_finder"` | `"trade_finder_auto"`.
+- `placedVia` values: `"fxflow"` | `"ut_bot_alerts"` | `"trade_finder"` | `"trade_finder_auto"` | `"ai_trader"`.
 - `enrichSource(source, metadata)` in `packages/db/src/trade-service.ts` maps to display labels.
 
 ### Daemon (port 4100)
@@ -76,6 +91,8 @@ packages/
 - StateManager is single source of truth — use event listeners, not polling.
 - Per-instrument mutex for trade syncing and signal processing.
 - Crash recovery: reset stuck "executing" states on startup.
+- Containerized via `Dockerfile` for cloud deployment (Railway/Fly.io).
+- Health endpoints: `/health` (liveness) + `/health/ready` (readiness).
 
 ### Signal Flow
 
@@ -106,3 +123,4 @@ Path-scoped rules in `.claude/rules/` provide context-specific guidance:
 - `07-dependencies.md` — dependency management
 - `08-trading-domain.md` — trading domain rules
 - `09-docs-sync.md` — keep docs in sync with code changes
+- `10-desktop-patterns.md` — Electron desktop app conventions

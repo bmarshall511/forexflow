@@ -16,6 +16,8 @@ model Settings {
   liveAccountId         String?
   riskPercent           Float    @default(1.0) // Global risk % for position sizing
   onboardingCompleted   Boolean  @default(false)
+  deploymentMode        String   @default("local") // "local" | "cloud"
+  cloudDaemonUrl        String?  // Remote daemon URL for cloud mode (e.g. https://daemon.railway.app)
   updatedAt             DateTime @updatedAt
 }
 

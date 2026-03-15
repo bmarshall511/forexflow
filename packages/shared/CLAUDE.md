@@ -26,6 +26,7 @@ src/
   trend-detector.ts         # detectTrend() — trend analysis
   trend-defaults.ts         # Default trend detection parameters
   commodity-correlation.ts  # Commodity-currency correlation logic
+  deployment.ts             # Deployment mode types + config resolver
 ```
 
 ## Key Utilities
@@ -54,6 +55,12 @@ src/
 ### Trend Detection
 
 - `trend-detector.ts` — `detectTrend()` analyzes price action for trend direction/strength.
+
+### Deployment Config
+
+- `deployment.ts` — `DeploymentMode` type (`"local" | "cloud"`), `DeploymentConfig` interface, `resolveDeploymentConfig()` function.
+- Used by all layers to determine whether to connect to local daemon or remote cloud daemon.
+- `LOCAL_DEFAULTS` constant provides default local configuration.
 
 ## Gotchas
 

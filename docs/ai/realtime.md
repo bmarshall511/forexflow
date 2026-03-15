@@ -39,10 +39,20 @@ All four locations must be updated — missing any one breaks the chain.
 ## Connection Management
 
 - **Status states**: `connected | connecting | disconnected | warning | unconfigured`
-- **Reconnection**: Exponential backoff starting at 1s, max 30s, with jitter.
+- **Reconnection**: Exponential backoff starting at 2s, max 30s, with jitter.
 - **Warning state**: Triggered when no heartbeat received within expected interval.
 - **Unconfigured**: No daemon URL set — show setup prompt, do not attempt connection.
 - **Cleanup**: Always close WebSocket on component unmount / route change.
+
+### Connection Modes
+
+`use-daemon-connection.ts` resolves the daemon URL based on environment:
+
+1. **Cloud mode**: `NEXT_PUBLIC_CLOUD_DAEMON_URL` env var → connect directly to remote daemon (ws/wss)
+2. **Local dev** (`localhost`): connect to `ws://localhost:4100` directly
+3. **Remote/tunnel** (non-localhost): proxy through `wss://${host}/ws` (production) or REST polling fallback (dev)
+
+REST polling (5s interval) supplements WebSocket when WS is unavailable, keeping the UI updated with daemon status via `isReachable` state.
 
 ## Data Flow Patterns
 

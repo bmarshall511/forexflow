@@ -33,6 +33,13 @@ export {
 } from "./settings-service"
 
 export {
+  getDeploymentSettings,
+  setDeploymentMode,
+  setCloudDaemonUrl,
+  type DeploymentSettings,
+} from "./deployment-service"
+
+export {
   createNotification,
   listNotifications,
   dismissNotification,

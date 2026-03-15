@@ -158,3 +158,15 @@ jobs:
             --title "v${NEW_VERSION}" \
             --notes "$NOTES" \
             --latest
+
+    outputs:
+      released: ${{ steps.bump.outputs.bump != 'none' }}
+      version: ${{ steps.version.outputs.version }}
+
+  # Build desktop DMGs and attach to the release
+  desktop:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/desktop.yml
+    with:
+      tag: v${{ needs.release.outputs.version }}

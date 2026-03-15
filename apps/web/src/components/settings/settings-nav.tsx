@@ -11,6 +11,7 @@ import {
   Activity,
   Shield,
   AlertTriangle,
+  Cloud,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -29,6 +30,7 @@ const SETTINGS_NAV: SettingsNavItem[] = [
   { label: "AI Analysis", href: "/settings/ai", icon: Sparkles },
   { label: "AI Trader", href: "/settings/ai-trader", icon: Bot },
   { label: "Security", href: "/settings/security", icon: Shield },
+  { label: "Deployment", href: "/settings/deployment", icon: Cloud },
   { label: "System", href: "/settings/system", icon: Activity },
   { label: "Reset", href: "/settings/reset", icon: AlertTriangle, variant: "destructive" },
 ]

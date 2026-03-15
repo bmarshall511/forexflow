@@ -95,19 +95,20 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes
 
 ## Architecture
 
-ForexFlow is a TypeScript monorepo with 4 apps and 3 shared packages:
+ForexFlow is a TypeScript monorepo with 5 apps and 3 shared packages:
 
 ```
 apps/
   web/           Next.js 15 App Router — frontend + 50+ API routes
   daemons/       Node.js daemon — 13+ subsystems, port 4100
+  desktop/       Electron macOS app — wraps web + daemon for non-technical users
   cf-worker/     Cloudflare Worker + Durable Objects — webhook relay
   mcp-server/    MCP server — Claude Code integration
 
 packages/
   types/         Shared TypeScript contracts (DTOs, WebSocket messages)
-  shared/        Pure utilities (market hours, pip math, zone detection)
-  db/            Prisma ORM + SQLite, 22+ models, 24 service files
+  shared/        Pure utilities (market hours, pip math, zone detection, deployment config)
+  db/            Prisma ORM + SQLite/Turso, 22+ models, 25 service files
 ```
 
 ### How it connects
@@ -275,6 +276,33 @@ FXFlow is installable as a Progressive Web App on mobile devices:
 
 Features: offline fallback page, app icons, standalone display mode, theme-color integration.
 
+### Desktop App (macOS)
+
+For non-technical users who want to install FXFlow like a regular app — no terminal, no Node.js required:
+
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/bmarshall511/forexflow/releases)
+2. Open the DMG and drag FXFlow to Applications
+3. **First launch**: right-click the app → Open → click "Open" in the dialog (required because the app is unsigned)
+4. FXFlow starts with the daemon running in the background and the web UI in the app window
+5. Closing the window hides it to the system tray — the daemon keeps running
+6. Auto-updates check GitHub Releases every 4 hours
+
+The desktop app supports both local and cloud deployment modes via **Settings > Deployment**.
+
+### Cloud Deployment (optional)
+
+Run the daemon on a remote server so FXFlow stays online 24/7 without keeping your computer on:
+
+1. **Deploy the daemon** to Railway or Fly.io using the included `apps/daemons/Dockerfile`
+2. **Create a Turso database** at [turso.tech](https://turso.tech) (free tier available)
+3. **Set environment variables** on your cloud host:
+   - `DATABASE_URL=libsql://your-db.turso.io`
+   - `TURSO_AUTH_TOKEN=your-token`
+   - `ENCRYPTION_KEY=your-64-char-hex`
+4. **Connect your web app**: set `NEXT_PUBLIC_CLOUD_DAEMON_URL=https://your-daemon.railway.app` in `.env.local`, or switch to cloud mode in **Settings > Deployment**
+
+The daemon's `Dockerfile` and `railway.toml` are pre-configured for one-click Railway deployment. Typical cost: ~$5/month.
+
 ---
 
 ## Development
@@ -345,7 +373,7 @@ This project includes a complete AI governance system in the [`.claude/`](.claud
 
 [`.claude/CLAUDE.md`](.claude/CLAUDE.md) is loaded into every Claude Code session. It defines the monorepo layout, strict import boundaries, coding standards, and critical domain concepts. The AI reads this before writing a single line of code.
 
-### 8 Path-Scoped Rules
+### 10 Path-Scoped Rules
 
 [`.claude/rules/`](.claude/rules/) contains context-specific rules that auto-load based on which files the AI is editing:
 
@@ -360,6 +388,8 @@ This project includes a complete AI governance system in the [`.claude/`](.claud
 | `06-accessibility.md`      | AAA accessibility baseline (semantic HTML, keyboard nav, focus management)    |
 | `07-dependencies.md`       | Dependency management (justification required, no overlaps)                   |
 | `08-trading-domain.md`     | Trading domain rules (source enrichment, pip calculations, market hours)      |
+| `09-docs-sync.md`          | Keep documentation in sync with code changes                                  |
+| `10-desktop-patterns.md`   | Electron desktop app conventions (main process, IPC, tray, auto-updater)      |
 
 ### 8 Reusable Skills
 

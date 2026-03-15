@@ -2,7 +2,7 @@
 
 ## Architecture
 
-- Prisma ORM with SQLite (LibSQL adapter).
+- Prisma ORM with SQLite (LibSQL adapter). Supports remote Turso (cloud LibSQL) connections.
 - WAL mode enabled, `busy_timeout=5000` for concurrent access.
 - Client: lazy-initialized singleton via `getDb()` in `client.ts`.
 - Schema: `prisma/schema.prisma` (22+ models).
@@ -33,6 +33,7 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 - `trade-finder-service.ts` / `trade-finder-config-service.ts`
 - `tag-service.ts` / `chart-layout-service.ts` / `curve-snapshot-service.ts`
 - `ai-digest-service.ts`
+- `deployment-service.ts` — deployment mode + cloud daemon URL
 
 ## Key Patterns
 
@@ -62,6 +63,12 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 - Most services have cleanup methods for pruning old records.
 - Call patterns vary (scheduled, on-startup, manual).
 
+### Cloud DB (Turso)
+
+- `client.ts` auto-detects local vs remote via URL prefix (`file:` vs `libsql://`/`https://`).
+- Remote connections pass `TURSO_AUTH_TOKEN` and skip SQLite pragmas (WAL, busy_timeout).
+- `deployment-service.ts` — CRUD for deployment settings (`deploymentMode`, `cloudDaemonUrl` on Settings model).
+
 ## Gotchas
 
 - Always use `getDb()` — never instantiate Prisma client directly.
@@ -69,3 +76,4 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 - SQLite limitations: no concurrent writes across processes, WAL helps but doesn't eliminate.
 - Prisma generates types in `src/generated/` — run `prisma generate` after schema changes.
 - Encryption key must be 32 bytes (256 bits) for AES-256-GCM.
+- For cloud DB: set `DATABASE_URL=libsql://...` + `TURSO_AUTH_TOKEN`. WAL/busy_timeout pragmas are skipped automatically.

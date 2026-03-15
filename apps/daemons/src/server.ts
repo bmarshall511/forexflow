@@ -113,6 +113,14 @@ export async function startServer(port: number, deps: ServerDeps) {
       return
     }
 
+    // Readiness probe for container orchestrators (Railway, Fly.io, K8s).
+    // Returns 200 only when the daemon is fully initialized and ready to serve.
+    if (req.method === "GET" && req.url === "/health/ready") {
+      const snapshot = stateManager.getSnapshot()
+      const isReady = snapshot.uptimeSeconds > 0
+      sendJson(res, isReady ? 200 : 503, { ok: isReady, uptime: process.uptime() })
+      return
+    }
     if (req.method === "GET" && req.url === "/health/detailed") {
       const mem = process.memoryUsage()
       const snapshot = stateManager.getSnapshot()

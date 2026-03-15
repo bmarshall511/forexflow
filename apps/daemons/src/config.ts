@@ -17,7 +17,8 @@ export interface DaemonConfig {
 
 export function getConfig(): DaemonConfig {
   return {
-    port: parseInt(process.env.DAEMON_PORT ?? "4100", 10),
+    // Railway/Fly.io set PORT dynamically — fall back to DAEMON_PORT or 4100
+    port: parseInt(process.env.DAEMON_PORT ?? process.env.PORT ?? "4100", 10),
     healthCheckIntervalMs: parseInt(process.env.DAEMON_HEALTH_INTERVAL ?? "5000", 10),
     dbPollIntervalMs: parseInt(process.env.DAEMON_DB_POLL_INTERVAL ?? "5000", 10),
     streamReconnectDelayMs: parseInt(process.env.DAEMON_STREAM_RECONNECT_DELAY ?? "5000", 10),

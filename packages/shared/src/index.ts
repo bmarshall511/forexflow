@@ -164,3 +164,10 @@ export {
 } from "./errors"
 
 export { Logger } from "./logger"
+
+export {
+  resolveDeploymentConfig,
+  LOCAL_DEFAULTS,
+  type DeploymentMode,
+  type DeploymentConfig,
+} from "./deployment"

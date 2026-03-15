@@ -87,7 +87,8 @@ Every feature page follows this structure:
 ## Remote Access
 
 - `server.ts` — custom Next.js server that proxies `/ws` WebSocket to daemon:4100 (production only).
-- `use-daemon-connection.ts` auto-detects local vs remote and switches between direct daemon connection and proxy.
+- `use-daemon-connection.ts` auto-detects local vs remote vs cloud and switches between direct daemon connection, proxy, or cloud URL.
+- **Cloud mode**: `NEXT_PUBLIC_CLOUD_DAEMON_URL` env var or Settings > Deployment overrides daemon URL to connect directly to a remote daemon.
 - `/api/daemon/[...path]` — REST proxy route for daemon calls when remote.
 - In dev mode (no WS proxy), `use-daemon-connection.ts` falls back to REST polling every 5s. `isReachable` state tracks REST-based connectivity alongside `isConnected` (WebSocket).
 - `/api/settings/tunnel-status` — returns tunnel status + URL (read from `data/.tunnel-url` written by `dev.sh`).
@@ -102,3 +103,5 @@ Every feature page follows this structure:
 - WS reconnection is handled automatically by `use-daemon-connection.ts`.
 - `use-daemon-status.ts` vs `use-daemon-connection.ts`: status is the consumer hook, connection is the provider.
 - `server.ts` is only used in production (`pnpm start`). Dev mode uses `next dev` directly (no WS proxy — REST polling fills the gap).
+- Deployment settings (local/cloud mode, cloud daemon URL) stored in `Settings` model via `deployment-service.ts`.
+- Settings > Deployment page: `components/settings/deployment/deployment-settings-page.tsx`.

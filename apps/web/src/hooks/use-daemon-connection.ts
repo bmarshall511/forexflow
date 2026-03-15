@@ -28,14 +28,24 @@ import type {
 } from "@fxflow/types"
 
 /**
- * Auto-detect whether to connect directly to the daemon (local dev)
- * or through the WebSocket proxy (remote/production).
+ * Auto-detect whether to connect directly to the daemon (local dev),
+ * through the WebSocket proxy (remote/production), or to a cloud daemon.
  *
+ * Cloud: NEXT_PUBLIC_CLOUD_DAEMON_URL is set → connect directly to remote daemon.
  * Local: browser is on localhost → connect to daemon on port 4100 directly.
  * Remote: browser is on a tunnel/domain → use /ws proxy path through same origin.
  */
 function resolveDaemonUrls(): { wsUrl: string; restUrl: string } {
   if (typeof window === "undefined") return { wsUrl: "", restUrl: "" }
+
+  // Cloud mode override — connect directly to remote daemon
+  const cloudUrl = process.env.NEXT_PUBLIC_CLOUD_DAEMON_URL
+  if (cloudUrl) {
+    return {
+      wsUrl: cloudUrl.replace(/^http/, "ws"),
+      restUrl: cloudUrl,
+    }
+  }
 
   const host = window.location.hostname
   const isLocal = host === "localhost" || host === "127.0.0.1"

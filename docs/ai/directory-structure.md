@@ -22,6 +22,12 @@ apps/
       ai/               # AI analysis pipeline (context, executor, monitor)
       trade-finder/     # Scanner, setup detection, auto-trade
       tv-alerts/        # Signal processor, webhook handling
+  desktop/              # Electron macOS app — wraps web + daemon for end users
+    src/
+      main/             # Main process (window, tray, daemon manager, IPC, updater)
+      preload/          # contextBridge preload script
+    assets/             # App icons, tray icon
+    electron-builder.yml # Build config (DMG, unsigned, GitHub publish)
   cf-worker/            # Cloudflare Worker — webhook relay
     src/                # Worker entry, Durable Objects
 
@@ -29,8 +35,8 @@ packages/
   types/                # Shared TypeScript contracts
     src/index.ts        # All shared types, enums, Zod schemas
   shared/               # Pure TS utilities (no runtime deps)
-    src/                # Formatting, validation, constants
-  db/                   # Prisma + SQLite data layer
+    src/                # Formatting, validation, constants, deployment config
+  db/                   # Prisma + SQLite/Turso data layer
     prisma/
       schema.prisma     # Single schema file
     src/                # Service files (one per domain)
@@ -38,14 +44,16 @@ packages/
 
 ## Import Boundaries
 
-| From              | To               | Allowed                             |
-| ----------------- | ---------------- | ----------------------------------- |
-| `apps/*`          | `packages/*`     | Yes                                 |
-| `packages/*`      | `apps/*`         | **Never**                           |
-| `apps/web`        | `apps/daemons`   | **Never** (communicate via HTTP/WS) |
-| `packages/db`     | `packages/types` | Yes                                 |
-| `packages/shared` | `packages/types` | Yes                                 |
-| `packages/types`  | other packages   | **Never** (leaf dependency)         |
+| From              | To               | Allowed                               |
+| ----------------- | ---------------- | ------------------------------------- |
+| `apps/*`          | `packages/*`     | Yes                                   |
+| `packages/*`      | `apps/*`         | **Never**                             |
+| `apps/web`        | `apps/daemons`   | **Never** (communicate via HTTP/WS)   |
+| `apps/desktop`    | `packages/*`     | Yes                                   |
+| `apps/desktop`    | `apps/*`         | **Never** (bundles as extraResources) |
+| `packages/db`     | `packages/types` | Yes                                   |
+| `packages/shared` | `packages/types` | Yes                                   |
+| `packages/types`  | other packages   | **Never** (leaf dependency)           |
 
 ## Where New Code Goes
 
@@ -59,7 +67,13 @@ packages/
 
 ## Workspace Commands
 
-- `pnpm dev` — run all apps in dev mode (Turbo)
-- `pnpm build` — build all workspaces
+- `pnpm dev` — run all apps in dev mode (Turbo). Desktop app is excluded.
+- `pnpm build` — build all workspaces (except desktop)
 - `pnpm --filter @fxflow/web dev` — run single workspace
 - `pnpm db:migrate` — apply Prisma migrations
+
+### Desktop-specific commands (run from `apps/desktop/`)
+
+- `pnpm electron:dev` — run Electron in dev mode
+- `pnpm electron:build` — compile Electron main/preload
+- `pnpm electron:package` — build macOS DMG via electron-builder

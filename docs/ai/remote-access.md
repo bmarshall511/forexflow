@@ -1,8 +1,14 @@
-# Remote Access & Security
+# Remote Access, Cloud Deployment & Security
 
 ## Overview
 
-FXFlow supports secure remote access from phones and other devices via Cloudflare Tunnel. Zero configuration required — `pnpm dev` handles everything automatically.
+FXFlow supports three deployment modes:
+
+1. **Local + Tunnel** (default dev) — daemon + web on your machine, Cloudflare Tunnel for mobile access
+2. **Desktop app** (Electron) — macOS DMG for non-technical users, daemon as child process
+3. **Cloud mode** — daemon on Railway/Fly.io, DB on Turso, web app connects to remote daemon
+
+For local mode, FXFlow supports secure remote access from phones and other devices via Cloudflare Tunnel. Zero configuration required — `pnpm dev` handles everything automatically.
 
 **Security layers:**
 
@@ -196,3 +202,96 @@ The URL file is cleaned up on exit and is gitignored (inside `data/`).
 | `apps/web/public/sw.js`                                           | Service worker                                |
 | `scripts/dev.sh`                                                  | Dev environment with auto-tunnel              |
 | `cloudflare/tunnel-config.example.yml`                            | Named tunnel config template                  |
+| `packages/shared/src/deployment.ts`                               | Deployment mode types + resolver              |
+| `packages/db/src/deployment-service.ts`                           | Deployment settings CRUD                      |
+| `apps/web/src/app/api/settings/deployment/route.ts`               | Deployment settings API                       |
+| `apps/web/src/components/settings/deployment/`                    | Deployment settings UI                        |
+| `apps/desktop/src/main/`                                          | Electron main process                         |
+| `apps/daemons/Dockerfile`                                         | Cloud deployment container                    |
+| `apps/daemons/railway.toml`                                       | Railway deployment config                     |
+
+## Cloud Deployment Mode
+
+### Overview
+
+Cloud mode runs the daemon on a remote server (Railway, Fly.io) with the database on Turso (cloud LibSQL). The web app connects directly to the remote daemon instead of localhost.
+
+### Architecture
+
+```
+Phone/Desktop Browser
+  ↓ HTTPS
+Cloud Daemon (Railway/Fly.io)
+  ├── REST API (trade actions, status)
+  ├── WebSocket (real-time updates)
+  └── Turso DB (cloud LibSQL)
+        ↑
+OANDA API (streaming + REST)
+```
+
+### Configuration
+
+1. **Deploy daemon**: Use the included `apps/daemons/Dockerfile` + `railway.toml`
+2. **Set env vars** on the cloud host:
+   - `DATABASE_URL=libsql://your-db.turso.io`
+   - `TURSO_AUTH_TOKEN=your-token`
+   - `ENCRYPTION_KEY=your-64-char-hex`
+   - `PORT` (auto-set by Railway/Fly.io)
+3. **Configure web app**: Set `NEXT_PUBLIC_CLOUD_DAEMON_URL=https://your-daemon.railway.app`
+4. **Or via Settings**: Settings > Deployment > Cloud mode > enter daemon URL
+
+### DB Client (Local vs Cloud)
+
+`packages/db/src/client.ts` auto-detects the connection mode:
+
+- **Local** (`file:` URL): SQLite with WAL mode + busy_timeout pragmas
+- **Remote** (`libsql://` or `https://`): Turso with auth token, no SQLite pragmas
+
+### Health Endpoints
+
+- `GET /health` — liveness probe (always returns 200)
+- `GET /health/ready` — readiness probe (checks OANDA connection + DB access)
+
+## Desktop App (Electron)
+
+### Overview
+
+The Electron app packages the web app + daemon into a macOS DMG for non-technical users. No Node.js, pnpm, or terminal knowledge required.
+
+### Architecture
+
+- **Main process**: manages BrowserWindow, system tray, daemon child process, auto-updater
+- **Daemon**: spawned as `fork()` child process in local mode, auto-restarts with exponential backoff (max 5 restarts)
+- **Web app**: bundled Next.js app served on localhost, loaded in BrowserWindow
+- **System tray**: close → hide to tray (daemon keeps running), context menu for status/quit
+- **Auto-updater**: `electron-updater` checks GitHub Releases every 4 hours
+
+### Build & Distribution
+
+- Built via `electron-builder` (DMG for macOS arm64 + x64)
+- **Unsigned** — users must right-click → Open → Open Anyway on first launch
+- Published to GitHub Releases via `.github/workflows/desktop.yml`
+- `electron-builder.yml` bundles daemon + web app as `extraResources`
+
+### IPC Bridge
+
+`contextBridge` exposes `window.fxflow` API to the renderer:
+
+- `getVersion()`, `getDeploymentMode()`, `setDeploymentMode()`
+- `getCloudDaemonUrl()`, `setCloudDaemonUrl()`
+- `getDaemonStatus()`, `getAutoLaunch()`, `setAutoLaunch()`
+
+### Key Files
+
+| File                                      | Purpose                              |
+| ----------------------------------------- | ------------------------------------ |
+| `apps/desktop/src/main/index.ts`          | Main orchestrator                    |
+| `apps/desktop/src/main/daemon-manager.ts` | Daemon child process management      |
+| `apps/desktop/src/main/window.ts`         | BrowserWindow creation               |
+| `apps/desktop/src/main/tray.ts`           | System tray + context menu           |
+| `apps/desktop/src/main/updater.ts`        | Auto-update via GitHub Releases      |
+| `apps/desktop/src/main/ipc-handlers.ts`   | IPC handler registration             |
+| `apps/desktop/src/main/store.ts`          | Persistent settings (electron-store) |
+| `apps/desktop/src/preload/index.ts`       | contextBridge preload                |
+| `apps/desktop/electron-builder.yml`       | Build configuration                  |
+| `.github/workflows/desktop.yml`           | CI: build + upload DMG to release    |

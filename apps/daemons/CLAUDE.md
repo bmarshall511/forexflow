@@ -84,9 +84,18 @@ src/
 - `notification-emitter.ts` — creates DB records + broadcasts via WS.
 - Specialized emitters: `emitTradeFinder()`, `emitAiAnalysis()`, `emitTradeCondition()`.
 
+## Cloud Deployment
+
+- `Dockerfile` — multi-stage build (node:22-slim, pnpm install, prisma generate).
+- `railway.toml` — Railway config with Dockerfile builder, health check, restart policy.
+- Health endpoints: `/health` (liveness, always 200) + `/health/ready` (readiness, checks OANDA + DB).
+- `PORT` env var auto-set by Railway/Fly.io — `config.ts` falls back: `DAEMON_PORT ?? PORT ?? "4100"`.
+- Cloud DB: `DATABASE_URL=libsql://...` + `TURSO_AUTH_TOKEN` for Turso connections.
+
 ## Gotchas
 
 - Config values come from env vars — check `config.ts` for defaults before adding new ones.
 - StateManager event listeners must be cleaned up to avoid memory leaks.
 - Transaction stream handles order fills AND cancellations — both must be processed.
 - Trade syncer mutex is per-instrument, not global — concurrent syncs on different pairs are OK.
+- In Electron desktop mode, the daemon is spawned as a `fork()` child process by `apps/desktop/src/main/daemon-manager.ts`.

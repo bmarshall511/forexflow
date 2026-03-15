@@ -1,0 +1,89 @@
+name: Desktop Build
+
+on:
+  # Called by release workflow after creating a GitHub Release
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.5.0)"
+        required: true
+        type: string
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to upload to (leave empty to skip upload)"
+        type: string
+        default: ""
+
+concurrency:
+  group: desktop-build
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+          - os: macos-13
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Build shared packages first
+      - name: Build packages
+        run: |
+          pnpm --filter @fxflow/types build
+          pnpm --filter @fxflow/shared build
+          pnpm --filter @fxflow/db build
+
+      # Build the web app (Next.js)
+      - name: Build web app
+        run: pnpm --filter @fxflow/web build
+
+      # Build the daemon
+      - name: Build daemon
+        run: pnpm --filter @fxflow/daemons build
+
+      # Build Electron app
+      - name: Build desktop app
+        working-directory: apps/desktop
+        run: |
+          pnpm electron:build
+          pnpm electron:package
+
+      # Upload artifacts for inspection
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FXFlow-${{ matrix.arch }}
+          path: apps/desktop/release/*.dmg
+          if-no-files-found: error
+
+      # Attach to GitHub Release (when called from release workflow or manual with tag)
+      - name: Upload to release
+        if: inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for dmg in apps/desktop/release/*.dmg; do
+            gh release upload "${{ inputs.tag }}" "$dmg" --clobber
+          done
