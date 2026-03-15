@@ -65,12 +65,6 @@ The maximum number of auto-placed orders that can be open at the same time. Defa
 
 If the limit is reached, additional eligible setups are queued by priority (score, then distance to entry). When a slot opens (order fills, cancels, or zone invalidates), the top queued setup is placed automatically.
 
-### Max Daily Auto-Trades
-
-The most auto-trades Trade Finder can place in a single day. Default is **5**.
-
-Once this limit is reached, eligible setups are queued until the next day.
-
 ### Max Total Risk %
 
 The maximum percentage of your account that all auto-trades combined can put at risk. Default is **6%**.
@@ -80,7 +74,7 @@ The maximum percentage of your account that all auto-trades combined can put at 
 
 ### Cap Visibility
 
-When auto-trade is enabled, the dashboard header shows utilization tiles for each cap (Concurrent, Daily, Risk). Tiles turn amber when a cap is reached, so you can quickly see why setups are being queued instead of placed.
+When auto-trade is enabled, the dashboard header shows utilization tiles for each cap (Concurrent, Risk). Tiles turn amber when a cap is reached, so you can quickly see why setups are being queued instead of placed.
 
 ### Min Risk:Reward
 

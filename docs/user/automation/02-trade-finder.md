@@ -69,7 +69,6 @@ You can also run Trade Finder in manual mode, where it shows you the setups but 
 
 Auto-trading without limits is dangerous, so Trade Finder has several safety settings:
 
-- **Max daily trades** — how many orders it can place per day (e.g., 3)
 - **Max concurrent orders** — how many pending orders can exist at once
 - **Max risk per trade** — maximum percentage of your account to risk on each setup
 - **Minimum R:R** — minimum reward-to-risk ratio (e.g., 2:1 means the potential profit must be at least twice the potential loss)
@@ -82,17 +81,16 @@ Auto-trading without limits is dangerous, so Trade Finder has several safety set
 When auto-trade is enabled, each setup card shows a badge indicating its auto-trade status:
 
 - **Eligible** (teal) — the setup passes all checks and will be placed when price reaches the entry zone
-- **Queued #N** (blue) — the setup is eligible but waiting for a cap slot to open (e.g., daily limit reached). The number shows its priority position — when a slot opens, the highest-priority queued setup is placed first
+- **Queued #N** (blue) — the setup is eligible but waiting for a cap slot to open (e.g., max concurrent orders reached). The number shows its priority position — when a slot opens, the highest-priority queued setup is placed first
 - **Blocked** (amber) — the setup will not auto-place (e.g., score too low, R:R below minimum, or same-instrument conflict)
 
 The reason for queuing or blocking is shown as a subtitle below the badge.
 
 ## Cap Utilization
 
-When auto-trade is on, the dashboard status bar shows three additional tiles:
+When auto-trade is on, the dashboard status bar shows two additional tiles:
 
 - **Concurrent** — how many auto-placed pending orders exist vs the maximum (e.g., "3/5")
-- **Daily** — how many auto-trades have been placed today vs the daily limit (e.g., "5/5")
 - **Risk** — total risk percentage of auto-placed orders vs the max risk cap (e.g., "4.2%/6%")
 
 These tiles turn amber when a cap is reached, helping you understand why setups are queued.
@@ -122,7 +120,7 @@ This log is your audit trail. Check it regularly to understand what Trade Finder
 1. Go to the Trade Finder page
 2. Select which currency pairs to scan
 3. Set your minimum score threshold
-4. Configure risk controls (max trades, risk %, min R:R)
+4. Configure risk controls (max concurrent orders, risk %, min R:R)
 5. Start in **manual mode** first — watch the setups and verify they match your expectations
 6. Once comfortable, enable auto-trade
 
