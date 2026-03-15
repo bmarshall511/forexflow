@@ -80,7 +80,7 @@ jobs:
         env:
           GH_OWNER: ${{ github.repository_owner }}
           GH_REPO: ${{ github.event.repository.name }}
-        run: pnpm electron:package --${{ matrix.arch }}
+        run: pnpm electron:package --${{ matrix.arch }} --publish never
 
       # Upload artifacts for inspection
       - name: Upload DMG artifact

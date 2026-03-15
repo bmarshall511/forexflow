@@ -1,6 +1,8 @@
 {
   "name": "@fxflow/desktop",
   "version": "0.0.0",
+  "description": "FXFlow desktop app for macOS — Electron wrapper for the web UI and daemon",
+  "author": "FXFlow",
   "private": true,
   "type": "module",
   "main": "dist/main/index.js",
