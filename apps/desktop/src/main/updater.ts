@@ -6,7 +6,8 @@
  *
  * @module updater
  */
-import { autoUpdater } from "electron-updater"
+import electronUpdater from "electron-updater"
+const { autoUpdater } = electronUpdater
 import { type BrowserWindow, dialog } from "electron"
 
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours
