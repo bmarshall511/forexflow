@@ -4,8 +4,10 @@ import { useState } from "react"
 import { CheckCircle, XCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import type { PreflightStatus } from "@fxflow/db"
 import type { ResetLevel } from "./reset-level-selector"
+import { useTradeActions } from "@/hooks/use-trade-actions"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
@@ -26,19 +28,49 @@ export function PreflightChecks({
 }: PreflightChecksProps) {
   const [forceReset, setForceReset] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const { closeAllTrades, cancelAllOrders, refreshPositions } = useTradeActions()
 
   const hasOpenTrades = preflight.openTrades > 0
   const hasPendingOrders = preflight.pendingOrders > 0
   const hasRunningAnalyses = preflight.runningAnalyses > 0
   const allClear = !hasOpenTrades && !hasPendingOrders && !hasRunningAnalyses
 
-  async function callDaemon(path: string, actionKey: string) {
-    setActionLoading(actionKey)
+  async function handleCloseAllTrades() {
+    setActionLoading("trades")
     try {
-      await fetch(`${DAEMON_URL}${path}`, { method: "POST" })
+      const result = await closeAllTrades(undefined)
+      if (result.succeeded > 0) await refreshPositions()
+      await onRefresh()
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleCancelAllOrders() {
+    setActionLoading("orders")
+    try {
+      const result = await cancelAllOrders(undefined)
+      if (result.succeeded > 0) await refreshPositions()
+      await onRefresh()
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleCancelAllAnalyses() {
+    setActionLoading("analyses")
+    try {
+      const res = await fetch(`${DAEMON_URL}/actions/ai/cancel-all-running`, { method: "POST" })
+      if (!res.ok) {
+        toast.error("Failed to cancel running analyses")
+      } else {
+        const json = await res.json()
+        const count: number = json.data?.aborted ?? 0
+        toast.success(`${count} ${count === 1 ? "analysis" : "analyses"} cancelled`)
+      }
       await onRefresh()
     } catch {
-      // Refresh anyway to show current state
+      toast.error("Failed to reach daemon")
       await onRefresh()
     } finally {
       setActionLoading(null)
@@ -51,9 +83,7 @@ export function PreflightChecks({
       label: "Open Trades",
       count: preflight.openTrades,
       passed: !hasOpenTrades,
-      action: hasOpenTrades
-        ? () => callDaemon("/actions/close-all-positions", "trades")
-        : undefined,
+      action: hasOpenTrades ? handleCloseAllTrades : undefined,
       actionLabel: "Close All",
     },
     {
@@ -61,9 +91,7 @@ export function PreflightChecks({
       label: "Pending Orders",
       count: preflight.pendingOrders,
       passed: !hasPendingOrders,
-      action: hasPendingOrders
-        ? () => callDaemon("/actions/cancel-all-orders", "orders")
-        : undefined,
+      action: hasPendingOrders ? handleCancelAllOrders : undefined,
       actionLabel: "Cancel All",
     },
     {
@@ -71,9 +99,7 @@ export function PreflightChecks({
       label: "Running Analyses",
       count: preflight.runningAnalyses,
       passed: !hasRunningAnalyses,
-      action: hasRunningAnalyses
-        ? () => callDaemon("/actions/ai/cancel-all", "analyses")
-        : undefined,
+      action: hasRunningAnalyses ? handleCancelAllAnalyses : undefined,
       actionLabel: "Cancel All",
     },
     {
