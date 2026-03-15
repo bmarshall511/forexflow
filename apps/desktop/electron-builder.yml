@@ -41,8 +41,8 @@ dmg:
 # Auto-updater checks GitHub Releases
 publish:
   provider: github
-  owner: "${GH_OWNER}"
-  repo: "${GH_REPO}"
+  owner: "${env.GH_OWNER}"
+  repo: "${env.GH_REPO}"
 
 # Do not sign or notarize (open-source, no Apple Developer account)
 afterSign: null

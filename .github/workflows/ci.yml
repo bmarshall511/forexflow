@@ -74,7 +74,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fxflow/db db:generate
-      - run: pnpm build
+      # Build only the core app (site has its own gh-pages workflow, desktop has its own workflow)
+      - run: pnpm --filter @fxflow/web build
 
   audit:
     runs-on: ubuntu-latest
