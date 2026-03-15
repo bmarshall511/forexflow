@@ -61,6 +61,7 @@ electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 
 ## Build & Distribution
 
+- `pnpm desktop:dist` (from repo root) — single command to build everything and package the arm64 DMG locally.
 - `pnpm electron:build` — compile main/preload via `tsc` (not electron-vite).
 - `pnpm electron:package` — build macOS DMG via electron-builder. In CI, `--publish never` is passed to prevent electron-builder from auto-publishing (uploads handled separately via `gh release upload`).
 - DMG is **unsigned** (no Apple Developer account) — users right-click → Open on first launch.

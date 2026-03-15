@@ -57,18 +57,19 @@ FXFlow supports three ways to run:
 
 ## Build / Test / Lint Commands
 
-| Command             | Scope    | Description                      |
-| ------------------- | -------- | -------------------------------- |
-| `pnpm dev`          | all      | Start all apps in dev mode       |
-| `pnpm build`        | all      | Production build                 |
-| `pnpm lint`         | all      | ESLint across workspaces         |
-| `pnpm typecheck`    | all      | `tsc --noEmit` across workspaces |
-| `pnpm test`         | all      | Run test suites                  |
-| `pnpm format`       | all      | Prettier format                  |
-| `pnpm format:check` | all      | Check formatting (no write)      |
-| `pnpm knip`         | all      | Find unused exports/dependencies |
-| `pnpm docs:api`     | packages | Generate TypeDoc API docs        |
-| `pnpm changelog`    | root     | Generate changelog from commits  |
+| Command             | Scope    | Description                       |
+| ------------------- | -------- | --------------------------------- |
+| `pnpm dev`          | all      | Start all apps in dev mode        |
+| `pnpm build`        | all      | Production build                  |
+| `pnpm lint`         | all      | ESLint across workspaces          |
+| `pnpm typecheck`    | all      | `tsc --noEmit` across workspaces  |
+| `pnpm test`         | all      | Run test suites                   |
+| `pnpm format`       | all      | Prettier format                   |
+| `pnpm format:check` | all      | Check formatting (no write)       |
+| `pnpm knip`         | all      | Find unused exports/dependencies  |
+| `pnpm docs:api`     | packages | Generate TypeDoc API docs         |
+| `pnpm changelog`    | root     | Generate changelog from commits   |
+| `pnpm desktop:dist` | desktop  | Build & package arm64 DMG locally |
 
 ## Key Domain Concepts
 

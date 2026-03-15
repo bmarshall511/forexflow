@@ -22,6 +22,7 @@
     "docs:api": "typedoc",
     "changelog": "auto-changelog --template keepachangelog --commit-limit false --unreleased",
     "postinstall": "lefthook install",
+    "desktop:dist": "pnpm --filter @fxflow/db db:generate && pnpm --filter @fxflow/types build && pnpm --filter @fxflow/shared build && pnpm --filter @fxflow/db build && pnpm --filter @fxflow/web build && pnpm --filter @fxflow/daemons build && pnpm --filter @fxflow/desktop electron:build && cd apps/desktop && GH_OWNER=local GH_REPO=local pnpm electron:package --arm64 --publish never",
     "site:dev": "pnpm --filter @fxflow/site dev",
     "site:build": "pnpm --filter @fxflow/site build",
     "site:preview": "pnpm --filter @fxflow/site preview"
