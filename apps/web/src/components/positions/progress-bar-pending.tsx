@@ -7,7 +7,7 @@ interface PendingProgressBarProps {
   instrument: string
   entryPrice: number
   currentPrice: number | null
-  /** Stop loss price — used as the reference scale for 0-100% */
+  /** Stop loss price — used as the reference weight for proximity % */
   stopLoss?: number | null
   /** Trade direction — used for label context */
   direction?: "long" | "short"
@@ -33,12 +33,15 @@ export function PendingProgressBar({
 
   const info = calculateDistanceInfo(instrument, currentPrice, entryPrice)
 
-  // Use SL distance as the reference scale; fall back to 100 pips if no SL
-  const referencePips = stopLoss ? priceToPips(instrument, Math.abs(entryPrice - stopLoss)) : 100
-  // Ensure a minimum reference to avoid division issues
-  const scale = Math.max(referencePips, 10)
+  // Reference weight: SL distance (or 100 pips fallback).
+  // Formula: ref / (current + ref) * 100 → 100% at entry, decays smoothly as distance grows.
+  // Unlike a linear scale, this never hits exactly 0% for non-zero distances.
+  const referencePips = stopLoss
+    ? Math.max(priceToPips(instrument, Math.abs(entryPrice - stopLoss)), 5)
+    : 100
 
-  const fillPercent = Math.min(100, Math.max(0, (1 - info.pips / scale) * 100))
+  const fillPercent =
+    info.pips === 0 ? 100 : Math.min(100, (referencePips / (info.pips + referencePips)) * 100)
   const isClose = fillPercent >= 75
   const isMedium = fillPercent >= 40 && fillPercent < 75
 
