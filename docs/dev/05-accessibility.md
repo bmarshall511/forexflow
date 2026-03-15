@@ -1,3 +1,10 @@
+---
+title: "Accessibility Standards"
+description: "AAA-level accessibility requirements, ARIA patterns, and testing checklist"
+category: "dev"
+order: 5
+---
+
 # Accessibility Standards (AAA Baseline)
 
 ## Semantic HTML

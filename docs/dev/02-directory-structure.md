@@ -1,3 +1,10 @@
+---
+title: "Directory Structure"
+description: "Monorepo layout, import boundaries, and where to place new code in FXFlow"
+category: "dev"
+order: 2
+---
+
 # Directory Structure
 
 ## Monorepo Layout

@@ -53,7 +53,7 @@ src/
   - `SectionCard` — `components/ui/section-card.tsx`
   - `Select` (Radix-based) — `components/ui/select.tsx`
 - **Toast**: Sonner via `components/ui/sonner.tsx`.
-- **In-app docs**: `components/docs/` — renders `README.md` + `docs/ai/*.md` via `/api/docs` route and `lib/markdown.ts` (zero-dependency markdown-to-HTML). Sidebar nav + card content with `.prose-fxflow` styles in `globals.css`.
+- **In-app docs**: `components/docs/` — renders `docs/user/` + `docs/dev/` via `/api/docs` route (category-based) and `lib/markdown.ts` (zero-dependency markdown-to-HTML with frontmatter, callouts, cross-links, TOC extraction). 3-column layout: grouped sidebar + content + TOC. Search via `/api/docs/search`. Styles in `.prose-fxflow` in `globals.css`.
 
 ## Page Layout Pattern
 
@@ -94,7 +94,7 @@ Every feature page follows this structure:
 - In dev mode (no WS proxy), `use-daemon-connection.ts` falls back to REST polling every 5s. `isReachable` state tracks REST-based connectivity alongside `isConnected` (WebSocket).
 - `/api/settings/tunnel-status` — returns tunnel status + URL (read from `data/.tunnel-url` written by `dev.sh`).
 - PWA manifest + service worker for installable mobile experience.
-- See `docs/ai/remote-access.md` for full architecture.
+- See `docs/dev/06-remote-access.md` for full architecture.
 
 ## Gotchas
 

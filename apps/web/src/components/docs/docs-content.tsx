@@ -1,19 +1,41 @@
 "use client"
 
 import { useMemo } from "react"
-import { markdownToHtml } from "@/lib/markdown"
+import { parseMarkdown, type DocHeading } from "@/lib/markdown"
+import { DocsBreadcrumbs } from "./docs-breadcrumbs"
+import { DocsNavFooter } from "./docs-nav-footer"
+import type { DocEntry } from "./docs-types"
 
 interface DocsContentProps {
   content: string
   title: string
+  categoryLabel: string
+  prev: DocEntry | null
+  next: DocEntry | null
+  onSelect: (slug: string) => void
+  onHeadings: (headings: DocHeading[]) => void
 }
 
-export function DocsContent({ content, title }: DocsContentProps) {
-  const html = useMemo(() => markdownToHtml(content), [content])
+export function DocsContent({
+  content,
+  title,
+  categoryLabel,
+  prev,
+  next,
+  onSelect,
+  onHeadings,
+}: DocsContentProps) {
+  const parsed = useMemo(() => {
+    const result = parseMarkdown(content)
+    onHeadings(result.headings)
+    return result
+  }, [content, onHeadings])
 
   return (
     <article aria-label={title}>
-      <div className="prose-fxflow" dangerouslySetInnerHTML={{ __html: html }} />
+      <DocsBreadcrumbs categoryLabel={categoryLabel} docTitle={title} />
+      <div className="prose-fxflow" dangerouslySetInnerHTML={{ __html: parsed.html }} />
+      <DocsNavFooter prev={prev} next={next} onSelect={onSelect} />
     </article>
   )
 }

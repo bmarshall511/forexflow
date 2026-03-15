@@ -1,3 +1,10 @@
+---
+title: "Testing Standards"
+description: "Vitest framework, test tiers, file conventions, and CI expectations for FXFlow"
+category: "dev"
+order: 4
+---
+
 # Testing Standards
 
 ## Framework

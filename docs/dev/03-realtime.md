@@ -1,3 +1,10 @@
+---
+title: "Real-Time Patterns"
+description: "WebSocket architecture, message types, connection management, and data flow patterns"
+category: "dev"
+order: 3
+---
+
 # Real-Time Patterns
 
 ## Architecture

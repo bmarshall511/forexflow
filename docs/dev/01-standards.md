@@ -1,3 +1,10 @@
+---
+title: "Coding Standards"
+description: "TypeScript conventions, error handling, file size limits, and naming rules for FXFlow development"
+category: "dev"
+order: 1
+---
+
 # Coding Standards
 
 ## TypeScript

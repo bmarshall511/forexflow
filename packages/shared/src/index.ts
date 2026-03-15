@@ -171,3 +171,5 @@ export {
   type DeploymentMode,
   type DeploymentConfig,
 } from "./deployment"
+
+export { parseFrontmatter, slugify, type DocFrontmatter } from "./markdown"

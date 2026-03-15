@@ -18,19 +18,20 @@ When making changes that affect documented behavior, update the corresponding do
 | `apps/web/src/app/api/`                         | `apps/web/CLAUDE.md` (API route pattern)                         |
 | `apps/web/src/state/`                           | `apps/web/CLAUDE.md` (state management)                          |
 | `apps/web/src/middleware.ts`, auth routes       | `apps/web/CLAUDE.md` (authentication, gotchas)                   |
-| `apps/web/server.ts`, WS proxy, tunnel          | `apps/web/CLAUDE.md` + `docs/ai/remote-access.md`                |
-| `apps/daemons/src/`                             | `apps/daemons/CLAUDE.md` + `docs/ai/realtime.md`                 |
+| `apps/web/server.ts`, WS proxy, tunnel          | `apps/web/CLAUDE.md` + `docs/dev/06-remote-access.md`            |
+| `apps/daemons/src/`                             | `apps/daemons/CLAUDE.md` + `docs/dev/03-realtime.md`             |
 | `apps/cf-worker/`                               | `apps/cf-worker/CLAUDE.md`                                       |
 | `packages/db/prisma/schema.prisma`              | `packages/db/CLAUDE.md`                                          |
 | `packages/db/src/*-service.ts`                  | `packages/db/CLAUDE.md`                                          |
 | `packages/types/`, `packages/shared/`           | Respective `CLAUDE.md` files                                     |
-| WebSocket messages, event types                 | `docs/ai/realtime.md`                                            |
+| WebSocket messages, event types                 | `docs/dev/03-realtime.md`                                        |
 | UI components (new shared primitives)           | `apps/web/CLAUDE.md` (shared UI primitives list)                 |
-| Directory structure changes                     | `docs/ai/directory-structure.md`                                 |
-| Testing patterns                                | `docs/ai/testing.md`                                             |
-| Accessibility patterns                          | `docs/ai/accessibility-aaa.md`                                   |
-| Auth, PIN, sessions, tunnel                     | `docs/ai/remote-access.md`                                       |
+| Directory structure changes                     | `docs/dev/02-directory-structure.md`                             |
+| Testing patterns                                | `docs/dev/04-testing.md`                                         |
+| Accessibility patterns                          | `docs/dev/05-accessibility-aaa.md`                               |
+| Auth, PIN, sessions, tunnel                     | `docs/dev/06-remote-access.md`                                   |
 | New `.claude/rules/` or `.claude/skills/`       | `.claude/CLAUDE.md` (rules/skills list)                          |
+| User-facing features, workflows                 | `docs/user/` (relevant category subdirectory)                    |
 
 ## What Counts as "Affects Documented Behavior"
 

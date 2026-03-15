@@ -298,3 +298,96 @@
 .prose-fxflow .table-wrap table {
   margin-bottom: 0;
 }
+
+/* ─── Callout blocks ─────────────────────────────────────────────────────── */
+
+.prose-fxflow .callout-tip,
+.prose-fxflow .callout-warning,
+.prose-fxflow .callout-note,
+.prose-fxflow .callout-important,
+.prose-fxflow .callout-forex {
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+  margin: 1.25rem 0;
+  border-left: 3px solid;
+  font-style: normal;
+}
+
+.prose-fxflow .callout-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 0.375rem;
+}
+
+.prose-fxflow .callout-body {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--color-muted-foreground);
+}
+
+.prose-fxflow .callout-tip {
+  background: oklch(0.45 0.1 145 / 0.08);
+  border-color: oklch(0.65 0.2 145);
+}
+
+.prose-fxflow .callout-tip .callout-label {
+  color: oklch(0.65 0.2 145);
+}
+
+.prose-fxflow .callout-warning {
+  background: oklch(0.55 0.12 75 / 0.08);
+  border-color: oklch(0.7 0.18 75);
+}
+
+.prose-fxflow .callout-warning .callout-label {
+  color: oklch(0.7 0.18 75);
+}
+
+.prose-fxflow .callout-note {
+  background: oklch(0.5 0.12 250 / 0.08);
+  border-color: oklch(0.65 0.18 250);
+}
+
+.prose-fxflow .callout-note .callout-label {
+  color: oklch(0.65 0.18 250);
+}
+
+.prose-fxflow .callout-important {
+  background: oklch(0.45 0.12 300 / 0.08);
+  border-color: oklch(0.6 0.18 300);
+}
+
+.prose-fxflow .callout-important .callout-label {
+  color: oklch(0.6 0.18 300);
+}
+
+.prose-fxflow .callout-forex {
+  background: oklch(0.45 0.1 185 / 0.08);
+  border-color: oklch(0.65 0.15 185);
+}
+
+.prose-fxflow .callout-forex .callout-label {
+  color: oklch(0.65 0.15 185);
+}
+
+/* ─── Cross-links ────────────────────────────────────────────────────────── */
+
+.prose-fxflow .cross-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.prose-fxflow .cross-link:hover {
+  text-decoration-style: solid;
+}
+
+/* ─── Nested list items ──────────────────────────────────────────────────── */
+
+.prose-fxflow li.nested {
+  margin-left: 1.5rem;
+}

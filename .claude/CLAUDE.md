@@ -103,12 +103,15 @@ TradingView → CF Worker POST /webhook/{token} → Daemon WebSocket → SignalP
 
 Canonical standards with full detail live in:
 
-- `docs/ai/standards.md` — coding standards
-- `docs/ai/directory-structure.md` — where code goes
-- `docs/ai/realtime.md` — WebSocket and realtime patterns
-- `docs/ai/testing.md` — testing approach
-- `docs/ai/accessibility-aaa.md` — accessibility requirements
-- `docs/ai/remote-access.md` — remote access, auth, PWA, tunnel setup
+- `docs/dev/01-standards.md` — coding standards
+- `docs/dev/02-directory-structure.md` — where code goes
+- `docs/dev/03-realtime.md` — WebSocket and realtime patterns
+- `docs/dev/04-testing.md` — testing approach
+- `docs/dev/05-accessibility-aaa.md` — accessibility requirements
+- `docs/dev/06-remote-access.md` — remote access, auth, PWA, tunnel setup
+
+User-facing documentation lives in `docs/user/` (8 categories, ~40 pages).
+Both `docs/user/` and `docs/dev/` are served in-app via the Documentation page.
 
 ## Claude Rules
 

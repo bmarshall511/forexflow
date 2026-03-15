@@ -1,3 +1,10 @@
+---
+title: "Remote Access & Deployment"
+description: "Cloudflare Tunnel setup, cloud deployment, desktop app architecture, and security hardening"
+category: "dev"
+order: 6
+---
+
 # Remote Access, Cloud Deployment & Security
 
 ## Overview
@@ -179,37 +186,6 @@ The tunnel URL is available in the app for easy sharing:
 
 The URL file is cleaned up on exit and is gitignored (inside `data/`).
 
-## Key Files
-
-| File                                                              | Purpose                                       |
-| ----------------------------------------------------------------- | --------------------------------------------- |
-| `packages/db/src/auth-service.ts`                                 | PIN hashing, verification, session management |
-| `apps/web/src/middleware.ts`                                      | Auth guard for all routes                     |
-| `apps/web/src/app/(auth)/login/page.tsx`                          | PIN login page                                |
-| `apps/web/src/app/(auth)/setup/page.tsx`                          | First-time PIN setup                          |
-| `apps/web/src/components/auth/pin-pad.tsx`                        | Reusable PIN keypad                           |
-| `apps/web/src/components/auth/pin-dots.tsx`                       | PIN progress indicator                        |
-| `apps/web/src/components/auth/lockout-timer.tsx`                  | Lockout countdown                             |
-| `apps/web/src/app/api/auth/*/route.ts`                            | Auth API routes (7 routes)                    |
-| `apps/web/src/lib/rate-limit.ts`                                  | In-memory rate limiter                        |
-| `apps/web/server.ts`                                              | Custom server with WS proxy (production)      |
-| `apps/web/src/hooks/use-daemon-connection.ts`                     | WS + REST polling fallback                    |
-| `apps/web/src/app/api/daemon/[...path]/route.ts`                  | Daemon REST proxy                             |
-| `apps/web/src/app/api/settings/tunnel-status/route.ts`            | Tunnel status + URL API                       |
-| `apps/web/src/components/layout/remote-access-status-popover.tsx` | Header tunnel status                          |
-| `apps/web/src/components/settings/security-*.tsx`                 | Security settings UI                          |
-| `apps/web/public/manifest.json`                                   | PWA manifest                                  |
-| `apps/web/public/sw.js`                                           | Service worker                                |
-| `scripts/dev.sh`                                                  | Dev environment with auto-tunnel              |
-| `cloudflare/tunnel-config.example.yml`                            | Named tunnel config template                  |
-| `packages/shared/src/deployment.ts`                               | Deployment mode types + resolver              |
-| `packages/db/src/deployment-service.ts`                           | Deployment settings CRUD                      |
-| `apps/web/src/app/api/settings/deployment/route.ts`               | Deployment settings API                       |
-| `apps/web/src/components/settings/deployment/`                    | Deployment settings UI                        |
-| `apps/desktop/src/main/`                                          | Electron main process                         |
-| `apps/daemons/Dockerfile`                                         | Cloud deployment container                    |
-| `apps/daemons/railway.toml`                                       | Railway deployment config                     |
-
 ## Cloud Deployment Mode
 
 ### Overview
@@ -273,12 +249,7 @@ The Electron app packages the web app + daemon into a macOS DMG for non-technica
 - Packaged via `electron-builder` (DMG for macOS arm64 + x64)
 - **Unsigned** — macOS Gatekeeper may show "damaged" error on first launch. Fix: `xattr -cr /path/to/FXFlow.app`
 - Custom app icon at `assets/icon.icns` (generated from the PWA `icon-512.png`)
-- Published to GitHub Releases via `.github/workflows/desktop.yml` (CI passes `--publish never`; uploads via `gh release upload`)
-- Both archs build on `macos-latest` (ARM); x64 is cross-compiled via `--x64` flag (`macos-13` x64 runners are no longer used)
-- `electron-builder.yml` bundles web standalone output + daemon (`pnpm deploy`) as `extraResources`
-- Daemon runs TypeScript directly via `node --import tsx/esm` (same as Docker container)
-- Desktop workflow runs `db:generate` and sets `DATABASE_URL` env var before building
-- **iCloud caveat**: if the repo lives in iCloud Drive, `pnpm deploy` may fail due to permission errors. The `desktop:dist` script works around this by deploying to `/tmp` first. Duplicate symlinks (e.g. `sdk 2`) may also appear in `node_modules` — clean with `find . -path "*/node_modules/*" -regex '.* [0-9]+$' -exec rm -rf {} +` before packaging
+- Published to GitHub Releases via `.github/workflows/desktop.yml`
 
 ### IPC Bridge
 

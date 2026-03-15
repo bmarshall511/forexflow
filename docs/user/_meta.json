@@ -1,0 +1,12 @@
+{
+  "categories": [
+    { "id": "getting-started", "label": "Getting Started", "icon": "Rocket", "order": 1 },
+    { "id": "dashboard", "label": "Dashboard & Navigation", "icon": "LayoutDashboard", "order": 2 },
+    { "id": "trading", "label": "Trading", "icon": "TrendingUp", "order": 3 },
+    { "id": "analytics", "label": "Analytics & Risk", "icon": "BarChart3", "order": 4 },
+    { "id": "automation", "label": "Automation", "icon": "Zap", "order": 5 },
+    { "id": "ai-trader", "label": "AI Trader Deep Dive", "icon": "Brain", "order": 6 },
+    { "id": "settings", "label": "Settings", "icon": "Settings", "order": 7 },
+    { "id": "reference", "label": "Reference", "icon": "BookOpen", "order": 8 }
+  ]
+}
