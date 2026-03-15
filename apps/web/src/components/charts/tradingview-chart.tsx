@@ -73,13 +73,11 @@ interface TradingViewChartProps {
 
 function TradingViewChartInner({
   instrument,
-  direction,
   entryPrice,
   currentPrice,
   lastTick,
   stopLoss,
   takeProfit,
-  exitPrice,
   defaultTimeframe,
   markers,
   tradeLevels,

@@ -43,7 +43,7 @@ export function TradeFinderDashboard() {
 
   const { config, update: updateConfig } = useTradeFinderConfig()
   const [tab, setTab] = useState<Tab>("active")
-  const [placingId, setPlacingId] = useState<string | null>(null)
+  const [, setPlacingId] = useState<string | null>(null)
   const [togglingAutoTrade, setTogglingAutoTrade] = useState(false)
 
   const handlePlace = async (setupId: string, orderType: "MARKET" | "LIMIT") => {

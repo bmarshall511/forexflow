@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils"
 import {
   CheckCircle,
   ArrowUpRight,
-  ArrowDownRight,
   Clock,
   Radio,
   Bot,

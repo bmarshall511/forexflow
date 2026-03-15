@@ -52,7 +52,6 @@ import {
   Bot,
   User,
   AlertTriangle,
-  Loader2,
   Trash2,
   ExternalLink,
 } from "lucide-react"

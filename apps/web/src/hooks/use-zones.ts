@@ -150,7 +150,7 @@ export function useZones({
       setNearestSupply(supply[0] ?? null)
 
       // Persist to DB in the background (non-blocking)
-      persistZones(instrument, effectiveTf, result.zones)
+      persistZones(instrument, effectiveTf)
 
       // Higher-TF zones
       if (s.showHigherTf) {
@@ -177,7 +177,7 @@ export function useZones({
               const alignment = computeAlignment(result, htfResult, price)
               setCurveAlignment(alignment)
 
-              persistZones(instrument, htf, htfResult.zones)
+              persistZones(instrument, htf)
             }
           } catch {
             // Higher-TF fetch failed — not critical
@@ -194,7 +194,7 @@ export function useZones({
         const htf = s.higherTimeframe ?? getHigherTimeframe(effectiveTf)
 
         // Determine which zones to use for curve
-        let curveZones: ZoneData[] | null = null
+        // curveZones determined by curve timeframe logic below
         let curveTimeframe: string | null = null
 
         if (!curveTf || curveTf === htf) {
@@ -204,7 +204,7 @@ export function useZones({
             // We need the unfiltered zones, so re-detect or use the result we have
             // Actually, the htfResult is scoped inside the showHigherTf block.
             // We'll re-fetch if needed below.
-            curveZones = null // Signal to fetch
+            // Signal to fetch via curveTimeframe
             curveTimeframe = htf
           } else if (htf) {
             curveTimeframe = htf
@@ -328,7 +328,7 @@ export function useZones({
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Fire-and-forget zone persistence to the API. */
-function persistZones(instrument: string, timeframe: string, zones: ZoneData[]): void {
+function persistZones(instrument: string, timeframe: string): void {
   fetch(`/api/zones/${instrument}?timeframe=${timeframe}&lookback=1&minScore=0`).catch(() => {})
 }
 

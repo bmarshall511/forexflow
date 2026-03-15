@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { upsertTrend, getTrend } from "@fxflow/db"
+import { upsertTrend } from "@fxflow/db"
 import { detectTrend, getDefaultSwingStrength } from "@fxflow/shared"
-import type { TrendData, TrendDetectionConfig, ZoneCandle } from "@fxflow/types"
+import type { TrendDetectionConfig, ZoneCandle } from "@fxflow/types"
 import { fetchCandles } from "@/components/charts/chart-utils"
 
 interface RouteParams {

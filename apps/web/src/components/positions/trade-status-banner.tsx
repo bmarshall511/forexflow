@@ -43,13 +43,10 @@ export function TradeStatusBanner({
   status,
   orderType,
   openedAt,
-  closedAt,
   outcome,
   closeReason,
 }: TradeStatusBannerProps) {
   const config = STATUS_CONFIG[status]
-  const Icon = config.icon
-
   return (
     <div className={cn("flex items-center justify-between rounded-lg border px-3 py-2", config.bg)}>
       <div className="flex items-center gap-2">

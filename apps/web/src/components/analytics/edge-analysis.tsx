@@ -2,7 +2,6 @@
 
 import { useMemo } from "react"
 import type { MfeMaeEntry } from "@fxflow/types"
-import { cn } from "@/lib/utils"
 import { DataTile } from "@/components/ui/data-tile"
 import { ArrowUpRight, ArrowDownRight, Scale, BarChart3 } from "lucide-react"
 

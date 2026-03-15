@@ -5,18 +5,23 @@ directories:
   output: release
 
 # Include daemon and web app in the bundle
+# Web: Next.js standalone output (self-contained server + node_modules)
+# Daemon: pnpm deploy output (self-contained with all deps, no symlinks)
 extraResources:
-  - from: ../../apps/daemons
-    to: daemons
+  - from: ../../apps/web/.next/standalone
+    to: web-standalone
     filter:
       - "**/*"
-      - "!node_modules"
-  - from: ../../apps/web/.next
-    to: web/.next
+  - from: ../../apps/web/.next/static
+    to: web-standalone/apps/web/.next/static
     filter:
       - "**/*"
   - from: ../../apps/web/public
-    to: web/public
+    to: web-standalone/apps/web/public
+    filter:
+      - "**/*"
+  - from: daemon-bundle
+    to: daemon-bundle
     filter:
       - "**/*"
 

@@ -35,7 +35,6 @@ interface TradeEditorFormProps {
 
 export function TradeEditorForm({
   instrument,
-  direction,
   entryPrice,
   draftSL,
   draftTP,

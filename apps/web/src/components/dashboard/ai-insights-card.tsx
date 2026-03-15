@@ -109,7 +109,7 @@ export function AiInsightsCard() {
 
   useEffect(() => {
     fetchAll()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!lastAiAnalysisCompleted) return

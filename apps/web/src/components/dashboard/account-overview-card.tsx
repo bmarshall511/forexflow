@@ -73,8 +73,7 @@ function AccountOverviewSkeleton() {
 }
 
 export function AccountOverviewCard() {
-  const { data, isLoaded, isAccountValid, isConfigured, hasError, errorMessage, tradingMode } =
-    useAccountOverview()
+  const { data, isLoaded, isConfigured, hasError, errorMessage, tradingMode } = useAccountOverview()
   const { openWithPrices } = usePositions()
 
   // Use live-streamed prices for unrealized P&L (same source as Positions card)

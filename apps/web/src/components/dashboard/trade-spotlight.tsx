@@ -18,7 +18,6 @@ export function TradeSpotlight() {
   const {
     isLoaded,
     isConfigured,
-    hasError,
     openWithPrices,
     tradesNearClosing,
     summary,
@@ -206,7 +205,7 @@ export function TradeSpotlight() {
           trade={closeTarget}
           open={closeTarget !== null}
           onOpenChange={(open) => !open && setCloseTarget(null)}
-          onConfirm={(units) => handleClose(closeTarget)}
+          onConfirm={() => handleClose(closeTarget)}
           isLoading={isClosing}
           currency={currency}
         />

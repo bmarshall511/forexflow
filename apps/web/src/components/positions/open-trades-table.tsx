@@ -138,7 +138,7 @@ export function OpenTradesTable({
   // Sort only when sort state changes (user clicks column), not on data changes.
   const sortedOrderRef = useRef<string[]>([])
 
-  const sorted = useMemo(() => {
+  useMemo(() => {
     const arr = [...filteredTrades].sort((a, b) => {
       const key = sort.key
       let va: unknown, vb: unknown
@@ -229,7 +229,7 @@ export function OpenTradesTable({
 
     const result = inOrder.filter(Boolean).concat(newTrades)
     return result
-  }, [filteredTrades, sorted])
+  }, [filteredTrades])
 
   const handleCloseConfirm = async (units?: number, reason?: string) => {
     if (!closeTrade) return

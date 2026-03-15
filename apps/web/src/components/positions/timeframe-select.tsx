@@ -26,8 +26,6 @@ export function TimeframeSelect({ value, onChange, className }: TimeframeSelectP
     [onChange],
   )
 
-  const label = TIMEFRAME_OPTIONS.find((o) => o.value === value)?.label
-
   return (
     <select
       value={value ?? ""}

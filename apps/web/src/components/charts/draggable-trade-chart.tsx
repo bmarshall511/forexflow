@@ -74,7 +74,6 @@ interface DraggableTradeChartProps {
 
 function DraggableTradeChartInner({
   instrument,
-  direction,
   entryPrice,
   currentPrice,
   lastTick,

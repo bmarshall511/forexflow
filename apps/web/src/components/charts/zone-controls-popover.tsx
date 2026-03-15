@@ -9,7 +9,7 @@ import type {
   TrendDisplaySettings,
   ChartPanelTrendOverrides,
 } from "@fxflow/types"
-import { ZONE_PRESETS, getPresetConfig } from "@fxflow/shared"
+import { getPresetConfig } from "@fxflow/shared"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
@@ -63,7 +63,7 @@ export function ZoneControlsPopover({
   const [tab, setTab] = useState<Tab>("zones")
   const [zoneAdvOpen, setZoneAdvOpen] = useState(false)
   const [trendAdvOpen, setTrendAdvOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [, setSaving] = useState(false)
 
   const hasTrend = !!(trendSettings && onSaveTrendGlobal && onSetTrendOverrides)
 

@@ -148,7 +148,7 @@ export function TradePriceChart({
         : false
 
     return { levels, entryPct, slPct, tpPct, currentPct, isProfit }
-  }, [entryPrice, stopLoss, takeProfit, currentPrice, exitPrice, direction, instrument, keyLevels])
+  }, [entryPrice, stopLoss, takeProfit, currentPrice, exitPrice, direction, keyLevels])
 
   return (
     <div className={cn("relative w-full", className)} style={{ height: effectiveHeight }}>

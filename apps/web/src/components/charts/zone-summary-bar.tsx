@@ -148,12 +148,11 @@ export function ZoneSummaryBar({
 function ZonePill({
   type,
   zone,
-  currentPrice,
   onClick,
 }: {
   type: "demand" | "supply"
   zone: ZoneData
-  currentPrice: number | null
+  currentPrice?: number | null
   onClick?: (zone: ZoneData) => void
 }) {
   const isDemand = type === "demand"

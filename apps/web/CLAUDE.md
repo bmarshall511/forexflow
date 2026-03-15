@@ -6,6 +6,7 @@
 - `middleware.ts` handles PIN authentication (session cookie validation, redirect to /login or /setup).
 - No Server Actions — all mutations go through REST API routes.
 - Theme: next-themes, class-based dark/light, dark is default.
+- `output: "standalone"` in `next.config.ts` produces a self-contained server for Electron desktop bundling.
 
 ## Directory Structure
 

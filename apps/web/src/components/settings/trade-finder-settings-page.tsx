@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import type { TradeFinderPairConfig, TradeFinderTimeframeSet } from "@fxflow/types"
-import { FOREX_PAIR_GROUPS, formatInstrument } from "@fxflow/shared"
+import { FOREX_PAIR_GROUPS } from "@fxflow/shared"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"

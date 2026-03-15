@@ -91,7 +91,6 @@ function ChartPanelInner({
   // ─── Zone detection ──────────────────────────────────────────────────
   const {
     settings: zoneSettings,
-    globalSettings,
     saveGlobal,
     overrides: zoneOverrides,
     setOverrides: setZoneOverrides,
@@ -131,7 +130,6 @@ function ChartPanelInner({
   // ─── Trend detection ────────────────────────────────────────────────────
   const {
     settings: trendSettings,
-    globalSettings: trendGlobalSettings,
     saveGlobal: saveTrendGlobal,
     overrides: trendOverrides,
     setOverrides: setTrendOverrides,

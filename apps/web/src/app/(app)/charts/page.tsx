@@ -273,15 +273,7 @@ export default function ChartsPage() {
       }
     }
     return result
-  }, [
-    tradesByPanel,
-    priceMap,
-    activeIndex,
-    editor.draftSL,
-    editor.draftTP,
-    editor.setDraftSL,
-    editor.setDraftTP,
-  ])
+  }, [tradesByPanel, priceMap, activeIndex, editor])
 
   // Clear a specific panel's trade (e.g. when user changes instrument)
   const clearPanelTrade = useCallback((index: number) => {
@@ -379,15 +371,7 @@ export default function ChartsPage() {
         ticket.setTakeProfit(price)
       }
     },
-    [
-      ticket.setEntryPrice,
-      ticket.slEnabled,
-      ticket.setSlEnabled,
-      ticket.setStopLoss,
-      ticket.tpEnabled,
-      ticket.setTpEnabled,
-      ticket.setTakeProfit,
-    ],
+    [ticket],
   )
 
   // Build order overlay config from ticket hook state

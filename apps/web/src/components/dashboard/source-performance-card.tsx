@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react"
 import { useSourceStats } from "@/hooks/use-source-stats"
-import { usePositions } from "@/hooks/use-positions"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { formatPnL, formatCurrency } from "@fxflow/shared"
 import { cn } from "@/lib/utils"

@@ -28,7 +28,6 @@ import { PendingProgressBar } from "./progress-bar-pending"
 import { DurationDisplay } from "./duration-display"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { PriceCard, StatRow } from "@/components/ui/price-card"
-import { AiAnalysisCell } from "./ai-analysis-cell"
 import { Eye, XCircle, Sparkles, ChevronDown, Target, ShieldAlert, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 

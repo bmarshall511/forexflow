@@ -16,6 +16,7 @@ import path from "node:path"
 import { fork, type ChildProcess } from "node:child_process"
 import { store } from "./store.js"
 import { createMainWindow } from "./window.js"
+import { createSplashWindow } from "./splash.js"
 import { TrayManager } from "./tray.js"
 import { DaemonManager } from "./daemon-manager.js"
 import { setupAutoUpdater } from "./updater.js"
@@ -35,14 +36,17 @@ let isQuitting = false
 
 /**
  * Start the embedded Next.js web server.
- * In local mode, this serves the UI on localhost:3000.
+ * Uses the Next.js standalone output (server.js) which is a self-contained server.
+ * The cwd must be set to the server directory so Next.js can find its .next folder.
  */
 function startWebServer(env: Record<string, string>): void {
-  const serverEntry = app.isPackaged
-    ? path.join(process.resourcesPath, "web", "server.js")
-    : path.join(app.getAppPath(), "..", "..", "web", "dist", "server.js")
+  const serverDir = app.isPackaged
+    ? path.join(process.resourcesPath, "web-standalone", "apps", "web")
+    : path.join(app.getAppPath(), "..", "..", "web", ".next", "standalone", "apps", "web")
+  const serverEntry = path.join(serverDir, "server.js")
 
   webServerProcess = fork(serverEntry, [], {
+    cwd: serverDir,
     env: {
       ...process.env,
       ...env,
@@ -108,6 +112,9 @@ app.whenReady().then(async () => {
   const mode = store.get("deploymentMode")
   const env = buildChildEnv()
 
+  // Show splash screen immediately so user sees the app is loading
+  const splash = createSplashWindow()
+
   // Ensure data directory exists (local mode)
   if (mode === "local") {
     const dataDir = path.join(app.getPath("userData"), "data")
@@ -131,8 +138,11 @@ app.whenReady().then(async () => {
   // Wait for web server to be ready
   await waitForServer("http://localhost:3000", 30_000)
 
-  // Create window
+  // Create main window and close splash
   mainWindow = createMainWindow()
+  mainWindow.once("ready-to-show", () => {
+    splash.close()
+  })
 
   // System tray
   trayManager.create(mainWindow)
@@ -193,8 +203,8 @@ async function waitForServer(url: string, timeoutMs: number): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(url)
-      if (res.ok) return
+      const res = await fetch(url, { redirect: "manual" })
+      if (res.status < 500) return
     } catch {
       // Not ready yet
     }

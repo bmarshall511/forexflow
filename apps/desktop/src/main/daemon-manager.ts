@@ -41,6 +41,7 @@ export class DaemonManager {
     } as Record<string, string>
 
     this.process = fork(daemonEntry, [], {
+      execArgv: ["--import", "tsx/esm"],
       env: mergedEnv,
       stdio: ["pipe", "pipe", "pipe", "ipc"],
       silent: true,
@@ -112,7 +113,7 @@ export class DaemonManager {
   /** Resolve path to daemon entry point (tsx in dev, compiled in production). */
   private resolveDaemonEntry(): string {
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, "daemons", "src", "index.ts")
+      return path.join(process.resourcesPath, "daemon-bundle", "src", "index.ts")
     }
     // Development: run from monorepo source
     return path.join(app.getAppPath(), "..", "..", "daemons", "src", "index.ts")

@@ -65,7 +65,7 @@ export function OpenProgressBar({
 
   // Progress: 0% = at SL, entryLine% = at entry, 100% = at TP
   const slSide = effectiveSlPips ?? totalRange / 2
-  const tpSide = effectiveTpPips ?? totalRange / 2
+
   const progress = ((currentPips + slSide) / totalRange) * 100
   const clampedProgress = Math.max(0, Math.min(100, progress))
   const entryPercent = (slSide / totalRange) * 100

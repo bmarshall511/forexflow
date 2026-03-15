@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { formatPnL, formatRelativeTime, priceToPips } from "@fxflow/shared"
+import { formatPnL, priceToPips } from "@fxflow/shared"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { TradeHealthBar } from "@/components/ui/trade-health-bar"
 import { DirectionBadge } from "@/components/positions/direction-badge"

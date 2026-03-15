@@ -9,7 +9,6 @@ import type {
 import { ALL_FOREX_PAIRS, FOREX_PAIR_GROUPS, formatInstrument } from "@fxflow/shared"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { X, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 

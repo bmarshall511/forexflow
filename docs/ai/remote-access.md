@@ -262,7 +262,7 @@ The Electron app packages the web app + daemon into a macOS DMG for non-technica
 
 - **Main process**: manages BrowserWindow, system tray, daemon child process, auto-updater
 - **Daemon**: spawned as `fork()` child process in local mode, auto-restarts with exponential backoff (max 5 restarts)
-- **Web app**: bundled Next.js app served on localhost, loaded in BrowserWindow
+- **Web app**: Next.js standalone output (`output: "standalone"`) served on localhost, loaded in BrowserWindow
 - **System tray**: close → hide to tray (daemon keeps running), context menu for status/quit
 - **Auto-updater**: `electron-updater` checks GitHub Releases every 4 hours
 
@@ -275,9 +275,10 @@ The Electron app packages the web app + daemon into a macOS DMG for non-technica
 - Custom app icon at `assets/icon.icns` (generated from the PWA `icon-512.png`)
 - Published to GitHub Releases via `.github/workflows/desktop.yml` (CI passes `--publish never`; uploads via `gh release upload`)
 - Both archs build on `macos-latest` (ARM); x64 is cross-compiled via `--x64` flag (`macos-13` x64 runners are no longer used)
-- `electron-builder.yml` bundles daemon + web app as `extraResources`
+- `electron-builder.yml` bundles web standalone output + daemon (`pnpm deploy`) as `extraResources`
+- Daemon runs TypeScript directly via `node --import tsx/esm` (same as Docker container)
 - Desktop workflow runs `db:generate` and sets `DATABASE_URL` env var before building
-- **iCloud caveat**: if the repo lives in iCloud Drive, duplicate symlinks (e.g. `sdk 2`) may appear in `node_modules`. Clean with `find . -path "*/node_modules/*" -regex '.* [0-9]+$' -exec rm -rf {} +` before packaging
+- **iCloud caveat**: if the repo lives in iCloud Drive, `pnpm deploy` may fail due to permission errors. The `desktop:dist` script works around this by deploying to `/tmp` first. Duplicate symlinks (e.g. `sdk 2`) may also appear in `node_modules` — clean with `find . -path "*/node_modules/*" -regex '.* [0-9]+$' -exec rm -rf {} +` before packaging
 
 ### IPC Bridge
 

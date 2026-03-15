@@ -63,6 +63,34 @@ export default function SetupPage() {
     [pin],
   )
 
+  const submitPin = useCallback(
+    async (finalPin: string) => {
+      setLoading(true)
+      try {
+        const res = await fetch("/api/auth/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin: finalPin }),
+        })
+        const json = (await res.json()) as { ok: boolean; error?: string }
+        if (json.ok) {
+          router.replace("/")
+        } else {
+          setError(true)
+          setErrorMessage(json.error ?? "Failed to create PIN")
+          setConfirmPin("")
+        }
+      } catch {
+        setError(true)
+        setErrorMessage("Connection error")
+        setConfirmPin("")
+      } finally {
+        setLoading(false)
+      }
+    },
+    [router],
+  )
+
   const handleConfirmDigit = useCallback(
     (digit: string) => {
       setError(false)
@@ -79,37 +107,11 @@ export default function SetupPage() {
           }, 800)
           return
         }
-        // Submit
         void submitPin(next)
       }
     },
-    [confirmPin, pin],
+    [confirmPin, pin, submitPin],
   )
-
-  const submitPin = async (finalPin: string) => {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/auth/setup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: finalPin }),
-      })
-      const json = (await res.json()) as { ok: boolean; error?: string }
-      if (json.ok) {
-        router.replace("/")
-      } else {
-        setError(true)
-        setErrorMessage(json.error ?? "Failed to create PIN")
-        setConfirmPin("")
-      }
-    } catch {
-      setError(true)
-      setErrorMessage("Connection error")
-      setConfirmPin("")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   if (step === "welcome") {
     return (

@@ -9,7 +9,7 @@ import type {
   SeriesType,
   ITimeScaleApi,
 } from "lightweight-charts"
-import type { TrendData, TrendVisualSettings, SwingPoint, TrendSegment } from "@fxflow/types"
+import type { TrendData, TrendVisualSettings, SwingPoint } from "@fxflow/types"
 import { getChartTheme, type ChartTheme } from "@/lib/chart-theme"
 
 // ─── Price Axis View ─────────────────────────────────────────────────────────

@@ -49,6 +49,7 @@ export async function GET(
 }
 
 export async function DELETE(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _request: NextRequest,
 ): Promise<NextResponse<ApiResponse<{ count: number }>>> {
   try {

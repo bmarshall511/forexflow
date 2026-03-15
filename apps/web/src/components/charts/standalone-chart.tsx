@@ -442,7 +442,7 @@ function StandaloneChartInner({
       sl: slLineRef.current,
       tp: tpLineRef.current,
     }),
-    [overlayIsLimit, overlayEntry, overlaySL, overlayTP],
+    [overlayIsLimit],
   )
   const { isDragging } = usePriceLineDrag({
     containerRef,

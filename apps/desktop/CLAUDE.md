@@ -65,14 +65,31 @@ electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 - `pnpm electron:build` — compile main/preload via `tsc` (not electron-vite).
 - `pnpm electron:package` — build macOS DMG via electron-builder. In CI, `--publish never` is passed to prevent electron-builder from auto-publishing (uploads handled separately via `gh release upload`).
 - DMG is **unsigned** (no Apple Developer account) — users right-click → Open on first launch.
-- `electron-builder.yml` bundles daemon + web app as `extraResources`. Custom app icon at `assets/icon.icns`.
+- `electron-builder.yml` bundles web + daemon as `extraResources`. Custom app icon at `assets/icon.icns`.
 - Since the app is unsigned, macOS Gatekeeper may show "damaged" error on first launch. Users must run `xattr -cr /path/to/FXFlow.app` to remove the quarantine attribute.
 - GitHub Actions builds arm64 + x64 DMGs on each release, both on `macos-latest` (ARM); x64 is cross-compiled via `--x64` flag.
+
+### Web Server Bundling
+
+- Next.js is configured with `output: "standalone"` and `outputFileTracingRoot` pointing to the monorepo root.
+- This produces `.next/standalone/` — a self-contained directory with `server.js`, traced `node_modules`, and workspace packages.
+- Static files (`.next/static`) and `public/` are copied alongside the standalone output during the build.
+- In the packaged app, the server entry is at `resources/web-standalone/apps/web/server.js`.
+
+### Daemon Bundling
+
+- `pnpm deploy --legacy` creates a self-contained copy of the daemon with all dependencies resolved (no pnpm symlinks).
+- Output goes to `apps/desktop/daemon-bundle/` (gitignored build artifact).
+- The daemon runs TypeScript directly via `node --import tsx/esm` (same approach as the Docker container).
+- `tsx` is a production dependency of `@fxflow/daemons` (not dev-only) since it's the runtime loader.
+- In the packaged app, the daemon entry is at `resources/daemon-bundle/src/index.ts`.
 
 ## Gotchas
 
 - Desktop app is excluded from turbo `dev`/`build`/`typecheck`/`lint` tasks.
 - `node_modules` must be installed separately: `cd apps/desktop && pnpm install`.
-- The web app is served on localhost by a forked Next.js server process, then loaded in BrowserWindow.
+- The web app is served on localhost by a forked Next.js standalone server, then loaded in BrowserWindow.
 - `waitForServer()` polls localhost:3000 before showing the window.
 - Tray icon must be a template image for macOS dark/light mode support.
+- `daemon-bundle/` is a build artifact (gitignored) — do not commit it.
+- iCloud Drive can cause issues with `pnpm deploy` due to permission errors. The `desktop:dist` script works around this by deploying to `/tmp` first, then copying back.

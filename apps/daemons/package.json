@@ -16,12 +16,12 @@
     "@fxflow/shared": "workspace:*",
     "@fxflow/types": "workspace:*",
     "dotenv": "^16",
+    "tsx": "^4",
     "ws": "^8"
   },
   "devDependencies": {
     "@types/ws": "^8",
     "eslint": "^9.39.3",
-    "tsx": "^4",
     "typescript": "^5.7",
     "vitest": "^3"
   }

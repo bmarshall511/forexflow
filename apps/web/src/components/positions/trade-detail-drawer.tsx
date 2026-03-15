@@ -7,13 +7,7 @@ import type {
   ClosedTradeData,
   TradeCloseReason,
 } from "@fxflow/types"
-import {
-  formatCurrency,
-  formatPips,
-  priceToPips,
-  calculateRiskReward,
-  getDecimalPlaces,
-} from "@fxflow/shared"
+import { formatCurrency, formatPips, priceToPips, getDecimalPlaces } from "@fxflow/shared"
 import {
   Sheet,
   SheetContent,
@@ -92,7 +86,7 @@ export function TradeDetailDrawer({
   const tradeId = trade?.id ?? null
   const [aiSheetOpen, setAiSheetOpen] = useState(false)
   const [replayOpen, setReplayOpen] = useState(false)
-  const { detail, isLoading, updateNotes, updateTimeframe, assignTag, removeTag, refetch } =
+  const { detail, updateNotes, updateTimeframe, assignTag, removeTag, refetch } =
     useTradeDetail(tradeId)
   const { history: aiHistory } = useAiAnalysis(tradeId)
   const { tags: allTags, createTag } = useTags()
@@ -138,14 +132,6 @@ export function TradeDetailDrawer({
   const livePrice = trade._type === "open" ? trade.currentPrice : (externalCurrentPrice ?? null)
 
   // Compute performance metrics
-  const rr = calculateRiskReward(
-    trade.direction,
-    trade.entryPrice,
-    trade.stopLoss,
-    trade.takeProfit,
-    trade.instrument,
-  )
-
   const tradeUnits =
     trade._type === "pending"
       ? trade.units

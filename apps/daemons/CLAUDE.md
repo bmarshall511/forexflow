@@ -98,4 +98,5 @@ src/
 - StateManager event listeners must be cleaned up to avoid memory leaks.
 - Transaction stream handles order fills AND cancellations — both must be processed.
 - Trade syncer mutex is per-instrument, not global — concurrent syncs on different pairs are OK.
-- In Electron desktop mode, the daemon is spawned as a `fork()` child process by `apps/desktop/src/main/daemon-manager.ts`.
+- In Electron desktop mode, the daemon is spawned as a `fork()` child process with `--import tsx/esm` by `apps/desktop/src/main/daemon-manager.ts`.
+- `tsx` is a production dependency (not dev-only) because it's needed at runtime for both Docker and Electron deployments.

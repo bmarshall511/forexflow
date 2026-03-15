@@ -3,12 +3,10 @@
 import type { PendingOrderData, OpenTradeData, ClosedTradeData } from "@fxflow/types"
 import {
   formatCurrency,
-  formatPips,
   getDecimalPlaces,
   formatShortDateTime,
   calculateRiskReward,
   getPipSize,
-  TIMEFRAME_OPTIONS,
 } from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
 import { SourceBadge } from "./source-badge"

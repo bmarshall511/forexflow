@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { cn } from "@/lib/utils"
 import { SectionCard } from "@/components/ui/section-card"
 import { Calculator } from "lucide-react"
 import { getPipSize } from "@fxflow/shared"
@@ -11,8 +10,6 @@ interface PositionSizerProps {
   accountBalance: number
   currency: string
 }
-
-const ALL_PAIRS = FOREX_PAIR_GROUPS.flatMap((g) => g.pairs.map((p) => p.value))
 
 export function PositionSizer({ accountBalance, currency }: PositionSizerProps) {
   const [instrument, setInstrument] = useState("EUR_USD")

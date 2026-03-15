@@ -5,7 +5,7 @@ import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { usePositions } from "@/hooks/use-positions"
 import { useCalendar } from "@/hooks/use-calendar"
 import { cn } from "@/lib/utils"
-import { Clock, AlertTriangle, TrendingUp } from "lucide-react"
+import { AlertTriangle, TrendingUp } from "lucide-react"
 
 function getGreeting(): string {
   const hour = new Date().getHours()

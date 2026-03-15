@@ -65,9 +65,9 @@ jobs:
       - name: Build web app
         run: pnpm --filter @fxflow/web build
 
-      # Build the daemon
-      - name: Build daemon
-        run: pnpm --filter @fxflow/daemons build
+      # Deploy daemon (self-contained bundle with all deps)
+      - name: Bundle daemon
+        run: pnpm --filter @fxflow/daemons --prod deploy --legacy apps/desktop/daemon-bundle
 
       # Compile Electron main/preload
       - name: Build desktop app

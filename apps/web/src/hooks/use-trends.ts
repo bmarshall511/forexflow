@@ -117,7 +117,7 @@ export function useTrends({
       setTrendData(result)
 
       // Persist in background
-      persistTrend(instrument, timeframe, result)
+      persistTrend(instrument, timeframe)
 
       // Higher-TF trend
       if (s.showHigherTf) {
@@ -141,7 +141,7 @@ export function useTrends({
                 htfPrice,
               )
               setHigherTfTrendData(htfResult)
-              persistTrend(instrument, htf, htfResult)
+              persistTrend(instrument, htf)
             }
           } catch {
             // HTF fetch failed — not critical
@@ -214,6 +214,6 @@ export function useTrends({
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Fire-and-forget trend persistence to the API. */
-function persistTrend(instrument: string, timeframe: string, data: TrendData): void {
+function persistTrend(instrument: string, timeframe: string): void {
   fetch(`/api/trends/${instrument}?timeframe=${timeframe}`).catch(() => {})
 }
