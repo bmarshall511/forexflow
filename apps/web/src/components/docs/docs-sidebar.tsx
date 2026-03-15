@@ -22,8 +22,11 @@ export function DocsSidebar({ categories, activeSlug, onSelect }: DocsSidebarPro
   // Auto-expand active category when activeSlug changes
   useEffect(() => {
     const active = categories.find((c) => c.docs.some((d) => d.slug === activeSlug))
-    if (active && !expanded.has(active.id)) {
-      setExpanded((prev) => new Set([...prev, active.id]))
+    if (active) {
+      setExpanded((prev) => {
+        if (prev.has(active.id)) return prev
+        return new Set([...prev, active.id])
+      })
     }
   }, [activeSlug, categories])
 

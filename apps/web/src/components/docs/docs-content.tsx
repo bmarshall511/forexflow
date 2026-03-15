@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { parseMarkdown, type DocHeading } from "@/lib/markdown"
 import { DocsBreadcrumbs } from "./docs-breadcrumbs"
 import { DocsNavFooter } from "./docs-nav-footer"
@@ -25,11 +25,11 @@ export function DocsContent({
   onSelect,
   onHeadings,
 }: DocsContentProps) {
-  const parsed = useMemo(() => {
-    const result = parseMarkdown(content)
-    onHeadings(result.headings)
-    return result
-  }, [content, onHeadings])
+  const parsed = useMemo(() => parseMarkdown(content), [content])
+
+  useEffect(() => {
+    onHeadings(parsed.headings)
+  }, [parsed, onHeadings])
 
   return (
     <article aria-label={title}>

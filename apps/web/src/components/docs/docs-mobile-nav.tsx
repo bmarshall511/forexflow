@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Menu, X, ChevronDown } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CategoryGroup } from "./docs-types"
 

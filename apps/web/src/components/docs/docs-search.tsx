@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
-import { cn } from "@/lib/utils"
 import type { SearchResult, CategoryGroup } from "./docs-types"
 
 interface DocsSearchProps {
