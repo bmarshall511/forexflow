@@ -1,3 +1,4 @@
+import { createRequire } from "node:module"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerTradeTools } from "./tools/trades.js"
@@ -9,9 +10,12 @@ import { registerSchemaTools } from "./tools/schema.js"
 import { registerResources } from "./resources/index.js"
 import { registerPrompts } from "./prompts/index.js"
 
+const require = createRequire(import.meta.url)
+const rootPkg = require("../../../package.json") as { version: string }
+
 const server = new McpServer({
   name: "fxflow",
-  version: "0.1.0",
+  version: rootPkg.version,
 })
 
 // Register all tools

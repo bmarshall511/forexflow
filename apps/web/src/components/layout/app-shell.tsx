@@ -6,6 +6,7 @@ import { Header } from "./header"
 import { Sidebar } from "./sidebar"
 import { MobileSidebar } from "./mobile-sidebar"
 import { OfflineBanner } from "./offline-banner"
+import { AppFooter } from "./app-footer"
 import { CommandPalette } from "@/components/ui/command-palette"
 import { ShortcutsHelp } from "@/components/ui/shortcuts-help"
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
@@ -55,6 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <main id="main-content" className="flex-1" role="main">
               {children}
             </main>
+            <AppFooter />
           </div>
         </div>
       </div>

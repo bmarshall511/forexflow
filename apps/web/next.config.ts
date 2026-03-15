@@ -1,11 +1,31 @@
 import type { NextConfig } from "next"
 import bundleAnalyzer from "@next/bundle-analyzer"
+import { execSync } from "node:child_process"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 })
 
+// Read version from monorepo root package.json
+const rootPkg = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../package.json"), "utf8"))
+const appVersion = rootPkg.version ?? "0.0.0"
+
+// Get git SHA at build time (short hash)
+let buildSha = "local"
+try {
+  buildSha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim()
+} catch {
+  // Not a git repo or git not available — use fallback
+}
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_BUILD_SHA: buildSha,
+    NEXT_PUBLIC_BUILD_DATE: new Date().toISOString(),
+  },
   transpilePackages: ["@fxflow/db", "@fxflow/shared", "@fxflow/types"],
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-libsql", "@libsql/client", "libsql"],
   async headers() {

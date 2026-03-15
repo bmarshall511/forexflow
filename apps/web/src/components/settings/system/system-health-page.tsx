@@ -5,6 +5,7 @@ import { DaemonHealthCard } from "./daemon-health-card"
 import { OandaHealthCard } from "./oanda-health-card"
 import { StorageStatsCard } from "./storage-stats-card"
 import { ServicesStatusCard } from "./services-status-card"
+import { VersionInfoCard } from "./version-info-card"
 import type { OandaHealthData } from "@fxflow/types"
 
 export function SystemHealthPage() {
@@ -36,6 +37,7 @@ export function SystemHealthPage() {
           <OandaHealthCard oanda={oanda as OandaHealthData | null} />
           <ServicesStatusCard daemon={health?.daemon ?? null} snapshot={snapshot} />
           <StorageStatsCard storage={health?.storage ?? null} />
+          <VersionInfoCard />
         </div>
       )}
     </div>

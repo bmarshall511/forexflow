@@ -1,31 +1,16 @@
 name: Documentation
 
+# Changelog generation has moved to .github/workflows/release.yml
+# This workflow is kept for future doc-specific automation (e.g. TypeDoc sync)
+
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  changelog:
+  placeholder:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Generate changelog
-        run: pnpm changelog
-      - name: Commit changelog
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git diff --staged --quiet || git commit -m "docs: update changelog [skip ci]"
-          git push || echo "Push failed — branch protection may block direct pushes"
+      - run: echo "Documentation workflow — see release.yml for changelog generation"

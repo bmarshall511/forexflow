@@ -1,6 +1,7 @@
 {
   "name": "FXFlow",
   "short_name": "FXFlow",
+  "version": "0.1.0",
   "description": "Forex Trading Platform",
   "start_url": "/",
   "display": "standalone",
