@@ -66,7 +66,9 @@ jobs:
         id: version
         if: steps.bump.outputs.bump != 'none'
         run: |
-          CURRENT=$(node -p "require('./package.json').version")
+          # Derive version from the latest git tag, not package.json
+          LATEST_TAG="${{ steps.bump.outputs.latest_tag }}"
+          CURRENT="${LATEST_TAG#v}"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
           BUMP="${{ steps.bump.outputs.bump }}"
@@ -94,11 +96,23 @@ jobs:
 
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "New version: $NEW_VERSION"
+          echo "New version: $NEW_VERSION (from tag $LATEST_TAG)"
 
-      # Tag current HEAD and create release (no commit to main needed)
-      - name: Create tag
+      # Check if this tag already exists (idempotency guard)
+      - name: Check tag exists
+        id: tag_check
         if: steps.bump.outputs.bump != 'none'
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+          if git rev-parse "v${NEW_VERSION}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v${NEW_VERSION} already exists, skipping release"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tag
+        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
         env:
           LEFTHOOK: "0"
         run: |
@@ -111,7 +125,7 @@ jobs:
           git push origin "v${NEW_VERSION}"
 
       - name: Create GitHub Release
-        if: steps.bump.outputs.bump != 'none'
+        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -128,7 +142,7 @@ jobs:
 
       # Create a PR to update version numbers in package.json files
       - name: Bump version in files
-        if: steps.bump.outputs.bump != 'none'
+        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
 
@@ -161,11 +175,11 @@ jobs:
           "
 
       - name: Generate changelog
-        if: steps.bump.outputs.bump != 'none'
+        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
         run: pnpm changelog
 
       - name: Create version bump PR
-        if: steps.bump.outputs.bump != 'none'
+        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LEFTHOOK: "0"
@@ -191,7 +205,7 @@ jobs:
           gh pr merge "$BRANCH" --auto --squash
 
     outputs:
-      released: ${{ steps.bump.outputs.bump != 'none' }}
+      released: ${{ steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true' }}
       version: ${{ steps.version.outputs.version }}
 
   # Build desktop DMGs and attach to the release
