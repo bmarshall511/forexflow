@@ -75,5 +75,5 @@ packages/
 ### Desktop-specific commands (run from `apps/desktop/`)
 
 - `pnpm electron:dev` — run Electron in dev mode
-- `pnpm electron:build` — compile Electron main/preload
+- `pnpm electron:build` — compile Electron main/preload via `tsc`
 - `pnpm electron:package` — build macOS DMG via electron-builder

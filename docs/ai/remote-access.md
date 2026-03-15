@@ -268,10 +268,14 @@ The Electron app packages the web app + daemon into a macOS DMG for non-technica
 
 ### Build & Distribution
 
-- Built via `electron-builder` (DMG for macOS arm64 + x64)
+- `electron:build` compiles main/preload via `tsc` (not electron-vite; `electron-vite` and `vite` are not dependencies)
+- Packaged via `electron-builder` (DMG for macOS arm64 + x64)
 - **Unsigned** — users must right-click → Open → Open Anyway on first launch
+- No `assets/icon.icns` — uses default Electron icon
 - Published to GitHub Releases via `.github/workflows/desktop.yml`
+- Both archs build on `macos-latest` (ARM); x64 is cross-compiled via `--x64` flag (`macos-13` x64 runners are no longer used)
 - `electron-builder.yml` bundles daemon + web app as `extraResources`
+- Desktop workflow runs `db:generate` and sets `DATABASE_URL` env var before building
 
 ### IPC Bridge
 

@@ -345,7 +345,7 @@ GitHub Actions runs on every pull request:
 | prisma-drift | Schema/migration sync         |
 | danger       | Automated PR review           |
 
-Additional workflows: CodeQL + Gitleaks security scanning, bundle size analysis on web changes, auto-changelog generation on merge to main.
+Additional workflows: CodeQL + Gitleaks security scanning, bundle size analysis on web changes, auto-changelog generation on merge to main. The release workflow derives the version from git tags (not package.json), creates a git tag and GitHub Release on merge to main, and triggers the desktop DMG build — no version-bump commits or PRs are created.
 
 ### Running individual apps
 
