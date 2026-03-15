@@ -12,6 +12,20 @@ Sometimes you need a fresh start. This page has three levels of reset, from gent
 > [!WARNING]
 > All reset actions on this page are permanent. Once you confirm, the deleted data is gone forever. There is no "undo" button. Make absolutely sure you want to do this before clicking.
 
+## Preflight Safety Checks
+
+Before you can run any reset, FXFlow checks that nothing is still active. You will see a checklist at the top of the page with green ticks or red crosses:
+
+- **Open Trades** — you have trades currently open on OANDA. Use the **Close All** button to close them before resetting.
+- **Pending Orders** — you have orders waiting to be filled. Use the **Cancel All** button to remove them.
+- **Running AI Analyses** — an AI analysis is still in progress. Wait for it to finish or cancel it from the Positions page.
+- **Active Conditions** — trade conditions are monitoring your positions. Use the **Cancel All** button to deactivate them.
+
+All four checks must pass (green ticks) before the reset buttons become available. This prevents you from accidentally deleting data while trades are still running.
+
+> [!TIP]
+> The Close All and Cancel All buttons on this page handle everything for you — you do not need to go to other pages to close trades or cancel conditions individually.
+
 ## Clear Trade History
 
 **What it does:** Removes all your closed trade records from FXFlow's database.
