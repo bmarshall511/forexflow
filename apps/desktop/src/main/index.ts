@@ -14,12 +14,12 @@
 import { app, BrowserWindow } from "electron"
 import path from "node:path"
 import { fork, type ChildProcess } from "node:child_process"
-import { store } from "./store"
-import { createMainWindow } from "./window"
-import { TrayManager } from "./tray"
-import { DaemonManager } from "./daemon-manager"
-import { setupAutoUpdater } from "./updater"
-import { registerIpcHandlers } from "./ipc-handlers"
+import { store } from "./store.js"
+import { createMainWindow } from "./window.js"
+import { TrayManager } from "./tray.js"
+import { DaemonManager } from "./daemon-manager.js"
+import { setupAutoUpdater } from "./updater.js"
+import { registerIpcHandlers } from "./ipc-handlers.js"
 
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock()
