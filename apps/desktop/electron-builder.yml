@@ -22,6 +22,7 @@ extraResources:
 
 mac:
   category: public.app-category.finance
+  icon: assets/icon.icns
   darkModeSupport: true
   hardenedRuntime: false
   gatekeeperAssess: false
