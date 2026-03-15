@@ -529,11 +529,13 @@ export function PendingOrdersTable({
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell className="min-w-[100px]">
+                <TableCell className="min-w-[120px]">
                   <PendingProgressBar
                     instrument={order.instrument}
                     entryPrice={order.entryPrice}
                     currentPrice={currentPrice}
+                    stopLoss={order.stopLoss}
+                    direction={order.direction}
                   />
                 </TableCell>
                 <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">

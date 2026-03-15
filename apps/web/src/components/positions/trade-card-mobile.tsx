@@ -246,6 +246,8 @@ export function TradeCardMobile({
           instrument={data.instrument}
           entryPrice={(data as PendingOrderData).entryPrice}
           currentPrice={currentPrice ?? null}
+          stopLoss={data.stopLoss}
+          direction={data.direction}
         />
       )}
       {isOpen && (

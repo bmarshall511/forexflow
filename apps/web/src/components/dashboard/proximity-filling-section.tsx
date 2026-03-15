@@ -50,6 +50,8 @@ export function ProximityFillingSection({ orders, onSelectTrade }: ProximityFill
                   instrument={order.instrument}
                   entryPrice={order.entryPrice}
                   currentPrice={currentPrice}
+                  stopLoss={order.stopLoss}
+                  direction={order.direction}
                   className="mt-0.5"
                 />
               </ProximityTradeRow>

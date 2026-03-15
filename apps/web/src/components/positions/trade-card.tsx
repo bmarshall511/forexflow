@@ -265,6 +265,8 @@ export function TradeCard({
                   instrument={data.instrument}
                   entryPrice={(data as PendingOrderData).entryPrice}
                   currentPrice={currentPriceProp ?? null}
+                  stopLoss={data.stopLoss}
+                  direction={data.direction}
                 />
               )}
               {isOpen && (

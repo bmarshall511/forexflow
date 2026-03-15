@@ -110,6 +110,8 @@ export function TradeEditorPanel({
             instrument={trade.instrument}
             entryPrice={trade.entryPrice}
             currentPrice={livePrice}
+            stopLoss={trade.stopLoss}
+            direction={trade.direction}
           />
         )}
       </div>

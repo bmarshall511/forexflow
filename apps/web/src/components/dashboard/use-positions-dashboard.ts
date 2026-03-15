@@ -113,8 +113,12 @@ function computePendingFillPercent(
 ): number | null {
   if (!currentPrice) return null
   const info = calculateDistanceInfo(order.instrument, currentPrice, order.entryPrice)
-  const maxPips = Math.max(info.pips * 2, 20)
-  return Math.min(100, Math.max(0, ((maxPips - info.pips) / maxPips) * 100))
+  // Use SL distance as the reference scale; fall back to 100 pips if no SL
+  const referencePips = order.stopLoss
+    ? priceToPips(order.instrument, Math.abs(order.entryPrice - order.stopLoss))
+    : 100
+  const scale = Math.max(referencePips, 10)
+  return Math.min(100, Math.max(0, (1 - info.pips / scale) * 100))
 }
 
 // ─── Hook ───────────────────────────────────────────────────────────────────
