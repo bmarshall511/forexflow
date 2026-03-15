@@ -117,12 +117,6 @@ export function TradeFinderSettingsPage() {
     await handleUpdate({ autoTradeMaxConcurrent: num })
   }
 
-  const handleAutoTradeMaxDailyChange = async (value: string) => {
-    const num = parseInt(value)
-    if (isNaN(num) || num < 1 || num > 50) return
-    await handleUpdate({ autoTradeMaxDaily: num })
-  }
-
   const handleAutoTradeMaxRiskChange = async (value: string) => {
     const num = parseFloat(value)
     if (isNaN(num) || num < 0.5 || num > 50) return
@@ -299,25 +293,6 @@ export function TradeFinderSettingsPage() {
                   step={1}
                   defaultValue={config.autoTradeMaxConcurrent}
                   onBlur={(e) => handleAutoTradeMaxConcurrentChange(e.target.value)}
-                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
-                />
-              </div>
-
-              {/* Max daily */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Max Daily Auto-Trades</Label>
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    Maximum auto-trades in a 24-hour window
-                  </p>
-                </div>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  step={1}
-                  defaultValue={config.autoTradeMaxDaily}
-                  onBlur={(e) => handleAutoTradeMaxDailyChange(e.target.value)}
                   className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
                 />
               </div>

@@ -33,7 +33,6 @@ import {
   findExistingSetup,
   pruneSetupHistory,
   countPendingAutoPlaced,
-  countAutoPlacedToday,
   getAutoPlacedTotalRiskPips,
   findSetupByResultSourceId,
   getPlacedAutoSetups,
@@ -475,17 +474,7 @@ export class TradeFinderScanner {
       return
     }
 
-    // 4. Max daily check
-    const dailyCount = await countAutoPlacedToday()
-    if (dailyCount >= config.autoTradeMaxDaily) {
-      await this.skipAutoTrade(
-        setup,
-        `Max daily auto-trades reached (${dailyCount}/${config.autoTradeMaxDaily})`,
-      )
-      return
-    }
-
-    // 5. Max total risk % check
+    // 4. Max total risk % check
     const snapshot = this.stateManager.getSnapshot()
     const balance = snapshot.accountOverview?.summary.balance ?? 0
     if (balance > 0) {
@@ -1115,7 +1104,6 @@ export class TradeFinderScanner {
   async getCapUtilization(): Promise<TradeFinderCapUtilization> {
     const config = await getTradeFinderConfig()
     const pendingCount = await countPendingAutoPlaced()
-    const dailyCount = await countAutoPlacedToday()
 
     const snapshot = this.stateManager.getSnapshot()
     const balance = snapshot.accountOverview?.summary.balance ?? 0
@@ -1131,7 +1119,6 @@ export class TradeFinderScanner {
 
     return {
       concurrent: { used: pendingCount, max: config.autoTradeMaxConcurrent },
-      daily: { used: dailyCount, max: config.autoTradeMaxDaily },
       risk: {
         usedPercent: Math.round(usedRiskPercent * 10) / 10,
         maxPercent: config.autoTradeMaxRiskPercent,

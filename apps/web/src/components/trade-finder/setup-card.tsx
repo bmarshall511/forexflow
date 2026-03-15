@@ -72,7 +72,7 @@ type AutoTradeStatus =
   | { type: "blocked"; reason: string }
   | null
 
-const CAP_KEYWORDS = ["concurrent", "daily", "risk"]
+const CAP_KEYWORDS = ["concurrent", "risk"]
 
 function isCappedReason(reason: string): boolean {
   const lower = reason.toLowerCase()
@@ -360,14 +360,14 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                 <PriceCard
                   icon={<ShieldAlert className="size-3.5" />}
                   label="Stop Loss"
-                  sublabel="Auto-close if wrong"
+                  sublabel={`-${fmtDollar(riskDollars)} if wrong`}
                   value={setup.stopLoss.toFixed(5)}
                   color="text-red-500"
                 />
                 <PriceCard
                   icon={<DollarSign className="size-3.5" />}
                   label="Take Profit"
-                  sublabel="Auto-close if right"
+                  sublabel={`+${fmtDollar(rewardDollars)} if right`}
                   value={setup.takeProfit.toFixed(5)}
                   color="text-green-500"
                 />

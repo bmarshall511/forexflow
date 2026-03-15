@@ -459,7 +459,6 @@ describe("TradeFinderConfigUpdateSchema", () => {
       autoTradeEnabled: true,
       autoTradeMinScore: 80,
       autoTradeMaxConcurrent: 3,
-      autoTradeMaxDaily: 10,
       autoTradeMaxRiskPercent: 2.0,
       autoTradeMinRR: 1.5,
       autoTradeCancelOnInvalidation: true,

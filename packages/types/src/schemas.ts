@@ -150,7 +150,6 @@ export const TradeFinderConfigUpdateSchema = z
     autoTradeEnabled: z.boolean().optional(),
     autoTradeMinScore: z.number().int().min(0).max(100).optional(),
     autoTradeMaxConcurrent: z.number().int().min(1).max(20).optional(),
-    autoTradeMaxDaily: z.number().int().min(1).max(100).optional(),
     autoTradeMaxRiskPercent: z.number().min(0.01).max(50).optional(),
     autoTradeMinRR: z.number().min(0.5).max(20).optional(),
     autoTradeCancelOnInvalidation: z.boolean().optional(),

@@ -2268,8 +2268,6 @@ export interface TradeFinderConfigData {
   autoTradeMinScore: number
   /** Max pending auto-placed orders at once */
   autoTradeMaxConcurrent: number
-  /** Max auto-trades per rolling 24h window */
-  autoTradeMaxDaily: number
   /** Max total risk % across all auto-placed pending orders */
   autoTradeMaxRiskPercent: number
   /** Minimum risk:reward ratio for auto-trade (e.g. 2 = 2:1) */
@@ -2342,7 +2340,6 @@ export interface TradeFinderSetupData {
 /** Auto-trade cap utilization snapshot */
 export interface TradeFinderCapUtilization {
   concurrent: { used: number; max: number }
-  daily: { used: number; max: number }
   risk: { usedPercent: number; maxPercent: number }
 }
 

@@ -14,7 +14,7 @@ import type {
 export type SkipCategory = "capped" | "blocked"
 
 /** Cap-related keywords in skip reasons that indicate temporary (queue-able) blocks */
-const CAP_KEYWORDS = ["concurrent", "daily", "risk"]
+const CAP_KEYWORDS = ["concurrent", "risk"]
 
 /**
  * Categorize a skip reason as "capped" (will auto-place when slot opens) or

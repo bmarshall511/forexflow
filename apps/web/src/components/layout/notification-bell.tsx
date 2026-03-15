@@ -23,12 +23,12 @@ export function NotificationBell() {
           {undismissedCount > 0 && (
             <span
               className={cn(
-                "absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center",
-                "bg-status-disconnected rounded-full text-[10px] font-medium text-white",
+                "absolute -right-1.5 -top-1.5 flex min-w-[18px] items-center justify-center rounded-full px-1 py-0.5",
+                "ring-background bg-red-500 text-[10px] font-semibold leading-none text-white ring-2",
               )}
               aria-hidden="true"
             >
-              {undismissedCount > 9 ? "9+" : undismissedCount}
+              {undismissedCount > 99 ? "99+" : undismissedCount}
             </span>
           )}
         </Button>

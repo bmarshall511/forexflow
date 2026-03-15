@@ -141,7 +141,7 @@ export function TradeFinderDashboard() {
         <div
           className={cn(
             "grid grid-cols-2 gap-3 sm:grid-cols-4",
-            config?.autoTradeEnabled && capUtilization && "lg:grid-cols-7",
+            config?.autoTradeEnabled && capUtilization && "lg:grid-cols-6",
           )}
         >
           <StatusTile
@@ -179,13 +179,6 @@ export function TradeFinderDashboard() {
                   capUtilization.concurrent.used >= capUtilization.concurrent.max
                     ? "warning"
                     : "default"
-                }
-              />
-              <StatusTile
-                label="Daily"
-                value={`${capUtilization.daily.used}/${capUtilization.daily.max}`}
-                variant={
-                  capUtilization.daily.used >= capUtilization.daily.max ? "warning" : "default"
                 }
               />
               <StatusTile

@@ -299,17 +299,6 @@ export async function countPendingAutoPlaced(): Promise<number> {
   })
 }
 
-/** Count auto-placed setups in the last 24 hours (uses placedAt for accuracy) */
-export async function countAutoPlacedToday(): Promise<number> {
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-  return db.tradeFinderSetup.count({
-    where: {
-      autoPlaced: true,
-      placedAt: { gte: twentyFourHoursAgo },
-    },
-  })
-}
-
 /** Get all pending auto-placed setups (for cancel-all) */
 export async function getPendingAutoPlacedSetups(): Promise<TradeFinderSetupData[]> {
   const rows = await db.tradeFinderSetup.findMany({
