@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "electron:dev": "tsc && electron .",
-    "electron:build": "tsc",
+    "electron:build": "rm -rf dist *.tsbuildinfo && tsc && tsc -p tsconfig.preload.json",
     "electron:package": "electron-builder --mac --config electron-builder.yml"
   },
   "dependencies": {

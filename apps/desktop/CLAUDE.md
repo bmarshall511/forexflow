@@ -63,7 +63,7 @@ electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 ## Build & Distribution
 
 - `pnpm desktop:dist` (from repo root) — single command to build everything and package the arm64 DMG locally.
-- `pnpm electron:build` — compile main/preload via `tsc` (not electron-vite).
+- `pnpm electron:build` — compile main process (ESM via `tsconfig.json`) and preload (CJS via `tsconfig.preload.json`) separately. Electron sandboxed preload scripts require CommonJS.
 - `pnpm electron:package` — build macOS DMG via electron-builder. In CI, `--publish never` is passed to prevent electron-builder from auto-publishing (uploads handled separately via `gh release upload`).
 - DMG is **unsigned** (no Apple Developer account) — users right-click → Open on first launch.
 - `electron-builder.yml` bundles web + daemon as `extraResources`. Custom app icon at `assets/icon.icns`.
@@ -103,5 +103,6 @@ electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 - Tray icon must be a template image for macOS dark/light mode support.
 - `daemon-bundle/` and `assets/template.db` are build artifacts (gitignored) — do not commit them.
 - iCloud Drive can cause issues with `pnpm deploy` due to permission errors. The `desktop:dist` script works around this by deploying to `/tmp` first, then copying back.
+- Preload script MUST compile to CommonJS (Electron sandbox restriction). Uses separate `tsconfig.preload.json` with `"module": "CommonJS"`. Main process compiles to ESM via the default `tsconfig.json`.
 - DevTools can be opened in the packaged app with Cmd+Shift+I for debugging.
 - Renderer console messages are forwarded to main process stdout for debugging.
