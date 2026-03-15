@@ -56,7 +56,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fxflow/db db:generate
       - run: pnpm test -- --coverage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage

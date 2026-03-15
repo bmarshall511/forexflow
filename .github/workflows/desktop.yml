@@ -84,7 +84,7 @@ jobs:
 
       # Upload artifacts for inspection
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: FXFlow-${{ matrix.arch }}
           path: apps/desktop/release/*.dmg
