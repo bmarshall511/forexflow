@@ -77,6 +77,35 @@ Auto-trading without limits is dangerous, so Trade Finder has several safety set
 > [!WARNING]
 > Always set these limits before enabling auto-trade. Without them, the scanner could place too many orders during a busy market session.
 
+## Setup Badges
+
+When auto-trade is enabled, each setup card shows a badge indicating its auto-trade status:
+
+- **Eligible** (teal) — the setup passes all checks and will be placed when price reaches the entry zone
+- **Queued #N** (blue) — the setup is eligible but waiting for a cap slot to open (e.g., daily limit reached). The number shows its priority position — when a slot opens, the highest-priority queued setup is placed first
+- **Blocked** (amber) — the setup will not auto-place (e.g., score too low, R:R below minimum, or same-instrument conflict)
+
+The reason for queuing or blocking is shown as a subtitle below the badge.
+
+## Cap Utilization
+
+When auto-trade is on, the dashboard status bar shows three additional tiles:
+
+- **Concurrent** — how many auto-placed pending orders exist vs the maximum (e.g., "3/5")
+- **Daily** — how many auto-trades have been placed today vs the daily limit (e.g., "5/5")
+- **Risk** — total risk percentage of auto-placed orders vs the max risk cap (e.g., "4.2%/6%")
+
+These tiles turn amber when a cap is reached, helping you understand why setups are queued.
+
+## Auto-Trade Queue
+
+When all caps are met but eligible setups still exist, they enter a priority queue. The queue is ordered by:
+
+1. **Score** (highest first) — stronger setups get priority
+2. **Distance to entry** (closest first) — as a tiebreaker, setups closer to their entry zone go first
+
+When a slot opens (an order fills, gets cancelled, or a zone is invalidated), the top queued setup is placed automatically — you do not have to wait for the next scan cycle.
+
 ## Activity Log
 
 The Activity tab on the Trade Finder dashboard shows every auto-trade event in real time:

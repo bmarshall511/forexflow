@@ -64,9 +64,13 @@ src/
 ## Trade Finder
 
 - `scanner.ts` — detects supply/demand zones, scores them, auto-places orders.
+- `auto-trade-queue.ts` — pure functions for queue position computation + skip reason categorization.
 - Setup lifecycle: `active → approaching → placed → filled → invalidated/expired`.
 - Fill detection: dual path — event-driven via `tradeSyncer.onOrderFilled` + fallback via `checkPlacedSetups()`.
 - Auto-trade events ring buffer (max 50) exposed via `GET /trade-finder/auto-trade-events`.
+- Skip reasons persisted to DB (`lastSkipReason` column) and broadcast via WS for accurate UI badges.
+- Queue system: eligible-but-capped setups are priority-ordered (score DESC, distance ASC). Reactive placement on slot open (fill/cancel/invalidation).
+- Cap utilization: `GET /trade-finder/caps` endpoint + `trade_finder_cap_utilization` WS message.
 
 ## TV Alerts
 

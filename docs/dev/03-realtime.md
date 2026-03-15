@@ -25,7 +25,7 @@ All WebSocket message types are defined in `packages/types` as `DaemonMessageTyp
 { type: DaemonMessageType; payload: <type-specific data> }
 ```
 
-Categories: price ticks, position updates, account snapshots, signal events, AI analysis events, trade finder events, notifications.
+Categories: price ticks, position updates, account snapshots, signal events, AI analysis events, trade finder events (setup updates, auto-trade events, cap utilization), notifications.
 
 ## Adding a New WebSocket Event
 
