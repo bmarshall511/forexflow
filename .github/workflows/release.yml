@@ -132,6 +132,8 @@ jobs:
 
       - name: Commit, tag, and push
         if: steps.bump.outputs.bump != 'none'
+        env:
+          LEFTHOOK: "0"
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
 
