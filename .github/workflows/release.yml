@@ -10,7 +10,6 @@ concurrency:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   release:
@@ -24,14 +23,6 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
 
       - name: Determine version bump
         id: bump
@@ -66,7 +57,7 @@ jobs:
         id: version
         if: steps.bump.outputs.bump != 'none'
         run: |
-          # Derive version from the latest git tag, not package.json
+          # Derive version from the latest git tag
           LATEST_TAG="${{ steps.bump.outputs.latest_tag }}"
           CURRENT="${LATEST_TAG#v}"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
@@ -75,7 +66,6 @@ jobs:
 
           case "$BUMP" in
             major)
-              # While pre-1.0, cap major bumps to minor
               if [ "$MAJOR" -eq 0 ]; then
                 MINOR=$((MINOR + 1))
                 PATCH=0
@@ -113,8 +103,6 @@ jobs:
 
       - name: Create tag
         if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
-        env:
-          LEFTHOOK: "0"
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
 
@@ -132,77 +120,12 @@ jobs:
           NEW_VERSION="${{ steps.version.outputs.version }}"
           PREV_TAG="${{ steps.bump.outputs.latest_tag }}"
 
-          # Generate release notes from commits
           NOTES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" 2>/dev/null || echo "- Initial release")
 
           gh release create "v${NEW_VERSION}" \
             --title "v${NEW_VERSION}" \
             --notes "$NOTES" \
             --latest
-
-      # Create a PR to update version numbers in package.json files
-      - name: Bump version in files
-        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
-        run: |
-          NEW_VERSION="${{ steps.version.outputs.version }}"
-
-          # Update root package.json
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '$NEW_VERSION';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-          # Update all workspace package.json files
-          for PKG_FILE in apps/*/package.json packages/*/package.json; do
-            if [ -f "$PKG_FILE" ]; then
-              node -e "
-                const fs = require('fs');
-                const pkg = JSON.parse(fs.readFileSync('$PKG_FILE', 'utf8'));
-                pkg.version = '$NEW_VERSION';
-                fs.writeFileSync('$PKG_FILE', JSON.stringify(pkg, null, 2) + '\n');
-              "
-            fi
-          done
-
-          # Update manifest.json
-          node -e "
-            const fs = require('fs');
-            const manifest = JSON.parse(fs.readFileSync('apps/web/public/manifest.json', 'utf8'));
-            manifest.version = '$NEW_VERSION';
-            fs.writeFileSync('apps/web/public/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
-          "
-
-      - name: Generate changelog
-        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
-        run: pnpm changelog
-
-      - name: Create version bump PR
-        if: steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LEFTHOOK: "0"
-        run: |
-          NEW_VERSION="${{ steps.version.outputs.version }}"
-          BRANCH="release/v${NEW_VERSION}"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git checkout -b "$BRANCH"
-          git add -A
-          git commit -m "chore(release): v${NEW_VERSION} [skip ci]"
-          git push origin "$BRANCH"
-
-          gh pr create \
-            --title "chore(release): v${NEW_VERSION}" \
-            --body "Automated version bump to v${NEW_VERSION}. Updates package.json files and changelog." \
-            --base main \
-            --head "$BRANCH"
-
-          # Enable auto-merge so it merges once status checks pass
-          gh pr merge "$BRANCH" --auto --squash
 
     outputs:
       released: ${{ steps.bump.outputs.bump != 'none' && steps.tag_check.outputs.exists != 'true' }}
