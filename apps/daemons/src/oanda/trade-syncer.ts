@@ -271,6 +271,23 @@ export class OandaTradeSyncer {
         : `${succeeded} cancelled, ${failed} failed`
     this.onActionNotification?.("Bulk Cancel", summary)
 
+    // Directly remove stale pending orders from DB. Prevents race condition
+    // where a concurrent periodic reconcile upserts orders back to "pending"
+    // after OANDA cancellation, and the subsequent reconcile() gets skipped
+    // by the mutex guard.
+    if (succeeded > 0) {
+      try {
+        const remainingActiveIds = sourceOrderIds
+          ? pending
+              .filter((o) => !targets.some((tgt) => tgt.sourceOrderId === o.sourceOrderId))
+              .map((o) => o.sourceOrderId)
+          : [] // cancelling all → no active orders remain
+        await removeStalePendingOrders(remainingActiveIds, "oanda")
+      } catch (err) {
+        console.warn("[cancelAllOrders] stale order cleanup failed:", (err as Error).message)
+      }
+    }
+
     if (targets.length > 0) await this.reconcile()
 
     return { succeeded, failed, errors }
@@ -373,6 +390,23 @@ export class OandaTradeSyncer {
         ? `${succeeded} ${succeeded === 1 ? "trade" : "trades"} closed`
         : `${succeeded} closed, ${failed} failed`
     this.onActionNotification?.("Bulk Close", summary)
+
+    // Directly mark orphaned trades in DB as closed. This prevents the race
+    // condition where a concurrent periodic reconcile upserts trades back to
+    // "open" after closeTrade() already set them to "closed", and the
+    // subsequent reconcile() call below gets skipped by the mutex guard.
+    if (succeeded > 0) {
+      try {
+        const remainingActiveIds = sourceTradeIds
+          ? open
+              .filter((t) => !targets.some((tgt) => tgt.sourceTradeId === t.sourceTradeId))
+              .map((t) => t.sourceTradeId)
+          : [] // closing all → no active trades remain
+        await closeOrphanedTrades("oanda", remainingActiveIds)
+      } catch (err) {
+        console.warn("[closeAllTrades] orphan cleanup failed:", (err as Error).message)
+      }
+    }
 
     if (targets.length > 0) await this.reconcile()
 
