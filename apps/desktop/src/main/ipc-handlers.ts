@@ -7,8 +7,8 @@
  * @module ipc-handlers
  */
 import { ipcMain, app } from "electron"
-import { store } from "./store"
-import type { DaemonManager } from "./daemon-manager"
+import { store } from "./store.js"
+import type { DaemonManager } from "./daemon-manager.js"
 
 export function registerIpcHandlers(daemonManager: DaemonManager | null): void {
   ipcMain.handle("app:getVersion", () => app.getVersion())
