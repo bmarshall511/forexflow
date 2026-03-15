@@ -72,8 +72,9 @@ packages/
 - `pnpm --filter @fxflow/web dev` — run single workspace
 - `pnpm db:migrate` — apply Prisma migrations
 
-### Desktop-specific commands (run from `apps/desktop/`)
+### Desktop commands
 
-- `pnpm electron:dev` — run Electron in dev mode
+- `pnpm desktop:dist` (from repo root) — single command to build everything and package the arm64 DMG locally
+- `pnpm electron:dev` — run Electron in dev mode (from `apps/desktop/`)
 - `pnpm electron:build` — compile Electron main/preload via `tsc`
 - `pnpm electron:package` — build macOS DMG via electron-builder (CI passes `--publish never`; uploads via `gh release upload`)

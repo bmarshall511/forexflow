@@ -282,10 +282,12 @@ For non-technical users who want to install FXFlow like a regular app — no ter
 
 1. Download the latest `.dmg` from [GitHub Releases](https://github.com/bmarshall511/forexflow/releases)
 2. Open the DMG and drag FXFlow to Applications
-3. **First launch**: right-click the app → Open → click "Open" in the dialog (required because the app is unsigned)
+3. **First launch**: if macOS shows "FXFlow is damaged", run `xattr -cr /Applications/FXFlow.app` in Terminal (required because the app is unsigned)
 4. FXFlow starts with the daemon running in the background and the web UI in the app window
 5. Closing the window hides it to the system tray — the daemon keeps running
 6. Auto-updates check GitHub Releases every 4 hours
+
+To build the DMG locally: `pnpm desktop:dist` (outputs to `apps/desktop/release/`)
 
 The desktop app supports both local and cloud deployment modes via **Settings > Deployment**.
 

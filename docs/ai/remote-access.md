@@ -268,14 +268,16 @@ The Electron app packages the web app + daemon into a macOS DMG for non-technica
 
 ### Build & Distribution
 
+- `pnpm desktop:dist` (from repo root) — single command to build everything and package the arm64 DMG locally
 - `electron:build` compiles main/preload via `tsc` (not electron-vite; `electron-vite` and `vite` are not dependencies)
 - Packaged via `electron-builder` (DMG for macOS arm64 + x64)
-- **Unsigned** — users must right-click → Open → Open Anyway on first launch
-- No `assets/icon.icns` — uses default Electron icon
-- Published to GitHub Releases via `.github/workflows/desktop.yml`
+- **Unsigned** — macOS Gatekeeper may show "damaged" error on first launch. Fix: `xattr -cr /path/to/FXFlow.app`
+- Custom app icon at `assets/icon.icns` (generated from the PWA `icon-512.png`)
+- Published to GitHub Releases via `.github/workflows/desktop.yml` (CI passes `--publish never`; uploads via `gh release upload`)
 - Both archs build on `macos-latest` (ARM); x64 is cross-compiled via `--x64` flag (`macos-13` x64 runners are no longer used)
 - `electron-builder.yml` bundles daemon + web app as `extraResources`
 - Desktop workflow runs `db:generate` and sets `DATABASE_URL` env var before building
+- **iCloud caveat**: if the repo lives in iCloud Drive, duplicate symlinks (e.g. `sdk 2`) may appear in `node_modules`. Clean with `find . -path "*/node_modules/*" -regex '.* [0-9]+$' -exec rm -rf {} +` before packaging
 
 ### IPC Bridge
 
