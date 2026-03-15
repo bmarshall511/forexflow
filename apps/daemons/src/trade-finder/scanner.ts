@@ -349,7 +349,7 @@ export class TradeFinderScanner {
         zone.type === "demand" ? zone.distalLine - slBuffer : zone.distalLine + slBuffer
       const riskPips = Math.abs(zone.proximalLine - stopLoss) / pipSize
 
-      // Find TP: opposing fresh zone or 2:1 fallback
+      // Find TP: opposing fresh zone (meeting min R:R) or min-R:R fallback
       const opposingType = zone.type === "demand" ? "supply" : "demand"
       const freshOpposing = ltfResult.zones
         .filter((z) => z.type === opposingType && z.status === "active" && z.testCount === 0)
@@ -358,19 +358,30 @@ export class TradeFinderScanner {
           return b.proximalLine - a.proximalLine
         })
 
-      let takeProfit: number
-      if (freshOpposing.length > 0) {
-        takeProfit =
-          zone.type === "demand"
-            ? freshOpposing[0]!.proximalLine - spread
-            : freshOpposing[0]!.proximalLine + spread
-      } else {
-        // 2:1 fallback
+      // When auto-trade is enabled, require TP to meet the configured min R:R
+      const minRRMultiplier =
+        config.autoTradeEnabled && pair.autoTradeEnabled !== false
+          ? Math.max(2, config.autoTradeMinRR)
+          : 2
+
+      let takeProfit: number | null = null
+      for (const oz of freshOpposing) {
+        const candidateTP =
+          zone.type === "demand" ? oz.proximalLine - spread : oz.proximalLine + spread
+        const candidateReward = Math.abs(candidateTP - zone.proximalLine) / pipSize
+        if (candidateReward / riskPips >= minRRMultiplier) {
+          takeProfit = candidateTP
+          break
+        }
+      }
+
+      if (takeProfit === null) {
+        // Fallback: place TP at min R:R distance
         const riskDistance = Math.abs(zone.proximalLine - stopLoss)
         takeProfit =
           zone.type === "demand"
-            ? zone.proximalLine + riskDistance * 2
-            : zone.proximalLine - riskDistance * 2
+            ? zone.proximalLine + riskDistance * minRRMultiplier
+            : zone.proximalLine - riskDistance * minRRMultiplier
       }
 
       const rewardPips = Math.abs(takeProfit - zone.proximalLine) / pipSize
@@ -448,7 +459,7 @@ export class TradeFinderScanner {
       return
     }
 
-    // 1b. Minimum R:R check
+    // 1b. Minimum R:R check (safety net — TP selection already targets min R:R)
     const rrNum = parseFloat(setup.rrRatio) // e.g. "2.1:1" → 2.1
     if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
       await this.skipAutoTrade(
