@@ -55,6 +55,26 @@ export function createMainWindow(): BrowserWindow {
   win.on("resize", saveBounds)
   win.on("move", saveBounds)
 
+  // Forward renderer console messages to main process for debugging
+  win.webContents.on("console-message", (_event, level, message) => {
+    const prefix = ["[renderer:verbose]", "[renderer:info]", "[renderer:warn]", "[renderer:error]"][
+      level
+    ]
+    console.log(`${prefix ?? "[renderer]"} ${message}`)
+  })
+
+  // Log page load failures
+  win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[window] Failed to load ${validatedURL}: ${errorDescription} (${errorCode})`)
+  })
+
+  // Open DevTools with Cmd+Shift+I (for debugging packaged app)
+  win.webContents.on("before-input-event", (_event, input) => {
+    if (input.meta && input.shift && input.key === "I") {
+      win.webContents.toggleDevTools()
+    }
+  })
+
   // Open external links in default browser
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http")) {

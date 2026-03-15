@@ -24,6 +24,7 @@ src/
 assets/
   icon.icns               # macOS app icon (generated from PWA icon-512.png)
   tray-icon.png           # macOS template tray icon
+  template.db             # Pre-migrated empty SQLite DB (build artifact, gitignored)
 electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 ```
 
@@ -69,11 +70,20 @@ electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 - Since the app is unsigned, macOS Gatekeeper may show "damaged" error on first launch. Users must run `xattr -cr /path/to/FXFlow.app` to remove the quarantine attribute.
 - GitHub Actions builds arm64 + x64 DMGs on each release, both on `macos-latest` (ARM); x64 is cross-compiled via `--x64` flag.
 
+### Database Initialization
+
+- A template SQLite database (with schema applied via `prisma migrate deploy`) is created at build time.
+- Bundled as `assets/template.db` (gitignored build artifact).
+- On first launch, if no database exists at the data directory, the template is copied.
+- This ensures Prisma queries work immediately without requiring the Prisma CLI at runtime.
+
 ### Web Server Bundling
 
 - Next.js is configured with `output: "standalone"` and `outputFileTracingRoot` pointing to the monorepo root.
 - This produces `.next/standalone/` — a self-contained directory with `server.js`, traced `node_modules`, and workspace packages.
 - Static files (`.next/static`) and `public/` are copied alongside the standalone output during the build.
+- `outputFileTracingIncludes` explicitly adds `@libsql/darwin-arm64` and `@libsql/darwin-x64` native binaries (pnpm's dynamic require can't be auto-traced).
+- `scripts/fix-standalone-native.sh` runs post-build to fix pnpm native module resolution (copies native modules into the correct `node_modules` path for runtime resolution).
 - In the packaged app, the server entry is at `resources/web-standalone/apps/web/server.js`.
 
 ### Daemon Bundling
@@ -91,5 +101,7 @@ electron-builder.yml      # Build config (DMG, unsigned, GitHub publish)
 - The web app is served on localhost by a forked Next.js standalone server, then loaded in BrowserWindow.
 - `waitForServer()` polls localhost:3000 before showing the window.
 - Tray icon must be a template image for macOS dark/light mode support.
-- `daemon-bundle/` is a build artifact (gitignored) — do not commit it.
+- `daemon-bundle/` and `assets/template.db` are build artifacts (gitignored) — do not commit them.
 - iCloud Drive can cause issues with `pnpm deploy` due to permission errors. The `desktop:dist` script works around this by deploying to `/tmp` first, then copying back.
+- DevTools can be opened in the packaged app with Cmd+Shift+I for debugging.
+- Renderer console messages are forwarded to main process stdout for debugging.

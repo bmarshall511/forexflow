@@ -54,6 +54,12 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @fxflow/db db:generate
 
+      # Create template database with schema applied (copied on first launch)
+      - name: Create template database
+        run: |
+          DATABASE_URL=file:/tmp/fxflow-template.db pnpm --filter @fxflow/db exec prisma migrate deploy
+          cp /tmp/fxflow-template.db apps/desktop/assets/template.db
+
       # Build shared packages first
       - name: Build packages
         run: |
@@ -64,6 +70,10 @@ jobs:
       # Build the web app (Next.js)
       - name: Build web app
         run: pnpm --filter @fxflow/web build
+
+      # Fix pnpm native module resolution in standalone output
+      - name: Fix standalone native modules
+        run: bash scripts/fix-standalone-native.sh
 
       # Deploy daemon (self-contained bundle with all deps)
       - name: Bundle daemon

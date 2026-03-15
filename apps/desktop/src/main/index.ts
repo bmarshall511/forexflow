@@ -13,6 +13,7 @@
  */
 import { app, BrowserWindow } from "electron"
 import path from "node:path"
+import { copyFileSync, existsSync, mkdirSync } from "node:fs"
 import { fork, type ChildProcess } from "node:child_process"
 import { store } from "./store.js"
 import { createMainWindow } from "./window.js"
@@ -115,11 +116,25 @@ app.whenReady().then(async () => {
   // Show splash screen immediately so user sees the app is loading
   const splash = createSplashWindow()
 
-  // Ensure data directory exists (local mode)
+  // Ensure data directory and database exist (local mode)
   if (mode === "local") {
     const dataDir = path.join(app.getPath("userData"), "data")
-    const { mkdirSync } = await import("node:fs")
     mkdirSync(dataDir, { recursive: true })
+
+    // On first launch, copy the template database with schema already applied.
+    // Without this, Prisma queries fail with "no such table" errors.
+    const dbPath = path.join(dataDir, "fxflow.db")
+    if (!existsSync(dbPath)) {
+      const templatePath = app.isPackaged
+        ? path.join(process.resourcesPath, "template.db")
+        : path.join(app.getAppPath(), "assets", "template.db")
+      if (existsSync(templatePath)) {
+        copyFileSync(templatePath, dbPath)
+        console.log("[startup] Initialized database from template")
+      } else {
+        console.warn("[startup] No template database found — database may need manual migration")
+      }
+    }
   }
 
   // Start daemon in local mode

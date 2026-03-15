@@ -23,6 +23,14 @@ try {
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: resolve(import.meta.dirname, "../../"),
+  // Include native libsql binaries that Next.js file tracing can't auto-detect.
+  // libsql uses dynamic require(`@libsql/${platform}`) which can't be traced statically.
+  outputFileTracingIncludes: {
+    "/**": [
+      "../../node_modules/.pnpm/@libsql+darwin-arm64@*/node_modules/@libsql/darwin-arm64/**/*",
+      "../../node_modules/.pnpm/@libsql+darwin-x64@*/node_modules/@libsql/darwin-x64/**/*",
+    ],
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
     NEXT_PUBLIC_BUILD_SHA: buildSha,

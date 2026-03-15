@@ -22,7 +22,7 @@
     "docs:api": "typedoc",
     "changelog": "auto-changelog --template keepachangelog --commit-limit false --unreleased",
     "postinstall": "lefthook install",
-    "desktop:dist": "rm -rf apps/web/.next apps/desktop/daemon-bundle /tmp/fxflow-daemon-bundle && DATABASE_URL=file:./dev.db pnpm --filter @fxflow/db db:generate && pnpm --filter @fxflow/web build && pnpm --filter @fxflow/daemons --prod deploy --legacy /tmp/fxflow-daemon-bundle && cp -R /tmp/fxflow-daemon-bundle apps/desktop/daemon-bundle && pnpm --filter @fxflow/desktop electron:build && cd apps/desktop && GH_OWNER=local GH_REPO=local pnpm electron:package --arm64 --publish never",
+    "desktop:dist": "rm -rf apps/web/.next apps/desktop/daemon-bundle /tmp/fxflow-daemon-bundle /tmp/fxflow-template.db && DATABASE_URL=file:./dev.db pnpm --filter @fxflow/db db:generate && DATABASE_URL=file:/tmp/fxflow-template.db pnpm --filter @fxflow/db exec prisma migrate deploy && cp /tmp/fxflow-template.db apps/desktop/assets/template.db && pnpm --filter @fxflow/web build && bash scripts/fix-standalone-native.sh && pnpm --filter @fxflow/daemons --prod deploy --legacy /tmp/fxflow-daemon-bundle && cp -R /tmp/fxflow-daemon-bundle apps/desktop/daemon-bundle && pnpm --filter @fxflow/desktop electron:build && cd apps/desktop && GH_OWNER=local GH_REPO=local pnpm electron:package --arm64 --publish never",
     "site:dev": "pnpm --filter @fxflow/site dev",
     "site:build": "pnpm --filter @fxflow/site build",
     "site:preview": "pnpm --filter @fxflow/site preview"
