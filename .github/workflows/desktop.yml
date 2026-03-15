@@ -28,12 +28,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-latest
-            arch: arm64
-          - os: macos-13
-            arch: x64
+          - arch: arm64
+          - arch: x64
 
-    runs-on: ${{ matrix.os }}
+    # All macOS runners are now ARM — cross-compile x64 via electron-builder
+    runs-on: macos-latest
+
+    env:
+      DATABASE_URL: "file:./dev.db"
 
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +49,10 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # Generate Prisma client (needed for daemon build)
+      - name: Generate Prisma client
+        run: pnpm --filter @fxflow/db db:generate
 
       # Build shared packages first
       - name: Build packages
@@ -63,12 +69,18 @@ jobs:
       - name: Build daemon
         run: pnpm --filter @fxflow/daemons build
 
-      # Build Electron app
+      # Compile Electron main/preload
       - name: Build desktop app
         working-directory: apps/desktop
-        run: |
-          pnpm electron:build
-          pnpm electron:package
+        run: pnpm electron:build
+
+      # Package DMG for the target arch
+      - name: Package DMG
+        working-directory: apps/desktop
+        env:
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+        run: pnpm electron:package --${{ matrix.arch }}
 
       # Upload artifacts for inspection
       - name: Upload DMG artifact
@@ -78,7 +90,7 @@ jobs:
           path: apps/desktop/release/*.dmg
           if-no-files-found: error
 
-      # Attach to GitHub Release (when called from release workflow or manual with tag)
+      # Attach to GitHub Release
       - name: Upload to release
         if: inputs.tag != ''
         env:

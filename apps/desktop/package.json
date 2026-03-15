@@ -5,8 +5,8 @@
   "type": "module",
   "main": "dist/main/index.js",
   "scripts": {
-    "electron:dev": "electron-vite dev",
-    "electron:build": "electron-vite build",
+    "electron:dev": "tsc && electron .",
+    "electron:build": "tsc",
     "electron:package": "electron-builder --mac --config electron-builder.yml"
   },
   "dependencies": {
@@ -18,9 +18,7 @@
   "devDependencies": {
     "electron": "^34",
     "electron-builder": "^25",
-    "electron-vite": "^3",
     "eslint": "^10.0.3",
-    "typescript": "^5.7",
-    "vite": "^6"
+    "typescript": "^5.7"
   }
 }

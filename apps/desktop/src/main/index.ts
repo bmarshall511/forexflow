@@ -31,6 +31,7 @@ let mainWindow: BrowserWindow | null = null
 let webServerProcess: ChildProcess | null = null
 const trayManager = new TrayManager()
 let daemonManager: DaemonManager | null = null
+let isQuitting = false
 
 /**
  * Start the embedded Next.js web server.
@@ -151,7 +152,7 @@ app.whenReady().then(async () => {
 
   // Hide to tray on window close (don't quit)
   mainWindow.on("close", (event) => {
-    if (!app.isQuitting) {
+    if (!isQuitting) {
       event.preventDefault()
       mainWindow?.hide()
     }
@@ -168,7 +169,7 @@ app.on("activate", () => {
 
 // Quit handler — clean up child processes
 app.on("before-quit", async () => {
-  ;(app as { isQuitting?: boolean }).isQuitting = true
+  isQuitting = true
 
   trayManager.destroy()
 
