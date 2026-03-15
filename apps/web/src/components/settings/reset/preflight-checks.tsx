@@ -28,19 +28,26 @@ export function PreflightChecks({
 }: PreflightChecksProps) {
   const [forceReset, setForceReset] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const { closeAllTrades, cancelAllOrders, refreshPositions } = useTradeActions()
+  const { closeAllTrades, cancelAllOrders } = useTradeActions()
 
-  const hasOpenTrades = preflight.openTrades > 0
-  const hasPendingOrders = preflight.pendingOrders > 0
-  const hasRunningAnalyses = preflight.runningAnalyses > 0
+  // Local overrides for optimistic UI updates after successful actions.
+  // The DB roundtrip via onRefresh is unreliable due to daemon reconcile races.
+  const [overrides, setOverrides] = useState<Partial<PreflightStatus>>({})
+  const merged = { ...preflight, ...overrides }
+
+  const hasOpenTrades = merged.openTrades > 0
+  const hasPendingOrders = merged.pendingOrders > 0
+  const hasRunningAnalyses = merged.runningAnalyses > 0
   const allClear = !hasOpenTrades && !hasPendingOrders && !hasRunningAnalyses
 
   async function handleCloseAllTrades() {
     setActionLoading("trades")
     try {
       const result = await closeAllTrades(undefined)
-      if (result.succeeded > 0) await refreshPositions()
-      await onRefresh()
+      if (result.succeeded > 0) {
+        setOverrides((prev) => ({ ...prev, openTrades: 0 }))
+      }
+      void onRefresh()
     } finally {
       setActionLoading(null)
     }
@@ -50,8 +57,10 @@ export function PreflightChecks({
     setActionLoading("orders")
     try {
       const result = await cancelAllOrders(undefined)
-      if (result.succeeded > 0) await refreshPositions()
-      await onRefresh()
+      if (result.succeeded > 0) {
+        setOverrides((prev) => ({ ...prev, pendingOrders: 0 }))
+      }
+      void onRefresh()
     } finally {
       setActionLoading(null)
     }
@@ -67,11 +76,11 @@ export function PreflightChecks({
         const json = await res.json()
         const count: number = json.data?.aborted ?? 0
         toast.success(`${count} ${count === 1 ? "analysis" : "analyses"} cancelled`)
+        setOverrides((prev) => ({ ...prev, runningAnalyses: 0 }))
       }
-      await onRefresh()
+      void onRefresh()
     } catch {
       toast.error("Failed to reach daemon")
-      await onRefresh()
     } finally {
       setActionLoading(null)
     }
@@ -81,7 +90,7 @@ export function PreflightChecks({
     {
       key: "trades",
       label: "Open Trades",
-      count: preflight.openTrades,
+      count: merged.openTrades,
       passed: !hasOpenTrades,
       action: hasOpenTrades ? handleCloseAllTrades : undefined,
       actionLabel: "Close All",
@@ -89,7 +98,7 @@ export function PreflightChecks({
     {
       key: "orders",
       label: "Pending Orders",
-      count: preflight.pendingOrders,
+      count: merged.pendingOrders,
       passed: !hasPendingOrders,
       action: hasPendingOrders ? handleCancelAllOrders : undefined,
       actionLabel: "Cancel All",
@@ -97,7 +106,7 @@ export function PreflightChecks({
     {
       key: "analyses",
       label: "Running Analyses",
-      count: preflight.runningAnalyses,
+      count: merged.runningAnalyses,
       passed: !hasRunningAnalyses,
       action: hasRunningAnalyses ? handleCancelAllAnalyses : undefined,
       actionLabel: "Cancel All",
@@ -105,7 +114,7 @@ export function PreflightChecks({
     {
       key: "conditions",
       label: "Active Conditions",
-      count: preflight.activeConditions,
+      count: merged.activeConditions,
       passed: true, // Informational only
       action: undefined,
       actionLabel: undefined,
