@@ -10,12 +10,15 @@ concurrency:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Skip release commits to prevent infinite loops
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    # Skip release/version-bump commits to prevent infinite loops
+    if: >-
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !startsWith(github.event.head_commit.message, 'chore(release):')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,7 +96,38 @@ jobs:
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
 
-      - name: Bump version in all package.json files
+      # Tag current HEAD and create release (no commit to main needed)
+      - name: Create tag
+        if: steps.bump.outputs.bump != 'none'
+        env:
+          LEFTHOOK: "0"
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+          git push origin "v${NEW_VERSION}"
+
+      - name: Create GitHub Release
+        if: steps.bump.outputs.bump != 'none'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+          PREV_TAG="${{ steps.bump.outputs.latest_tag }}"
+
+          # Generate release notes from commits
+          NOTES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" 2>/dev/null || echo "- Initial release")
+
+          gh release create "v${NEW_VERSION}" \
+            --title "v${NEW_VERSION}" \
+            --notes "$NOTES" \
+            --latest
+
+      # Create a PR to update version numbers in package.json files
+      - name: Bump version in files
         if: steps.bump.outputs.bump != 'none'
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
@@ -130,36 +164,31 @@ jobs:
         if: steps.bump.outputs.bump != 'none'
         run: pnpm changelog
 
-      - name: Commit, tag, and push
+      - name: Create version bump PR
         if: steps.bump.outputs.bump != 'none'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LEFTHOOK: "0"
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="release/v${NEW_VERSION}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          git checkout -b "$BRANCH"
           git add -A
           git commit -m "chore(release): v${NEW_VERSION} [skip ci]"
-          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
-          git push origin main --follow-tags
+          git push origin "$BRANCH"
 
-      - name: Create GitHub Release
-        if: steps.bump.outputs.bump != 'none'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NEW_VERSION="${{ steps.version.outputs.version }}"
-          PREV_TAG="${{ steps.bump.outputs.latest_tag }}"
+          gh pr create \
+            --title "chore(release): v${NEW_VERSION}" \
+            --body "Automated version bump to v${NEW_VERSION}. Updates package.json files and changelog." \
+            --base main \
+            --head "$BRANCH"
 
-          # Generate release notes from commits
-          NOTES=$(git log "${PREV_TAG}..HEAD~1" --pretty=format:"- %s" 2>/dev/null || echo "- Initial release")
-
-          gh release create "v${NEW_VERSION}" \
-            --title "v${NEW_VERSION}" \
-            --notes "$NOTES" \
-            --latest
+          # Enable auto-merge so it merges once status checks pass
+          gh pr merge "$BRANCH" --auto --squash
 
     outputs:
       released: ${{ steps.bump.outputs.bump != 'none' }}
