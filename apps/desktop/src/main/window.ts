@@ -45,6 +45,16 @@ export function createMainWindow(): BrowserWindow {
   // Show when ready to avoid white flash
   win.once("ready-to-show", () => {
     win.show()
+    // Auto-open DevTools for debugging — remove once blank screen issue is resolved
+    win.webContents.openDevTools({ mode: "detach" })
+  })
+
+  // Log navigation events for debugging
+  win.webContents.on("did-navigate", (_event, url, httpResponseCode) => {
+    console.log(`[window] Navigated to ${url} (HTTP ${httpResponseCode})`)
+  })
+  win.webContents.on("did-navigate-in-page", (_event, url) => {
+    console.log(`[window] In-page navigation to ${url}`)
   })
 
   // Persist window bounds on move/resize

@@ -24,6 +24,9 @@ extraResources:
     to: daemon-bundle
     filter:
       - "**/*"
+  # Template database with schema applied — copied on first launch
+  - from: assets/template.db
+    to: template.db
 
 mac:
   category: public.app-category.finance

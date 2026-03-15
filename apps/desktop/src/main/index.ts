@@ -13,7 +13,7 @@
  */
 import { app, BrowserWindow } from "electron"
 import path from "node:path"
-import { copyFileSync, existsSync, mkdirSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs"
 import { fork, type ChildProcess } from "node:child_process"
 import { store } from "./store.js"
 import { createMainWindow } from "./window.js"
@@ -45,6 +45,22 @@ function startWebServer(env: Record<string, string>): void {
     ? path.join(process.resourcesPath, "web-standalone", "apps", "web")
     : path.join(app.getAppPath(), "..", "..", "web", ".next", "standalone", "apps", "web")
   const serverEntry = path.join(serverDir, "server.js")
+
+  // Startup diagnostics — verify critical files exist
+  console.log(`[startup] isPackaged: ${app.isPackaged}`)
+  console.log(`[startup] serverDir: ${serverDir}`)
+  console.log(`[startup] server.js exists: ${existsSync(serverEntry)}`)
+  const staticDir = path.join(serverDir, ".next", "static")
+  console.log(`[startup] .next/static exists: ${existsSync(staticDir)}`)
+  if (existsSync(staticDir)) {
+    try {
+      console.log(`[startup] .next/static contents: ${readdirSync(staticDir).join(", ")}`)
+    } catch {
+      /* ignore */
+    }
+  }
+  const publicDir = path.join(serverDir, "public")
+  console.log(`[startup] public/ exists: ${existsSync(publicDir)}`)
 
   webServerProcess = fork(serverEntry, [], {
     cwd: serverDir,
