@@ -654,6 +654,18 @@ export async function startServer(port: number, deps: ServerDeps) {
       return
     }
 
+    if (req.method === "GET" && req.url === "/trade-finder/caps") {
+      if (!_tradeFinderScanner) {
+        sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })
+        return
+      }
+      _tradeFinderScanner
+        .getCapUtilization()
+        .then((caps) => sendJson(res, 200, { ok: true, data: caps }))
+        .catch((err) => sendJson(res, 500, { ok: false, error: String(err) }))
+      return
+    }
+
     if (req.method === "POST" && req.url === "/actions/trade-finder/scan") {
       if (!_tradeFinderScanner) {
         sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })

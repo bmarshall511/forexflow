@@ -5,6 +5,7 @@ import type {
   TradeFinderScanStatus,
   TradeFinderScoreBreakdown,
   TradeFinderAutoTradeEvent,
+  TradeFinderCapUtilization,
   TradeDirection,
   ZoneData,
   TrendData,
@@ -36,12 +37,15 @@ import {
   getAutoPlacedTotalRiskPips,
   findSetupByResultSourceId,
   getPlacedAutoSetups,
+  updateSetupSkipReason,
+  getSetup,
   type CreateSetupInput,
 } from "@fxflow/db"
 import type { StateManager } from "../state-manager.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
 import { getRestUrl } from "../oanda/api-client.js"
 import { CandleCache, fetchOandaCandles } from "./candle-cache.js"
+import { computeQueuePositions } from "./auto-trade-queue.js"
 
 const CANDLE_COUNT_MAP: Record<string, number> = {
   M1: 500,
@@ -117,6 +121,9 @@ export class TradeFinderScanner {
 
   // Auto-trade activity event ring buffer
   private autoTradeEvents: TradeFinderAutoTradeEvent[] = []
+
+  // Queue positions computed after each scan (setupId → 1-indexed position)
+  private queuePositions = new Map<string, number>()
 
   constructor(stateManager: StateManager, broadcast: (msg: AnyDaemonMessage) => void) {
     this.stateManager = stateManager
@@ -216,6 +223,10 @@ export class TradeFinderScanner {
 
       // Check existing setups for invalidation
       await this.validateExistingSetups(config, apiUrl, creds.token)
+
+      // Compute queue positions and broadcast cap utilization
+      await this.computeAndBroadcastQueue()
+      await this.broadcastCapUtilization()
 
       // Prune old history
       await pruneSetupHistory(200)
@@ -425,13 +436,13 @@ export class TradeFinderScanner {
     _pair: TradeFinderPairConfig,
   ): Promise<void> {
     if (!this.placeOrderFn) {
-      this.broadcastAutoTradeSkipped(setup, "Trade syncer not available")
+      await this.skipAutoTrade(setup, "Trade syncer not available")
       return
     }
 
     // 1. Score threshold check
     if (setup.scores.total < config.autoTradeMinScore) {
-      this.broadcastAutoTradeSkipped(
+      await this.skipAutoTrade(
         setup,
         `Score ${setup.scores.total} below auto-trade threshold ${config.autoTradeMinScore}`,
       )
@@ -441,7 +452,7 @@ export class TradeFinderScanner {
     // 1b. Minimum R:R check
     const rrNum = parseFloat(setup.rrRatio) // e.g. "2.1:1" → 2.1
     if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
-      this.broadcastAutoTradeSkipped(
+      await this.skipAutoTrade(
         setup,
         `R:R ${setup.rrRatio} below minimum ${config.autoTradeMinRR}:1`,
       )
@@ -450,14 +461,14 @@ export class TradeFinderScanner {
 
     // 2. Same-instrument guard — skip if existing open trade or pending order
     if (this.hasExistingPositionFn && this.hasExistingPositionFn(setup.instrument)) {
-      this.broadcastAutoTradeSkipped(setup, `Existing position on ${setup.instrument}`)
+      await this.skipAutoTrade(setup, `Existing position on ${setup.instrument}`)
       return
     }
 
     // 3. Max concurrent check
     const pendingCount = await countPendingAutoPlaced()
     if (pendingCount >= config.autoTradeMaxConcurrent) {
-      this.broadcastAutoTradeSkipped(
+      await this.skipAutoTrade(
         setup,
         `Max concurrent auto-trades reached (${pendingCount}/${config.autoTradeMaxConcurrent})`,
       )
@@ -467,7 +478,7 @@ export class TradeFinderScanner {
     // 4. Max daily check
     const dailyCount = await countAutoPlacedToday()
     if (dailyCount >= config.autoTradeMaxDaily) {
-      this.broadcastAutoTradeSkipped(
+      await this.skipAutoTrade(
         setup,
         `Max daily auto-trades reached (${dailyCount}/${config.autoTradeMaxDaily})`,
       )
@@ -489,7 +500,7 @@ export class TradeFinderScanner {
       totalRiskDollars += thisRiskDollars
       const totalRiskPercent = (totalRiskDollars / balance) * 100
       if (totalRiskPercent > config.autoTradeMaxRiskPercent) {
-        this.broadcastAutoTradeSkipped(
+        await this.skipAutoTrade(
           setup,
           `Total risk ${totalRiskPercent.toFixed(1)}% exceeds cap ${config.autoTradeMaxRiskPercent}%`,
         )
@@ -594,6 +605,12 @@ export class TradeFinderScanner {
     }
   }
 
+  /** Broadcast skip + persist reason to DB for UI display */
+  private async skipAutoTrade(setup: TradeFinderSetupData, reason: string): Promise<void> {
+    this.broadcastAutoTradeSkipped(setup, reason)
+    await updateSetupSkipReason(setup.id, reason).catch(() => {})
+  }
+
   private broadcastAutoTradeSkipped(setup: TradeFinderSetupData, reason: string): void {
     const now = new Date().toISOString()
     console.log(`[trade-finder] Auto-trade skipped: ${setup.instrument} — ${reason}`)
@@ -603,6 +620,7 @@ export class TradeFinderScanner {
       data: {
         setupId: setup.id,
         instrument: setup.instrument,
+        direction: setup.direction,
         score: setup.scores.total,
         reason,
       },
@@ -907,6 +925,7 @@ export class TradeFinderScanner {
 
     const pendingIds = this.getPendingOrderIdsFn()
     const openIds = this.getOpenTradeIdsFn()
+    let slotOpened = false
 
     for (const setup of placedSetups) {
       const sourceId = setup.resultSourceId!
@@ -917,11 +936,13 @@ export class TradeFinderScanner {
       // Filled — order is now an open trade
       if (openIds.has(sourceId)) {
         await this.transitionToFilled(setup)
+        slotOpened = true
         continue
       }
 
       // Not in pending AND not in open — externally cancelled or filled & closed
       await updateSetupStatus(setup.id, "invalidated")
+      slotOpened = true
       const now = new Date().toISOString()
       this.broadcast({
         type: "trade_finder_setup_removed",
@@ -945,6 +966,12 @@ export class TradeFinderScanner {
       console.log(
         `[trade-finder] External cancellation detected: ${setup.instrument} order ${sourceId}`,
       )
+    }
+
+    // If a slot opened during validation, try to place the next queued setup
+    // (only when not mid-scan — scan cycle handles it via validateExistingSetups)
+    if (slotOpened && !this.scanning) {
+      void this.tryPlaceNextQueued()
     }
   }
 
@@ -1020,6 +1047,8 @@ export class TradeFinderScanner {
         `${setup.instrument.replace("_", "/")} — ${reason}`,
         "warning",
       )
+      // Slot opened — try to place the next queued setup
+      void this.tryPlaceNextQueued()
     } catch (err) {
       console.error(`[trade-finder] Failed to auto-cancel ${setup.resultSourceId}:`, err)
     }
@@ -1033,6 +1062,8 @@ export class TradeFinderScanner {
       const setup = await findSetupByResultSourceId(sourceTradeId)
       if (setup && setup.status === "placed") {
         await this.transitionToFilled(setup)
+        // Slot opened — try to place the next queued setup
+        void this.tryPlaceNextQueued()
       }
     } catch (err) {
       console.warn("[trade-finder] Error checking order fill:", (err as Error).message)
@@ -1076,6 +1107,124 @@ export class TradeFinderScanner {
       timestamp: new Date().toISOString(),
       data: this.getScanStatus(),
     })
+  }
+
+  // ─── Cap Utilization ────────────────────────────────────────────────────────
+
+  /** Get current auto-trade cap utilization snapshot */
+  async getCapUtilization(): Promise<TradeFinderCapUtilization> {
+    const config = await getTradeFinderConfig()
+    const pendingCount = await countPendingAutoPlaced()
+    const dailyCount = await countAutoPlacedToday()
+
+    const snapshot = this.stateManager.getSnapshot()
+    const balance = snapshot.accountOverview?.summary.balance ?? 0
+    let usedRiskPercent = 0
+    if (balance > 0) {
+      const entries = await getAutoPlacedTotalRiskPips()
+      let totalRiskDollars = 0
+      for (const entry of entries) {
+        totalRiskDollars += entry.positionSize * entry.riskPips * getPipSize(entry.instrument)
+      }
+      usedRiskPercent = (totalRiskDollars / balance) * 100
+    }
+
+    return {
+      concurrent: { used: pendingCount, max: config.autoTradeMaxConcurrent },
+      daily: { used: dailyCount, max: config.autoTradeMaxDaily },
+      risk: {
+        usedPercent: Math.round(usedRiskPercent * 10) / 10,
+        maxPercent: config.autoTradeMaxRiskPercent,
+      },
+    }
+  }
+
+  /** Broadcast cap utilization to connected clients */
+  private async broadcastCapUtilization(): Promise<void> {
+    try {
+      const caps = await this.getCapUtilization()
+      this.broadcast({
+        type: "trade_finder_cap_utilization",
+        timestamp: new Date().toISOString(),
+        data: caps,
+      })
+    } catch {
+      // Non-critical — don't fail scan for cap broadcast
+    }
+  }
+
+  // ─── Queue Position Management ─────────────────────────────────────────────
+
+  /** Get current queue positions map */
+  getQueuePositions(): Map<string, number> {
+    return this.queuePositions
+  }
+
+  /** Compute queue positions for eligible-but-capped setups and broadcast updates */
+  private async computeAndBroadcastQueue(): Promise<void> {
+    try {
+      const config = await getTradeFinderConfig()
+      if (!config.autoTradeEnabled) {
+        this.queuePositions.clear()
+        return
+      }
+
+      const setups = await getActiveSetups()
+      const newPositions = computeQueuePositions(
+        setups,
+        config,
+        this.hasExistingPositionFn ?? undefined,
+      )
+
+      // Broadcast updates for setups whose queue position changed
+      const now = new Date().toISOString()
+      for (const setup of setups) {
+        const oldPos = this.queuePositions.get(setup.id) ?? null
+        const newPos = newPositions.get(setup.id) ?? null
+        if (oldPos !== newPos) {
+          this.broadcast({
+            type: "trade_finder_setup_updated",
+            timestamp: now,
+            data: { ...setup, queuePosition: newPos },
+          })
+        }
+      }
+
+      this.queuePositions = newPositions
+    } catch (err) {
+      console.warn("[trade-finder] Error computing queue positions:", (err as Error).message)
+    }
+  }
+
+  /** Try to place the highest-priority queued setup when a cap slot opens */
+  private async tryPlaceNextQueued(): Promise<void> {
+    if (this.scanning) return // Scan cycle will handle it
+
+    try {
+      const config = await getTradeFinderConfig()
+      if (!config.autoTradeEnabled) return
+
+      const setups = await getActiveSetups() // Sorted by score DESC
+      for (const setup of setups) {
+        if (setup.autoPlaced || setup.resultSourceId) continue
+        if (setup.status !== "active" && setup.status !== "approaching") continue
+
+        const pair = config.pairs.find((p) => p.instrument === setup.instrument)
+        if (!pair || pair.autoTradeEnabled === false) continue
+
+        // Try to place — tryAutoPlace will check all guards
+        await this.tryAutoPlace(setup, config, pair)
+
+        // If it succeeded (setup was placed), stop — one at a time
+        const updated = await getSetup(setup.id)
+        if (updated?.status === "placed") break
+      }
+
+      await this.computeAndBroadcastQueue()
+      await this.broadcastCapUtilization()
+    } catch (err) {
+      console.warn("[trade-finder] Error placing next queued:", (err as Error).message)
+    }
   }
 
   /** Force an immediate rescan */

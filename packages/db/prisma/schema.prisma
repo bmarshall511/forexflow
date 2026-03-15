@@ -401,6 +401,7 @@ model TradeFinderSetup {
   resultSourceId   String? // OANDA trade/order ID if placed
   autoPlaced       Boolean  @default(false) // Whether auto-traded
   placedAt         DateTime? // When auto-trade placed the order (for daily cap)
+  lastSkipReason   String? // Why auto-trade was most recently skipped
   detectedAt       DateTime @default(now())
   lastUpdatedAt    DateTime @default(now())
   expiredAt        DateTime?

@@ -19,6 +19,7 @@ import type {
   TradeFinderSetupData,
   TradeFinderScanStatus,
   TradeFinderAutoTradeEvent,
+  TradeFinderCapUtilization,
   AiTraderOpportunityData,
   AiTraderScanStatus,
   AiTraderScanProgressData,
@@ -117,6 +118,8 @@ export interface DaemonConnectionState {
   tradeFinderScanStatus: TradeFinderScanStatus | null
   /** Most recent auto-trade event (placed/filled/skipped/cancelled) */
   lastAutoTradeEvent: TradeFinderAutoTradeEvent | null
+  /** Latest auto-trade cap utilization snapshot */
+  tradeFinderCapUtilization: TradeFinderCapUtilization | null
   /** Most recent AI Trader opportunity (found or updated) */
   lastAiTraderOpportunity: AiTraderOpportunityData | null
   /** Latest AI Trader scan status */
@@ -174,6 +177,8 @@ export function useDaemonConnection(): DaemonConnectionState {
   const [lastAutoTradeEvent, setLastAutoTradeEvent] = useState<TradeFinderAutoTradeEvent | null>(
     null,
   )
+  const [tradeFinderCapUtilization, setTradeFinderCapUtilization] =
+    useState<TradeFinderCapUtilization | null>(null)
   const [lastAiTraderOpportunity, setLastAiTraderOpportunity] =
     useState<AiTraderOpportunityData | null>(null)
   const [lastAiTraderScanStatus, setLastAiTraderScanStatus] = useState<AiTraderScanStatus | null>(
@@ -341,6 +346,7 @@ export function useDaemonConnection(): DaemonConnectionState {
               const d = msg.data as {
                 setupId: string
                 instrument: string
+                direction: string
                 score: number
                 reason: string
               }
@@ -348,13 +354,16 @@ export function useDaemonConnection(): DaemonConnectionState {
                 type: "skipped",
                 setupId: d.setupId,
                 instrument: d.instrument,
-                direction: "long",
+                direction: (d.direction as "long" | "short") ?? "long",
                 score: d.score,
                 reason: d.reason,
                 timestamp: msg.timestamp,
               })
               break
             }
+            case "trade_finder_cap_utilization":
+              setTradeFinderCapUtilization(msg.data as TradeFinderCapUtilization)
+              break
             case "ai_trader_opportunity_found":
             case "ai_trader_opportunity_updated":
               setLastAiTraderOpportunity(msg.data)
@@ -518,6 +527,7 @@ export function useDaemonConnection(): DaemonConnectionState {
     lastTradeFinderRemoved,
     tradeFinderScanStatus,
     lastAutoTradeEvent,
+    tradeFinderCapUtilization,
     lastAiTraderOpportunity,
     lastAiTraderScanStatus,
     lastAiTraderScanProgress,

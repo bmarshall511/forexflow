@@ -66,25 +66,56 @@ function computeDollarAmount(positionSize: number, pips: number, instrument: str
   return positionSize * pips * pipSize
 }
 
-/** Compute the first auto-trade gate that blocks this setup, or null if eligible */
-function getAutoTradeBlockReason(
-  setup: TradeFinderSetupData,
-  config: AutoTradeConfig,
-): string | null {
+type AutoTradeStatus =
+  | { type: "eligible" }
+  | { type: "queued"; position: number | null; reason: string }
+  | { type: "blocked"; reason: string }
+  | null
+
+const CAP_KEYWORDS = ["concurrent", "daily", "risk"]
+
+function isCappedReason(reason: string): boolean {
+  const lower = reason.toLowerCase()
+  return CAP_KEYWORDS.some((kw) => lower.includes(kw))
+}
+
+function getAutoTradeStatus(setup: TradeFinderSetupData, config: AutoTradeConfig): AutoTradeStatus {
   if (!config.autoTradeEnabled) return null
   if (setup.status === "placed" || setup.status === "filled") return null
   if (setup.autoPlaced) return null
+  if (setup.status !== "active" && setup.status !== "approaching") return null
 
+  // Check client-side gates first
   if (setup.scores.total < config.autoTradeMinScore) {
-    return `Score ${setup.scores.total} below auto-trade threshold ${config.autoTradeMinScore}`
+    return {
+      type: "blocked",
+      reason: `Score ${setup.scores.total} below threshold ${config.autoTradeMinScore}`,
+    }
   }
 
   const rrNum = parseFloat(setup.rrRatio)
   if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
-    return `R:R ${setup.rrRatio} below minimum ${config.autoTradeMinRR}:1`
+    return { type: "blocked", reason: `R:R ${setup.rrRatio} below min ${config.autoTradeMinRR}:1` }
   }
 
-  return null
+  // Server-side skip reason from DB/WS
+  if (setup.lastSkipReason) {
+    if (isCappedReason(setup.lastSkipReason)) {
+      return {
+        type: "queued",
+        position: setup.queuePosition,
+        reason: setup.lastSkipReason,
+      }
+    }
+    return { type: "blocked", reason: setup.lastSkipReason }
+  }
+
+  // Queue position without skip reason = queued from queue computation
+  if (setup.queuePosition != null) {
+    return { type: "queued", position: setup.queuePosition, reason: "Waiting for cap slot" }
+  }
+
+  return { type: "eligible" }
 }
 
 export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
@@ -121,10 +152,8 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
   const rewardDollars = computeDollarAmount(setup.positionSize, setup.rewardPips, setup.instrument)
   const statusInfo = STATUS_STYLES[setup.status] ?? { className: "", label: setup.status }
 
-  // Auto-trade eligibility (client-side check for visibility — server has full gates including positions, caps)
-  const autoTradeBlockReason = autoTradeConfig
-    ? getAutoTradeBlockReason(setup, autoTradeConfig)
-    : null
+  // Auto-trade status: eligible / queued / blocked (combines client + server-side checks)
+  const autoTradeStatus = autoTradeConfig ? getAutoTradeStatus(setup, autoTradeConfig) : null
 
   const handlePlaceClick = (orderType: "MARKET" | "LIMIT") => {
     setConfirmDialog({ open: true, orderType })
@@ -208,26 +237,42 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                       Auto
                     </Badge>
                   )}
-                  {/* "Eligible" badge when setup passes client-side auto-trade gates */}
-                  {autoTradeConfig?.autoTradeEnabled &&
-                    !setup.autoPlaced &&
-                    !autoTradeBlockReason &&
-                    (setup.status === "active" || setup.status === "approaching") && (
-                      <Badge
-                        variant="outline"
-                        className="gap-0.5 border-teal-500/20 bg-teal-500/5 px-1.5 py-0 text-[10px] text-teal-600 dark:text-teal-400"
-                      >
-                        <Zap className="size-2.5" />
-                        Eligible
-                      </Badge>
-                    )}
+                  {/* Auto-trade status badge: Eligible / Queued / Blocked */}
+                  {autoTradeStatus?.type === "eligible" && (
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-teal-500/20 bg-teal-500/5 px-1.5 py-0 text-[10px] text-teal-600 dark:text-teal-400"
+                    >
+                      <Zap className="size-2.5" />
+                      Eligible
+                    </Badge>
+                  )}
+                  {autoTradeStatus?.type === "queued" && (
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-blue-500/20 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-500"
+                    >
+                      <Clock className="size-2.5" />
+                      Queued
+                      {autoTradeStatus.position != null ? ` #${autoTradeStatus.position}` : ""}
+                    </Badge>
+                  )}
+                  {autoTradeStatus?.type === "blocked" && (
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-amber-500/20 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-500"
+                    >
+                      <AlertCircle className="size-2.5" />
+                      Blocked
+                    </Badge>
+                  )}
                 </div>
-                {/* Auto-trade block reason (if applicable) */}
-                {autoTradeBlockReason && (
+                {/* Skip/block reason subtitle */}
+                {(autoTradeStatus?.type === "queued" || autoTradeStatus?.type === "blocked") && (
                   <div className="mt-0.5 flex items-center gap-1">
                     <AlertCircle className="size-3 shrink-0 text-amber-500" />
                     <span className="truncate text-[10px] text-amber-500">
-                      {autoTradeBlockReason}
+                      {autoTradeStatus.reason}
                     </span>
                   </div>
                 )}

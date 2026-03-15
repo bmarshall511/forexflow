@@ -33,6 +33,7 @@ export function TradeFinderDashboard() {
     history,
     scanStatus,
     autoTradeEvents,
+    capUtilization,
     isLoading,
     triggerScan,
     placeOrder,
@@ -137,7 +138,12 @@ export function TradeFinderDashboard() {
         }
       >
         {/* Status tiles */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-3 sm:grid-cols-4",
+            config?.autoTradeEnabled && capUtilization && "lg:grid-cols-7",
+          )}
+        >
           <StatusTile
             label="Scanner"
             value={config?.enabled ? "Active" : "Off"}
@@ -164,6 +170,35 @@ export function TradeFinderDashboard() {
             }
             variant={scanStatus?.isScanning ? "warning" : "default"}
           />
+          {config?.autoTradeEnabled && capUtilization && (
+            <>
+              <StatusTile
+                label="Concurrent"
+                value={`${capUtilization.concurrent.used}/${capUtilization.concurrent.max}`}
+                variant={
+                  capUtilization.concurrent.used >= capUtilization.concurrent.max
+                    ? "warning"
+                    : "default"
+                }
+              />
+              <StatusTile
+                label="Daily"
+                value={`${capUtilization.daily.used}/${capUtilization.daily.max}`}
+                variant={
+                  capUtilization.daily.used >= capUtilization.daily.max ? "warning" : "default"
+                }
+              />
+              <StatusTile
+                label="Risk"
+                value={`${capUtilization.risk.usedPercent.toFixed(1)}%/${capUtilization.risk.maxPercent}%`}
+                variant={
+                  capUtilization.risk.usedPercent >= capUtilization.risk.maxPercent
+                    ? "warning"
+                    : "default"
+                }
+              />
+            </>
+          )}
         </div>
       </PageHeader>
 

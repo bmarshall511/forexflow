@@ -736,6 +736,7 @@ export type DaemonMessageType =
   | "trade_finder_auto_trade_filled"
   | "trade_finder_auto_trade_cancelled"
   | "trade_finder_auto_trade_skipped"
+  | "trade_finder_cap_utilization"
   // Price Alerts
   | "price_alert_triggered"
   // AI Trader
@@ -941,10 +942,16 @@ export interface TradeFinderAutoTradeFilledMessage extends DaemonMessage<{
 export interface TradeFinderAutoTradeSkippedMessage extends DaemonMessage<{
   setupId: string
   instrument: string
+  direction: TradeDirection
   score: number
   reason: string
 }> {
   type: "trade_finder_auto_trade_skipped"
+}
+
+/** Broadcast current auto-trade cap utilization to clients. */
+export interface TradeFinderCapUtilizationMessage extends DaemonMessage<TradeFinderCapUtilization> {
+  type: "trade_finder_cap_utilization"
 }
 
 /** Auto-trade activity event for the activity log */
@@ -986,6 +993,7 @@ export type AnyDaemonMessage =
   | TradeFinderAutoTradeFilledMessage
   | TradeFinderAutoTradeCancelledMessage
   | TradeFinderAutoTradeSkippedMessage
+  | TradeFinderCapUtilizationMessage
   | AiTraderOpportunityFoundMessage
   | AiTraderOpportunityUpdatedMessage
   | AiTraderOpportunityRemovedMessage
@@ -2325,6 +2333,17 @@ export interface TradeFinderSetupData {
   autoPlaced: boolean
   /** When the auto-trade order was placed */
   placedAt: string | null
+  /** Why auto-trade was skipped on the most recent attempt (null = never skipped or eligible) */
+  lastSkipReason: string | null
+  /** Queue position when eligible but capped (null = not queued, 1 = next to be placed) */
+  queuePosition: number | null
+}
+
+/** Auto-trade cap utilization snapshot */
+export interface TradeFinderCapUtilization {
+  concurrent: { used: number; max: number }
+  daily: { used: number; max: number }
+  risk: { usedPercent: number; maxPercent: number }
 }
 
 /** Scanner status broadcast to clients */

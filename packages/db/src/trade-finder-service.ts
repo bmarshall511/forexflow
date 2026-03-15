@@ -61,6 +61,7 @@ function toSetupData(row: {
   resultSourceId: string | null
   autoPlaced: boolean
   placedAt: Date | null
+  lastSkipReason: string | null
   detectedAt: Date
   lastUpdatedAt: Date
 }): TradeFinderSetupData {
@@ -92,6 +93,8 @@ function toSetupData(row: {
     resultSourceId: row.resultSourceId,
     autoPlaced: row.autoPlaced,
     placedAt: row.placedAt ? safeIso(row.placedAt) : null,
+    lastSkipReason: row.lastSkipReason ?? null,
+    queuePosition: null, // Computed at runtime by the daemon scanner
   }
 }
 
@@ -203,7 +206,10 @@ export async function updateSetupStatus(
   if (extra?.resultSourceId !== undefined) data.resultSourceId = extra.resultSourceId
   if (extra?.distanceToEntry !== undefined) data.distanceToEntry = extra.distanceToEntry
   if (extra?.autoPlaced !== undefined) data.autoPlaced = extra.autoPlaced
-  if (status === "placed") data.placedAt = new Date()
+  if (status === "placed") {
+    data.placedAt = new Date()
+    data.lastSkipReason = null
+  }
   if (status === "expired" || status === "invalidated") data.expiredAt = new Date()
 
   await db.tradeFinderSetup.update({ where: { id }, data })
@@ -233,6 +239,14 @@ export async function updateSetupScores(
   if (positionSize !== undefined) data.positionSize = positionSize
 
   await db.tradeFinderSetup.update({ where: { id }, data })
+}
+
+/** Update the last skip reason for a setup (null to clear) */
+export async function updateSetupSkipReason(id: string, reason: string | null): Promise<void> {
+  await db.tradeFinderSetup.update({
+    where: { id },
+    data: { lastSkipReason: reason, lastUpdatedAt: new Date() },
+  })
 }
 
 /** Remove old history setups beyond retention limit */

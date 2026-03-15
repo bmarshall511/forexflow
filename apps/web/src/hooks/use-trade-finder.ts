@@ -5,6 +5,7 @@ import type {
   TradeFinderSetupData,
   TradeFinderScanStatus,
   TradeFinderAutoTradeEvent,
+  TradeFinderCapUtilization,
 } from "@fxflow/types"
 import { useDaemonConnection } from "./use-daemon-connection"
 
@@ -18,6 +19,7 @@ export function useTradeFinder() {
   const [history, setHistory] = useState<TradeFinderSetupData[]>([])
   const [scanStatus, setScanStatus] = useState<TradeFinderScanStatus | null>(null)
   const [autoTradeEvents, setAutoTradeEvents] = useState<TradeFinderAutoTradeEvent[]>([])
+  const [capUtilization, setCapUtilization] = useState<TradeFinderCapUtilization | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const {
@@ -25,6 +27,7 @@ export function useTradeFinder() {
     lastTradeFinderRemoved,
     tradeFinderScanStatus,
     lastAutoTradeEvent,
+    tradeFinderCapUtilization,
   } = useDaemonConnection()
 
   // Fetch active setups
@@ -73,12 +76,24 @@ export function useTradeFinder() {
     }
   }, [])
 
+  // Fetch cap utilization from daemon
+  const fetchCapUtilization = useCallback(async () => {
+    try {
+      const res = await fetch(`${DAEMON_URL}/trade-finder/caps`)
+      const json = await res.json()
+      if (json.ok) setCapUtilization(json.data)
+    } catch {
+      // Daemon might not be connected
+    }
+  }, [])
+
   useEffect(() => {
     void fetchSetups()
     void fetchHistory()
     void fetchScanStatus()
     void fetchAutoTradeEvents()
-  }, [fetchSetups, fetchHistory, fetchScanStatus, fetchAutoTradeEvents])
+    void fetchCapUtilization()
+  }, [fetchSetups, fetchHistory, fetchScanStatus, fetchAutoTradeEvents, fetchCapUtilization])
 
   // Handle real-time WS: setup found/updated
   useEffect(() => {
@@ -111,12 +126,27 @@ export function useTradeFinder() {
       const next = [lastAutoTradeEvent, ...prev]
       return next.length > 50 ? next.slice(0, 50) : next
     })
+    // Merge skip reason into setup state
+    if (lastAutoTradeEvent.type === "skipped") {
+      setSetups((prev) =>
+        prev.map((s) =>
+          s.id === lastAutoTradeEvent.setupId
+            ? { ...s, lastSkipReason: lastAutoTradeEvent.reason ?? null }
+            : s,
+        ),
+      )
+    }
     // Refresh setups/history when a placement or fill happens
     if (lastAutoTradeEvent.type === "placed" || lastAutoTradeEvent.type === "filled") {
       void fetchSetups()
       void fetchHistory()
     }
   }, [lastAutoTradeEvent, fetchSetups, fetchHistory])
+
+  // Handle real-time WS: cap utilization
+  useEffect(() => {
+    if (tradeFinderCapUtilization) setCapUtilization(tradeFinderCapUtilization)
+  }, [tradeFinderCapUtilization])
 
   // Trigger manual scan
   const triggerScan = useCallback(async () => {
@@ -175,6 +205,7 @@ export function useTradeFinder() {
     history,
     scanStatus,
     autoTradeEvents,
+    capUtilization,
     isLoading,
     triggerScan,
     placeOrder,
