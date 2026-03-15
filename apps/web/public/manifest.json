@@ -1,14 +1,16 @@
 {
   "name": "FXFlow",
   "short_name": "FXFlow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Forex Trading Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "orientation": "any",
-  "categories": ["finance"],
+  "categories": [
+    "finance"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
