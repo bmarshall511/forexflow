@@ -90,6 +90,7 @@ export function PositionsFilterBar({
             { label: "Win", value: "win" },
             { label: "Loss", value: "loss" },
             { label: "B/E", value: "breakeven" },
+            { label: "Cancelled", value: "cancelled" },
           ]}
         />
       )}

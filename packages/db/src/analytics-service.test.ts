@@ -37,6 +37,7 @@ function makeTrade(
     instrument: string
     direction: string
     realizedPL: number
+    exitPrice: number | null
     mfe: number | null
     mae: number | null
     metadata: string | null
@@ -53,6 +54,7 @@ function makeTrade(
     instrument: overrides.instrument ?? "EUR_USD",
     direction: overrides.direction ?? "long",
     realizedPL: overrides.realizedPL ?? 50,
+    exitPrice: overrides.exitPrice ?? 1.11,
     mfe: overrides.mfe ?? 80,
     mae: overrides.mae ?? -20,
     metadata: overrides.metadata ?? null,
@@ -66,7 +68,7 @@ function makeTrade(
 
 const winTrade = makeTrade({ id: "t-1", realizedPL: 100 })
 const lossTrade = makeTrade({ id: "t-2", realizedPL: -40 })
-const breakeven = makeTrade({ id: "t-3", realizedPL: 0 })
+const breakeven = makeTrade({ id: "t-3", realizedPL: 0, exitPrice: 1.1 })
 
 describe("analytics-service", () => {
   beforeEach(() => {

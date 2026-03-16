@@ -10,7 +10,7 @@ interface TradeRiskEntry {
   tradeId: string
   instrument: string
   riskPercent: number
-  outcome: "win" | "loss" | "breakeven"
+  outcome: "win" | "loss" | "breakeven" | "cancelled"
 }
 
 interface RiskPerTradeChartProps {
@@ -33,7 +33,7 @@ export function RiskPerTradeChart({ targetRisk }: RiskPerTradeChartProps) {
             entryPrice: number
             stopLoss: number | null
             units: number
-            outcome: "win" | "loss" | "breakeven"
+            outcome: "win" | "loss" | "breakeven" | "cancelled"
           }>
         }
         // Approximate risk% from SL distance (we don't have account balance at trade time)

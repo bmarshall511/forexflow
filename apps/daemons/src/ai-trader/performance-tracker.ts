@@ -28,7 +28,7 @@ export class PerformanceTracker {
     technique: AiTraderTechnique | null
     realizedPL: number
     riskRewardRatio: number
-    outcome: "win" | "loss" | "breakeven"
+    outcome: "win" | "loss" | "breakeven" | "cancelled"
   }): Promise<void> {
     const now = new Date()
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1) // Month start

@@ -15,6 +15,7 @@ const outcomeLabels: Record<TradeOutcome, string> = {
   win: "Win",
   loss: "Loss",
   breakeven: "Breakeven",
+  cancelled: "Cancelled",
 }
 
 const reasonLabels: Record<string, string> = {
@@ -24,6 +25,7 @@ const reasonLabels: Record<string, string> = {
   MARGIN_CLOSEOUT: "Margin",
   MARKET_ORDER: "Manual",
   LINKED_TRADE_CLOSED: "Linked",
+  ORDER_CANCEL: "Cancelled",
   REVERSAL: "Reversal",
   UNKNOWN: "",
 }
@@ -31,11 +33,16 @@ const reasonLabels: Record<string, string> = {
 export function OutcomeBadge({ outcome, closeReason, closeContext, className }: OutcomeBadgeProps) {
   // When a SL was moved to breakeven by an AI condition and then hit, show "SL (AI Breakeven)"
   const isAIBreakevenSL = closeReason === "STOP_LOSS_ORDER" && closeContext?.breakeven === true
-  const reasonLabel = isAIBreakevenSL
-    ? "AI Breakeven"
-    : closeReason
-      ? reasonLabels[closeReason]
-      : ""
+
+  // For cancelled orders, don't append a redundant close reason suffix
+  const reasonLabel =
+    outcome === "cancelled"
+      ? ""
+      : isAIBreakevenSL
+        ? "AI Breakeven"
+        : closeReason
+          ? (reasonLabels[closeReason] ?? "")
+          : ""
   const label = reasonLabel ? `${outcomeLabels[outcome]} (${reasonLabel})` : outcomeLabels[outcome]
 
   return (
@@ -48,6 +55,8 @@ export function OutcomeBadge({ outcome, closeReason, closeContext, className }: 
         outcome === "loss" &&
           "border-status-disconnected/30 bg-status-disconnected/10 text-status-disconnected",
         outcome === "breakeven" && !isAIBreakevenSL && "border-border text-muted-foreground",
+        outcome === "cancelled" &&
+          "border-border/50 bg-muted/30 text-muted-foreground/70 line-through",
         // AI breakeven SL hits get amber styling — it's a capital preservation event
         isAIBreakevenSL && "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
         className,

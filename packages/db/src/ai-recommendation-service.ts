@@ -57,7 +57,7 @@ export async function markActionFollowed(analysisId: string): Promise<void> {
  */
 export async function resolveOutcomes(
   tradeId: string,
-  outcome: "win" | "loss" | "breakeven",
+  outcome: "win" | "loss" | "breakeven" | "cancelled",
   pnl: number,
 ): Promise<void> {
   await db.aiRecommendationOutcome.updateMany({

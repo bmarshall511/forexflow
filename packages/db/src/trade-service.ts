@@ -94,14 +94,18 @@ export interface CreateTradeEventInput {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Derive trade outcome from realized P&L.
+ * Derive trade outcome from realized P&L and exit state.
+ * Orders that never filled (no exit price, zero P&L) are "cancelled", not "breakeven".
  *
  * @param realizedPL - The realized profit/loss value
- * @returns The trade outcome: "win", "loss", or "breakeven"
+ * @param exitPrice - The exit price (null for unfilled/cancelled orders)
+ * @returns The trade outcome: "win", "loss", "breakeven", or "cancelled"
  */
-function getOutcome(realizedPL: number): TradeOutcome {
+function getOutcome(realizedPL: number, exitPrice: number | null): TradeOutcome {
   if (realizedPL > 0) return "win"
   if (realizedPL < 0) return "loss"
+  // Zero P&L with no exit price = order never filled = cancelled
+  if (exitPrice === null) return "cancelled"
   return "breakeven"
 }
 
@@ -185,7 +189,7 @@ function toClosedTradeData(row: TradeRow): ClosedTradeData {
     financing: row.financing,
     closeReason: (row.closeReason ?? "UNKNOWN") as TradeCloseReason,
     closeContext: parseCloseContext(row.closeContext),
-    outcome: getOutcome(row.realizedPL),
+    outcome: getOutcome(row.realizedPL, row.exitPrice),
     mfe: row.mfe,
     mae: row.mae,
     timeframe: (row.timeframe as Timeframe) ?? null,
@@ -401,7 +405,7 @@ export async function closeOrphanedTrades(
     },
     data: {
       status: "closed",
-      closeReason: "MARKET_ORDER",
+      closeReason: "UNKNOWN",
       closedAt: new Date(),
     },
   })
@@ -486,10 +490,16 @@ export async function listTrades(opts: ListTradesOptions = {}): Promise<TradeLis
     where.tags = { some: { tagId: { in: tagIds } } }
   }
 
-  // Outcome filter requires checking realizedPL range
+  // Outcome filter: cancelled = unfilled orders (no exit price, zero P&L)
   if (outcome === "win") where.realizedPL = { gt: 0 }
   else if (outcome === "loss") where.realizedPL = { lt: 0 }
-  else if (outcome === "breakeven") where.realizedPL = 0
+  else if (outcome === "breakeven") {
+    where.realizedPL = 0
+    where.exitPrice = { not: null }
+  } else if (outcome === "cancelled") {
+    where.realizedPL = 0
+    where.exitPrice = null
+  }
 
   // Date range filtering
   if (from || to) {

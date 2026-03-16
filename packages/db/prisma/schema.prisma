@@ -207,7 +207,7 @@ model AiRecommendationOutcome {
   qualityScore      Float
   actionFollowed    Boolean   @default(false)
   actionFollowedAt  DateTime?
-  tradeOutcome      String? // "win" | "loss" | "breakeven"
+  tradeOutcome      String? // "win" | "loss" | "breakeven" | "cancelled"
   actualPnl         Float?
   resolvedAt        DateTime?
   createdAt         DateTime  @default(now())

@@ -54,6 +54,9 @@ Each closed trade shows a badge:
 - **Win** (green) — You made money on this trade
 - **Loss** (red) — You lost money on this trade
 - **Breakeven** (gray) — You came out roughly even, no significant gain or loss
+- **Cancelled** (dimmed, strikethrough) — The order was placed but never filled. It was either cancelled by you, by the system, or it expired before the market reached the order price. Cancelled orders don't count toward your win rate or other performance statistics.
+
+The badge also shows _how_ the trade was closed when applicable. For example, "Loss (Stop Loss)" means you lost money because your stop loss was hit, "Breakeven (Manual)" means you manually closed the trade at roughly your entry price, and "Win (Take Profit)" means your take profit target was reached.
 
 This tab is great for reviewing your trading history and learning from past trades.
 

@@ -261,10 +261,17 @@ async function main() {
       .then(async ({ resolveOutcomes, db }) => {
         const trade = await db.trade.findUnique({
           where: { id: tradeId },
-          select: { realizedPL: true },
+          select: { realizedPL: true, exitPrice: true },
         })
         if (trade) {
-          const outcome = trade.realizedPL > 0 ? "win" : trade.realizedPL < 0 ? "loss" : "breakeven"
+          const outcome =
+            trade.realizedPL > 0
+              ? "win"
+              : trade.realizedPL < 0
+                ? "loss"
+                : trade.exitPrice === null
+                  ? "cancelled"
+                  : "breakeven"
           await resolveOutcomes(tradeId, outcome, trade.realizedPL)
           // Notify AI Trader of closed trade
           void aiTraderScanner.onTradeClosed(tradeId, trade.realizedPL)

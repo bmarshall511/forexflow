@@ -178,7 +178,7 @@ function TradeItem({
   direction: "long" | "short"
   entryPrice: number
   pnl?: number
-  outcome?: "win" | "loss" | "breakeven"
+  outcome?: "win" | "loss" | "breakeven" | "cancelled"
   isSelected: boolean
   /** Already assigned to another panel */
   isAssigned?: boolean

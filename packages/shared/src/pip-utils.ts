@@ -101,10 +101,14 @@ export function formatPips(pips: number): string {
   return pips.toFixed(1)
 }
 
-/** Determine trade outcome from realized P&L. */
-export function getTradeOutcome(realizedPL: number): TradeOutcome {
+/**
+ * Determine trade outcome from realized P&L and exit state.
+ * Orders that never filled (no exit price, zero P&L) are "cancelled".
+ */
+export function getTradeOutcome(realizedPL: number, exitPrice?: number | null): TradeOutcome {
   if (realizedPL > 0) return "win"
   if (realizedPL < 0) return "loss"
+  if (exitPrice === null || exitPrice === undefined) return "cancelled"
   return "breakeven"
 }
 

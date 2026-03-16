@@ -57,7 +57,10 @@ export function registerTradeTools(server: McpServer) {
     {
       instrument: z.string().optional().describe("Filter by instrument (e.g., EUR_USD)"),
       direction: z.enum(["long", "short"]).optional().describe("Filter by trade direction"),
-      outcome: z.enum(["win", "loss", "breakeven"]).optional().describe("Filter by trade outcome"),
+      outcome: z
+        .enum(["win", "loss", "breakeven", "cancelled"])
+        .optional()
+        .describe("Filter by trade outcome"),
       limit: z.number().optional().describe("Max results to return (default 20, max 100)"),
       offset: z.number().optional().describe("Offset for pagination (default 0)"),
     },

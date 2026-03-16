@@ -36,6 +36,8 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 ## C
 
+**Cancelled** — A pending order that was never filled. The market didn't reach the order price before it was cancelled or expired. Cancelled orders show as a dimmed, strikethrough badge in Trade History and are excluded from your win rate and performance statistics.
+
 **Candlestick** — A small bar on a chart that shows four prices for a time period: where the price opened, the highest point, the lowest point, and where it closed. Green (or hollow) candles mean the price went up; red (or filled) candles mean it went down. Visible on the Charts page.
 
 **CHoCH (Change of Character)** — When the price breaks a key level in the _opposite_ direction of the current trend, hinting that the trend may be reversing. Another Smart Money Concepts term used by the AI Trader.

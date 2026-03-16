@@ -262,11 +262,12 @@ export type TradeCloseReason =
   | "TRAILING_STOP_LOSS_ORDER"
   | "MARGIN_CLOSEOUT"
   | "LINKED_TRADE_CLOSED"
+  | "ORDER_CANCEL"
   | "REVERSAL"
   | "UNKNOWN"
 
-/** Outcome classification of a closed trade, derived from realizedPL. */
-export type TradeOutcome = "win" | "loss" | "breakeven"
+/** Outcome classification of a closed trade, derived from realizedPL and exit state. */
+export type TradeOutcome = "win" | "loss" | "breakeven" | "cancelled"
 
 /** OANDA candlestick granularity identifiers (M = minutes, H = hours, D/W/M = day/week/month). */
 export type Timeframe = "M1" | "M5" | "M15" | "M30" | "H1" | "H4" | "D" | "W" | "M"
@@ -2901,6 +2902,7 @@ export interface PerformanceSummary {
   wins: number
   losses: number
   breakevens: number
+  cancelled: number
   /** Win rate as a decimal (0-1). */
   winRate: number
   totalPL: number

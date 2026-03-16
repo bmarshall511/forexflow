@@ -41,19 +41,28 @@ function pf(gw: number, gl: number): number { return gl === 0 ? (gw > 0 ? MAX_PF
 
 interface Row {
   id: string; source: string; instrument: string; direction: string
-  realizedPL: number; mfe: number | null; mae: number | null; metadata: string | null
-  openedAt: Date; closedAt: Date | null; stopLoss: number | null
+  realizedPL: number; exitPrice: number | null; mfe: number | null; mae: number | null
+  metadata: string | null; openedAt: Date; closedAt: Date | null; stopLoss: number | null
   takeProfit: number | null; entryPrice: number
 } // prettier-ignore
 
 const SELECT = {
   id: true, source: true, instrument: true, direction: true, realizedPL: true,
-  mfe: true, mae: true, metadata: true, openedAt: true, closedAt: true,
+  exitPrice: true, mfe: true, mae: true, metadata: true, openedAt: true, closedAt: true,
   stopLoss: true, takeProfit: true, entryPrice: true,
 } as const // prettier-ignore
 
-async function fetchClosed(filters?: AnalyticsFilters): Promise<Row[]> {
+/** Returns true for trades that actually filled (not cancelled unfilled orders). */
+function isFilled(r: Row): boolean {
+  return r.exitPrice !== null || r.realizedPL !== 0
+}
+
+async function fetchClosed(filters?: AnalyticsFilters, includeCancelled = false): Promise<Row[]> {
   const where: Record<string, unknown> = { status: "closed" }
+  // By default exclude cancelled (unfilled) orders from analytics
+  if (!includeCancelled) {
+    where.OR = [{ exitPrice: { not: null } }, { realizedPL: { not: 0 } }]
+  }
   if (filters?.dateFrom || filters?.dateTo) {
     const d: Record<string, Date> = {}
     if (filters.dateFrom) d.gte = filters.dateFrom
@@ -127,15 +136,19 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 const EMPTY_SUMMARY: PerformanceSummary = {
-  totalTrades: 0, wins: 0, losses: 0, breakevens: 0, winRate: 0, totalPL: 0, avgPL: 0,
-  profitFactor: 0, expectancy: 0, avgRR: 0, avgHoldTimeMinutes: 0, largestWin: 0, largestLoss: 0,
-  currentStreak: { type: "win", count: 0 }, longestWinStreak: 0, longestLossStreak: 0,
+  totalTrades: 0, wins: 0, losses: 0, breakevens: 0, cancelled: 0, winRate: 0, totalPL: 0,
+  avgPL: 0, profitFactor: 0, expectancy: 0, avgRR: 0, avgHoldTimeMinutes: 0, largestWin: 0,
+  largestLoss: 0, currentStreak: { type: "win", count: 0 }, longestWinStreak: 0, longestLossStreak: 0,
 } // prettier-ignore
 
 export async function getPerformanceSummary(
   filters?: AnalyticsFilters,
 ): Promise<PerformanceSummary> {
-  const trades = await fetchClosed(filters)
+  // Fetch all closed trades (including cancelled) to count them separately
+  const allTrades = await fetchClosed(filters, true)
+  const cancelledCount = allTrades.filter((t) => !isFilled(t)).length
+  // Exclude cancelled orders from performance calculations
+  const trades = allTrades.filter(isFilled)
   const n = trades.length
   if (n === 0) return { ...EMPTY_SUMMARY }
 
@@ -166,7 +179,8 @@ export async function getPerformanceSummary(
     totalTrades: n,
     wins: a.wins,
     losses: a.losses,
-    breakevens: trades.filter((t) => t.realizedPL === 0).length,
+    breakevens: trades.filter((t) => t.realizedPL === 0 && t.exitPrice !== null).length,
+    cancelled: cancelledCount,
     winRate: a.winRate,
     totalPL: a.totalPL,
     avgPL: a.avgPL,

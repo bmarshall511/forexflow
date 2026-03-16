@@ -35,7 +35,7 @@ export interface UpsertPerformanceInput {
 export interface TradeStatsInput {
   realizedPL: number
   riskRewardRatio: number
-  outcome: "win" | "loss" | "breakeven"
+  outcome: "win" | "loss" | "breakeven" | "cancelled"
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -225,15 +225,17 @@ export async function recalculatePerformance(
   periodEnd: Date,
   trades: TradeStatsInput[],
 ): Promise<void> {
-  const totalTrades = trades.length
+  // Exclude cancelled (unfilled) orders from performance metrics
+  const filledTrades = trades.filter((t) => t.outcome !== "cancelled")
+  const totalTrades = filledTrades.length
   if (totalTrades === 0) return
 
-  const wins = trades.filter((t) => t.outcome === "win").length
-  const losses = trades.filter((t) => t.outcome === "loss").length
-  const breakevens = trades.filter((t) => t.outcome === "breakeven").length
+  const wins = filledTrades.filter((t) => t.outcome === "win").length
+  const losses = filledTrades.filter((t) => t.outcome === "loss").length
+  const breakevens = filledTrades.filter((t) => t.outcome === "breakeven").length
 
-  const winTrades = trades.filter((t) => t.outcome === "win")
-  const lossTrades = trades.filter((t) => t.outcome === "loss")
+  const winTrades = filledTrades.filter((t) => t.outcome === "win")
+  const lossTrades = filledTrades.filter((t) => t.outcome === "loss")
 
   const grossProfit = winTrades.reduce((s, t) => s + t.realizedPL, 0)
   const grossLoss = Math.abs(lossTrades.reduce((s, t) => s + t.realizedPL, 0))

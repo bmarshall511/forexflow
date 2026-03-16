@@ -146,17 +146,23 @@ describe("formatPips", () => {
 
 describe("getTradeOutcome", () => {
   it("should return win for positive P&L", () => {
-    expect(getTradeOutcome(100)).toBe("win")
-    expect(getTradeOutcome(0.01)).toBe("win")
+    expect(getTradeOutcome(100, 1.2345)).toBe("win")
+    expect(getTradeOutcome(0.01, 1.2345)).toBe("win")
   })
 
   it("should return loss for negative P&L", () => {
-    expect(getTradeOutcome(-50)).toBe("loss")
-    expect(getTradeOutcome(-0.01)).toBe("loss")
+    expect(getTradeOutcome(-50, 1.2345)).toBe("loss")
+    expect(getTradeOutcome(-0.01, 1.2345)).toBe("loss")
   })
 
-  it("should return breakeven for zero P&L", () => {
-    expect(getTradeOutcome(0)).toBe("breakeven")
+  it("should return breakeven for zero P&L with an exit price", () => {
+    expect(getTradeOutcome(0, 1.2345)).toBe("breakeven")
+  })
+
+  it("should return cancelled for zero P&L with no exit price", () => {
+    expect(getTradeOutcome(0, null)).toBe("cancelled")
+    expect(getTradeOutcome(0, undefined)).toBe("cancelled")
+    expect(getTradeOutcome(0)).toBe("cancelled")
   })
 })
 

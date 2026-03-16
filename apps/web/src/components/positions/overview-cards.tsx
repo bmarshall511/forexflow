@@ -78,10 +78,12 @@ export function OverviewCards({ positions, openWithPrices, currency = "USD" }: O
   const best = sorted.length > 0 ? sorted[0] : null
   const worst = sorted.length > 0 ? sorted[sorted.length - 1] : null
 
-  const todayWins = closed.filter((t) => t.outcome === "win").length
-  const todayLosses = closed.filter((t) => t.outcome === "loss").length
-  const todayNetPL = closed.reduce((s, t) => s + t.realizedPL + t.financing, 0)
-  const winRate = closed.length > 0 ? ((todayWins / closed.length) * 100).toFixed(0) : "—"
+  const filledTrades = closed.filter((t) => t.outcome !== "cancelled")
+  const todayWins = filledTrades.filter((t) => t.outcome === "win").length
+  const todayLosses = filledTrades.filter((t) => t.outcome === "loss").length
+  const todayNetPL = filledTrades.reduce((s, t) => s + t.realizedPL + t.financing, 0)
+  const winRate =
+    filledTrades.length > 0 ? ((todayWins / filledTrades.length) * 100).toFixed(0) : "—"
 
   const latestClose = closed.length > 0 ? closed[0] : null
 
