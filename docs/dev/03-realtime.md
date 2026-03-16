@@ -27,6 +27,10 @@ All WebSocket message types are defined in `packages/types` as `DaemonMessageTyp
 
 Categories: price ticks, position updates, account snapshots, signal events, AI analysis events, trade finder events (setup updates, auto-trade events, cap utilization), notifications.
 
+### Connect-Time Snapshots
+
+On WebSocket client connect, the daemon sends initial state snapshots so the UI has data immediately without waiting for the next broadcast cycle. This includes `tv_alerts_status` (signal count, config status) alongside existing position and account snapshots.
+
 ## Adding a New WebSocket Event
 
 1. **Daemon**: Add broadcast call in the relevant service (`ws.broadcast({ type, payload })`)

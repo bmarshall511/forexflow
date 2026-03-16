@@ -55,6 +55,11 @@ Types are grouped by domain in this order:
 3. Export from the file (all exports are at declaration site, no barrel re-exports needed).
 4. Run `pnpm build` in packages/types to ensure downstream consumers pick up changes.
 
+## Zod Schemas
+
+- `schemas.ts` contains runtime validation schemas used at API boundaries.
+- `CreateConditionSchema` uses `.superRefine()` for server-side validation: checks that `triggerValue` has the correct keys for each trigger type (price, pips, amount, datetime, hours, distancePips) and validates `actionParams` for partial_close (percent), move_stop_loss (price), move_take_profit (price).
+
 ## Gotchas
 
 - This is a single large file by design — do not split into multiple files.

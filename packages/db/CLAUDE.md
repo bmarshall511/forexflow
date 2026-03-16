@@ -27,7 +27,7 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 - `settings-service.ts` — app settings CRUD
 - `ai-settings-service.ts` / `ai-analysis-service.ts` / `ai-recommendation-service.ts`
 - `trade-condition-service.ts` — AI trade conditions
-- `tv-alerts-config-service.ts` / `tv-alerts-signal-service.ts` / `signal-audit-service.ts`
+- `tv-alerts-config-service.ts` / `tv-alerts-signal-service.ts` (weekend-aware: `getTodaySignalCount()` and `getAutoTradesSummary()` use `getLastTradingSessionStart()` to show last session's data on weekends) / `signal-audit-service.ts`
 - `zone-service.ts` / `zone-settings-service.ts`
 - `trend-service.ts` / `trend-settings-service.ts`
 - `trade-finder-service.ts` / `trade-finder-config-service.ts`

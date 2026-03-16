@@ -60,6 +60,7 @@ src/
 - `condition-monitor.ts` — price conditions evaluated every tick (sub-ms), time conditions every 1 minute.
 - Stuck "executing" conditions are reset on startup (crash recovery).
 - Price ticks wire to ConditionMonitor via `positionPriceTracker.onPriceTick`, NOT streamClient.
+- **Condition deduplication**: `analysis-executor.ts` deduplicates AI-suggested conditions by parameter values (triggerType + triggerValue + actionType + actionParams via JSON.stringify), not by label text. AI models can generate different labels for functionally identical conditions.
 - **Grace period**: destructive actions (`close_trade`, `cancel_order`) are blocked for 60 seconds after `max(trade.openedAt, condition.createdAt)`. Uses `GracePeriodError` to revert condition to "active" for retry on the next tick.
 - **Condition expiry**: AI-created conditions auto-expire after 7 days to prevent stale conditions from executing inappropriate actions.
 - **Priority-based evaluation**: conditions are sorted by priority (ascending) before evaluation so higher-priority conditions fire first.
@@ -77,10 +78,16 @@ src/
 - Queue system: eligible-but-capped setups are priority-ordered (score DESC, distance ASC). Reactive placement on slot open (fill/cancel/invalidation).
 - Cap utilization: `GET /trade-finder/caps` endpoint + `trade_finder_cap_utilization` WS message.
 
+## Market Hours
+
+- `market-analyzer.ts` — determines market open/closed status from OANDA stream.
+- **Weekend override**: OANDA practice accounts may report `tradeable=true` on weekends. `isWeekendClosed()` forces market closed on weekends regardless of OANDA stream state.
+
 ## TV Alerts
 
 - `signal-processor.ts` — processes signals from CF Worker with per-instrument mutex.
 - `CFWorkerClient` maintains WS connection to Cloudflare Durable Object.
+- On WS client connect, a dedicated `tv_alerts_status` message is sent so the dashboard gets signal count immediately without waiting for the next broadcast cycle.
 
 ## Error Handling
 
@@ -97,7 +104,7 @@ src/
 
 - `Dockerfile` — multi-stage build (node:22-slim, pnpm install, prisma generate).
 - `railway.toml` — Railway config with Dockerfile builder, health check, restart policy.
-- Health endpoints: `/health` (liveness, always 200) + `/health/ready` (readiness, checks OANDA + DB).
+- Health endpoints: `/health` (liveness, always 200) + `/health/ready` (readiness, checks OANDA + DB). `/health/detailed` includes full tvAlerts data (signal counts, config status).
 - `PORT` env var auto-set by Railway/Fly.io — `config.ts` falls back: `DAEMON_PORT ?? PORT ?? "4100"`.
 - Cloud DB: `DATABASE_URL=libsql://...` + `TURSO_AUTH_TOKEN` for Turso connections.
 

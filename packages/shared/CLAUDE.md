@@ -34,7 +34,7 @@ src/
 ### Market & Time
 
 - `market-hours.ts` — uses ET (Eastern Time) timezone for all market session logic.
-- `forex-trading-day.ts` — forex day rolls at 5pm ET, not midnight.
+- `forex-trading-day.ts` — forex day rolls at 5pm ET, not midnight. `getLastTradingSessionStart()` returns the previous forex day start during weekends so "signals today" shows last session's count instead of 0.
 
 ### Formatting
 
