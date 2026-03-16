@@ -15,6 +15,7 @@ import type {
 } from "@fxflow/types"
 import {
   getAiTraderConfig,
+  getDecryptedClaudeKey,
   createOpportunity,
   updateOpportunityStatus,
   expireOldOpportunities,
@@ -568,7 +569,9 @@ export class AiTraderScanner {
     const pairLabel = signal.instrument.replace("_", "/")
     const tier2Prompt = buildTier2Prompt(signal)
 
-    const anthropic = new Anthropic()
+    const apiKey = await getDecryptedClaudeKey()
+    if (!apiKey) throw new Error("Claude API key not configured — set it in Settings > AI")
+    const anthropic = new Anthropic({ apiKey })
     const tier2Response = await anthropic.messages.create({
       model: config.scanModel || "claude-haiku-4-5-20251001",
       max_tokens: 200,
