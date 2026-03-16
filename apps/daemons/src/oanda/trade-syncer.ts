@@ -764,6 +764,9 @@ export class OandaTradeSyncer {
     // may differ from the order.id in the pending list. If not found by sourceId, search
     // by instrument + direction + status as a fallback to handle ID mismatches.
     let dbTrade = await getTradeBySourceId("oanda", sourceId)
+    console.log(
+      `[placeOrder] sourceId=${sourceId}, found by sourceId: ${!!dbTrade}${dbTrade ? ` (id=${dbTrade.id})` : ""}`,
+    )
     if (!dbTrade) {
       // Fallback: find by instrument + direction + recent creation
       const { db: prisma } = await import("@fxflow/db")
@@ -773,11 +776,32 @@ export class OandaTradeSyncer {
           instrument,
           direction,
           status: filled ? "open" : "pending",
-          openedAt: { gte: new Date(Date.now() - 30_000) }, // within last 30 seconds
+          openedAt: { gte: new Date(Date.now() - 60_000) }, // within last 60 seconds
         },
         orderBy: { openedAt: "desc" },
       })
-      if (recent) dbTrade = recent
+      if (recent) {
+        dbTrade = recent
+        console.log(
+          `[placeOrder] Fallback found: id=${recent.id}, sourceTradeId=${recent.sourceTradeId}`,
+        )
+      } else {
+        console.warn(
+          `[placeOrder] FAILED to find DB record for ${instrument} ${direction} (sourceId=${sourceId})`,
+        )
+        // Last resort: list all recent trades for debugging
+        const allRecent = await prisma.trade.findMany({
+          where: {
+            source: "oanda",
+            instrument,
+            openedAt: { gte: new Date(Date.now() - 120_000) },
+          },
+          select: { id: true, sourceTradeId: true, status: true, direction: true, openedAt: true },
+          orderBy: { openedAt: "desc" },
+          take: 5,
+        })
+        console.warn(`[placeOrder] Recent DB trades for ${instrument}:`, JSON.stringify(allRecent))
+      }
     }
 
     // Apply metadata (placedVia) to the reconciled record — this is the authoritative
@@ -790,9 +814,17 @@ export class OandaTradeSyncer {
           where: { id: dbTrade.id },
           data: { metadata: JSON.stringify({ placedVia }) },
         })
-      } catch {
-        // Best-effort — enrichSource will fall back to "oanda"
+        console.log(`[placeOrder] Metadata set: trade=${dbTrade.id}, placedVia=${placedVia}`)
+      } catch (metaErr) {
+        console.error(
+          `[placeOrder] FAILED to set metadata for ${dbTrade.id}:`,
+          (metaErr as Error).message,
+        )
       }
+    } else {
+      console.error(
+        `[placeOrder] NO DB RECORD FOUND — metadata not set for ${instrument} ${direction} (sourceId=${sourceId}, placedVia=${placedVia})`,
+      )
     }
 
     // Re-reconcile so the WS broadcast picks up the updated metadata
