@@ -9,6 +9,7 @@ import {
   getNextExpectedChange,
   isWeekendClosed,
   isRolloverWindow,
+  toET,
 } from "@fxflow/shared"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 
@@ -38,22 +39,28 @@ export function MarketStatus() {
   // Only trust daemon market data when OANDA stream is actively feeding it
   const trustDaemonMarket = daemonUp && market && oanda?.streamConnected === true
   const open = trustDaemonMarket ? market.isOpen : isMarketExpectedOpen(now)
-  const closeLabel =
-    trustDaemonMarket && !market.isOpen
-      ? market.closeLabel
-      : !open
-        ? isWeekendClosed(now)
-          ? "Weekend Close"
-          : isRolloverWindow(now)
-            ? "Daily Rollover"
-            : "Closed"
-        : null
-
   // Countdown target: from daemon if available, else client-side
   const nextChange =
     trustDaemonMarket && market.nextExpectedChange
       ? new Date(market.nextExpectedChange)
       : getNextExpectedChange(now)
+
+  // Reason for the next state change — always shown
+  const nextChangeReason = (() => {
+    // Currently closed: use daemon label or detect from schedule
+    if (!open) {
+      if (trustDaemonMarket && market.closeLabel) return market.closeLabel
+      if (isWeekendClosed(now)) return "Weekend Close"
+      if (isRolloverWindow(now)) return "Daily Rollover"
+      return "Closed"
+    }
+    // Currently open: determine what the upcoming close will be
+    const nextET = toET(nextChange)
+    // Friday 5 PM ET = weekend close
+    if (nextET.day === 5 && nextET.hour === 17) return "Weekend Close"
+    // Otherwise it's a daily rollover (4:59 PM ET)
+    return "Daily Rollover"
+  })()
 
   const countdown = formatCountdown(now, nextChange)
   const actionLabel = open ? "Closes" : "Opens"
@@ -63,11 +70,7 @@ export function MarketStatus() {
   const shortLabel = open ? "Market Open" : "Market Closed"
 
   // Full status label for popover
-  const fullStatusLabel = open
-    ? "Forex Market Open"
-    : closeLabel
-      ? `Market Closed \u2013 ${closeLabel}`
-      : "Forex Market Closed"
+  const fullStatusLabel = open ? "Forex Market Open" : `Market Closed \u2013 ${nextChangeReason}`
 
   return (
     <Popover>
@@ -120,12 +123,10 @@ export function MarketStatus() {
               <span className="text-muted-foreground">{actionLabel}</span>
               <span className="font-medium">{dateTimeStr}</span>
             </div>
-            {closeLabel && (
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Reason</span>
-                <span className="font-medium">{closeLabel}</span>
-              </div>
-            )}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Reason</span>
+              <span className="font-medium">{nextChangeReason}</span>
+            </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Countdown</span>
               <span className="font-mono font-semibold tabular-nums">
