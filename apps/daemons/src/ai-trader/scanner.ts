@@ -40,6 +40,26 @@ import { buildTier2Prompt, buildTier3Prompt, type Tier3Context } from "./prompt-
 
 const MAX_SCAN_LOG_ENTRIES = 100
 
+/** Extract JSON from a model response that may be wrapped in markdown code blocks. */
+function extractJSON<T>(text: string): T {
+  // Try raw parse first
+  try {
+    return JSON.parse(text)
+  } catch {
+    // Strip markdown code blocks: ```json ... ``` or ``` ... ```
+    const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
+    if (codeBlockMatch?.[1]) {
+      return JSON.parse(codeBlockMatch[1])
+    }
+    // Try to find first { ... } in the text
+    const braceMatch = text.match(/\{[\s\S]*\}/)
+    if (braceMatch) {
+      return JSON.parse(braceMatch[0])
+    }
+    throw new Error(`No valid JSON found in response: ${text.slice(0, 200)}`)
+  }
+}
+
 // ─── AI Trader Scanner ───────────────────────────────────────────────────────
 
 export class AiTraderScanner {
@@ -594,12 +614,19 @@ export class AiTraderScanner {
 
     let tier2Result: { pass: boolean; confidence: number; reason: string }
     try {
-      tier2Result = JSON.parse(tier2Text)
+      tier2Result = extractJSON(tier2Text)
     } catch {
       console.warn(
-        `[ai-trader] Tier 2 invalid JSON for ${signal.instrument}: ${tier2Text.slice(0, 100)}`,
+        `[ai-trader] Tier 2 invalid JSON for ${signal.instrument}: ${tier2Text.slice(0, 200)}`,
       )
-      this.addLogEntry("tier2_fail", `${pairLabel}: Tier 2 returned invalid response`)
+      this.addLogEntry("tier2_fail", `${pairLabel}: Tier 2 returned invalid response`, undefined, {
+        instrument: signal.instrument,
+        direction: signal.direction,
+        profile: signal.profile,
+        confidence: signal.confidence,
+        error: `Could not parse response: ${tier2Text.slice(0, 150)}`,
+        tier: 1,
+      })
       return
     }
 
@@ -750,12 +777,19 @@ export class AiTraderScanner {
       managementPlan: string
     }
     try {
-      tier3Result = JSON.parse(tier3Text)
+      tier3Result = extractJSON(tier3Text)
     } catch {
       console.warn(
-        `[ai-trader] Tier 3 invalid JSON for ${signal.instrument}: ${tier3Text.slice(0, 100)}`,
+        `[ai-trader] Tier 3 invalid JSON for ${signal.instrument}: ${tier3Text.slice(0, 200)}`,
       )
-      this.addLogEntry("tier3_fail", `${pairLabel}: Tier 3 returned invalid response`)
+      this.addLogEntry("tier3_fail", `${pairLabel}: Tier 3 returned invalid response`, undefined, {
+        instrument: signal.instrument,
+        direction: signal.direction,
+        profile: signal.profile,
+        confidence: tier2Result.confidence,
+        error: `Could not parse response: ${tier3Text.slice(0, 150)}`,
+        tier: 2,
+      })
       return
     }
 
