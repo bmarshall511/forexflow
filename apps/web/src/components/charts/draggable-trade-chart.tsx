@@ -100,6 +100,7 @@ function DraggableTradeChartInner({
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
+  const entryLineRef = useRef<IPriceLine | null>(null)
   const slLineRef = useRef<IPriceLine | null>(null)
   const tpLineRef = useRef<IPriceLine | null>(null)
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
@@ -196,6 +197,16 @@ function DraggableTradeChartInner({
       })
     }
 
+    // Entry price line (dotted, subtle)
+    entryLineRef.current = series.createPriceLine({
+      price: entryPrice,
+      color: isDark ? "#94a3b8" : "#64748b",
+      lineWidth: 1,
+      lineStyle: LineStyle.Dotted,
+      axisLabelVisible: true,
+      title: "Entry",
+    })
+
     // Attach trade-level primitive (draws entry/exit lines on candles)
     const tradeLevelPrim = new TradeLevelPrimitive()
     series.attachPrimitive(tradeLevelPrim)
@@ -260,6 +271,7 @@ function DraggableTradeChartInner({
       seriesRef.current = null
       lastCandleRef.current = null
       priceLineRef.current = null
+      entryLineRef.current = null
       slLineRef.current = null
       tpLineRef.current = null
       markersRef.current = null
@@ -288,6 +300,9 @@ function DraggableTradeChartInner({
     if (!chart || !series) return
     chart.applyOptions(getChartOptions(isDark, height ?? containerRef.current?.clientHeight ?? 400))
     series.applyOptions(getCandlestickOptions(isDark, decimals, minMove))
+    if (entryLineRef.current) {
+      entryLineRef.current.applyOptions({ color: isDark ? "#94a3b8" : "#64748b" })
+    }
   }, [isDark, height, decimals, minMove])
 
   // Sync draft price line positions when draft values change externally (from form input)
