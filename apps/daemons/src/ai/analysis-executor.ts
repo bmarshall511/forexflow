@@ -541,12 +541,17 @@ export async function executeAnalysis(opts: {
               continue
             }
 
-            // Dedup: skip if an active condition with same trigger+action+label already exists
+            // Dedup: skip if an active condition with same trigger+action+params already exists.
+            // Compare by parameter values (not label) since AI may generate different labels
+            // for functionally identical conditions.
+            const sugTriggerJSON = JSON.stringify(suggestion.triggerValue)
+            const sugActionJSON = JSON.stringify(suggestion.actionParams ?? {})
             const isDuplicate = activeConditions.some(
               (c) =>
                 c.triggerType === suggestion.triggerType &&
                 c.actionType === suggestion.actionType &&
-                c.label === suggestion.label,
+                JSON.stringify(c.triggerValue) === sugTriggerJSON &&
+                JSON.stringify(c.actionParams ?? {}) === sugActionJSON,
             )
             if (isDuplicate) {
               console.log(`[ai-executor] Skipping duplicate condition: ${suggestion.label}`)

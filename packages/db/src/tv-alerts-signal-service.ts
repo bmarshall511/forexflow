@@ -8,7 +8,11 @@
  * @module tv-alerts-signal-service
  */
 import { db } from "./client"
-import { getForexDayStart, getForexPeriodBoundaries } from "@fxflow/shared"
+import {
+  getForexDayStart,
+  getForexPeriodBoundaries,
+  getLastTradingSessionStart,
+} from "@fxflow/shared"
 import type {
   TVAlertSignal,
   TVAlertStatus,
@@ -377,22 +381,24 @@ export async function getActiveAutoTradeIds(): Promise<string[]> {
   return openTrades.map((t) => t.sourceTradeId)
 }
 
-/** Count signals received today (forex day boundary). */
+/** Count signals received in the current/last trading session.
+ *  On weekends, shows the last active trading day's count instead of 0. */
 export async function getTodaySignalCount(): Promise<number> {
-  const forexDayStart = getForexDayStart(new Date())
+  const sessionStart = getLastTradingSessionStart(new Date())
   return db.tVAlertSignal.count({
-    where: { receivedAt: { gte: forexDayStart } },
+    where: { receivedAt: { gte: sessionStart } },
   })
 }
 
-/** Batch: get all auto-trade data in a single pass (count, IDs, today P&L, signal count). */
+/** Batch: get all auto-trade data in a single pass (count, IDs, today P&L, signal count).
+ *  Uses getLastTradingSessionStart so weekend queries show last session's data. */
 export async function getAutoTradesSummary(): Promise<{
   activeAutoTradeIds: string[]
   activeAutoPositions: number
   todayAutoPL: number
   signalCountToday: number
 }> {
-  const forexDayStart = getForexDayStart(new Date())
+  const forexDayStart = getLastTradingSessionStart(new Date())
 
   // Single query for all executed signals with trade IDs
   const [executedSignals, signalCountToday] = await Promise.all([

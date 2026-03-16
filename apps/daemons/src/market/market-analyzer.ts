@@ -29,7 +29,11 @@ export class MarketAnalyzer {
 
     const now = new Date()
 
-    if (tradeable) {
+    // Override: OANDA practice accounts may report tradeable on weekends.
+    // Trust the schedule over the stream for weekend closures.
+    const effectiveTradeable = tradeable && !isWeekendClosed(now)
+
+    if (effectiveTradeable) {
       this.stateManager.updateMarket({
         isOpen: true,
         closeReason: null,

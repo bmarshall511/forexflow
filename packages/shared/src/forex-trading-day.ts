@@ -10,7 +10,7 @@
  * from market-hours.ts to handle DST transitions correctly.
  */
 
-import { getETOffsetHours, toET } from "./market-hours"
+import { getETOffsetHours, toET, isWeekendClosed } from "./market-hours"
 
 export interface ForexPeriodBoundaries {
   /** Start of current forex trading day (most recent 5 PM ET) */
@@ -153,6 +153,25 @@ export function getForexPeriodBoundaries(date: Date): ForexPeriodBoundaries {
     monthStart: getForexMonthStart(date),
     yearStart: getForexYearStart(date),
   }
+}
+
+/**
+ * Get the start of the most recent active trading session.
+ *
+ * During market hours (Sun 5 PM–Fri 5 PM ET), returns same as getForexDayStart().
+ * During weekends, getForexDayStart() returns Friday 5 PM ET — but no trading
+ * happened after that. This returns the previous day start (Thursday 5 PM ET)
+ * so queries like "signals today" show the last session's count instead of 0.
+ */
+export function getLastTradingSessionStart(date: Date): Date {
+  if (isWeekendClosed(date)) {
+    // Weekend: current forex day started Friday 5 PM but had no activity.
+    // Go back to the previous forex day (Thursday 5 PM → Friday 5 PM session).
+    const forexDayStart = getForexDayStart(date)
+    const beforeForexDay = new Date(forexDayStart.getTime() - 1)
+    return getForexDayStart(beforeForexDay)
+  }
+  return getForexDayStart(date)
 }
 
 // ─── Internal helper ──────────────────────────────────────────────────────────

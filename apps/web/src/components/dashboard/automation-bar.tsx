@@ -212,7 +212,7 @@ export function AutomationBar() {
     : "disabled"
   const tvLine1 = tvAlertsStatus
     ? tvAlertsStatus.enabled
-      ? `${tvAlertsStatus.signalCountToday} signal${tvAlertsStatus.signalCountToday !== 1 ? "s" : ""} today`
+      ? `${tvAlertsStatus.signalCountToday ?? 0} signal${(tvAlertsStatus.signalCountToday ?? 0) !== 1 ? "s" : ""} today`
       : "Disabled"
     : "Not configured"
 

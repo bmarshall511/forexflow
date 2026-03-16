@@ -18,6 +18,7 @@ export {
   getForexMonthStart,
   getForexYearStart,
   getForexPeriodBoundaries,
+  getLastTradingSessionStart,
   type ForexPeriodBoundaries,
 } from "./forex-trading-day"
 

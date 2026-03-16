@@ -139,12 +139,7 @@ export async function startServer(port: number, deps: ServerDeps) {
           oanda: snapshot.oanda,
           market: snapshot.market,
           tradingMode: snapshot.tradingMode,
-          tvAlerts: snapshot.tvAlerts
-            ? {
-                enabled: snapshot.tvAlerts.enabled,
-                cfWorkerConnected: snapshot.tvAlerts.cfWorkerConnected,
-              }
-            : null,
+          tvAlerts: snapshot.tvAlerts ?? null,
           tradeFinder: _tradeFinderScanner
             ? { enabled: true, scanStatus: _tradeFinderScanner.getScanStatus() }
             : { enabled: false, scanStatus: null },
@@ -970,6 +965,19 @@ export async function startServer(port: number, deps: ServerDeps) {
           type: "positions_update",
           timestamp: new Date().toISOString(),
           data: positions,
+        }),
+      )
+    }
+
+    // Send full TV alerts status so dashboard has signal count, P&L, etc.
+    // The snapshot.tvAlerts may be null if daemon is still initializing.
+    const tvAlertsFullStatus = _tvAlertsState?.getStatus()
+    if (tvAlertsFullStatus) {
+      ws.send(
+        JSON.stringify({
+          type: "tv_alerts_status",
+          timestamp: new Date().toISOString(),
+          data: tvAlertsFullStatus,
         }),
       )
     }

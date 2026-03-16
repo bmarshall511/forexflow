@@ -125,6 +125,100 @@ export const CreateConditionSchema = z
     status: z.enum(["active", "waiting"]).optional(),
   })
   .strict()
+  .superRefine((data, ctx) => {
+    // Validate triggerValue has the required keys for each trigger type
+    const tv = data.triggerValue as Record<string, unknown>
+    switch (data.triggerType) {
+      case "price_reaches":
+      case "price_breaks_above":
+      case "price_breaks_below":
+        if (typeof tv.price !== "number" || tv.price <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `triggerValue.price must be a positive number for ${data.triggerType}`,
+            path: ["triggerValue", "price"],
+          })
+        }
+        break
+      case "pnl_pips":
+        if (typeof tv.pips !== "number") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "triggerValue.pips must be a number for pnl_pips",
+            path: ["triggerValue", "pips"],
+          })
+        }
+        break
+      case "pnl_currency":
+        if (typeof tv.amount !== "number") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "triggerValue.amount must be a number for pnl_currency",
+            path: ["triggerValue", "amount"],
+          })
+        }
+        break
+      case "time_reached":
+        if (typeof tv.datetime !== "string") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "triggerValue.datetime must be an ISO string for time_reached",
+            path: ["triggerValue", "datetime"],
+          })
+        }
+        break
+      case "duration_hours":
+        if (typeof tv.hours !== "number" || tv.hours <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "triggerValue.hours must be a positive number for duration_hours",
+            path: ["triggerValue", "hours"],
+          })
+        }
+        break
+      case "trailing_stop":
+        if (typeof tv.distancePips !== "number" || tv.distancePips <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "triggerValue.distancePips must be a positive number for trailing_stop",
+            path: ["triggerValue", "distancePips"],
+          })
+        }
+        break
+    }
+
+    // Validate actionParams for actions that require them
+    const ap = data.actionParams as Record<string, unknown> | undefined
+    switch (data.actionType) {
+      case "partial_close":
+        if (!ap || typeof ap.percent !== "number" || ap.percent <= 0 || ap.percent >= 100) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "actionParams.percent must be between 0 and 100 for partial_close",
+            path: ["actionParams", "percent"],
+          })
+        }
+        break
+      case "move_stop_loss":
+        if (!ap || typeof ap.price !== "number" || ap.price <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "actionParams.price must be a positive number for move_stop_loss",
+            path: ["actionParams", "price"],
+          })
+        }
+        break
+      case "move_take_profit":
+        if (!ap || typeof ap.price !== "number" || ap.price <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "actionParams.price must be a positive number for move_take_profit",
+            path: ["actionParams", "price"],
+          })
+        }
+        break
+    }
+  })
 
 // ─── Trade Finder Config (PUT) ──────────────────────────────────────────────
 
