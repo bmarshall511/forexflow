@@ -67,6 +67,8 @@ When the AI finishes analysing a trade, it sometimes suggests "conditions" — r
 
 You can still see and delete them — they are just set up automatically instead of you doing it manually.
 
+Auto-applied conditions include built-in safety features: destructive actions (closing trades or cancelling orders) are blocked for 60 seconds after creation, and AI-created conditions automatically expire after 7 days so stale rules do not act on outdated analysis.
+
 ## Auto-Apply Actions
 
 > [!WARNING]

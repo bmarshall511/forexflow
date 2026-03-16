@@ -92,6 +92,12 @@ When a condition triggers, it can:
 - **Move SL/TP** — adjust stop loss or take profit
 - **Just notify** — send you an alert without taking action
 
+### Safety Features
+
+- **Grace period** — destructive actions (closing a trade or cancelling an order) are blocked for 60 seconds after a trade opens or a condition is created, whichever is later. This prevents a condition from immediately closing a trade before you have had a chance to review it.
+- **Automatic expiry** — conditions created by the AI automatically expire after 7 days. This stops stale conditions from triggering on market moves that no longer match the original analysis. You can always create fresh conditions with a new analysis.
+- **Priority order** — when multiple conditions exist on the same trade, they are evaluated in priority order (highest priority first). If a condition closes or cancels the trade, remaining conditions are skipped for that tick.
+
 > [!NOTE]
 > Conditions keep running even when you are not looking at FXFlow. They are like a watchdog that monitors your trade 24/7.
 

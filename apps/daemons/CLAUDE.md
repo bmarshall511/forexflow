@@ -60,6 +60,11 @@ src/
 - `condition-monitor.ts` — price conditions evaluated every tick (sub-ms), time conditions every 1 minute.
 - Stuck "executing" conditions are reset on startup (crash recovery).
 - Price ticks wire to ConditionMonitor via `positionPriceTracker.onPriceTick`, NOT streamClient.
+- **Grace period**: destructive actions (`close_trade`, `cancel_order`) are blocked for 60 seconds after `max(trade.openedAt, condition.createdAt)`. Uses `GracePeriodError` to revert condition to "active" for retry on the next tick.
+- **Condition expiry**: AI-created conditions auto-expire after 7 days to prevent stale conditions from executing inappropriate actions.
+- **Priority-based evaluation**: conditions are sorted by priority (ascending) before evaluation so higher-priority conditions fire first.
+- **Early exit on close**: when a `close_trade` or `cancel_order` condition fires, remaining conditions for the same trade are skipped in that tick.
+- **Filtered startup**: `listActiveConditions()` excludes conditions for closed trades to avoid wasted evaluation cycles on load.
 
 ## Trade Finder
 
