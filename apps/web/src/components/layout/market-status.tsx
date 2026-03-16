@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
-import { formatCountdown, isMarketExpectedOpen, getNextExpectedChange } from "@fxflow/shared"
+import {
+  formatCountdown,
+  isMarketExpectedOpen,
+  getNextExpectedChange,
+  isWeekendClosed,
+  isRolloverWindow,
+} from "@fxflow/shared"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 
 function formatDateTime(date: Date): string {
@@ -32,7 +38,16 @@ export function MarketStatus() {
   // Only trust daemon market data when OANDA stream is actively feeding it
   const trustDaemonMarket = daemonUp && market && oanda?.streamConnected === true
   const open = trustDaemonMarket ? market.isOpen : isMarketExpectedOpen(now)
-  const closeLabel = trustDaemonMarket && !market.isOpen ? market.closeLabel : null
+  const closeLabel =
+    trustDaemonMarket && !market.isOpen
+      ? market.closeLabel
+      : !open
+        ? isWeekendClosed(now)
+          ? "Weekend Close"
+          : isRolloverWindow(now)
+            ? "Daily Rollover"
+            : "Closed"
+        : null
 
   // Countdown target: from daemon if available, else client-side
   const nextChange =
@@ -105,6 +120,12 @@ export function MarketStatus() {
               <span className="text-muted-foreground">{actionLabel}</span>
               <span className="font-medium">{dateTimeStr}</span>
             </div>
+            {closeLabel && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Reason</span>
+                <span className="font-medium">{closeLabel}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Countdown</span>
               <span className="font-mono font-semibold tabular-nums">
