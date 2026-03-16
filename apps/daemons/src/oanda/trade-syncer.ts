@@ -755,38 +755,51 @@ export class OandaTradeSyncer {
       )
     }
 
-    // Pre-seed the DB record with source metadata BEFORE the first reconcile so the
-    // first broadcast already carries the correct source (avoids the "OANDA" flash).
-    // If OANDA hasn't propagated the trade yet the upsert creates a minimal record;
-    // the reconcile below will fill in the remaining fields via its own upsert.
-    if (sourceId) {
-      try {
-        await upsertTrade({
+    // Reconcile FIRST so OANDA's canonical order/trade ID is in the DB.
+    // Then we apply metadata, notes, tags to the reconciled record.
+    await this.reconcile()
+
+    // Find the DB record by sourceId. For LIMIT orders, OANDA's orderCreateTransaction.id
+    // may differ from the order.id in the pending list. If not found by sourceId, search
+    // by instrument + direction + status as a fallback to handle ID mismatches.
+    let dbTrade = await getTradeBySourceId("oanda", sourceId)
+    if (!dbTrade) {
+      // Fallback: find by instrument + direction + recent creation
+      const { db: prisma } = await import("@fxflow/db")
+      const recent = await prisma.trade.findFirst({
+        where: {
           source: "oanda",
-          sourceTradeId: sourceId,
-          status: filled ? "open" : "pending",
           instrument,
           direction,
-          orderType: orderType ?? "MARKET",
-          entryPrice: fillPrice ?? entryPrice ?? 0,
-          initialUnits: units,
-          currentUnits: units,
-          openedAt: new Date(),
-          metadata: JSON.stringify({ placedVia }),
+          status: filled ? "open" : "pending",
+          openedAt: { gte: new Date(Date.now() - 30_000) }, // within last 30 seconds
+        },
+        orderBy: { openedAt: "desc" },
+      })
+      if (recent) dbTrade = recent
+    }
+
+    // Apply metadata (placedVia) to the reconciled record — this is the authoritative
+    // source attribution. Done post-reconcile to guarantee the record exists with the
+    // correct OANDA order/trade ID.
+    if (dbTrade) {
+      try {
+        const { db: prisma } = await import("@fxflow/db")
+        await prisma.trade.update({
+          where: { id: dbTrade.id },
+          data: { metadata: JSON.stringify({ placedVia }) },
         })
       } catch {
-        // Best-effort — reconcile will still persist the record
+        // Best-effort — enrichSource will fall back to "oanda"
       }
     }
 
-    // Reconcile to sync full trade data from OANDA to DB and update positions.
-    // The pre-seeded metadata is preserved because the reconcile upsert passes
-    // metadata: undefined in the update path, which Prisma skips.
+    // Re-reconcile so the WS broadcast picks up the updated metadata
     await this.reconcile()
 
-    // Create audit event and persist timeframe (best-effort)
+    // Create audit event and persist timeframe, notes, tags (best-effort)
     try {
-      const dbTrade = await getTradeBySourceId("oanda", sourceId)
+      if (!dbTrade) dbTrade = await getTradeBySourceId("oanda", sourceId)
       if (dbTrade) {
         if (timeframe) {
           await updateTradeTimeframe(dbTrade.id, timeframe)
