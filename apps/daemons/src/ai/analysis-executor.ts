@@ -139,7 +139,18 @@ IMPORTANT rules for immediateActions vs conditionSuggestions:
 - For "adjust_entry", include params.entryPrice (number) — only works on PENDING orders
 - For "update_expiry", include params.hours (number of hours from now) OR params.expiry (ISO 8601 datetime string) — only works on PENDING orders
 - NEVER use "adjust_tp_partial" as an immediateAction type. "Take partial profits at price X" is a CONDITIONAL rule, not an instant action. Put it in conditionSuggestions instead with triggerType "price_breaks_above" (long) or "price_breaks_below" (short), actionType "partial_close", and actionParams { units: N }.
-- For trailing stop suggestions, use triggerType "trailing_stop" with triggerValue { distance_pips: number, step_pips?: number }. The distance_pips is the trailing distance from the current price, and step_pips (optional) is the minimum step size for the trailing stop to move.`
+- For trailing stop suggestions, use triggerType "trailing_stop" with triggerValue { distance_pips: number, step_pips?: number }. The distance_pips is the trailing distance from the current price, and step_pips (optional) is the minimum step size for the trailing stop to move.
+
+BREAKEVEN & STOP-LOSS MANAGEMENT RULES (CRITICAL — these prevent premature stop-outs):
+- NEVER suggest moving SL to breakeven unless the trade has captured at least 40% of the distance to its take-profit target. If no TP is set, require at least 1.5× the original risk (distance from entry to SL) in unrealized profit before suggesting breakeven.
+- NEVER suggest breakeven if the ATR(H1) value exceeds 50% of the original stop-loss distance — the normal market noise alone would trigger the breakeven SL, causing a needless exit.
+- NEVER suggest breakeven on trades that have been open for less than 15 minutes — the trade needs time to develop beyond initial volatility.
+- If a major economic news event (high impact) is within 2 hours, cap breakeven condition confidence at "low" — news-driven volatility makes tight SL placement dangerous.
+- When suggesting a breakeven move_stop_loss condition, set the actionParams.price to the EXACT entry price — the system will automatically add a spread + volatility buffer at execution time. Do NOT manually add a buffer in the price.
+- Consider MFE (Max Favorable Excursion): if the trade's MFE is significantly higher than the current price (i.e., price has already retraced), breakeven may be appropriate to protect remaining gains. If MFE is close to current price (trade still near peak), prefer a trailing stop instead.
+- Consider the trade's timeframe: scalp trades (M15 timeframe) warrant tighter breakeven triggers (e.g., +8-10 pips) while swing trades (H4/D1) need wider triggers (e.g., +30-50 pips) to avoid being shaken out by normal retracements.
+- For conditionSuggestions with actionType "move_stop_loss" where the target is near entry price, set the pnl_pips trigger to at least 1.5× ATR(H1) in pips to avoid whipsaw triggers from normal price oscillation.
+- PREFER trailing stops over breakeven when the trade is trending strongly (confluence score >= 7 and alignment is "strong"). Breakeven locks in zero profit; a trailing stop captures the trend.`
 
 // ─── Progress Stages ─────────────────────────────────────────────────────────
 
@@ -520,23 +531,29 @@ export async function executeAnalysis(opts: {
         const aiSettings = await getAiSettings()
         if (aiSettings.autoAnalysis.autoApplyConditions) {
           const minCondConf = aiSettings.autoAnalysis.autoApplyMinConditionConfidence ?? "medium"
+          // SL-modifying conditions (breakeven, move SL) use a separate, stricter threshold
+          const minSLCondConf = aiSettings.autoAnalysis.autoApplyMinSLConditionConfidence ?? "high"
           const condConfRank: Record<string, number> = { high: 3, medium: 2, low: 1 }
           const minCondRank = condConfRank[minCondConf] ?? 2
+          const minSLCondRank = condConfRank[minSLCondConf] ?? 3
 
           // Fetch existing conditions to prevent duplicates
           const existing = await listConditionsForTrade(tradeId)
           const activeConditions = existing.filter((c) => c.status === "active")
 
           console.log(
-            `[ai-executor] Auto-applying conditions for trade ${tradeId} (${sections.conditionSuggestions.length} suggested, ${activeConditions.length} already active, minConfidence: ${minCondConf})`,
+            `[ai-executor] Auto-applying conditions for trade ${tradeId} (${sections.conditionSuggestions.length} suggested, ${activeConditions.length} already active, minConfidence: ${minCondConf}, minSLConfidence: ${minSLCondConf})`,
           )
           for (const suggestion of sections.conditionSuggestions) {
-            // Filter by confidence threshold
+            // Filter by confidence threshold — SL-modifying conditions use stricter bar
+            const isSLCondition = suggestion.actionType === "move_stop_loss"
+            const effectiveMinRank = isSLCondition ? minSLCondRank : minCondRank
+            const effectiveMinConf = isSLCondition ? minSLCondConf : minCondConf
             const suggestionConf = suggestion.confidence ?? "medium" // default to medium if AI omits
             const suggestionRank = condConfRank[suggestionConf] ?? 2
-            if (suggestionRank < minCondRank) {
+            if (suggestionRank < effectiveMinRank) {
               console.log(
-                `[ai-executor] Skipping low-confidence condition: ${suggestion.label} (${suggestionConf} < ${minCondConf})`,
+                `[ai-executor] Skipping ${isSLCondition ? "SL " : ""}low-confidence condition: ${suggestion.label} (${suggestionConf} < ${effectiveMinConf})`,
               )
               continue
             }
@@ -558,10 +575,23 @@ export async function executeAnalysis(opts: {
               continue
             }
             try {
-              // AI-created conditions expire after 7 days to prevent stale conditions
-              // from executing inappropriate actions if market conditions change
-              const AI_CONDITION_EXPIRY_DAYS = 7
-              const expiresAt = new Date(Date.now() + AI_CONDITION_EXPIRY_DAYS * 86_400_000)
+              // AI-created conditions use tiered expiry by action type:
+              // SL moves expire fastest (market structure changes quickly),
+              // trailing stops a bit longer, everything else gets 7 days.
+              const EXPIRY_MS_BY_ACTION: Record<string, number> = {
+                move_stop_loss: 2 * 86_400_000, // 48 hours
+                move_take_profit: 5 * 86_400_000, // 5 days
+                close_trade: 7 * 86_400_000, // 7 days
+                partial_close: 7 * 86_400_000, // 7 days
+                cancel_order: 7 * 86_400_000, // 7 days
+                notify: 7 * 86_400_000, // 7 days
+              }
+              // Trailing stop trigger type gets 72h regardless of action
+              const expiryMs =
+                suggestion.triggerType === "trailing_stop"
+                  ? 3 * 86_400_000
+                  : (EXPIRY_MS_BY_ACTION[suggestion.actionType] ?? 7 * 86_400_000)
+              const expiresAt = new Date(Date.now() + expiryMs)
 
               const condition = await createCondition({
                 tradeId,

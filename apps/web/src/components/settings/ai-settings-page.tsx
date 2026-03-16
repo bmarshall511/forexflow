@@ -527,6 +527,31 @@ export function AiSettingsPage() {
                     <option value="low">Low — All confidence levels</option>
                   </select>
                 </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Minimum Confidence for Stop-Loss Conditions</Label>
+                  <select
+                    value={autoAnalysis.autoApplyMinSLConditionConfidence ?? "high"}
+                    onChange={(e) =>
+                      void updatePref({
+                        autoApplyMinSLConditionConfidence: e.target.value as
+                          | "high"
+                          | "medium"
+                          | "low",
+                      })
+                    }
+                    disabled={saving}
+                    className={selectClass}
+                  >
+                    <option value="high">High — Only highest confidence (recommended)</option>
+                    <option value="medium">Medium — Moderate confidence and above</option>
+                    <option value="low">Low — All confidence levels</option>
+                  </select>
+                  <p className="text-muted-foreground text-[10px]">
+                    SL modifications (breakeven, move stop-loss) directly affect risk — a higher bar
+                    prevents premature stop-outs from marginal AI suggestions.
+                  </p>
+                </div>
               </>
             )}
           </div>

@@ -48,6 +48,7 @@ export function RecentActivitySection({
                 <OutcomeBadge
                   outcome={trade.outcome}
                   closeReason={trade.closeReason}
+                  closeContext={trade.closeContext}
                   className="w-fit"
                 />
               </ProximityTradeRow>

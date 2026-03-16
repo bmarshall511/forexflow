@@ -130,6 +130,7 @@ export function TradeCardMobile({
               <OutcomeBadge
                 outcome={(data as ClosedTradeData).outcome}
                 closeReason={(data as ClosedTradeData).closeReason}
+                closeContext={(data as ClosedTradeData).closeContext}
               />
             )}
             {isPending && (

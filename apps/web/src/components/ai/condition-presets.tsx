@@ -100,7 +100,7 @@ function BreakEvenTrailForm({ trade, onCreated }: ConditionPresetsProps) {
           onChange={(e) => setBreakevenPips(e.target.value)}
         />
         <p className="text-muted-foreground text-[10px]">
-          How many pips in profit before moving SL to entry
+          How many pips in profit before moving SL to entry. Must sustain for 30s to avoid spikes.
         </p>
       </div>
       <div className="space-y-1">
@@ -115,7 +115,7 @@ function BreakEvenTrailForm({ trade, onCreated }: ConditionPresetsProps) {
           onChange={(e) => setTrailDistancePips(e.target.value)}
         />
         <p className="text-muted-foreground text-[10px]">
-          How far behind price to trail after break-even
+          How far behind price to trail after break-even. SL will never drop below entry.
         </p>
       </div>
       <Button
@@ -321,7 +321,7 @@ export function ConditionPresets({ trade, onCreated }: ConditionPresetsProps) {
             <div>
               <p className="text-xs font-medium">Break-even + Trail</p>
               <p className="text-muted-foreground text-[10px]">
-                Move SL to entry, then trail behind price
+                Move SL to entry (with spread buffer), then trail behind price
               </p>
             </div>
           </div>

@@ -386,6 +386,8 @@ export interface ClosedTradeData {
   financing: number
   /** What caused the trade to close. */
   closeReason: TradeCloseReason
+  /** Rich context about the close — e.g., AI breakeven move that led to this SL hit. */
+  closeContext: CloseContext | null
   /** Win/loss/breakeven classification. */
   outcome: TradeOutcome
   /** Max Favorable Excursion in pips (null for backfilled trades) */
@@ -402,6 +404,19 @@ export interface ClosedTradeData {
   openedAt: string
   /** ISO timestamp when the trade was closed on OANDA. */
   closedAt: string
+}
+
+/** Context stored when an AI condition modifies a trade's SL to breakeven.
+ *  Used to attribute SL stop-outs back to the AI breakeven decision. */
+export interface CloseContext {
+  breakeven?: boolean
+  conditionId?: string
+  conditionLabel?: string
+  createdBy?: "user" | "ai"
+  movedAt?: string
+  originalSL?: number
+  bufferedSL?: number
+  entryPrice?: number
 }
 
 // ─── Aggregate Positions Payload ───────────────────────────────────────────
@@ -610,6 +625,8 @@ export interface TradeDetailData {
   financing: number
   /** Close reason (null if not yet closed). */
   closeReason: string | null
+  /** Rich context about the close — e.g., AI breakeven move that led to this SL hit. */
+  closeContext: CloseContext | null
   /** Time-in-force for pending orders. */
   timeInForce: string | null
   /** GTD expiry time for pending orders. */
@@ -1658,6 +1675,9 @@ export interface AiAutoAnalysisSettings {
   autoApplyConditions: boolean
   /** Minimum confidence level for auto-applying condition suggestions */
   autoApplyMinConditionConfidence: "high" | "medium" | "low"
+  /** Minimum confidence for auto-applying SL-modifying conditions (breakeven, move SL).
+   *  Defaults to "high" — SL changes directly affect risk so require higher bar. */
+  autoApplyMinSLConditionConfidence: "high" | "medium" | "low"
   /** Send a notification when auto-analysis completes. */
   notifyOnComplete: boolean
   /** Learning mode: AI includes educational explanations in each section */
@@ -1686,6 +1706,7 @@ export const AI_AUTO_ANALYSIS_DEFAULTS: AiAutoAnalysisSettings = {
   autoApplyMinConfidence: "high",
   autoApplyConditions: false,
   autoApplyMinConditionConfidence: "medium",
+  autoApplyMinSLConditionConfidence: "high",
   notifyOnComplete: true,
   learningMode: false,
   digestEnabled: false,

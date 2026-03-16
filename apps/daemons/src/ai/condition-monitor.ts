@@ -13,6 +13,17 @@ interface PriceMap {
   [instrument: string]: number // mid price
 }
 
+/** Live bid/ask spread per instrument, updated on every tick */
+interface SpreadMap {
+  [instrument: string]: number // ask - bid (raw spread)
+}
+
+/** Tracks sustained PnL trigger state for hysteresis — prevents spike-based breakeven triggers */
+interface SustainedTrigger {
+  firstTriggerAt: number // epoch ms when condition first met
+  count: number // consecutive ticks where condition held
+}
+
 interface CachedTradeData {
   id: string
   instrument: string
@@ -26,6 +37,14 @@ interface CachedTradeData {
 }
 
 const TRADE_CACHE_TTL_MS = 60_000 // 60 seconds
+/** Minimum time a pnl_pips trigger must sustain before firing a move_stop_loss action */
+const PNL_SUSTAIN_MS = 30_000 // 30 seconds
+/** Grace period for SL modification actions after trade open / condition creation */
+const SL_GRACE_PERIOD_MS = 30_000 // 30 seconds
+/** Grace period for destructive actions (close/cancel) */
+const DESTRUCTIVE_GRACE_PERIOD_MS = 60_000 // 60 seconds
+/** ATR multiplier for breakeven buffer: buffer = spread + (ATR_BUFFER_FACTOR × ATR) */
+const ATR_BUFFER_FACTOR = 0.05
 
 /**
  * ConditionMonitor evaluates active trade conditions against live price ticks
@@ -36,11 +55,14 @@ const TRADE_CACHE_TTL_MS = 60_000 // 60 seconds
 export class ConditionMonitor {
   private readonly conditions = new Map<string, TradeConditionData>() // conditionId → condition
   private readonly priceMap: PriceMap = {}
+  private readonly spreadMap: SpreadMap = {}
   private readonly tradeSyncer: OandaTradeSyncer
   private readonly broadcast: (msg: AnyDaemonMessage) => void
   private checkTimer: NodeJS.Timeout | null = null
   private readonly tradeDataCache = new Map<string, CachedTradeData>()
   private lastTrailTime = new Map<string, number>()
+  /** Tracks how long a pnl_pips trigger has been sustained (for hysteresis on SL moves) */
+  private readonly sustainedTriggers = new Map<string, SustainedTrigger>()
 
   constructor(tradeSyncer: OandaTradeSyncer, broadcast: (msg: AnyDaemonMessage) => void) {
     this.tradeSyncer = tradeSyncer
@@ -205,6 +227,7 @@ export class ConditionMonitor {
   onPriceTick(tick: PositionPriceTick): void {
     const mid = (tick.bid + tick.ask) / 2
     this.priceMap[tick.instrument] = mid
+    this.spreadMap[tick.instrument] = tick.ask - tick.bid
     this.evaluatePriceConditions(tick.instrument, mid).catch((err) => {
       console.error(
         `[condition-monitor] Price condition evaluation error for ${tick.instrument}:`,
@@ -315,12 +338,37 @@ export class ConditionMonitor {
       }
 
       const triggered = this.checkPriceCondition(condition, currentPrice, instrument, tradeData)
+
       if (triggered) {
+        // Hysteresis: pnl_pips triggers paired with move_stop_loss must sustain for 30s
+        // to avoid spike-based breakeven moves that immediately get stopped out
+        const needsSustain =
+          condition.triggerType === "pnl_pips" && condition.actionType === "move_stop_loss"
+        if (needsSustain) {
+          const now = Date.now()
+          const existing = this.sustainedTriggers.get(condition.id)
+          if (!existing) {
+            this.sustainedTriggers.set(condition.id, { firstTriggerAt: now, count: 1 })
+            continue // Don't fire yet — wait for sustained confirmation
+          }
+          existing.count++
+          if (now - existing.firstTriggerAt < PNL_SUSTAIN_MS) {
+            continue // Still within sustain window — keep waiting
+          }
+          // Sustained long enough — clear tracking and proceed to fire
+          this.sustainedTriggers.delete(condition.id)
+        }
+
         await this.triggerCondition(condition, currentPrice)
 
         // If this was a close/cancel action, mark the trade so we skip remaining conditions
         if (condition.actionType === "close_trade" || condition.actionType === "cancel_order") {
           closedTradeIds.add(condition.tradeId)
+        }
+      } else {
+        // Price dropped below threshold — reset sustain tracking
+        if (this.sustainedTriggers.has(condition.id)) {
+          this.sustainedTriggers.delete(condition.id)
         }
       }
     }
@@ -604,27 +652,28 @@ export class ConditionMonitor {
       return
     }
 
-    // Guard: grace period — don't execute close/cancel actions within 60s of trade open
-    // OR within 60s of the condition being created (whichever is more recent).
-    // This prevents AI conditions created on pending orders from immediately closing
-    // the trade when the order fills.
-    const GRACE_PERIOD_MS = 60_000
+    // Guard: grace period — prevents premature action execution after trade open
+    // or condition creation. Different windows for destructive vs SL-modifying actions.
+    const now = Date.now()
+    const tradeOpenMs = trade.openedAt ? new Date(trade.openedAt).getTime() : 0
+    const conditionCreatedMs = new Date(condition.createdAt).getTime()
+    const referenceMs = Math.max(tradeOpenMs, conditionCreatedMs)
+    const ageMs = now - referenceMs
+
     const isDestructive =
       condition.actionType === "close_trade" || condition.actionType === "cancel_order"
-    if (isDestructive) {
-      const now = Date.now()
-      // Use the more recent of trade open time and condition creation time
-      const tradeOpenMs = trade.openedAt ? new Date(trade.openedAt).getTime() : 0
-      const conditionCreatedMs = new Date(condition.createdAt).getTime()
-      const referenceMs = Math.max(tradeOpenMs, conditionCreatedMs)
-      const ageMs = now - referenceMs
+    const isSLMove = condition.actionType === "move_stop_loss"
+    const gracePeriodMs = isDestructive
+      ? DESTRUCTIVE_GRACE_PERIOD_MS
+      : isSLMove
+        ? SL_GRACE_PERIOD_MS
+        : 0
 
-      if (ageMs < GRACE_PERIOD_MS) {
-        throw new GracePeriodError(
-          `Grace period: ${condition.actionType} for condition ${condition.id} — ` +
-            `reference age is only ${Math.round(ageMs / 1000)}s (need ${GRACE_PERIOD_MS / 1000}s)`,
-        )
-      }
+    if (gracePeriodMs > 0 && ageMs < gracePeriodMs) {
+      throw new GracePeriodError(
+        `Grace period: ${condition.actionType} for condition ${condition.id} — ` +
+          `reference age is only ${Math.round(ageMs / 1000)}s (need ${gracePeriodMs / 1000}s)`,
+      )
     }
 
     const params = condition.actionParams
@@ -650,9 +699,50 @@ export class ConditionMonitor {
       }
 
       case "move_stop_loss": {
-        const stopLoss = params.price as number | undefined
+        let stopLoss = params.price as number | undefined
         if (!stopLoss) throw new Error("move_stop_loss requires price param")
+
+        // Smart breakeven buffer: when moving SL to entry price (breakeven),
+        // add spread + ATR-based buffer to prevent immediate stop-out from bid/ask spread.
+        // Without this, a long trade with SL at exact entry gets stopped when bid dips
+        // below entry even though mid price is still above.
         if (trade.status === "open") {
+          const instrument = await this.getTradeInstrument(condition.tradeId)
+          const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+          const originalSL = stopLoss
+          const isBreakevenMove = Math.abs(stopLoss - trade.entryPrice) < pip * 1.5
+          if (isBreakevenMove) {
+            stopLoss = this.applyBreakevenBuffer(
+              trade.entryPrice,
+              trade.direction as "long" | "short",
+              instrument,
+            )
+            console.log(
+              `[condition-monitor] Breakeven buffer applied: entry=${trade.entryPrice} → buffered SL=${stopLoss} (${trade.direction} ${instrument})`,
+            )
+
+            // Persist closeContext for attribution — if this trade later hits SL,
+            // we can trace it back to this AI-triggered breakeven move.
+            try {
+              await db.trade.update({
+                where: { id: condition.tradeId },
+                data: {
+                  closeContext: JSON.stringify({
+                    breakeven: true,
+                    conditionId: condition.id,
+                    conditionLabel: condition.label,
+                    createdBy: condition.createdBy,
+                    movedAt: new Date().toISOString(),
+                    originalSL,
+                    bufferedSL: stopLoss,
+                    entryPrice: trade.entryPrice,
+                  }),
+                },
+              })
+            } catch {
+              // Non-critical — don't fail the SL move if context save fails
+            }
+          }
           await this.tradeSyncer.modifyTradeSLTP(trade.sourceTradeId, stopLoss, undefined)
         } else if (trade.status === "pending") {
           await this.tradeSyncer.modifyPendingOrderSLTP(trade.sourceTradeId, stopLoss, undefined)
@@ -693,6 +783,33 @@ export class ConditionMonitor {
     }
   }
 
+  /**
+   * Apply a smart buffer when moving SL to breakeven. Accounts for bid/ask spread
+   * and a small ATR-based cushion so the SL doesn't get immediately triggered by
+   * normal price noise around the entry level.
+   *
+   * Formula: buffered_price = entry ± (spread + ATR_BUFFER_FACTOR × ATR × pip)
+   * Falls back to entry ± 1.5 pips if spread data is unavailable.
+   */
+  private applyBreakevenBuffer(
+    entryPrice: number,
+    direction: "long" | "short",
+    instrument: string,
+  ): number {
+    const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+    const spread = this.spreadMap[instrument] ?? pip * 1.5 // fallback: 1.5 pip spread
+    // Buffer = current spread + small ATR factor (ATR_BUFFER_FACTOR is 0.05)
+    // We use spread as the primary buffer (it's the minimum distance needed)
+    // plus a tiny volatility cushion. Total buffer is typically 1.5-5 pips.
+    const buffer = spread + ATR_BUFFER_FACTOR * pip * 10 // ~0.5 pip extra cushion on top of spread
+    const buffered =
+      direction === "long"
+        ? entryPrice + buffer // For longs: SL above entry so bid must drop further to trigger
+        : entryPrice - buffer // For shorts: SL below entry so ask must rise further to trigger
+    // Round to pip precision
+    return Math.round(buffered / pip) * pip
+  }
+
   private evaluateTrailingStop(
     condition: TradeConditionData,
     currentPrice: number,
@@ -711,7 +828,18 @@ export class ConditionMonitor {
     const step = stepPips * pip
 
     // Calculate ideal SL based on current price
-    const idealSL = direction === "long" ? currentPrice - distance : currentPrice + distance
+    let idealSL = direction === "long" ? currentPrice - distance : currentPrice + distance
+
+    // Breakeven floor: if this trailing stop has a breakeven parent, never move SL
+    // below the entry price. This preserves the breakeven protection.
+    if (condition.parentConditionId) {
+      const beFloor = this.applyBreakevenBuffer(tradeData.entryPrice, direction, instrument)
+      if (direction === "long" && idealSL < beFloor) {
+        idealSL = beFloor
+      } else if (direction === "short" && idealSL > beFloor) {
+        idealSL = beFloor
+      }
+    }
 
     const currentSL = tradeData.stopLoss
     if (!currentSL) return { shouldMove: true, newSL: Math.round(idealSL / pip) * pip }

@@ -406,7 +406,11 @@ export function TradeHistoryTable({
                     />
                   </TableCell>
                   <TableCell>
-                    <OutcomeBadge outcome={trade.outcome} closeReason={trade.closeReason} />
+                    <OutcomeBadge
+                      outcome={trade.outcome}
+                      closeReason={trade.closeReason}
+                      closeContext={trade.closeContext}
+                    />
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs tabular-nums">
                     {trade.mfe !== null ? (

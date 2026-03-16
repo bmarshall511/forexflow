@@ -54,6 +54,7 @@ model Trade {
   unrealizedPL         Float    @default(0)
   financing            Float    @default(0)
   closeReason          String? // "STOP_LOSS_ORDER" | "TAKE_PROFIT_ORDER" etc.
+  closeContext         String? // JSON: { breakeven?: boolean, conditionId?: string, originalSL?: number, bufferedSL?: number }
   timeInForce          String? // "GTC" | "GTD"
   gtdTime              String?
   mfe                  Float? // Max Favorable Excursion (pips)

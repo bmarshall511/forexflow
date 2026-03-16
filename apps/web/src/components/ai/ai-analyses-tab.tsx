@@ -153,6 +153,7 @@ function tradeDetailToUnion(d: TradeDetailData): TradeUnion {
     realizedPL: d.realizedPL,
     financing: d.financing,
     closeReason: (d.closeReason ?? "UNKNOWN") as TradeCloseReason,
+    closeContext: d.closeContext ?? null,
     outcome: (d.realizedPL > 0 ? "win" : d.realizedPL < 0 ? "loss" : "breakeven") as TradeOutcome,
     mfe: d.mfe,
     mae: d.mae,

@@ -16,6 +16,7 @@ import type {
   TradeOutcome,
   Timeframe,
   ClosedTradeData,
+  CloseContext,
   TradeDetailData,
 } from "@fxflow/types"
 
@@ -119,6 +120,7 @@ interface TradeRow {
   realizedPL: number
   financing: number
   closeReason: string | null
+  closeContext: string | null
   mfe: number | null
   mae: number | null
   timeframe: string | null
@@ -149,6 +151,16 @@ function enrichSource(source: string, metadata?: string | null): TradeSource {
   return source as TradeSource
 }
 
+/** Parse closeContext JSON string into typed CloseContext, returning null on failure. */
+function parseCloseContext(json: string | null): CloseContext | null {
+  if (!json) return null
+  try {
+    return JSON.parse(json) as CloseContext
+  } catch {
+    return null
+  }
+}
+
 /**
  * Map a Prisma trade row to the `ClosedTradeData` DTO, enriching the source
  * from metadata and computing the outcome from realized P&L.
@@ -171,6 +183,7 @@ function toClosedTradeData(row: TradeRow): ClosedTradeData {
     realizedPL: row.realizedPL,
     financing: row.financing,
     closeReason: (row.closeReason ?? "UNKNOWN") as TradeCloseReason,
+    closeContext: parseCloseContext(row.closeContext),
     outcome: getOutcome(row.realizedPL),
     mfe: row.mfe,
     mae: row.mae,
@@ -651,6 +664,7 @@ export async function getTradeWithDetails(tradeId: string): Promise<TradeDetailD
     unrealizedPL: trade.unrealizedPL,
     financing: trade.financing,
     closeReason: trade.closeReason,
+    closeContext: parseCloseContext(trade.closeContext ?? null),
     timeInForce: trade.timeInForce,
     gtdTime: trade.gtdTime,
     mfe: trade.mfe,
