@@ -545,7 +545,13 @@ export class ConditionMonitor {
     const { db } = await import("@fxflow/db")
     const trade = await db.trade.findUnique({
       where: { id: condition.tradeId },
-      select: { sourceTradeId: true, status: true, direction: true, entryPrice: true },
+      select: {
+        sourceTradeId: true,
+        status: true,
+        direction: true,
+        entryPrice: true,
+        openedAt: true,
+      },
     })
 
     if (!trade) throw new Error(`Trade ${condition.tradeId} not found`)
@@ -560,6 +566,22 @@ export class ConditionMonitor {
       await updateConditionStatus(condition.id, "expired")
       this.conditions.delete(condition.id)
       return
+    }
+
+    // Guard: grace period — don't execute close/cancel actions within 60s of trade open.
+    // This prevents AI conditions created on pending orders from immediately closing
+    // the trade when the order fills.
+    const GRACE_PERIOD_MS = 60_000
+    const isDestructive =
+      condition.actionType === "close_trade" || condition.actionType === "cancel_order"
+    if (isDestructive && trade.openedAt) {
+      const tradeAgeMs = Date.now() - new Date(trade.openedAt).getTime()
+      if (tradeAgeMs < GRACE_PERIOD_MS) {
+        console.log(
+          `[condition-monitor] Skipping ${condition.actionType} for condition ${condition.id} — trade ${condition.tradeId} is only ${Math.round(tradeAgeMs / 1000)}s old (grace period: ${GRACE_PERIOD_MS / 1000}s)`,
+        )
+        return // Don't mark as triggered — will retry on next tick after grace period
+      }
     }
 
     const params = condition.actionParams

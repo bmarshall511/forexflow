@@ -83,11 +83,11 @@ export async function GET(
     const timeframe: Timeframe = (tfParam as Timeframe) ?? detail.timeframe ?? "M15"
     const tfSecs = TF_SECONDS[timeframe] ?? 900
 
-    // Compute padded time window: 50 candles before entry, 20 after exit
+    // Compute padded time window: 50 candles before entry, up to 20 after exit (capped at now)
     const openMs = new Date(detail.openedAt).getTime()
     const closeMs = new Date(detail.closedAt).getTime()
     const fromMs = openMs - 50 * tfSecs * 1000
-    const toMs = closeMs + 20 * tfSecs * 1000
+    const toMs = Math.min(closeMs + 20 * tfSecs * 1000, Date.now())
 
     const fromISO = new Date(fromMs).toISOString()
     const toISO = new Date(toMs).toISOString()
