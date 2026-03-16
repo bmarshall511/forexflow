@@ -10,6 +10,36 @@ import { parseBody, apiSuccess, apiError } from "@/lib/api-validation"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
+/**
+ * Close all open trades and cancel all pending orders on OANDA before DB reset.
+ * Without this, OANDA orders survive the DB reset and get re-created as "OANDA" source
+ * on the next reconcile cycle — losing source attribution permanently.
+ */
+async function closeAllOandaPositions(): Promise<void> {
+  try {
+    // Cancel all pending orders (omit sourceOrderIds to cancel ALL)
+    await fetch(`${DAEMON_URL}/actions/cancel-all-orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "Trading data reset" }),
+    }).catch(() => {})
+
+    // Close all open trades (omit sourceTradeIds to close ALL)
+    await fetch(`${DAEMON_URL}/actions/close-all-trades`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "Trading data reset" }),
+    }).catch(() => {})
+
+    // Cancel AI conditions
+    await fetch(`${DAEMON_URL}/actions/ai/cancel-all-conditions`, { method: "POST" }).catch(
+      () => {},
+    )
+  } catch {
+    // Best-effort — don't block the reset
+  }
+}
+
 /** Notify daemon to re-sync in-memory state after DB resets (best-effort). */
 async function notifyDaemonAfterReset(modules: ResetModule[]): Promise<void> {
   const promises: Promise<unknown>[] = []
@@ -60,6 +90,11 @@ export async function POST(request: Request) {
         return apiError("At least one module is required for selective reset")
       }
 
+      // Close OANDA positions before clearing trading history to prevent orphaned orders
+      if (modules.includes("trading_history")) {
+        await closeAllOandaPositions()
+      }
+
       const errors: string[] = []
       const modulesReset: ResetModule[] = []
       let recordsDeleted = 0
@@ -86,12 +121,14 @@ export async function POST(request: Request) {
     }
 
     if (level === "trading_data") {
+      await closeAllOandaPositions()
       const result = await resetTradingData()
       await notifyDaemonAfterReset(["trading_history", "tv_alerts", "trade_finder", "ai_trader"])
       return apiSuccess(result)
     }
 
     // factory
+    await closeAllOandaPositions()
     const result = await resetFactory()
     await notifyDaemonAfterReset(["trading_history", "tv_alerts", "trade_finder", "ai_trader"])
     return apiSuccess(result)
