@@ -2602,6 +2602,11 @@ export interface AiTraderScanLogEntry {
     pairsScanned?: number
     candidatesFound?: number
     candidatesAnalyzed?: number
+    /** Pipeline funnel stats (scan_complete only) */
+    tier2Passed?: number
+    tier3Passed?: number
+    tradesPlaced?: number
+    gateBlocked?: number
     elapsedMs?: number
     reason?: string
     tier?: 1 | 2 | 3

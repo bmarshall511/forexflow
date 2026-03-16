@@ -12,17 +12,52 @@ export function ScanLogEntryDetail({ entry }: ScanLogEntryDetailProps) {
   // Scan summary entries
   if (entry.type === "scan_complete" || entry.type === "pair_scanned") {
     return (
-      <div className="grid grid-cols-3 gap-3 text-xs">
-        {m?.pairsScanned != null && <Stat label="Pairs scanned" value={String(m.pairsScanned)} />}
-        {m?.candidatesFound != null && (
-          <Stat label="Signals found" value={String(m.candidatesFound)} />
-        )}
-        {m?.candidatesAnalyzed != null && (
-          <Stat label="AI analyzed" value={String(m.candidatesAnalyzed)} />
-        )}
-        {m?.elapsedMs != null && (
-          <Stat label="Duration" value={`${(m.elapsedMs / 1000).toFixed(1)}s`} />
-        )}
+      <div className="space-y-2 text-xs">
+        <div className="grid grid-cols-3 gap-3">
+          {m?.pairsScanned != null && <Stat label="Pairs scanned" value={String(m.pairsScanned)} />}
+          {m?.candidatesFound != null && (
+            <Stat label="Signals found" value={String(m.candidatesFound)} />
+          )}
+          {m?.candidatesAnalyzed != null && (
+            <Stat label="AI analyzed" value={String(m.candidatesAnalyzed)} />
+          )}
+          {m?.elapsedMs != null && (
+            <Stat label="Duration" value={`${(m.elapsedMs / 1000).toFixed(1)}s`} />
+          )}
+        </div>
+        {entry.type === "scan_complete" &&
+          m?.candidatesAnalyzed != null &&
+          m.candidatesAnalyzed > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              {m?.tier2Passed != null && (
+                <Stat
+                  label="Tier 2 passed"
+                  value={String(m.tier2Passed)}
+                  className={
+                    m.tier2Passed > 0 ? "font-medium text-blue-500" : "text-muted-foreground"
+                  }
+                />
+              )}
+              {m?.tier3Passed != null && (
+                <Stat
+                  label="Tier 3 passed"
+                  value={String(m.tier3Passed)}
+                  className={
+                    m.tier3Passed > 0 ? "font-medium text-emerald-500" : "text-muted-foreground"
+                  }
+                />
+              )}
+              {m?.tradesPlaced != null && (
+                <Stat
+                  label="Trades placed"
+                  value={String(m.tradesPlaced)}
+                  className={
+                    m.tradesPlaced > 0 ? "font-medium text-emerald-500" : "text-muted-foreground"
+                  }
+                />
+              )}
+            </div>
+          )}
       </div>
     )
   }

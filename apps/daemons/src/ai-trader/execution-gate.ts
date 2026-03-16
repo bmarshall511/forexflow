@@ -52,11 +52,12 @@ export class ExecutionGate {
   }
 
   /**
-   * Check if a specific trade can be placed (post-analysis).
+   * Pre-Tier-3 check: can we proceed to deep analysis?
+   * Checks constraints (concurrent trades, existing position, budget) but NOT confidence.
+   * Confidence is checked post-Tier-3 with the final score.
    */
-  async canExecute(
+  async canProceedToTier3(
     config: AiTraderConfigData,
-    confidence: number,
     instrument: string,
     hasExistingPosition: (instrument: string) => boolean,
   ): Promise<GateResult> {
@@ -74,14 +75,6 @@ export class ExecutionGate {
       return { allowed: false, reason: `Already have a position on ${instrument}` }
     }
 
-    // Confidence vs mode check
-    if (confidence < config.minimumConfidence) {
-      return {
-        allowed: false,
-        reason: `Confidence ${confidence} below minimum ${config.minimumConfidence}`,
-      }
-    }
-
     // Budget check (estimate ~$0.01 for Tier 3 call)
     const estimatedCost = 0.01
     if (await this.costTracker.wouldExceedDailyBudget(estimatedCost, config.dailyBudgetUsd)) {
@@ -89,6 +82,31 @@ export class ExecutionGate {
     }
 
     return { allowed: true, reason: null }
+  }
+
+  /**
+   * Post-Tier-3 check: should we place the trade?
+   * Uses the final Tier 3 confidence for minimum confidence and auto-execute decisions.
+   */
+  checkFinalConfidence(
+    config: AiTraderConfigData,
+    confidence: number,
+  ): GateResult & { autoExecute: boolean } {
+    if (confidence < config.minimumConfidence) {
+      return {
+        allowed: false,
+        reason: `Final confidence ${confidence}% below minimum ${config.minimumConfidence}%`,
+        autoExecute: false,
+      }
+    }
+
+    const autoExecute = this.shouldAutoExecute(
+      config.operatingMode,
+      confidence,
+      config.confidenceThreshold,
+    )
+
+    return { allowed: true, reason: null, autoExecute }
   }
 
   /**
@@ -125,32 +143,30 @@ export class ExecutionGate {
   }
 
   /**
-   * Full pre-execution check combining all gates.
+   * Pre-Tier-3 gate: checks kill switch + constraints (not confidence).
+   * Call this BEFORE Tier 3 to avoid wasting API budget on blocked trades.
    */
-  async fullCheck(
+  async preTier3Check(
     config: AiTraderConfigData,
-    confidence: number,
     instrument: string,
     hasExistingPosition: (instrument: string) => boolean,
-  ): Promise<GateResult & { autoExecute: boolean }> {
+  ): Promise<GateResult> {
     // Kill switch
     if (await this.isKillSwitchEngaged()) {
-      return { allowed: false, reason: "Kill switch is engaged", autoExecute: false }
+      return { allowed: false, reason: "Kill switch is engaged" }
     }
 
-    // Can execute?
-    const execResult = await this.canExecute(config, confidence, instrument, hasExistingPosition)
-    if (!execResult.allowed) {
-      return { ...execResult, autoExecute: false }
-    }
+    return this.canProceedToTier3(config, instrument, hasExistingPosition)
+  }
 
-    // Should auto-execute?
-    const autoExecute = this.shouldAutoExecute(
-      config.operatingMode,
-      confidence,
-      config.confidenceThreshold,
-    )
-
-    return { allowed: true, reason: null, autoExecute }
+  /**
+   * Post-Tier-3 gate: checks final confidence + auto-execute decision.
+   * Call this AFTER Tier 3 with the final confidence score.
+   */
+  postTier3Check(
+    config: AiTraderConfigData,
+    finalConfidence: number,
+  ): GateResult & { autoExecute: boolean } {
+    return this.checkFinalConfidence(config, finalConfidence)
   }
 }

@@ -44,6 +44,7 @@ This system is called the **3-tier pipeline**. Let's walk through each tier.
 1. Haiku receives a summary of each candidate's analysis scores
 2. It quickly decides: "Worth investigating further?" or "Not good enough"
 3. Weak signals get filtered out — maybe only 3-5 candidates survive
+4. Rejection reasons are shown in plain English in the Activity Log
 
 **Cost:** About $0.0005 per check. That's half a tenth of a penny. If 10 candidates reach Tier 2, that's roughly half a cent total.
 
@@ -103,7 +104,7 @@ The AI Trader scans on a schedule that you control. The default is **every 30 mi
 
 ## What Happens When a Trade Is Approved?
 
-When Tier 3 says "yes, take this trade," here's what happens next:
+When Tier 3 says "yes, take this trade," and the confidence score meets your threshold, here's what happens next:
 
 1. **Order sent to OANDA** — FXFlow sends the trade details to your broker (OANDA) automatically
 2. **Order appears in your positions** — you'll see it in your Open Trades list within seconds

@@ -510,6 +510,11 @@ export class AiTraderScanner {
       const topCandidates = allSignals.slice(0, 10)
 
       // ─── Analyze candidates with AI ─────────────────────────
+      let tier2Passed = 0
+      let tier3Passed = 0
+      let tradesPlaced = 0
+      let gateBlocked = 0
+
       if (topCandidates.length > 0) {
         this.updateProgress(
           "analyzing_candidates",
@@ -523,7 +528,12 @@ export class AiTraderScanner {
         for (let i = 0; i < topCandidates.length; i++) {
           const signal = topCandidates[i]!
           try {
-            await this.processTier2And3(signal, config)
+            const result = await this.processTier2And3(signal, config)
+            if (result === "tier2_pass" || result === "tier3_pass" || result === "placed")
+              tier2Passed++
+            if (result === "tier3_pass" || result === "placed") tier3Passed++
+            if (result === "placed") tradesPlaced++
+            if (result === "gate_blocked") gateBlocked++
           } catch (err) {
             const errMsg = (err as Error).message
             console.warn(`[ai-trader] Tier 2/3 error for ${signal.instrument}:`, errMsg)
@@ -555,22 +565,38 @@ export class AiTraderScanner {
       this.scheduleScan(config.scanIntervalMinutes * 60_000)
 
       const elapsed = Date.now() - new Date(startedAt).getTime()
+
+      // Build pipeline funnel summary
+      const funnelParts = [`${allSignals.length} signals found`]
+      if (topCandidates.length > 0) {
+        funnelParts.push(`${topCandidates.length} sent to AI`)
+        funnelParts.push(`${tier2Passed} passed Tier 2`)
+        if (tier2Passed > 0) funnelParts.push(`${tier3Passed} passed Tier 3`)
+        if (gateBlocked > 0) funnelParts.push(`${gateBlocked} blocked by gates`)
+        funnelParts.push(`${tradesPlaced} trade(s) placed`)
+      }
+      const funnelSummary = funnelParts.join(" → ")
+
       this.updateProgress(
         "complete",
-        `Scan complete in ${Math.round(elapsed / 1000)}s. Found ${allSignals.length} signals from ${pairs.length} pairs.`,
+        `Scan complete in ${Math.round(elapsed / 1000)}s. ${funnelSummary}`,
       )
       this.addLogEntry(
         "scan_complete",
         `Scan finished in ${Math.round(elapsed / 1000)}s`,
-        `${pairs.length} pairs, ${allSignals.length} Tier 1 signals, ${topCandidates.length} analyzed`,
+        funnelSummary,
         {
           pairsScanned: pairs.length,
           candidatesFound: allSignals.length,
           candidatesAnalyzed: topCandidates.length,
+          tier2Passed,
+          tier3Passed,
+          tradesPlaced,
+          gateBlocked,
           elapsedMs: elapsed,
         },
       )
-      console.log(`[ai-trader] Scan complete. Next scan at ${this.nextScanAt}`)
+      console.log(`[ai-trader] Scan complete: ${funnelSummary}. Next scan at ${this.nextScanAt}`)
     } catch (err) {
       this.lastError = (err as Error).message
       console.error("[ai-trader] Scan error:", this.lastError)
@@ -585,7 +611,12 @@ export class AiTraderScanner {
 
   // ─── Tier 2/3 Processing ───────────────────────────────────────────
 
-  private async processTier2And3(signal: Tier1Signal, config: AiTraderConfigData): Promise<void> {
+  private async processTier2And3(
+    signal: Tier1Signal,
+    config: AiTraderConfigData,
+  ): Promise<
+    "tier2_fail" | "tier2_pass" | "tier3_fail" | "tier3_pass" | "gate_blocked" | "placed"
+  > {
     const pairLabel = signal.instrument.replace("_", "/")
     const tier2Prompt = buildTier2Prompt(signal)
 
@@ -627,10 +658,10 @@ export class AiTraderScanner {
         error: `Could not parse response: ${tier2Text.slice(0, 150)}`,
         tier: 1,
       })
-      return
+      return "tier2_fail"
     }
 
-    if (!tier2Result.pass || tier2Result.confidence < config.minimumConfidence) {
+    if (!tier2Result.pass) {
       this.addLogEntry(
         "tier2_fail",
         `${pairLabel}: Tier 2 rejected (${tier2Result.confidence}%)`,
@@ -644,7 +675,7 @@ export class AiTraderScanner {
           tier: 2,
         },
       )
-      return
+      return "tier2_fail"
     }
 
     this.addLogEntry(
@@ -661,29 +692,29 @@ export class AiTraderScanner {
       },
     )
 
+    // ─── Pre-Tier-3 Gate: check constraints (not confidence) ──────────
     const hasExistingPosition = (inst: string) => {
       const positions = this.positionManager.getPositions()
       return positions.open.some((t) => t.instrument === inst)
     }
 
-    const gateResult = await this.executionGate.fullCheck(
+    const preTier3 = await this.executionGate.preTier3Check(
       config,
-      tier2Result.confidence,
       signal.instrument,
       hasExistingPosition,
     )
 
-    if (!gateResult.allowed) {
+    if (!preTier3.allowed) {
       this.addLogEntry(
         "gate_blocked",
         `${pairLabel}: Blocked by risk gate`,
-        gateResult.reason ?? undefined,
+        preTier3.reason ?? undefined,
         {
           instrument: signal.instrument,
           direction: signal.direction,
           profile: signal.profile,
           confidence: tier2Result.confidence,
-          reason: gateResult.reason ?? undefined,
+          reason: preTier3.reason ?? undefined,
           tier: 2,
         },
       )
@@ -710,10 +741,10 @@ export class AiTraderScanner {
         regime: castRegime(signal.technicalSnapshot.regime),
         session: castSession(signal.technicalSnapshot.session),
         primaryTechnique: signal.primaryTechnique,
-        entryRationale: gateResult.reason ?? undefined,
+        entryRationale: preTier3.reason ?? undefined,
         technicalSnapshot: signal.technicalSnapshot,
       })
-      return
+      return "gate_blocked"
     }
 
     // ─── Tier 3: Deep decision ───────────────────────────────────────
@@ -790,7 +821,7 @@ export class AiTraderScanner {
         error: `Could not parse response: ${tier3Text.slice(0, 150)}`,
         tier: 2,
       })
-      return
+      return "tier3_fail"
     }
 
     // ─── Create opportunity + update with tier data ────────────────────
@@ -852,7 +883,38 @@ export class AiTraderScanner {
           tier: 3,
         },
       )
-      return
+      return "tier3_fail"
+    }
+
+    // ─── Post-Tier-3 Gate: check final confidence + auto-execute ─────
+    const postTier3 = this.executionGate.postTier3Check(config, tier3Result.confidence)
+    if (!postTier3.allowed) {
+      this.addLogEntry(
+        "gate_blocked",
+        `${pairLabel}: Below minimum confidence after Tier 3`,
+        postTier3.reason ?? undefined,
+        {
+          instrument: signal.instrument,
+          direction: signal.direction,
+          profile: signal.profile,
+          confidence: tier3Result.confidence,
+          reason: postTier3.reason ?? undefined,
+          tier: 3,
+        },
+      )
+      await updateOpportunityStatus(opportunity.id, "rejected", {
+        tier2Response: tier2Text,
+        tier2Model: tier2Model,
+        tier2InputTokens,
+        tier2OutputTokens,
+        tier2Cost,
+        tier3Response: tier3Text,
+        tier3Model: config.decisionModel || "claude-sonnet-4-5-20241022",
+        tier3InputTokens,
+        tier3OutputTokens,
+        tier3Cost,
+      })
+      return "gate_blocked"
     }
 
     this.addLogEntry(
@@ -895,9 +957,12 @@ export class AiTraderScanner {
       `${pairLabel} ${signal.direction.toUpperCase()} — Confidence: ${tier3Result.confidence}%`,
     )
 
-    if (gateResult.autoExecute) {
+    if (postTier3.autoExecute) {
       await this.executeOpportunity(updatedOpp)
+      return "placed"
     }
+
+    return "tier3_pass"
   }
 
   // ─── Execute Trade ─────────────────────────────────────────────────

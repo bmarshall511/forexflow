@@ -123,7 +123,7 @@ export function ScanActivityLog({ entries }: ScanActivityLogProps) {
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      scrollRef.current.scrollTop = 0
     }
   }, [entries.length])
 
