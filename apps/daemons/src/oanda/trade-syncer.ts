@@ -37,6 +37,7 @@ import {
   updateTradeTimeframe,
   updateTradeSourceId,
   updateTradeNotes,
+  updateTradeMetadata,
   appendTradeNotes,
   assignTagToTrade,
   getTagsForTradeIds,
@@ -1210,6 +1211,21 @@ export class OandaTradeSyncer {
             // Enrich with DB metadata (timeframe, notes, source override)
             order.timeframe = (dbRecord.timeframe as PendingOrderData["timeframe"]) ?? null
             order.notes = dbRecord.notes ?? null
+
+            // Recover missing metadata by matching against Trade Finder setups / AI Trader opportunities
+            if (!dbRecord.metadata) {
+              const recovered = await this.recoverSourceMetadata(order.sourceOrderId)
+              if (recovered) {
+                try {
+                  await updateTradeMetadata(dbRecord.id, recovered)
+                } catch {
+                  /* best-effort */
+                }
+                // Use the recovered value for this broadcast
+                dbRecord.metadata = recovered
+              }
+            }
+
             if (dbRecord.metadata) {
               try {
                 const meta = JSON.parse(dbRecord.metadata)
@@ -1258,6 +1274,20 @@ export class OandaTradeSyncer {
             trade.notes = dbRecord.notes ?? null
             trade.mfe = dbRecord.mfe
             trade.mae = dbRecord.mae
+
+            // Recover missing metadata by matching against Trade Finder setups / AI Trader opportunities
+            if (!dbRecord.metadata) {
+              const recovered = await this.recoverSourceMetadata(trade.sourceTradeId)
+              if (recovered) {
+                try {
+                  await updateTradeMetadata(dbRecord.id, recovered)
+                } catch {
+                  /* best-effort */
+                }
+                dbRecord.metadata = recovered
+              }
+            }
+
             if (dbRecord.metadata) {
               try {
                 const meta = JSON.parse(dbRecord.metadata)
@@ -1358,6 +1388,38 @@ export class OandaTradeSyncer {
     const current = prev.then(fn, fn) // Run fn regardless of previous result
     this.instrumentMutex.set(instrument, current)
     return current
+  }
+
+  /**
+   * Recover source metadata for a trade/order that has none (e.g., after DB reset).
+   * Checks Trade Finder setups and AI Trader opportunities for a matching OANDA sourceId.
+   * Returns the metadata JSON string if found, null otherwise.
+   */
+  private async recoverSourceMetadata(sourceId: string): Promise<string | null> {
+    try {
+      const { db: prisma } = await import("@fxflow/db")
+
+      // Check Trade Finder setups
+      const tfSetup = await prisma.tradeFinderSetup.findFirst({
+        where: { resultSourceId: sourceId },
+        select: { status: true },
+      })
+      if (tfSetup) {
+        return JSON.stringify({ placedVia: "trade_finder_auto" })
+      }
+
+      // Check AI Trader opportunities
+      const aiOpp = await prisma.aiTraderOpportunity.findFirst({
+        where: { resultSourceId: sourceId },
+        select: { status: true },
+      })
+      if (aiOpp) {
+        return JSON.stringify({ placedVia: "ai_trader" })
+      }
+    } catch {
+      // Best-effort — don't block reconcile
+    }
+    return null
   }
 }
 
