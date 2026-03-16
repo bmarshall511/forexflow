@@ -880,7 +880,10 @@ export class OandaTradeSyncer {
     // Re-reconcile to pick up timeframe changes
     await this.reconcile()
 
-    return { sourceId, filled, fillPrice }
+    // Return the canonical OANDA ID from the DB (may differ from orderCreateTransaction.id)
+    // so callers (e.g., Trade Finder scanner) store the correct ID for later cancellation.
+    const canonicalSourceId = dbTrade?.sourceTradeId ?? sourceId
+    return { sourceId: canonicalSourceId, filled, fillPrice }
   }
 
   /** Modify SL/TP on an open trade. Returns verified SL/TP from OANDA. */
