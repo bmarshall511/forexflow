@@ -67,6 +67,7 @@ export {
   updateTradeNotes,
   updateTradeTimeframe,
   updateTradeMetadata,
+  updateTradeCloseContext,
   updateTradeSourceId,
   appendTradeNotes,
   deleteClosedTrades,

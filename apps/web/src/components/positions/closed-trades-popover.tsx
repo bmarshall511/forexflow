@@ -61,7 +61,11 @@ export function ClosedTradesPopover({ trades, currency = "USD" }: ClosedTradesPo
                   {trade.instrument.replace("_", "/")}
                 </span>
                 <DirectionBadge direction={trade.direction} />
-                <OutcomeBadge outcome={trade.outcome} />
+                <OutcomeBadge
+                  outcome={trade.outcome}
+                  closeReason={trade.closeReason}
+                  closeContext={trade.closeContext}
+                />
               </div>
               <span
                 className={cn("shrink-0 font-mono text-xs font-semibold tabular-nums", plColor)}

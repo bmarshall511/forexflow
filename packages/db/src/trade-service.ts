@@ -364,52 +364,109 @@ export async function migrateFilledPendingOrders(
 
 /**
  * Soft-close pending orders that are no longer in OANDA's active order list.
- *
- * Previously used deleteMany which CASCADE DELETED all associated data
- * (tags, notes, analyses, conditions, events). Now uses updateMany to
- * preserve all relationships. This prevents data loss when:
- * - An order is replaced (SL/TP modification gives a new order ID)
- * - An order fills (becomes an open trade with a different ID)
- * - An order is cancelled
+ * Creates an audit trail event and stores cancellation context for each order
+ * so the UI can explain WHY the order was cancelled.
  */
 export async function removeStalePendingOrders(
   activeSourceIds: string[],
   source: TradeSource,
   closedAt?: Date,
 ): Promise<number> {
-  const result = await db.trade.updateMany({
-    where: {
-      source,
-      status: "pending",
-      sourceTradeId: { notIn: activeSourceIds },
-    },
-    data: {
-      status: "closed",
-      closeReason: "ORDER_CANCEL",
-      closedAt: closedAt ?? new Date(),
-    },
+  const now = closedAt ?? new Date()
+  const stale = await db.trade.findMany({
+    where: { source, status: "pending", sourceTradeId: { notIn: activeSourceIds } },
+    select: { id: true, closeContext: true },
   })
-  return result.count
+  if (stale.length === 0) return 0
+
+  for (const trade of stale) {
+    // Preserve any existing closeContext (e.g., set by cancelOrder() before reconcile)
+    const existing = parseCloseContext(trade.closeContext)
+    const ctx = existing ?? {
+      cancelledBy: "system",
+      cancelReason: "Order no longer active on OANDA",
+      cancelledAt: now.toISOString(),
+    }
+
+    await db.trade.update({
+      where: { id: trade.id },
+      data: {
+        status: "closed",
+        closeReason: "ORDER_CANCEL",
+        closedAt: now,
+        closeContext: JSON.stringify(ctx),
+      },
+    })
+
+    // Create audit event if one wasn't already created by cancelOrder()
+    if (!existing?.cancelledBy) {
+      try {
+        await db.tradeEvent.create({
+          data: {
+            tradeId: trade.id,
+            eventType: "ORDER_CANCELLED",
+            detail: JSON.stringify({
+              cancelledBy: "system",
+              reason: "Order no longer active on OANDA — detected during reconciliation",
+              time: now.toISOString(),
+            }),
+          },
+        })
+      } catch {
+        /* non-critical */
+      }
+    }
+  }
+  return stale.length
 }
 
-/** Mark orphaned "open" trades as closed (they disappeared from OANDA). */
+/**
+ * Mark orphaned "open" trades as closed (they disappeared from OANDA).
+ * Creates an audit trail event for each orphaned trade.
+ */
 export async function closeOrphanedTrades(
   source: TradeSource,
   activeSourceIds: string[],
 ): Promise<number> {
-  const result = await db.trade.updateMany({
-    where: {
-      source,
-      status: "open",
-      sourceTradeId: { notIn: activeSourceIds },
-    },
-    data: {
-      status: "closed",
-      closeReason: "UNKNOWN",
-      closedAt: new Date(),
-    },
+  const now = new Date()
+  const orphans = await db.trade.findMany({
+    where: { source, status: "open", sourceTradeId: { notIn: activeSourceIds } },
+    select: { id: true },
   })
-  return result.count
+  if (orphans.length === 0) return 0
+
+  for (const trade of orphans) {
+    await db.trade.update({
+      where: { id: trade.id },
+      data: {
+        status: "closed",
+        closeReason: "UNKNOWN",
+        closedAt: now,
+        closeContext: JSON.stringify({
+          cancelledBy: "system",
+          cancelReason: "Trade disappeared from OANDA — closed externally",
+          cancelledAt: now.toISOString(),
+        }),
+      },
+    })
+
+    try {
+      await db.tradeEvent.create({
+        data: {
+          tradeId: trade.id,
+          eventType: "TRADE_CLOSED",
+          detail: JSON.stringify({
+            closedBy: "system",
+            reason: "Trade disappeared from OANDA — closed externally",
+            time: now.toISOString(),
+          }),
+        },
+      })
+    } catch {
+      /* non-critical */
+    }
+  }
+  return orphans.length
 }
 
 /**
@@ -616,6 +673,14 @@ export async function updateTradeMetadata(tradeId: string, metadata: string | nu
   return db.trade.update({
     where: { id: tradeId },
     data: { metadata },
+  })
+}
+
+/** Update a trade's closeContext JSON field. */
+export async function updateTradeCloseContext(tradeId: string, closeContext: string) {
+  return db.trade.update({
+    where: { id: tradeId },
+    data: { closeContext },
   })
 }
 

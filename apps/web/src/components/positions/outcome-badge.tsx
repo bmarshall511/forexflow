@@ -30,20 +30,33 @@ const reasonLabels: Record<string, string> = {
   UNKNOWN: "",
 }
 
+/** Map cancelledBy values to short badge-friendly labels */
+const CANCEL_SOURCE_LABELS: Record<string, string> = {
+  trade_finder: "Zone Invalidated",
+  user: "Manual",
+  user_bulk: "Bulk Cancel",
+  ai_condition: "AI Condition",
+  system: "Auto",
+  expired: "Expired",
+}
+
 export function OutcomeBadge({ outcome, closeReason, closeContext, className }: OutcomeBadgeProps) {
   // When a SL was moved to breakeven by an AI condition and then hit, show "SL (AI Breakeven)"
   const isAIBreakevenSL = closeReason === "STOP_LOSS_ORDER" && closeContext?.breakeven === true
 
-  // For cancelled orders, don't append a redundant close reason suffix
-  const reasonLabel =
-    outcome === "cancelled"
-      ? ""
-      : isAIBreakevenSL
-        ? "AI Breakeven"
-        : closeReason
-          ? (reasonLabels[closeReason] ?? "")
-          : ""
-  const label = reasonLabel ? `${outcomeLabels[outcome]} (${reasonLabel})` : outcomeLabels[outcome]
+  let label: string
+  if (outcome === "cancelled") {
+    // Show a meaningful cancellation reason from closeContext
+    const cancelLabel = closeContext?.cancelledBy
+      ? (CANCEL_SOURCE_LABELS[closeContext.cancelledBy] ?? closeContext.cancelledBy)
+      : null
+    label = cancelLabel ? `Cancelled (${cancelLabel})` : "Cancelled"
+  } else if (isAIBreakevenSL) {
+    label = `${outcomeLabels[outcome]} (AI Breakeven)`
+  } else {
+    const reasonLabel = closeReason ? (reasonLabels[closeReason] ?? "") : ""
+    label = reasonLabel ? `${outcomeLabels[outcome]} (${reasonLabel})` : outcomeLabels[outcome]
+  }
 
   return (
     <Badge
@@ -55,8 +68,7 @@ export function OutcomeBadge({ outcome, closeReason, closeContext, className }: 
         outcome === "loss" &&
           "border-status-disconnected/30 bg-status-disconnected/10 text-status-disconnected",
         outcome === "breakeven" && !isAIBreakevenSL && "border-border text-muted-foreground",
-        outcome === "cancelled" &&
-          "border-border/50 bg-muted/30 text-muted-foreground/70 line-through",
+        outcome === "cancelled" && "border-border/50 bg-muted/30 text-muted-foreground/70",
         // AI breakeven SL hits get amber styling — it's a capital preservation event
         isAIBreakevenSL && "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
         className,

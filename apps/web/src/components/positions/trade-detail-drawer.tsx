@@ -6,6 +6,7 @@ import type {
   OpenTradeData,
   ClosedTradeData,
   TradeCloseReason,
+  CloseContext,
 } from "@fxflow/types"
 import { formatCurrency, formatPips, priceToPips, getDecimalPlaces } from "@fxflow/shared"
 import {
@@ -50,7 +51,51 @@ import {
   Info,
   Scissors,
   PlayCircle,
+  Ban,
 } from "lucide-react"
+
+/** Map cancelledBy values to user-friendly descriptions */
+const CANCEL_DESCRIPTIONS: Record<string, string> = {
+  trade_finder:
+    "The Trade Finder scanner detected that the supply/demand zone this order was based on became invalid (price broke through the zone boundary), so the order was automatically cancelled.",
+  user: "You cancelled this order manually.",
+  user_bulk: "This order was cancelled as part of a bulk cancel action.",
+  ai_condition: "An AI condition triggered the cancellation of this order.",
+  system:
+    "This order was no longer found on OANDA during a routine sync. It may have been cancelled directly on the broker platform, expired, or rejected.",
+  expired: "This order expired before the market reached the entry price.",
+}
+
+function CancellationCallout({ closeContext }: { closeContext?: CloseContext | null }) {
+  const cancelledBy = closeContext?.cancelledBy
+  const reason = closeContext?.cancelReason
+  const description = cancelledBy ? (CANCEL_DESCRIPTIONS[cancelledBy] ?? null) : null
+
+  return (
+    <div className="border-border/50 bg-muted/30 flex gap-3 rounded-lg border px-3.5 py-3">
+      <Ban className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+      <div className="min-w-0 space-y-1">
+        <p className="text-xs font-medium">Why was this order cancelled?</p>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          {description ?? reason ?? "No cancellation details are available for this order."}
+        </p>
+        {description && reason && reason !== description && (
+          <p className="text-muted-foreground/80 text-[11px] italic">{reason}</p>
+        )}
+        {closeContext?.cancelledAt && (
+          <p className="text-muted-foreground/60 text-[10px]">
+            {new Date(closeContext.cancelledAt).toLocaleString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export type TradeUnion =
   | (PendingOrderData & { _type: "pending" })
@@ -230,7 +275,13 @@ export function TradeDetailDrawer({
               closedAt={trade._type === "closed" ? trade.closedAt : undefined}
               outcome={trade._type === "closed" ? trade.outcome : undefined}
               closeReason={trade._type === "closed" ? trade.closeReason : undefined}
+              closeContext={trade._type === "closed" ? trade.closeContext : undefined}
             />
+
+            {/* Cancellation explanation callout */}
+            {trade._type === "closed" && trade.outcome === "cancelled" && (
+              <CancellationCallout closeContext={trade.closeContext} />
+            )}
 
             {/* Chart with price overlays */}
             <SectionCard
@@ -480,10 +531,12 @@ export function TradeDetailDrawer({
                         />
                       }
                     />
-                    <MetricTile
-                      label="Close Reason"
-                      value={trade.closeReason?.replace(/_/g, " ") ?? "—"}
-                    />
+                    {trade.outcome !== "cancelled" && (
+                      <MetricTile
+                        label="Close Reason"
+                        value={trade.closeReason?.replace(/_/g, " ") ?? "—"}
+                      />
+                    )}
                   </>
                 )}
 

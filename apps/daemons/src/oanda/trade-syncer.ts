@@ -43,6 +43,7 @@ import {
   getTagsForTradeIds,
   createTradeEvent,
   getTradeBySourceId,
+  updateTradeCloseContext,
 } from "@fxflow/db"
 
 export class OandaTradeSyncer {
@@ -178,6 +179,7 @@ export class OandaTradeSyncer {
       try {
         const dbTrade = await getTradeBySourceId("oanda", sourceOrderId)
         if (dbTrade) {
+          const now = new Date().toISOString()
           await createTradeEvent({
             tradeId: dbTrade.id,
             eventType: "ORDER_CANCELLED",
@@ -185,10 +187,19 @@ export class OandaTradeSyncer {
               cancelledBy,
               reason: reason ?? null,
               alreadyCancelled,
-              time: new Date().toISOString(),
+              time: now,
             }),
           })
-          if (reason) await appendTradeNotes(dbTrade.id, `Cancelled Reason: ${reason}`)
+          // Store cancellation context so removeStalePendingOrders preserves it
+          await updateTradeCloseContext(
+            dbTrade.id,
+            JSON.stringify({
+              cancelledBy,
+              cancelReason: reason ?? null,
+              cancelledAt: now,
+            }),
+          )
+          if (reason) await appendTradeNotes(dbTrade.id, `Cancelled: ${reason}`)
         }
       } catch (dbErr) {
         console.warn(

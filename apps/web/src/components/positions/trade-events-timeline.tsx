@@ -88,6 +88,7 @@ const CANCELLED_BY_LABELS: Record<string, string> = {
   user_bulk: "Bulk Cancel",
   trade_finder: "Trade Finder",
   ai_condition: "AI Condition",
+  system: "Auto (Reconcile)",
 }
 
 function parseCancelDetail(detail: string): { source: string; reason: string | null } | null {

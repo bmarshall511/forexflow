@@ -1,6 +1,6 @@
 "use client"
 
-import type { TradeOutcome, TradeCloseReason, OrderType } from "@fxflow/types"
+import type { TradeOutcome, TradeCloseReason, CloseContext, OrderType } from "@fxflow/types"
 import { cn } from "@/lib/utils"
 import { Clock, CircleDot, CheckCircle2 } from "lucide-react"
 import { OutcomeBadge } from "./outcome-badge"
@@ -13,6 +13,7 @@ interface TradeStatusBannerProps {
   closedAt?: string | null
   outcome?: TradeOutcome | null
   closeReason?: TradeCloseReason | string | null
+  closeContext?: CloseContext | null
 }
 
 const STATUS_CONFIG = {
@@ -45,6 +46,7 @@ export function TradeStatusBanner({
   openedAt,
   outcome,
   closeReason,
+  closeContext,
 }: TradeStatusBannerProps) {
   const config = STATUS_CONFIG[status]
   return (
@@ -67,7 +69,11 @@ export function TradeStatusBanner({
           />
         )}
         {status === "closed" && outcome && (
-          <OutcomeBadge outcome={outcome} closeReason={closeReason as TradeCloseReason} />
+          <OutcomeBadge
+            outcome={outcome}
+            closeReason={closeReason as TradeCloseReason}
+            closeContext={closeContext}
+          />
         )}
       </div>
     </div>

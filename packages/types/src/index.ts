@@ -408,9 +408,11 @@ export interface ClosedTradeData {
   closedAt: string
 }
 
-/** Context stored when an AI condition modifies a trade's SL to breakeven.
- *  Used to attribute SL stop-outs back to the AI breakeven decision. */
+/** Context stored on trade closure for attribution and audit trail.
+ *  - AI breakeven: tracks when an AI condition moved SL to breakeven before the SL was hit.
+ *  - Cancellation: tracks why a pending order was cancelled and by whom. */
 export interface CloseContext {
+  // ── AI Breakeven fields ──
   breakeven?: boolean
   conditionId?: string
   conditionLabel?: string
@@ -419,6 +421,13 @@ export interface CloseContext {
   originalSL?: number
   bufferedSL?: number
   entryPrice?: number
+  // ── Cancellation fields ──
+  /** Who/what cancelled the order: "trade_finder", "user", "system", "ai_condition", "expired" */
+  cancelledBy?: string
+  /** Human-readable reason for the cancellation. */
+  cancelReason?: string
+  /** ISO timestamp when the cancellation was detected or executed. */
+  cancelledAt?: string
 }
 
 // ─── Aggregate Positions Payload ───────────────────────────────────────────
