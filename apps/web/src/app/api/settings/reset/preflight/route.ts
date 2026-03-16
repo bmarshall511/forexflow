@@ -3,9 +3,36 @@ import { apiSuccess, apiError } from "@/lib/api-validation"
 
 export const dynamic = "force-dynamic"
 
+const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+
 export async function GET() {
   try {
     const status = await getResetPreflightStatus()
+
+    // Also check daemon's live OANDA state — the DB may be empty after a previous
+    // reset but OANDA can still have active orders/trades that need to be closed.
+    try {
+      const daemonRes = await fetch(`${DAEMON_URL}/status`, { cache: "no-store" })
+      if (daemonRes.ok) {
+        const json = (await daemonRes.json()) as {
+          ok: boolean
+          data?: {
+            oanda?: { openTradeCount?: number; pendingOrderCount?: number }
+          }
+        }
+        if (json.ok && json.data?.oanda) {
+          // Use the higher of DB count vs OANDA live count
+          status.openTrades = Math.max(status.openTrades, json.data.oanda.openTradeCount ?? 0)
+          status.pendingOrders = Math.max(
+            status.pendingOrders,
+            json.data.oanda.pendingOrderCount ?? 0,
+          )
+        }
+      }
+    } catch {
+      // Daemon may be offline — use DB counts only
+    }
+
     return apiSuccess(status)
   } catch (error) {
     console.error("[GET /api/settings/reset/preflight]", error)
