@@ -3,6 +3,7 @@
 export {
   getETOffsetHours,
   toET,
+  getETCalendarDate,
   isWeekendClosed,
   isRolloverWindow,
   isMarketExpectedOpen,

@@ -201,17 +201,39 @@ export function formatShortDateTime(date: Date): string {
 
 // ─── Internal helpers ───────────────────────────────────────────────────────
 
+/**
+ * Get the ET calendar date (year, month, day) for a given UTC Date.
+ *
+ * Critical: when it's e.g. Sunday 9 PM ET, the UTC date is already Monday.
+ * Using the UTC calendar date to construct ET times would be off by a day.
+ * This helper ensures we always work with the correct ET calendar date.
+ */
+export function getETCalendarDate(date: Date): { year: number; month: number; day: number } {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  })
+  const parts = fmt.formatToParts(date)
+  return {
+    year: parseInt(parts.find((p) => p.type === "year")?.value ?? "2026", 10),
+    month: parseInt(parts.find((p) => p.type === "month")?.value ?? "1", 10),
+    day: parseInt(parts.find((p) => p.type === "day")?.value ?? "1", 10),
+  }
+}
+
 /** Get a Date for a specific ET time today. */
 function getTimeToday(date: Date, etHour: number, etMinute: number, offsetHours: number): Date {
   return getTimeOnDate(date, etHour, etMinute, offsetHours)
 }
 
-/** Get a Date for a specific ET time on a given date. */
+/** Get a Date for a specific ET time on the ET calendar date of the given date. */
 function getTimeOnDate(date: Date, etHour: number, etMinute: number, offsetHours: number): Date {
-  const result = new Date(date)
-  const utcHour = etHour - offsetHours
-  result.setUTCHours(utcHour, etMinute, 0, 0)
-  return result
+  const etCal = getETCalendarDate(date)
+  return new Date(
+    Date.UTC(etCal.year, etCal.month - 1, etCal.day, etHour - offsetHours, etMinute, 0, 0),
+  )
 }
 
 /** Get the next occurrence of a specific weekday at a specific ET time. */

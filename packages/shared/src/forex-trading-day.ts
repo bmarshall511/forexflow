@@ -10,7 +10,7 @@
  * from market-hours.ts to handle DST transitions correctly.
  */
 
-import { getETOffsetHours, toET, isWeekendClosed } from "./market-hours"
+import { getETOffsetHours, toET, isWeekendClosed, getETCalendarDate } from "./market-hours"
 
 export interface ForexPeriodBoundaries {
   /** Start of current forex trading day (most recent 5 PM ET) */
@@ -176,10 +176,10 @@ export function getLastTradingSessionStart(date: Date): Date {
 
 // ─── Internal helper ──────────────────────────────────────────────────────────
 
-/** Create a UTC Date for a specific ET time on the same calendar date. */
+/** Create a UTC Date for a specific ET time on the ET calendar date of the given date. */
 function makeETDate(date: Date, etHour: number, etMinute: number, offsetHours: number): Date {
-  const result = new Date(date)
-  const utcHour = etHour - offsetHours
-  result.setUTCHours(utcHour, etMinute, 0, 0)
-  return result
+  const etCal = getETCalendarDate(date)
+  return new Date(
+    Date.UTC(etCal.year, etCal.month - 1, etCal.day, etHour - offsetHours, etMinute, 0, 0),
+  )
 }
