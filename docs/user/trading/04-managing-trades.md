@@ -20,6 +20,9 @@ Your Stop Loss (SL) is the price where the trade automatically closes to protect
 > [!TIP]
 > Moving your Stop Loss to breakeven once a trade is nicely in profit is one of the most common things traders do. It's like saying "I've already won some ground — now let me make sure I don't give it all back."
 
+> [!NOTE]
+> When you use a condition preset (or AI suggestion) to move your SL to breakeven, FXFlow automatically adds a small **smart buffer** based on the current spread and volatility. Instead of placing the SL at the exact entry price — where spread alone could immediately trigger it — the SL is placed slightly beyond entry to give the trade breathing room. This applies to both manual condition presets and AI-suggested breakeven conditions.
+
 To modify your SL, go to the **Live** tab on the Positions page, find your trade, and click the modify option. Enter the new price and confirm.
 
 ## Modify Take Profit

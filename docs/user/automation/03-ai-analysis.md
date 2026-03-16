@@ -94,9 +94,14 @@ When a condition triggers, it can:
 
 ### Safety Features
 
-- **Grace period** — destructive actions (closing a trade or cancelling an order) are blocked for 60 seconds after a trade opens or a condition is created, whichever is later. This prevents a condition from immediately closing a trade before you have had a chance to review it.
-- **Automatic expiry** — conditions created by the AI automatically expire after 7 days. This stops stale conditions from triggering on market moves that no longer match the original analysis. You can always create fresh conditions with a new analysis.
+- **Grace period** — destructive actions (closing a trade or cancelling an order) are blocked for 60 seconds after a trade opens or a condition is created, whichever is later. This prevents a condition from immediately closing a trade before you have had a chance to review it. Stop-loss modification conditions have an additional 30-second grace period after trade open or condition creation before they can fire.
+- **30-second sustain check** — PnL-based conditions that move your stop loss (e.g., "at +10 pips profit, move SL to breakeven") must sustain their trigger level for 30 continuous seconds before firing. This prevents brief price spikes from triggering a premature SL move.
+- **Smart breakeven buffer** — when a condition moves your stop loss to breakeven, a small buffer based on spread and volatility is automatically added. Instead of placing the SL at the exact entry price (where spread alone could stop you out), the SL is placed slightly beyond entry to account for real market conditions.
+- **Trailing stop floor** — when a trailing stop is chained to a breakeven condition, the trail can never move your stop loss below your entry price. This preserves the breakeven protection.
+- **Tiered automatic expiry** — AI-created conditions expire based on their type: stop-loss moves expire after 48 hours, trailing stops after 72 hours, and other conditions after 7 days. This stops stale conditions from triggering on market moves that no longer match the original analysis. You can always create fresh conditions with a new analysis.
 - **Priority order** — when multiple conditions exist on the same trade, they are evaluated in priority order (highest priority first). If a condition closes or cancels the trade, remaining conditions are skipped for that tick.
+- **AI breakeven intelligence** — the AI follows strict rules before suggesting breakeven moves: the trade must have captured at least 40% of its take-profit distance, been open for at least 15 minutes, and volatility conditions must be suitable. This prevents premature breakeven moves on trades that need room to develop.
+- **Close context tracking** — when an AI condition moves your SL to breakeven and that SL is later hit, the trade's outcome badge shows "SL (AI Breakeven)" in amber instead of the generic "Stop Loss" in red, so you can see exactly what happened.
 
 > [!NOTE]
 > Conditions keep running even when you are not looking at FXFlow. They are like a watchdog that monitors your trade 24/7.

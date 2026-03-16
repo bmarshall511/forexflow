@@ -67,7 +67,16 @@ When the AI finishes analysing a trade, it sometimes suggests "conditions" — r
 
 You can still see and delete them — they are just set up automatically instead of you doing it manually.
 
-Auto-applied conditions include built-in safety features: destructive actions (closing trades or cancelling orders) are blocked for 60 seconds after creation, and AI-created conditions automatically expire after 7 days so stale rules do not act on outdated analysis.
+Auto-applied conditions include built-in safety features: destructive actions (closing trades or cancelling orders) are blocked for 60 seconds after creation, and AI-created conditions automatically expire based on type — stop-loss moves expire after 48 hours, trailing stops after 72 hours, and other conditions after 7 days — so stale rules do not act on outdated analysis.
+
+## Minimum Confidence for Stop-Loss Conditions
+
+By default, AI-suggested conditions use your general confidence threshold. However, conditions that move your stop loss carry extra risk, so there is a separate setting: **Minimum Confidence for Stop-Loss Conditions**.
+
+This defaults to **High**, meaning the AI must be highly confident before it suggests moving your stop loss. You can lower it if you prefer more frequent SL suggestions, but the High default is recommended.
+
+> [!TIP]
+> Keeping this set to High is a good safety net. It means the AI will only suggest stop-loss moves when it is very sure — reducing the chance of a bad suggestion costing you money.
 
 ## Auto-Apply Actions
 
