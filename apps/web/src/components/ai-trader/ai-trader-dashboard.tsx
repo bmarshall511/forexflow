@@ -23,21 +23,10 @@ import { toast } from "sonner"
 import { useAiTrader } from "@/hooks/use-ai-trader"
 import { ScannerStatusBar } from "./scanner-status-bar"
 import { ScanActivityLog } from "./scan-activity-log"
+import { OpportunityCard } from "./opportunity-card"
+import { PipelineExplainer } from "./pipeline-explainer"
 
 type Tab = "opportunities" | "activity" | "performance"
-
-const statusBadge: Record<string, { label: string; className: string }> = {
-  detected: { label: "Detected", className: "bg-blue-500/15 text-blue-500" },
-  suggested: { label: "Suggested", className: "bg-amber-500/15 text-amber-500" },
-  approved: { label: "Approved", className: "bg-green-500/15 text-green-500" },
-  placed: { label: "Placed", className: "bg-purple-500/15 text-purple-500" },
-  filled: { label: "Filled", className: "bg-teal-500/15 text-teal-500" },
-  managed: { label: "Managing", className: "bg-blue-500/15 text-blue-500" },
-  closed: { label: "Closed", className: "bg-muted text-muted-foreground" },
-  rejected: { label: "Rejected", className: "bg-red-500/15 text-red-500" },
-  expired: { label: "Expired", className: "bg-muted text-muted-foreground" },
-  skipped: { label: "Skipped", className: "bg-muted text-muted-foreground" },
-}
 
 export function AiTraderDashboard() {
   const [tab, setTab] = useState<Tab>("opportunities")
@@ -48,6 +37,8 @@ export function AiTraderDashboard() {
     progress,
     scanLog,
     opportunities,
+    operatingMode,
+    confidenceThreshold,
     isLoading,
     triggerScan,
     pauseScanner,
@@ -105,7 +96,9 @@ export function AiTraderDashboard() {
   const onAction = async (id: string, action: "approve" | "reject") => {
     try {
       await handleAction(id, action)
-      toast.success(action === "approve" ? "Opportunity approved" : "Opportunity rejected")
+      toast.success(
+        action === "approve" ? "Trade approved — placing order" : "Opportunity rejected",
+      )
     } catch {
       toast.error(`Failed to ${action} opportunity`)
     }
@@ -127,6 +120,10 @@ export function AiTraderDashboard() {
       </div>
     )
   }
+
+  const suggestedCount = opportunities.filter((o) =>
+    ["suggested", "detected"].includes(o.status),
+  ).length
 
   return (
     <div className="min-h-screen">
@@ -190,8 +187,8 @@ export function AiTraderDashboard() {
           onClick={() => setTab("opportunities")}
           icon={<Zap className="size-3.5" />}
           label="Opportunities"
-          count={opportunities.filter((o) => ["suggested", "detected"].includes(o.status)).length}
-          pulse={opportunities.some((o) => o.status === "suggested")}
+          count={suggestedCount}
+          pulse={suggestedCount > 0}
         />
         <TabNavButton
           active={tab === "activity"}
@@ -211,7 +208,27 @@ export function AiTraderDashboard() {
 
       <div className="space-y-4 px-4 py-6 md:px-6">
         {tab === "opportunities" && (
-          <OpportunityList opportunities={opportunities} onAction={onAction} />
+          <>
+            <PipelineExplainer />
+            {opportunities.length === 0 ? (
+              <div className="text-muted-foreground py-12 text-center text-sm">
+                No opportunities found yet. The AI scanner will discover trading setups on the next
+                scan cycle.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {opportunities.map((opp) => (
+                  <OpportunityCard
+                    key={opp.id}
+                    opportunity={opp}
+                    operatingMode={operatingMode}
+                    confidenceThreshold={confidenceThreshold}
+                    onAction={onAction}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
         {tab === "activity" && <ScanActivityLog entries={scanLog} />}
         {tab === "performance" && (
@@ -279,116 +296,5 @@ function ScanControlButtons({
         </Button>
       )}
     </>
-  )
-}
-
-// ─── Opportunity List ──────────────────────────────────────────────────────
-
-function OpportunityList({
-  opportunities,
-  onAction,
-}: {
-  opportunities: {
-    id: string
-    instrument: string
-    direction: string
-    profile: string
-    confidence: number
-    entryPrice: number
-    stopLoss: number
-    takeProfit: number
-    status: string
-    primaryTechnique?: string | null
-    entryRationale?: string | null
-  }[]
-  onAction: (id: string, action: "approve" | "reject") => void
-}) {
-  if (opportunities.length === 0) {
-    return (
-      <div className="text-muted-foreground py-12 text-center text-sm">
-        No opportunities found yet. The AI scanner will discover them on the next cycle.
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      {opportunities.map((opp) => {
-        const badge = statusBadge[opp.status] ?? {
-          label: opp.status,
-          className: "bg-muted text-muted-foreground",
-        }
-        return (
-          <div key={opp.id} className="border-border/50 bg-card space-y-3 rounded-lg border p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">{opp.instrument.replace("_", "/")}</span>
-                <span
-                  className={cn(
-                    "text-xs font-medium",
-                    opp.direction === "long" ? "text-green-500" : "text-red-500",
-                  )}
-                >
-                  {opp.direction.toUpperCase()}
-                </span>
-                <span className="text-muted-foreground text-xs capitalize">{opp.profile}</span>
-                {opp.primaryTechnique && (
-                  <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px]">
-                    {opp.primaryTechnique.replace(/_/g, " ")}
-                  </span>
-                )}
-              </div>
-              <span
-                className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", badge.className)}
-              >
-                {badge.label}
-              </span>
-            </div>
-            {opp.entryRationale && (
-              <p className="text-muted-foreground line-clamp-2 text-xs leading-relaxed">
-                {opp.entryRationale}
-              </p>
-            )}
-            <div className="grid grid-cols-4 gap-2 text-xs">
-              <div>
-                <span className="text-muted-foreground">Confidence</span>
-                <p className="font-mono font-semibold">{opp.confidence}%</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Entry</span>
-                <p className="font-mono">{opp.entryPrice}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">SL</span>
-                <p className="font-mono text-red-500">{opp.stopLoss}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">TP</span>
-                <p className="font-mono text-green-500">{opp.takeProfit}</p>
-              </div>
-            </div>
-            {opp.status === "suggested" && (
-              <div className="flex gap-2 pt-1">
-                <Button
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => onAction(opp.id, "approve")}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  onClick={() => onAction(opp.id, "reject")}
-                >
-                  Reject
-                </Button>
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
   )
 }

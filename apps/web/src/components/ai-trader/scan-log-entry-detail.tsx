@@ -31,7 +31,7 @@ export function ScanLogEntryDetail({ entry }: ScanLogEntryDetailProps) {
             <div className="grid grid-cols-3 gap-3">
               {m?.tier2Passed != null && (
                 <Stat
-                  label="Tier 2 passed"
+                  label="Quick AI check passed"
                   value={String(m.tier2Passed)}
                   className={
                     m.tier2Passed > 0 ? "font-medium text-blue-500" : "text-muted-foreground"
@@ -40,7 +40,7 @@ export function ScanLogEntryDetail({ entry }: ScanLogEntryDetailProps) {
               )}
               {m?.tier3Passed != null && (
                 <Stat
-                  label="Tier 3 passed"
+                  label="Deep AI analysis passed"
                   value={String(m.tier3Passed)}
                   className={
                     m.tier3Passed > 0 ? "font-medium text-emerald-500" : "text-muted-foreground"

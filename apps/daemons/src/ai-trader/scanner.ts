@@ -40,7 +40,8 @@ import { buildTier2Prompt, buildTier3Prompt, type Tier3Context } from "./prompt-
 
 const MAX_SCAN_LOG_ENTRIES = 100
 
-/** Extract JSON from a model response that may be wrapped in markdown code blocks. */
+/** Extract JSON from a model response that may be wrapped in markdown code blocks.
+ *  Also handles truncated responses where the closing brace/fence is missing. */
 function extractJSON<T>(text: string): T {
   // Try raw parse first
   try {
@@ -49,12 +50,40 @@ function extractJSON<T>(text: string): T {
     // Strip markdown code blocks: ```json ... ``` or ``` ... ```
     const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
     if (codeBlockMatch?.[1]) {
-      return JSON.parse(codeBlockMatch[1])
+      try {
+        return JSON.parse(codeBlockMatch[1])
+      } catch {
+        // Code block content may itself be truncated — fall through to brace matching
+      }
     }
     // Try to find first { ... } in the text
     const braceMatch = text.match(/\{[\s\S]*\}/)
     if (braceMatch) {
       return JSON.parse(braceMatch[0])
+    }
+    // Handle truncated responses: find opening { and attempt to close it
+    // This handles cases where max_tokens cut off the response mid-JSON
+    const openBrace = text.indexOf("{")
+    if (openBrace >= 0) {
+      let partial = text.slice(openBrace)
+      // Strip trailing markdown fence if present but unclosed
+      partial = partial.replace(/```\s*$/, "")
+      // Try to salvage by truncating the last incomplete string value and closing
+      // Common pattern: { "pass": true, "confidence": 62, "reason": "text cut off here
+      const lastQuote = partial.lastIndexOf('"')
+      if (lastQuote > 0) {
+        const truncated = partial.slice(0, lastQuote + 1) + "}"
+        try {
+          return JSON.parse(truncated)
+        } catch {
+          // Try closing with extra brackets for nested structures
+          try {
+            return JSON.parse(truncated + "}")
+          } catch {
+            // fall through
+          }
+        }
+      }
     }
     throw new Error(`No valid JSON found in response: ${text.slice(0, 200)}`)
   }
@@ -625,7 +654,7 @@ export class AiTraderScanner {
     const anthropic = new Anthropic({ apiKey })
     const tier2Response = await anthropic.messages.create({
       model: config.scanModel || "claude-haiku-4-5-20251001",
-      max_tokens: 200,
+      max_tokens: 500,
       system: tier2Prompt.system,
       messages: [{ role: "user", content: tier2Prompt.user }],
     })

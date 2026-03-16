@@ -1204,6 +1204,8 @@ export class OandaTradeSyncer {
                 else if (meta.placedVia === "ut_bot_alerts") order.source = "ut_bot_alerts"
                 else if (meta.placedVia === "trade_finder") order.source = "trade_finder"
                 else if (meta.placedVia === "trade_finder_auto") order.source = "trade_finder_auto"
+                else if (meta.placedVia === "ai_trader") order.source = "ai_trader"
+                else if (meta.placedVia === "ai_trader_manual") order.source = "ai_trader_manual"
               } catch {
                 /* ignore malformed metadata */
               }
@@ -1250,6 +1252,8 @@ export class OandaTradeSyncer {
                 else if (meta.placedVia === "ut_bot_alerts") trade.source = "ut_bot_alerts"
                 else if (meta.placedVia === "trade_finder") trade.source = "trade_finder"
                 else if (meta.placedVia === "trade_finder_auto") trade.source = "trade_finder_auto"
+                else if (meta.placedVia === "ai_trader") trade.source = "ai_trader"
+                else if (meta.placedVia === "ai_trader_manual") trade.source = "ai_trader_manual"
               } catch {
                 /* ignore malformed metadata */
               }

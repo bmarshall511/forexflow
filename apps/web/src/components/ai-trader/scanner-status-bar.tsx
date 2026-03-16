@@ -10,12 +10,12 @@ interface ScannerStatusBarProps {
 }
 
 const PHASE_LABELS: Record<string, string> = {
-  starting: "Starting up...",
-  checking_config: "Checking settings...",
-  checking_market: "Checking market hours...",
-  checking_budget: "Checking budget...",
-  scanning_pairs: "Scanning currency pairs...",
-  analyzing_candidates: "AI is analyzing candidates...",
+  starting: "Getting ready...",
+  checking_config: "Checking your settings...",
+  checking_market: "Checking if markets are open...",
+  checking_budget: "Checking AI spending budget...",
+  scanning_pairs: "Looking for trading opportunities...",
+  analyzing_candidates: "AI is analyzing potential trades...",
   complete: "Scan complete",
   skipped: "Scan skipped",
   error: "Scan error",

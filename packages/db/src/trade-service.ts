@@ -143,6 +143,7 @@ function enrichSource(source: string, metadata?: string | null): TradeSource {
       if (meta.placedVia === "trade_finder") return "trade_finder"
       if (meta.placedVia === "trade_finder_auto") return "trade_finder_auto"
       if (meta.placedVia === "ai_trader") return "ai_trader"
+      if (meta.placedVia === "ai_trader_manual") return "ai_trader_manual"
       if (meta.placedVia === "fxflow") return "manual"
     } catch {
       /* ignore malformed metadata */

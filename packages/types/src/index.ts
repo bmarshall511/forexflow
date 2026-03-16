@@ -242,6 +242,7 @@ export type TradeSource =
   | "trade_finder"
   | "trade_finder_auto"
   | "ai_trader"
+  | "ai_trader_manual"
 
 /** OANDA order types, including dependent orders (SL/TP/TSL). */
 export type OrderType =
@@ -558,7 +559,13 @@ export interface PlaceOrderRequest {
   /** Tag IDs to assign to the trade after placement */
   tagIds?: string[]
   /** Identifies the origin of this order for source tracking metadata */
-  placedVia?: "fxflow" | "ut_bot_alerts" | "trade_finder" | "trade_finder_auto" | "ai_trader"
+  placedVia?:
+    | "fxflow"
+    | "ut_bot_alerts"
+    | "trade_finder"
+    | "trade_finder_auto"
+    | "ai_trader"
+    | "ai_trader_manual"
 }
 
 /** Response data after successful order placement */

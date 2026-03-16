@@ -895,7 +895,7 @@ export async function startServer(port: number, deps: ServerDeps) {
             entryPrice: opp.entryPrice,
             stopLoss: opp.stopLoss,
             takeProfit: opp.takeProfit,
-            placedVia: "ai_trader",
+            placedVia: "ai_trader_manual",
             notes: `AI Trade (manual approve) | ${opp.profile} | Confidence: ${opp.confidence}%`,
           })
           await updateOpportunityStatus(opportunityId, "placed", {

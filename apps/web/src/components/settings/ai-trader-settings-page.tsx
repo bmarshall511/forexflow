@@ -23,6 +23,7 @@ import {
   ExternalLink,
 } from "lucide-react"
 import { AiTraderScanConfig } from "./ai-trader-scan-config"
+import { SettingsPresets } from "./settings-presets"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,9 @@ export function AiTraderSettingsPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── Quick Setup Presets ── */}
+      <SettingsPresets onApply={(values) => void save(values)} disabled={saving} />
+
       {/* ── General Settings ── */}
       <Card>
         <CardHeader>

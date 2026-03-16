@@ -6,6 +6,7 @@ import type {
   AiTraderScanProgressData,
   AiTraderScanLogEntry,
   AiTraderOpportunityData,
+  AiTraderOperatingMode,
 } from "@fxflow/types"
 import { useDaemonStatus } from "./use-daemon-status"
 
@@ -14,6 +15,8 @@ export interface UseAiTraderReturn {
   progress: AiTraderScanProgressData | null
   scanLog: AiTraderScanLogEntry[]
   opportunities: AiTraderOpportunityData[]
+  operatingMode: AiTraderOperatingMode
+  confidenceThreshold: number
   isLoading: boolean
   triggerScan: () => Promise<void>
   pauseScanner: () => Promise<void>
@@ -28,6 +31,8 @@ export function useAiTrader(): UseAiTraderReturn {
   const [scanLog, setScanLog] = useState<AiTraderScanLogEntry[]>([])
   const [opportunities, setOpportunities] = useState<AiTraderOpportunityData[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [operatingMode, setOperatingMode] = useState<AiTraderOperatingMode>("manual")
+  const [confidenceThreshold, setConfidenceThreshold] = useState(70)
   const hasFetchedOnce = useRef(false)
 
   const {
@@ -42,10 +47,11 @@ export function useAiTrader(): UseAiTraderReturn {
   const fetchData = useCallback(async () => {
     if (!hasFetchedOnce.current) setIsLoading(true)
     try {
-      const [statusRes, oppsRes, logRes] = await Promise.all([
+      const [statusRes, oppsRes, logRes, configRes] = await Promise.all([
         fetch("/api/ai-trader/status"),
         fetch("/api/ai-trader/opportunities"),
         fetch("/api/ai-trader/scan-log"),
+        fetch("/api/ai-trader/config"),
       ])
 
       if (statusRes.ok) {
@@ -59,6 +65,17 @@ export function useAiTrader(): UseAiTraderReturn {
       if (logRes.ok) {
         const json = (await logRes.json()) as { ok: boolean; data?: AiTraderScanLogEntry[] }
         if (json.ok && json.data) setScanLog(json.data)
+      }
+      if (configRes.ok) {
+        const json = (await configRes.json()) as {
+          ok: boolean
+          data?: { operatingMode?: AiTraderOperatingMode; confidenceThreshold?: number }
+        }
+        if (json.ok && json.data) {
+          if (json.data.operatingMode) setOperatingMode(json.data.operatingMode)
+          if (json.data.confidenceThreshold != null)
+            setConfidenceThreshold(json.data.confidenceThreshold)
+        }
       }
     } catch {
       // Daemon may be offline
@@ -140,6 +157,8 @@ export function useAiTrader(): UseAiTraderReturn {
     progress,
     scanLog,
     opportunities,
+    operatingMode,
+    confidenceThreshold,
     isLoading,
     triggerScan,
     pauseScanner,

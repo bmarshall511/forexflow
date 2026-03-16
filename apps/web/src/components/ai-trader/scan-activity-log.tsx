@@ -21,72 +21,56 @@ interface ScanActivityLogProps {
   entries: AiTraderScanLogEntry[]
 }
 
-const ENTRY_STYLE: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  scan_start: {
-    icon: <Search className="size-3.5" />,
-    color: "text-blue-500",
-    label: "Scan Started",
-  },
-  scan_complete: {
-    icon: <CheckCircle2 className="size-3.5" />,
-    color: "text-emerald-500",
-    label: "Scan Complete",
-  },
-  scan_skip: {
-    icon: <AlertTriangle className="size-3.5" />,
-    color: "text-amber-500",
-    label: "Scan Skipped",
-  },
-  scan_error: {
-    icon: <XCircle className="size-3.5" />,
-    color: "text-red-500",
-    label: "Scan Error",
-  },
-  pair_scanned: {
+interface EntryStyle {
+  icon: React.ReactNode
+  color: string
+  label: string
+}
+
+const BASE_STYLE: Record<string, { icon: React.ReactNode; color: string }> = {
+  scan_start: { icon: <Search className="size-3.5" />, color: "text-blue-500" },
+  scan_complete: { icon: <CheckCircle2 className="size-3.5" />, color: "text-emerald-500" },
+  scan_skip: { icon: <AlertTriangle className="size-3.5" />, color: "text-amber-500" },
+  scan_error: { icon: <XCircle className="size-3.5" />, color: "text-red-500" },
+  pair_scanned: { icon: <Search className="size-3.5" />, color: "text-muted-foreground" },
+  candidate_found: { icon: <Zap className="size-3.5" />, color: "text-amber-500" },
+  tier2_pass: { icon: <CheckCircle2 className="size-3.5" />, color: "text-blue-500" },
+  tier2_fail: { icon: <XCircle className="size-3.5" />, color: "text-muted-foreground" },
+  tier3_pass: { icon: <TrendingUp className="size-3.5" />, color: "text-emerald-500" },
+  tier3_fail: { icon: <XCircle className="size-3.5" />, color: "text-red-400" },
+  trade_placed: { icon: <ArrowUpRight className="size-3.5" />, color: "text-emerald-500" },
+  trade_rejected: { icon: <XCircle className="size-3.5" />, color: "text-red-500" },
+  gate_blocked: { icon: <ShieldAlert className="size-3.5" />, color: "text-amber-500" },
+}
+
+/** Generate a plain-English summary label based on entry type and metadata */
+function getEntryStyle(entry: AiTraderScanLogEntry): EntryStyle {
+  const base = BASE_STYLE[entry.type] ?? {
     icon: <Search className="size-3.5" />,
     color: "text-muted-foreground",
-    label: "Pairs Scanned",
-  },
-  candidate_found: {
-    icon: <Zap className="size-3.5" />,
-    color: "text-amber-500",
-    label: "Signal Found",
-  },
-  tier2_pass: {
-    icon: <CheckCircle2 className="size-3.5" />,
-    color: "text-blue-500",
-    label: "AI Quick Check Passed",
-  },
-  tier2_fail: {
-    icon: <XCircle className="size-3.5" />,
-    color: "text-muted-foreground",
-    label: "AI Quick Check Failed",
-  },
-  tier3_pass: {
-    icon: <TrendingUp className="size-3.5" />,
-    color: "text-emerald-500",
-    label: "AI Deep Analysis Approved",
-  },
-  tier3_fail: {
-    icon: <XCircle className="size-3.5" />,
-    color: "text-red-400",
-    label: "AI Deep Analysis Rejected",
-  },
-  trade_placed: {
-    icon: <ArrowUpRight className="size-3.5" />,
-    color: "text-emerald-500",
-    label: "Trade Placed",
-  },
-  trade_rejected: {
-    icon: <XCircle className="size-3.5" />,
-    color: "text-red-500",
-    label: "Trade Failed",
-  },
-  gate_blocked: {
-    icon: <ShieldAlert className="size-3.5" />,
-    color: "text-amber-500",
-    label: "Risk Gate Blocked",
-  },
+  }
+  const m = entry.metadata
+  const pair = m?.instrument ? String(m.instrument).replace("_", "/") : ""
+  const conf = m?.confidence != null ? `${m.confidence}%` : ""
+  const dir = m?.direction ? String(m.direction).toUpperCase() : ""
+
+  const labels: Record<string, string> = {
+    scan_start: "Starting market scan...",
+    scan_complete: `Scan finished — ${m?.pairsScanned ?? "?"} pairs checked`,
+    scan_skip: `Scan skipped — ${entry.message || "conditions not met"}`,
+    scan_error: `Scan error — ${entry.message || "something went wrong"}`,
+    pair_scanned: `Checked ${pair || "pairs"}`,
+    candidate_found: `Found potential signal on ${pair}`,
+    tier2_pass: `${pair} passed initial screening (${conf})`,
+    tier2_fail: `${pair} didn't pass screening — weak setup`,
+    tier3_pass: `${pair} approved — ${conf} confident ${dir}`,
+    tier3_fail: `${pair} rejected by deep analysis`,
+    trade_placed: `Placed LIMIT ${dir} on ${pair}${m?.entryPrice ? ` at ${m.entryPrice}` : ""}`,
+    trade_rejected: `${pair} trade failed — ${entry.message || "execution error"}`,
+    gate_blocked: `${pair} blocked — ${m?.reason || entry.message || "risk check failed"}`,
+  }
+
+  return { ...base, label: labels[entry.type] ?? entry.type }
 }
 
 /** Types that show a separator line before them (scan cycle boundaries) */
@@ -154,11 +138,7 @@ export function ScanActivityLog({ entries }: ScanActivityLogProps) {
       className="border-border/50 bg-card max-h-[480px] overflow-y-auto rounded-lg border"
     >
       {displayed.map((entry, idx) => {
-        const style = ENTRY_STYLE[entry.type] ?? {
-          icon: <Search className="size-3.5" />,
-          color: "text-muted-foreground",
-          label: entry.type,
-        }
+        const style = getEntryStyle(entry)
         const isExpanded = expanded.has(entry.id)
         const canExpand = hasDetail(entry)
         const showSeparator = idx > 0 && CYCLE_START_TYPES.has(entry.type)
@@ -189,20 +169,7 @@ export function ScanActivityLog({ entries }: ScanActivityLogProps) {
             >
               <span className={cn("mt-0.5 shrink-0", style.color)}>{style.icon}</span>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className={cn("font-medium", style.color)}>{style.label}</span>
-                  {entry.metadata?.instrument && (
-                    <span className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-[10px]">
-                      {entry.metadata.instrument.replace("_", "/")}
-                    </span>
-                  )}
-                  {entry.metadata?.confidence != null && (
-                    <span className="text-muted-foreground text-[10px]">
-                      {entry.metadata.confidence}%
-                    </span>
-                  )}
-                </div>
-                <p className="text-muted-foreground mt-0.5">{entry.message}</p>
+                <p className={cn("font-medium leading-snug", style.color)}>{style.label}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <span className="text-muted-foreground text-[10px] tabular-nums">
