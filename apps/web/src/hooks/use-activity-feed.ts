@@ -96,13 +96,15 @@ export function useActivityFeed(): UseActivityFeedReturn {
     }
   }, [positions?.closed, addEvent])
 
-  // TV Alert signals
+  // TV Alert signals (daemon broadcasts lightweight { signalId } — direction/instrument may be absent)
   useEffect(() => {
     if (!lastTVSignal) return
+    const dir = lastTVSignal.direction ? lastTVSignal.direction.toUpperCase() : "SIGNAL"
+    const pair = lastTVSignal.instrument ? lastTVSignal.instrument.replace("_", "/") : ""
     addEvent({
-      id: `tv-${lastTVSignal.id}`,
+      id: `tv-${lastTVSignal.id ?? Date.now()}`,
       type: "tv_signal",
-      title: `TV Alert: ${lastTVSignal.direction.toUpperCase()} ${lastTVSignal.instrument.replace("_", "/")}`,
+      title: `TV Alert: ${dir}${pair ? ` ${pair}` : ""}`,
       timestamp: new Date().toISOString(),
       intent: "info",
     })
@@ -137,11 +139,14 @@ export function useActivityFeed(): UseActivityFeedReturn {
   // AI Trader opportunity
   useEffect(() => {
     if (!lastAiTraderOpportunity) return
+    const pair = lastAiTraderOpportunity.instrument?.replace("_", "/") ?? "unknown"
+    const dir = lastAiTraderOpportunity.direction?.toUpperCase() ?? ""
+    const conf = Math.round(lastAiTraderOpportunity.confidence ?? 0)
     addEvent({
-      id: `ait-${lastAiTraderOpportunity.id}`,
+      id: `ait-${lastAiTraderOpportunity.id ?? Date.now()}`,
       type: "ai_opportunity",
-      title: `AI opportunity: ${lastAiTraderOpportunity.instrument.replace("_", "/")}`,
-      detail: `${lastAiTraderOpportunity.direction.toUpperCase()} ${Math.round(lastAiTraderOpportunity.confidence)}%`,
+      title: `AI opportunity: ${pair}`,
+      detail: `${dir} ${conf}%`.trim(),
       timestamp: new Date().toISOString(),
       intent: "warning",
     })
