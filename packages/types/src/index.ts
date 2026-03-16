@@ -2611,6 +2611,8 @@ export interface AiTraderScanLogEntry {
     techniques?: string[]
     /** Human-readable reasons from technical analysis */
     reasons?: string[]
+    /** Error message when Tier 2/3 processing fails */
+    error?: string
   }
 }
 

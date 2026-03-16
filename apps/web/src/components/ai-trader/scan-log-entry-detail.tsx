@@ -82,6 +82,7 @@ export function ScanLogEntryDetail({ entry }: ScanLogEntryDetailProps) {
           </ul>
         )}
         {m.reason && <p className="text-muted-foreground leading-relaxed">{m.reason}</p>}
+        {m.error && <p className="leading-relaxed text-red-400">{m.error}</p>}
       </div>
     )
   }

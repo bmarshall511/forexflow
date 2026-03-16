@@ -504,9 +504,20 @@ export class AiTraderScanner {
           try {
             await this.processTier2And3(signal, config)
           } catch (err) {
-            console.warn(
-              `[ai-trader] Tier 2/3 error for ${signal.instrument}:`,
-              (err as Error).message,
+            const errMsg = (err as Error).message
+            console.warn(`[ai-trader] Tier 2/3 error for ${signal.instrument}:`, errMsg)
+            this.addLogEntry(
+              "tier2_fail",
+              `${signal.instrument.replace("_", "/")}: Tier 2/3 error`,
+              errMsg,
+              {
+                instrument: signal.instrument,
+                direction: signal.direction,
+                profile: signal.profile,
+                confidence: signal.confidence,
+                error: errMsg,
+                tier: 1,
+              },
             )
           }
           this.updateProgress(
