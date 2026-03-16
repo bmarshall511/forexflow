@@ -211,10 +211,14 @@ export async function listConditionsForTrade(tradeId: string): Promise<TradeCond
   return rows.map(toConditionData)
 }
 
-/** List all active conditions across all trades — used by ConditionMonitor on startup */
+/** List all active conditions for non-closed trades — used by ConditionMonitor on startup */
 export async function listActiveConditions(): Promise<TradeConditionData[]> {
   const rows = await db.tradeCondition.findMany({
-    where: { status: "active" },
+    where: {
+      status: "active",
+      // Exclude conditions for already-closed trades to avoid wasting evaluation cycles
+      trade: { status: { not: "closed" } },
+    },
     orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
   })
   return rows.map(toConditionData)

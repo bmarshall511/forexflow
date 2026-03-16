@@ -553,6 +553,11 @@ export async function executeAnalysis(opts: {
               continue
             }
             try {
+              // AI-created conditions expire after 7 days to prevent stale conditions
+              // from executing inappropriate actions if market conditions change
+              const AI_CONDITION_EXPIRY_DAYS = 7
+              const expiresAt = new Date(Date.now() + AI_CONDITION_EXPIRY_DAYS * 86_400_000)
+
               const condition = await createCondition({
                 tradeId,
                 triggerType: suggestion.triggerType as TradeConditionTriggerType,
@@ -562,6 +567,7 @@ export async function executeAnalysis(opts: {
                 label: suggestion.label,
                 createdBy: "ai",
                 analysisId,
+                expiresAt,
               })
               if (conditionMonitor) {
                 await conditionMonitor.reloadCondition(condition.id)

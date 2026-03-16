@@ -1,6 +1,14 @@
 import type { TradeConditionData, PositionPriceTick, AnyDaemonMessage } from "@fxflow/types"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 
+/** Thrown when a destructive action is blocked by the grace period — condition should retry later */
+class GracePeriodError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "GracePeriodError"
+  }
+}
+
 interface PriceMap {
   [instrument: string]: number // mid price
 }
@@ -247,7 +255,17 @@ export class ConditionMonitor {
       }
     }
 
+    // Sort by priority (lower = higher priority) so important conditions evaluate first.
+    // This ensures e.g. a close_trade condition at priority 0 fires before a move_sl at priority 1.
+    toCheck.sort((a, b) => a.priority - b.priority)
+
+    // Track trades closed during this tick to skip remaining conditions for the same trade
+    const closedTradeIds = new Set<string>()
+
     for (const condition of toCheck) {
+      // Skip if this trade was already closed by a prior condition in this tick
+      if (closedTradeIds.has(condition.tradeId)) continue
+
       const tradeData = await this.getTradeData(condition.tradeId)
       if (!tradeData || tradeData.instrument !== instrument) continue
 
@@ -299,6 +317,11 @@ export class ConditionMonitor {
       const triggered = this.checkPriceCondition(condition, currentPrice, instrument, tradeData)
       if (triggered) {
         await this.triggerCondition(condition, currentPrice)
+
+        // If this was a close/cancel action, mark the trade so we skip remaining conditions
+        if (condition.actionType === "close_trade" || condition.actionType === "cancel_order") {
+          closedTradeIds.add(condition.tradeId)
+        }
       }
     }
   }
@@ -502,6 +525,19 @@ export class ConditionMonitor {
     } catch (err) {
       errorMsg = (err as Error).message
       success = false
+
+      // Grace period: silently revert to active for retry — not a real failure
+      if (err instanceof GracePeriodError) {
+        console.log(`[condition-monitor] ${errorMsg}`)
+        try {
+          await updateConditionStatus(condition.id, "active")
+        } catch {
+          /* best effort revert */
+        }
+        this.conditions.set(condition.id, condition)
+        return // Don't broadcast failure or create notification — will retry next tick
+      }
+
       console.error(`[condition-monitor] Failed to execute condition ${condition.id}:`, errorMsg)
 
       // Step 4b: Execution failed — revert to "active" and re-add to memory for retry
@@ -568,19 +604,26 @@ export class ConditionMonitor {
       return
     }
 
-    // Guard: grace period — don't execute close/cancel actions within 60s of trade open.
+    // Guard: grace period — don't execute close/cancel actions within 60s of trade open
+    // OR within 60s of the condition being created (whichever is more recent).
     // This prevents AI conditions created on pending orders from immediately closing
     // the trade when the order fills.
     const GRACE_PERIOD_MS = 60_000
     const isDestructive =
       condition.actionType === "close_trade" || condition.actionType === "cancel_order"
-    if (isDestructive && trade.openedAt) {
-      const tradeAgeMs = Date.now() - new Date(trade.openedAt).getTime()
-      if (tradeAgeMs < GRACE_PERIOD_MS) {
-        console.log(
-          `[condition-monitor] Skipping ${condition.actionType} for condition ${condition.id} — trade ${condition.tradeId} is only ${Math.round(tradeAgeMs / 1000)}s old (grace period: ${GRACE_PERIOD_MS / 1000}s)`,
+    if (isDestructive) {
+      const now = Date.now()
+      // Use the more recent of trade open time and condition creation time
+      const tradeOpenMs = trade.openedAt ? new Date(trade.openedAt).getTime() : 0
+      const conditionCreatedMs = new Date(condition.createdAt).getTime()
+      const referenceMs = Math.max(tradeOpenMs, conditionCreatedMs)
+      const ageMs = now - referenceMs
+
+      if (ageMs < GRACE_PERIOD_MS) {
+        throw new GracePeriodError(
+          `Grace period: ${condition.actionType} for condition ${condition.id} — ` +
+            `reference age is only ${Math.round(ageMs / 1000)}s (need ${GRACE_PERIOD_MS / 1000}s)`,
         )
-        return // Don't mark as triggered — will retry on next tick after grace period
       }
     }
 
