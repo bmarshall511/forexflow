@@ -75,7 +75,7 @@ export interface AutoTradePlaceOrderFn {
 
 /** Callback for cancelling a pending order */
 export interface AutoTradeCancelOrderFn {
-  (sourceOrderId: string, reason: string): Promise<void>
+  (sourceOrderId: string, reason: string, cancelledBy?: string): Promise<void>
 }
 
 /** Callback for checking if an instrument has an existing open trade or pending order */
@@ -1015,7 +1015,7 @@ export class TradeFinderScanner {
     if (!this.cancelOrderFn || !setup.resultSourceId) return
 
     try {
-      await this.cancelOrderFn(setup.resultSourceId, reason)
+      await this.cancelOrderFn(setup.resultSourceId, reason, "trade_finder")
 
       const now = new Date().toISOString()
       this.broadcast({

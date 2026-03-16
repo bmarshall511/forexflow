@@ -82,12 +82,33 @@ function parseSltpDetail(detail: string): SltpDetail | null {
   }
 }
 
+/** Map raw cancelledBy values to human-readable labels */
+const CANCELLED_BY_LABELS: Record<string, string> = {
+  user: "Manual",
+  user_bulk: "Bulk Cancel",
+  trade_finder: "Trade Finder",
+  ai_condition: "AI Condition",
+}
+
+function parseCancelDetail(detail: string): { source: string; reason: string | null } | null {
+  try {
+    const obj = JSON.parse(detail)
+    if (!obj.cancelledBy) return null
+    const source = CANCELLED_BY_LABELS[obj.cancelledBy] ?? obj.cancelledBy
+    return { source, reason: obj.reason ?? null }
+  } catch {
+    return null
+  }
+}
+
 function parseGenericDetail(detail: string): string {
   try {
     const obj = JSON.parse(detail)
     if (obj.message) return obj.message
-    // Filter out internal fields
-    const filtered = Object.entries(obj).filter(([k]) => !["time", "modifiedBy"].includes(k))
+    // Filter out internal / already-handled fields
+    const filtered = Object.entries(obj).filter(
+      ([k]) => !["time", "modifiedBy", "cancelledBy", "reason", "alreadyCancelled"].includes(k),
+    )
     if (filtered.length === 0) return ""
     return filtered.map(([k, v]) => `${formatKey(k)}: ${v}`).join(" · ")
   } catch {
@@ -177,7 +198,9 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
           event.eventType === "SL_MODIFIED" ||
           event.eventType === "TP_MODIFIED"
         const sltpDetail = isSltpEvent ? parseSltpDetail(event.detail) : null
-        const genericText = !sltpDetail ? parseGenericDetail(event.detail) : null
+        const isCancelEvent = event.eventType === "ORDER_CANCELLED"
+        const cancelDetail = isCancelEvent ? parseCancelDetail(event.detail) : null
+        const genericText = !sltpDetail && !cancelDetail ? parseGenericDetail(event.detail) : null
 
         return (
           <div key={event.id} className="flex gap-3">
@@ -208,6 +231,17 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
                 <div className="bg-muted/40 mt-1.5 space-y-0.5 rounded-md px-2.5 py-1.5">
                   <SltpChange label="SL" oldVal={sltpDetail.oldSL} newVal={sltpDetail.newSL} />
                   <SltpChange label="TP" oldVal={sltpDetail.oldTP} newVal={sltpDetail.newTP} />
+                </div>
+              )}
+
+              {/* Cancel detail */}
+              {cancelDetail && (
+                <div className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                  <span>
+                    Cancelled By:{" "}
+                    <span className="text-foreground font-medium">{cancelDetail.source}</span>
+                  </span>
+                  {cancelDetail.reason && <span> · Reason: {cancelDetail.reason}</span>}
                 </div>
               )}
 

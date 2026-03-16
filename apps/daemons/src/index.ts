@@ -285,7 +285,12 @@ async function main() {
     // placeOrder
     (req) => tradeSyncer.placeOrder(req),
     // cancelOrder
-    (sourceOrderId, reason) => tradeSyncer.cancelOrder(sourceOrderId, reason),
+    (sourceOrderId, reason, cancelledBy) =>
+      tradeSyncer.cancelOrder(
+        sourceOrderId,
+        reason,
+        (cancelledBy as "trade_finder") ?? "trade_finder",
+      ),
     // hasExistingPosition — check if instrument has any open trade or pending order
     (instrument) => {
       const positions = positionManager.getPositions()

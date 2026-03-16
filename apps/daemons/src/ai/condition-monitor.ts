@@ -615,6 +615,7 @@ export class ConditionMonitor {
         await this.tradeSyncer.cancelOrder(
           trade.sourceTradeId,
           `Condition triggered: ${condition.label ?? "automated condition"}`,
+          "ai_condition",
         )
         break
 

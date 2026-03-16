@@ -130,7 +130,11 @@ export class OandaTradeSyncer {
   }
 
   /** Cancel a pending order on OANDA. Gracefully handles ORDER_DOESNT_EXIST (404). */
-  async cancelOrder(sourceOrderId: string, reason?: string): Promise<void> {
+  async cancelOrder(
+    sourceOrderId: string,
+    reason?: string,
+    cancelledBy: "user" | "trade_finder" | "ai_condition" = "user",
+  ): Promise<void> {
     const creds = this.stateManager.getCredentials()
     if (!creds) throw new Error("No credentials configured")
 
@@ -177,7 +181,7 @@ export class OandaTradeSyncer {
             tradeId: dbTrade.id,
             eventType: "ORDER_CANCELLED",
             detail: JSON.stringify({
-              cancelledBy: "user",
+              cancelledBy,
               reason: reason ?? null,
               alreadyCancelled,
               time: new Date().toISOString(),
