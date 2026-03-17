@@ -78,6 +78,7 @@ function TradingViewChartInner({
   lastTick,
   stopLoss,
   takeProfit,
+  exitPrice,
   defaultTimeframe,
   markers,
   tradeLevels,
@@ -97,6 +98,7 @@ function TradingViewChartInner({
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
   const slLineRef = useRef<IPriceLine | null>(null)
+  const exitLineRef = useRef<IPriceLine | null>(null)
   const tpLineRef = useRef<IPriceLine | null>(null)
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const tradeLevelPrimRef = useRef<TradeLevelPrimitive | null>(null)
@@ -183,6 +185,17 @@ function TradingViewChartInner({
       })
     }
 
+    if (exitPrice != null) {
+      exitLineRef.current = series.createPriceLine({
+        price: exitPrice,
+        color: "#a855f7",
+        lineWidth: 1,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: "Exit",
+      })
+    }
+
     // Attach trade-level primitive (draws entry/exit lines on candles)
     const tradeLevelPrim = new TradeLevelPrimitive()
     series.attachPrimitive(tradeLevelPrim)
@@ -249,6 +262,7 @@ function TradingViewChartInner({
       priceLineRef.current = null
       slLineRef.current = null
       tpLineRef.current = null
+      exitLineRef.current = null
       markersRef.current = null
       tradeLevelPrimRef.current = null
       zonePrimRef.current = null
@@ -262,6 +276,7 @@ function TradingViewChartInner({
     entryPrice,
     stopLoss,
     takeProfit,
+    exitPrice,
     granularity,
     decimals,
     minMove,
