@@ -25,8 +25,10 @@ import {
   type OandaTransactionStreamEvent,
   type OandaCreateOrderResponse,
   type OandaCloseTradeResponse,
+  type OandaTradeDetailResponse,
 } from "./api-client.js"
 import {
+  enrichSource,
   upsertTrade,
   closeTrade,
   migrateFilledPendingOrders,
@@ -44,6 +46,7 @@ import {
   createTradeEvent,
   getTradeBySourceId,
   updateTradeCloseContext,
+  type OrphanCloseDetails,
 } from "@fxflow/db"
 
 export class OandaTradeSyncer {
@@ -724,12 +727,44 @@ export class OandaTradeSyncer {
       orderBody.timeInForce = "GTC"
     }
 
+    // Validate SL/TP are on the correct side of entry and not equal after rounding
+    const effectiveEntry = entryPrice ?? 0
     if (stopLoss !== null) {
-      orderBody.stopLossOnFill = { price: stopLoss.toFixed(decimals), timeInForce: "GTC" }
+      const slRounded = stopLoss.toFixed(decimals)
+      const entryRounded = effectiveEntry.toFixed(decimals)
+      if (slRounded === entryRounded) {
+        throw new Error(
+          `SL (${slRounded}) equals entry (${entryRounded}) after rounding — order would be unprotected`,
+        )
+      }
+      if (direction === "long" && stopLoss >= effectiveEntry) {
+        throw new Error(`SL (${stopLoss}) must be below entry (${effectiveEntry}) for long trades`)
+      }
+      if (direction === "short" && stopLoss <= effectiveEntry) {
+        throw new Error(`SL (${stopLoss}) must be above entry (${effectiveEntry}) for short trades`)
+      }
+      orderBody.stopLossOnFill = { price: slRounded, timeInForce: "GTC" }
     }
 
     if (takeProfit !== null) {
-      orderBody.takeProfitOnFill = { price: takeProfit.toFixed(decimals), timeInForce: "GTC" }
+      const tpRounded = takeProfit.toFixed(decimals)
+      const entryRounded = effectiveEntry.toFixed(decimals)
+      if (tpRounded === entryRounded) {
+        throw new Error(
+          `TP (${tpRounded}) equals entry (${entryRounded}) after rounding — no profit potential`,
+        )
+      }
+      if (direction === "long" && takeProfit <= effectiveEntry) {
+        throw new Error(
+          `TP (${takeProfit}) must be above entry (${effectiveEntry}) for long trades`,
+        )
+      }
+      if (direction === "short" && takeProfit >= effectiveEntry) {
+        throw new Error(
+          `TP (${takeProfit}) must be below entry (${effectiveEntry}) for short trades`,
+        )
+      }
+      orderBody.takeProfitOnFill = { price: tpRounded, timeInForce: "GTC" }
     }
 
     // POST to OANDA
@@ -767,18 +802,36 @@ export class OandaTradeSyncer {
       )
     }
 
-    // Reconcile FIRST so OANDA's canonical order/trade ID is in the DB.
-    // Then we apply metadata, notes, tags to the reconciled record.
+    // Pre-seed the DB record WITH metadata BEFORE reconcile.
+    // This ensures the record exists with correct source attribution from the start,
+    // eliminating the race window where reconcile could fire callbacks before metadata is set.
+    const metadata = JSON.stringify({ placedVia })
+    let dbTrade: Awaited<ReturnType<typeof upsertTrade>> | null = await upsertTrade({
+      source: "oanda",
+      sourceTradeId: sourceId,
+      status: filled ? "open" : "pending",
+      instrument,
+      direction,
+      orderType,
+      entryPrice: fillPrice ?? entryPrice ?? 0,
+      initialUnits: units,
+      currentUnits: units,
+      openedAt: new Date(),
+      metadata,
+    })
+    console.log(
+      `[placeOrder] Pre-seeded DB record: id=${dbTrade.id}, sourceId=${sourceId}, placedVia=${placedVia}`,
+    )
+
+    // Now reconcile — the record already has metadata, so reconcile won't overwrite it
+    // (upsertTrade only updates metadata if explicitly provided, and reconcile omits it).
     await this.reconcile()
 
-    // Find the DB record by sourceId. For LIMIT orders, OANDA's orderCreateTransaction.id
-    // may differ from the order.id in the pending list. If not found by sourceId, search
-    // by instrument + direction + status as a fallback to handle ID mismatches.
-    let dbTrade = await getTradeBySourceId("oanda", sourceId)
-    console.log(
-      `[placeOrder] sourceId=${sourceId}, found by sourceId: ${!!dbTrade}${dbTrade ? ` (id=${dbTrade.id})` : ""}`,
-    )
-    if (!dbTrade) {
+    // Re-fetch in case reconcile updated the sourceTradeId (e.g., order ID migration)
+    const refreshed = await getTradeBySourceId("oanda", sourceId)
+    if (refreshed) {
+      dbTrade = refreshed
+    } else {
       // Fallback: find by instrument + direction + recent creation
       const { db: prisma } = await import("@fxflow/db")
       const recent = await prisma.trade.findFirst({
@@ -787,58 +840,22 @@ export class OandaTradeSyncer {
           instrument,
           direction,
           status: filled ? "open" : "pending",
-          openedAt: { gte: new Date(Date.now() - 60_000) }, // within last 60 seconds
+          openedAt: { gte: new Date(Date.now() - 60_000) },
         },
         orderBy: { openedAt: "desc" },
       })
       if (recent) {
         dbTrade = recent
-        console.log(
-          `[placeOrder] Fallback found: id=${recent.id}, sourceTradeId=${recent.sourceTradeId}`,
-        )
-      } else {
-        console.warn(
-          `[placeOrder] FAILED to find DB record for ${instrument} ${direction} (sourceId=${sourceId})`,
-        )
-        // Last resort: list all recent trades for debugging
-        const allRecent = await prisma.trade.findMany({
-          where: {
-            source: "oanda",
-            instrument,
-            openedAt: { gte: new Date(Date.now() - 120_000) },
-          },
-          select: { id: true, sourceTradeId: true, status: true, direction: true, openedAt: true },
-          orderBy: { openedAt: "desc" },
-          take: 5,
-        })
-        console.warn(`[placeOrder] Recent DB trades for ${instrument}:`, JSON.stringify(allRecent))
+        // Ensure metadata is on the correct record
+        if (!recent.metadata) {
+          await import("@fxflow/db").then(({ db: p }) =>
+            p.trade.update({ where: { id: recent.id }, data: { metadata } }),
+          )
+        }
       }
     }
 
-    // Apply metadata (placedVia) to the reconciled record — this is the authoritative
-    // source attribution. Done post-reconcile to guarantee the record exists with the
-    // correct OANDA order/trade ID.
-    if (dbTrade) {
-      try {
-        const { db: prisma } = await import("@fxflow/db")
-        await prisma.trade.update({
-          where: { id: dbTrade.id },
-          data: { metadata: JSON.stringify({ placedVia }) },
-        })
-        console.log(`[placeOrder] Metadata set: trade=${dbTrade.id}, placedVia=${placedVia}`)
-      } catch (metaErr) {
-        console.error(
-          `[placeOrder] FAILED to set metadata for ${dbTrade.id}:`,
-          (metaErr as Error).message,
-        )
-      }
-    } else {
-      console.error(
-        `[placeOrder] NO DB RECORD FOUND — metadata not set for ${instrument} ${direction} (sourceId=${sourceId}, placedVia=${placedVia})`,
-      )
-    }
-
-    // Re-reconcile so the WS broadcast picks up the updated metadata
+    // Re-reconcile so the WS broadcast picks up the record with metadata
     await this.reconcile()
 
     // Create audit event and persist timeframe, notes, tags (best-effort)
@@ -999,10 +1016,102 @@ export class OandaTradeSyncer {
   private async startSync(): Promise<void> {
     if (!this.hasBackfilled) {
       await this.performBackfill()
+      await this.repairOrphanedTrades()
       this.hasBackfilled = true
     }
     await this.reconcile()
     this.reconcileTimer = setInterval(() => void this.reconcile(), this.config.reconcileIntervalMs)
+  }
+
+  /**
+   * One-time repair: find closed trades with UNKNOWN close reason and $0 P&L
+   * that were orphaned before the close-details fetcher was added.
+   * Fetches actual close data from OANDA and updates the DB records.
+   */
+  private async repairOrphanedTrades(): Promise<void> {
+    try {
+      const { db: prisma } = await import("@fxflow/db")
+      const orphans = await prisma.trade.findMany({
+        where: {
+          source: "oanda",
+          status: "closed",
+          closeReason: "UNKNOWN",
+          realizedPL: 0,
+          exitPrice: null,
+        },
+        select: { id: true, sourceTradeId: true, instrument: true },
+      })
+
+      if (orphans.length === 0) return
+
+      console.log(
+        `[trade-syncer] Repairing ${orphans.length} orphaned trade(s) with missing P&L...`,
+      )
+
+      let repaired = 0
+      for (const orphan of orphans) {
+        const details = await this.fetchTradeCloseDetails(orphan.sourceTradeId)
+        if (details) {
+          await prisma.trade.update({
+            where: { id: orphan.id },
+            data: {
+              exitPrice: details.exitPrice,
+              closeReason: details.closeReason,
+              realizedPL: details.realizedPL,
+              financing: details.financing,
+              closedAt: details.closedAt,
+              closeContext: JSON.stringify({
+                cancelledBy: "system",
+                cancelReason: "Repaired on startup — close details recovered from OANDA",
+                cancelledAt: details.closedAt.toISOString(),
+              }),
+            },
+          })
+          repaired++
+          console.log(
+            `[trade-syncer] Repaired ${orphan.instrument} (${orphan.sourceTradeId}): ` +
+              `P&L=${details.realizedPL}, reason=${details.closeReason}`,
+          )
+        }
+      }
+
+      if (repaired > 0) {
+        console.log(`[trade-syncer] Repair complete: ${repaired}/${orphans.length} trades updated`)
+      }
+
+      // Also repair trades with null metadata (source attribution lost)
+      const nullMeta = await prisma.trade.findMany({
+        where: { source: "oanda", metadata: null, status: { in: ["open", "pending"] } },
+        select: { id: true, sourceTradeId: true, instrument: true },
+      })
+
+      if (nullMeta.length > 0) {
+        console.log(
+          `[trade-syncer] Recovering metadata for ${nullMeta.length} trade(s) with null metadata...`,
+        )
+        let metaRepaired = 0
+        for (const trade of nullMeta) {
+          const recovered = await this.recoverSourceMetadata(trade.sourceTradeId)
+          if (recovered) {
+            await prisma.trade.update({
+              where: { id: trade.id },
+              data: { metadata: recovered },
+            })
+            metaRepaired++
+            console.log(
+              `[trade-syncer] Recovered metadata for ${trade.instrument} (${trade.sourceTradeId}): ${recovered}`,
+            )
+          }
+        }
+        if (metaRepaired > 0) {
+          console.log(
+            `[trade-syncer] Metadata repair complete: ${metaRepaired}/${nullMeta.length} trades updated`,
+          )
+        }
+      }
+    } catch (error) {
+      console.error("[trade-syncer] Orphan repair error:", (error as Error).message)
+    }
   }
 
   // ─── Backfill ─────────────────────────────────────────────────────────────
@@ -1272,19 +1381,9 @@ export class OandaTradeSyncer {
               }
             }
 
-            if (dbRecord.metadata) {
-              try {
-                const meta = JSON.parse(dbRecord.metadata)
-                if (meta.placedVia === "fxflow") order.source = "manual"
-                else if (meta.placedVia === "ut_bot_alerts") order.source = "ut_bot_alerts"
-                else if (meta.placedVia === "trade_finder") order.source = "trade_finder"
-                else if (meta.placedVia === "trade_finder_auto") order.source = "trade_finder_auto"
-                else if (meta.placedVia === "ai_trader") order.source = "ai_trader"
-                else if (meta.placedVia === "ai_trader_manual") order.source = "ai_trader_manual"
-              } catch {
-                /* ignore malformed metadata */
-              }
-            }
+            // Enrich source from metadata using shared function
+            order.source = enrichSource(order.source, dbRecord.metadata)
+
             // Track new pending orders for lifecycle callbacks
             if (!this.knownPendingSourceIds.has(order.sourceOrderId) && this.hasBackfilled) {
               this.knownPendingSourceIds.add(order.sourceOrderId)
@@ -1334,19 +1433,9 @@ export class OandaTradeSyncer {
               }
             }
 
-            if (dbRecord.metadata) {
-              try {
-                const meta = JSON.parse(dbRecord.metadata)
-                if (meta.placedVia === "fxflow") trade.source = "manual"
-                else if (meta.placedVia === "ut_bot_alerts") trade.source = "ut_bot_alerts"
-                else if (meta.placedVia === "trade_finder") trade.source = "trade_finder"
-                else if (meta.placedVia === "trade_finder_auto") trade.source = "trade_finder_auto"
-                else if (meta.placedVia === "ai_trader") trade.source = "ai_trader"
-                else if (meta.placedVia === "ai_trader_manual") trade.source = "ai_trader_manual"
-              } catch {
-                /* ignore malformed metadata */
-              }
-            }
+            // Enrich source from metadata using shared function
+            trade.source = enrichSource(trade.source, dbRecord.metadata)
+
             // Track new open trades for lifecycle callbacks
             if (!this.knownOpenSourceIds.has(trade.sourceTradeId) && this.hasBackfilled) {
               this.knownOpenSourceIds.add(trade.sourceTradeId)
@@ -1372,11 +1461,21 @@ export class OandaTradeSyncer {
         this.onOrderFilled?.(dbId)
       }
 
-      // Mark any DB "open" trades that are no longer in OANDA as closed
+      // Mark any DB "open" trades that are no longer in OANDA as closed.
+      // Pass a fetcher that retrieves actual close details (P&L, exit price, reason)
+      // from OANDA's API instead of defaulting to $0 P&L.
       const activeTradeIds = openTrades.map((t) => t.sourceTradeId)
-      const orphaned = await closeOrphanedTrades("oanda", activeTradeIds)
-      if (orphaned > 0) {
-        console.log(`[trade-syncer] Closed ${orphaned} orphaned trade(s) in DB`)
+      const orphanResult = await closeOrphanedTrades("oanda", activeTradeIds, (sourceTradeId) =>
+        this.fetchTradeCloseDetails(sourceTradeId),
+      )
+      if (orphanResult.count > 0) {
+        console.log(
+          `[trade-syncer] Closed ${orphanResult.count} orphaned trade(s) in DB (with close details)`,
+        )
+        // Fire onTradeClosed callbacks so downstream systems (AI Trader, Trade Finder) can update
+        for (const tradeId of orphanResult.closedTradeIds) {
+          this.onTradeClosed?.(tradeId)
+        }
       }
     } catch (error) {
       console.error(
@@ -1437,6 +1536,68 @@ export class OandaTradeSyncer {
   }
 
   /**
+   * Fetch actual close details for a trade from OANDA's API.
+   * Used when a trade disappears from the open list (orphaned) to recover
+   * the real P&L, exit price, and close reason instead of defaulting to $0.
+   */
+  private async fetchTradeCloseDetails(sourceTradeId: string): Promise<OrphanCloseDetails | null> {
+    const creds = this.stateManager.getCredentials()
+    if (!creds) return null
+
+    try {
+      const response = await oandaGet<OandaTradeDetailResponse>({
+        mode: creds.mode,
+        token: creds.token,
+        path: `/v3/accounts/${creds.accountId}/trades/${sourceTradeId}`,
+      })
+
+      const trade = response.trade
+      if (!trade) return null
+
+      // Only process if trade is actually closed on OANDA
+      if (trade.state !== "CLOSED" && trade.state !== "CLOSE_WHEN_TRADEABLE") return null
+
+      const realizedPL = parseFloat(trade.realizedPL) || 0
+      const financing = parseFloat(trade.financing) || 0
+      const exitPrice = trade.averageClosePrice ? parseFloat(trade.averageClosePrice) : null
+      const closedAt = trade.closeTime ? new Date(trade.closeTime) : new Date()
+
+      // Determine close reason from closing transaction IDs
+      // We need to look up the transaction to find the reason
+      let closeReason: TradeCloseReason = "UNKNOWN"
+      if (trade.closingTransactionIDs?.length) {
+        try {
+          const lastTxId = trade.closingTransactionIDs[trade.closingTransactionIDs.length - 1]
+          const txResponse = await oandaGet<{ transaction: { type: string; reason?: string } }>({
+            mode: creds.mode,
+            token: creds.token,
+            path: `/v3/accounts/${creds.accountId}/transactions/${lastTxId}`,
+          })
+          if (txResponse.transaction?.reason) {
+            closeReason = mapFillReasonToCloseReason(txResponse.transaction.reason)
+          }
+        } catch {
+          // Best-effort — we still have the P&L
+        }
+      }
+
+      console.log(
+        `[trade-syncer] Recovered close details for ${sourceTradeId}: P&L=${realizedPL}, reason=${closeReason}`,
+      )
+
+      return { exitPrice, closeReason, realizedPL, financing, closedAt }
+    } catch (error) {
+      // 404 = trade doesn't exist (very old or practice account reset)
+      const msg = (error as Error).message
+      if (msg.includes("404") || msg.includes("NOT_FOUND")) {
+        console.warn(`[trade-syncer] Trade ${sourceTradeId} not found on OANDA (may be expired)`)
+        return null
+      }
+      throw error
+    }
+  }
+
+  /**
    * Recover source metadata for a trade/order that has none (e.g., after DB reset).
    * Checks Trade Finder setups and AI Trader opportunities for a matching OANDA sourceId.
    * Returns the metadata JSON string if found, null otherwise.
@@ -1461,6 +1622,15 @@ export class OandaTradeSyncer {
       })
       if (aiOpp) {
         return JSON.stringify({ placedVia: "ai_trader" })
+      }
+
+      // Check TV Alert signals
+      const tvSignal = await prisma.tVAlertSignal.findFirst({
+        where: { resultTradeId: sourceId },
+        select: { status: true },
+      })
+      if (tvSignal) {
+        return JSON.stringify({ placedVia: "ut_bot_alerts" })
       }
     } catch {
       // Best-effort — don't block reconcile
