@@ -18,7 +18,7 @@
  */
 
 import { getPipSize } from "@fxflow/shared"
-import { getCurrentSession, type ForexSession } from "@fxflow/shared"
+import { getCurrentSession } from "@fxflow/shared"
 import type {
   SmartFlowTradeData,
   SmartFlowConfigData,
@@ -162,7 +162,7 @@ export class ManagementEngine {
   loadActiveTrades(trades: SmartFlowTradeData[]): void {
     for (const trade of trades) {
       if (!trade.sourceTradeId || !trade.instrument || !trade.direction) continue
-      const config = this.configCache.get(trade.configId)
+      const _config = this.configCache.get(trade.configId)
       const positions = this.positionManager.getPositions()
       const oandaTrade = positions.open.find((t) => t.sourceTradeId === trade.sourceTradeId)
 

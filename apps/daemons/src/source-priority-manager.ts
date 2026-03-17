@@ -204,10 +204,7 @@ export class SourcePriorityManager {
 
       if (requestingPriority < pendingPriority) {
         // Requesting source has HIGHER priority (lower number) — replace
-        const cancelled = await this.cancelPendingForReplacement(
-          instrument,
-          pendingOrder.sourceOrderId,
-        )
+        await this.cancelPendingForReplacement(instrument, pendingOrder.sourceOrderId)
         const reason = `Replaced ${pendingSource} pending order on ${instrument} (priority ${requestingPriority} < ${pendingPriority})`
         this.logDecision(
           instrument,
