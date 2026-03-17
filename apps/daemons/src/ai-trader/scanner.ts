@@ -25,7 +25,7 @@ import {
   getTradeBySourceId,
   getRiskPercent,
 } from "@fxflow/db"
-import { ALL_FOREX_PAIRS, getPipSize } from "@fxflow/shared"
+import { ALL_FOREX_PAIRS, getPipSize, priceToPips } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { PositionManager } from "../positions/position-manager.js"
@@ -861,6 +861,37 @@ export class AiTraderScanner {
     const stopLoss = tier3Result.adjustedSL ?? signal.suggestedSL
     const takeProfit = tier3Result.adjustedTP ?? signal.suggestedTP
 
+    // Recalculate R:R using final (potentially Tier 3-adjusted) levels
+    const finalRiskPips = priceToPips(signal.instrument, Math.abs(entryPrice - stopLoss))
+    const finalRewardPips = priceToPips(signal.instrument, Math.abs(takeProfit - entryPrice))
+    const finalRR = finalRiskPips > 0 ? finalRewardPips / finalRiskPips : 0
+
+    // Re-validate R:R against profile minimum after Tier 3 adjustments
+    const profileConfig = getProfileConfig(signal.profile)
+    if (finalRR < profileConfig.minRR) {
+      console.warn(
+        `[ai-trader] R:R dropped below minimum after Tier 3: ${finalRR.toFixed(1)} < ${profileConfig.minRR} for ${signal.instrument}`,
+      )
+      this.addLogEntry(
+        "tier3_fail",
+        `${pairLabel}: R:R ${finalRR.toFixed(1)}:1 below minimum ${profileConfig.minRR}:1 after Tier 3 adjustments`,
+        undefined,
+        {
+          instrument: signal.instrument,
+          direction: signal.direction,
+          profile: signal.profile,
+          confidence: tier3Result.confidence,
+          entryPrice,
+          stopLoss,
+          takeProfit,
+          riskRewardRatio: finalRR,
+          reason: `R:R ${finalRR.toFixed(1)}:1 < min ${profileConfig.minRR}:1`,
+          tier: 3,
+        },
+      )
+      return "tier3_fail"
+    }
+
     // Deterministic position sizing — calculated from account settings, never from LLM
     const pipSize = getPipSize(signal.instrument)
     const riskPipsForSizing = Math.abs(entryPrice - stopLoss) / pipSize
@@ -885,9 +916,9 @@ export class AiTraderScanner {
       entryPrice,
       stopLoss,
       takeProfit,
-      riskPips: signal.riskPips,
-      rewardPips: signal.rewardPips,
-      riskRewardRatio: signal.riskRewardRatio,
+      riskPips: finalRiskPips,
+      rewardPips: finalRewardPips,
+      riskRewardRatio: finalRR,
       positionSize,
       regime: castRegime(signal.technicalSnapshot.regime),
       session: castSession(signal.technicalSnapshot.session),
