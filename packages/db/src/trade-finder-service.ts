@@ -249,17 +249,19 @@ export async function updateSetupSkipReason(id: string, reason: string | null): 
   })
 }
 
-/** Remove old history setups beyond retention limit */
+/** Remove old history setups beyond retention limit.
+ *  "filled" and "placed" setups are NEVER pruned — they link to actual trades
+ *  and are needed for setup analysis in the trade detail drawer. */
 export async function pruneSetupHistory(keepCount = 200): Promise<number> {
-  const historyStatuses = ["placed", "filled", "invalidated", "expired"]
+  const prunableStatuses = ["invalidated", "expired"]
   const total = await db.tradeFinderSetup.count({
-    where: { status: { in: historyStatuses } },
+    where: { status: { in: prunableStatuses } },
   })
 
   if (total <= keepCount) return 0
 
   const toDelete = await db.tradeFinderSetup.findMany({
-    where: { status: { in: historyStatuses } },
+    where: { status: { in: prunableStatuses } },
     orderBy: { lastUpdatedAt: "asc" },
     take: total - keepCount,
     select: { id: true },
@@ -333,10 +335,12 @@ export async function clearActiveSetups(): Promise<number> {
   return result.count
 }
 
-/** Clear setup history (placed, filled, invalidated, expired) */
+/** Clear setup history. Keeps "filled" and "placed" setups that link to
+ *  actual trades (needed for setup analysis in the trade detail drawer).
+ *  Only removes invalidated and expired setups. */
 export async function clearSetupHistory(): Promise<number> {
   const result = await db.tradeFinderSetup.deleteMany({
-    where: { status: { in: ["placed", "filled", "invalidated", "expired"] } },
+    where: { status: { in: ["invalidated", "expired"] } },
   })
   return result.count
 }
