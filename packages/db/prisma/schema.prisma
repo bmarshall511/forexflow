@@ -700,6 +700,22 @@ model SmartFlowTimeEstimate {
   @@index([closedAt])
 }
 
+model SmartFlowActivityLog {
+  id         String   @id @default(uuid())
+  type       String // SmartFlowActivityType
+  message    String
+  detail     String?
+  severity   String   @default("info") // "info" | "success" | "warning" | "error"
+  instrument String?
+  tradeId    String?
+  configId   String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([configId, createdAt])
+  @@index([instrument, createdAt])
+}
+
 // ─── Authentication ─────────────────────────────────────────────────────────
 
 model AuthPin {

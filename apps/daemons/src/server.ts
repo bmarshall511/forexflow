@@ -61,7 +61,7 @@ export function setSourcePriorityManager(manager: SourcePriorityManager): void {
   _sourcePriorityManager = manager
 }
 
-import { getActivityEvents, emitActivity } from "./smart-flow/activity-feed.js"
+import { getActivityEvents, emitActivity, clearActivityEvents } from "./smart-flow/activity-feed.js"
 import type { SmartFlowManager } from "./smart-flow/manager.js"
 let _smartFlowManager: SmartFlowManager | null = null
 export function setSmartFlowManager(manager: SmartFlowManager): void {
@@ -1123,6 +1123,13 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "GET" && req.url === "/smart-flow/activity") {
       sendJson(res, 200, { ok: true, events: getActivityEvents() })
+      return
+    }
+
+    if (req.method === "DELETE" && req.url === "/smart-flow/activity") {
+      clearActivityEvents()
+        .then(() => sendJson(res, 200, { ok: true }))
+        .catch((err) => sendJson(res, 500, { ok: false, error: (err as Error).message }))
       return
     }
 

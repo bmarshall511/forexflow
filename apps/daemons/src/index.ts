@@ -362,6 +362,10 @@ async function main() {
   smartFlowManager.setPositionManager(positionManager)
   smartFlowManager.setManagementEngine(managementEngine)
   setSmartFlowManager(smartFlowManager)
+  // Initialize activity feed from DB before starting SmartFlow
+  const { initActivityFeed } = await import("./smart-flow/activity-feed.js")
+  await initActivityFeed()
+
   await smartFlowManager.start()
 
   // 12i. Economic calendar fetcher — periodic Finnhub calendar sync

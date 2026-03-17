@@ -388,3 +388,11 @@ export {
   createTimeEstimate,
   getTimeEstimates,
 } from "./smart-flow-trade-service"
+
+export {
+  createActivityLog,
+  getActivityLogs,
+  getActivityLogsByConfig,
+  clearActivityLogs,
+  cleanupOldActivityLogs,
+} from "./smart-flow-activity-service"
