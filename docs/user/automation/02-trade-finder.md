@@ -115,6 +115,19 @@ The Activity tab on the Trade Finder dashboard shows every auto-trade event in r
 
 This log is your audit trail. Check it regularly to understand what Trade Finder is doing on your behalf.
 
+## Reviewing Trade Finder Trades
+
+When a Trade Finder setup becomes a live trade (or closes), you can view the full setup context from the **Positions** page. Click on any trade with a "Trade Finder" source badge to open the detail drawer, which includes:
+
+- **Chart overlays** — The trigger zone, MTF trend, and HTF curve are overlaid on the trade chart, showing exactly what the scanner saw when it detected the setup.
+- **Setup Analysis** — A dedicated section with the setup's score gauge, trade thesis narrative, market context, and timing metadata.
+- **Score Breakdown** — All 7 scoring dimensions (Strength, Time, Freshness, Trend, Curve, Profit Zone, Commodity Correlation) with progress bars.
+
+This makes it easy to review why Trade Finder took a trade and evaluate its decision quality against the actual outcome.
+
+> [!TIP]
+> Use the overlay toggle pills below the chart to show or hide zones, trend lines, and curve bands independently.
+
 ## Getting Started
 
 1. Go to the Trade Finder page

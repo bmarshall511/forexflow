@@ -75,6 +75,29 @@ Every trade has a small colored badge showing _how_ it was created. This helps y
 > [!NOTE]
 > All trades ultimately live on OANDA (your broker). The source badge just tells you _who_ or _what_ created the trade. FXFlow tracks this so you can compare performance across different methods.
 
+## Trade Detail View
+
+Click on any trade to open the **detail drawer** on the right side. This shows the full picture of the trade:
+
+- **Chart** — A candlestick chart showing the trade from entry to exit (or live for open trades). You can switch timeframes and, for open/pending trades, drag the SL/TP lines directly on the chart.
+- **Trade Details** — Pair, direction, entry price, units, and timeframe.
+- **Protection** — Stop Loss, Take Profit, distances in pips, and R:R ratio.
+- **Performance** — P/L, duration, MFE/MAE, financing, and margin.
+- **Tags** — Assign colored labels to organize trades.
+- **Notes** — Add personal notes about your reasoning or lessons learned.
+- **Events** — A timeline of everything that happened (fills, modifications, partial closes).
+
+### Trade Finder Setup Analysis
+
+When viewing a trade that was placed by **Trade Finder**, the detail drawer shows additional context from the original setup analysis:
+
+- **Chart overlays** — The supply/demand zone that triggered the trade is displayed on the chart, along with the MTF trend (swing points, segments, controlling swing) and HTF curve bands. Toggle each overlay on or off with the pills below the chart.
+- **Setup Analysis section** — Shows a circular score gauge, a natural-language "trade thesis" explaining why the setup was detected, market context (zone type, trend direction, curve position, R:R ratio), and setup metadata (detection time, placement time, timeframe set, risk/reward in pips, position size).
+- **Score Breakdown** — Expand to see all 7 scoring dimensions: Strength, Time, Freshness, Trend, Curve, Profit Zone, and Commodity Correlation.
+
+> [!TIP]
+> Reviewing the setup analysis on closed trades is a great way to evaluate Trade Finder's performance. You can see exactly what the scanner detected at the time and compare it to the trade's actual outcome.
+
 ## Filtering and Pagination
 
 When you have lots of trades, you can narrow things down:
