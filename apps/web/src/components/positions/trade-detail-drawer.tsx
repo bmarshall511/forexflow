@@ -7,6 +7,8 @@ import type {
   ClosedTradeData,
   TradeCloseReason,
   CloseContext,
+  TrendVisualSettings,
+  ZoneData,
 } from "@fxflow/types"
 import { formatCurrency, formatPips, priceToPips, getDecimalPlaces } from "@fxflow/shared"
 import {
@@ -37,7 +39,11 @@ import { AiAnalysisSheet } from "@/components/ai/ai-analysis-sheet"
 import { TradeReplayDialog } from "@/components/analytics/trade-replay-dialog"
 import { useTradeDetail } from "@/hooks/use-trade-detail"
 import { useAiAnalysis } from "@/hooks/use-ai-analysis"
+import { useTradeFinderSetup } from "@/hooks/use-trade-finder-setup"
 import { useTags } from "@/hooks/use-tags"
+import { ChartOverlayToggles } from "./chart-overlay-toggles"
+import type { OverlayVisibility } from "./chart-overlay-toggles"
+import { SetupAnalysisSection } from "./setup-analysis-section"
 import { DurationDisplay } from "./duration-display"
 import { cn } from "@/lib/utils"
 import {
@@ -136,6 +142,21 @@ export function TradeDetailDrawer({
   const { history: aiHistory } = useAiAnalysis(tradeId)
   const { tags: allTags, createTag } = useTags()
 
+  // Trade Finder setup lookup (only fetches for TF trades)
+  const oandaSourceId = trade
+    ? trade._type === "pending"
+      ? trade.sourceOrderId
+      : trade.sourceTradeId
+    : null
+  const { setup: tfSetup, isTradeFinderTrade } = useTradeFinderSetup(oandaSourceId, trade?.source)
+
+  // Chart overlay toggles (only relevant when setup data exists)
+  const [overlayVis, setOverlayVis] = useState<OverlayVisibility>({
+    showZones: true,
+    showTrend: true,
+    showCurve: true,
+  })
+
   // Compute trade entry/exit levels for chart (must be before early return)
   const tradeTimeframe = detail?.timeframe ?? trade?.timeframe ?? "H1"
   const tradeLevels = useMemo((): TradeLevel[] => {
@@ -167,6 +188,32 @@ export function TradeDetailDrawer({
     if (trade._type === "closed") return Math.floor(new Date(trade.openedAt).getTime() / 1000)
     return undefined
   }, [trade])
+
+  // Derive chart overlay data from the Trade Finder setup snapshot
+  const setupZones = useMemo((): ZoneData[] | undefined => {
+    if (!tfSetup || !overlayVis.showZones) return undefined
+    return [tfSetup.zone]
+  }, [tfSetup, overlayVis.showZones])
+
+  const setupTrendVisuals = useMemo(
+    (): TrendVisualSettings => ({
+      showBoxes: false,
+      showLines: true,
+      showMarkers: true,
+      showLabels: true,
+      showControllingSwing: true,
+      boxOpacity: 0.1,
+    }),
+    [],
+  )
+
+  const setupTrendData = overlayVis.showTrend ? (tfSetup?.trendData ?? null) : null
+  const setupCurveData = overlayVis.showCurve ? (tfSetup?.curveData ?? null) : null
+  const setupZonePrice = trade
+    ? trade._type === "open" && trade.currentPrice != null
+      ? trade.currentPrice
+      : trade.entryPrice
+    : null
 
   if (!trade) return null
 
@@ -304,6 +351,11 @@ export function TradeDetailDrawer({
                   onSaved={refetch}
                   tradeLevels={tradeLevels}
                   scrollToTime={scrollToTime}
+                  zones={setupZones}
+                  zoneCurrentPrice={setupZonePrice}
+                  curveData={setupCurveData}
+                  trendData={setupTrendData}
+                  trendVisuals={setupTrendVisuals}
                 />
               ) : (
                 <TradingViewChart
@@ -318,7 +370,22 @@ export function TradeDetailDrawer({
                   defaultTimeframe={detail?.timeframe}
                   tradeLevels={tradeLevels}
                   scrollToTime={scrollToTime}
+                  zones={setupZones}
+                  zoneCurrentPrice={setupZonePrice}
+                  curveData={setupCurveData}
+                  trendData={setupTrendData}
+                  trendVisuals={setupTrendVisuals}
                   height={260}
+                />
+              )}
+              {/* Overlay toggles for Trade Finder trades */}
+              {isTradeFinderTrade && tfSetup && (
+                <ChartOverlayToggles
+                  visibility={overlayVis}
+                  onChange={setOverlayVis}
+                  hasTrend={tfSetup.trendData != null}
+                  hasCurve={tfSetup.curveData != null}
+                  className="pt-1"
                 />
               )}
             </SectionCard>
@@ -445,6 +512,9 @@ export function TradeDetailDrawer({
                 />
               </div>
             </SectionCard>
+
+            {/* Setup Analysis (Trade Finder trades only) */}
+            {tfSetup && <SetupAnalysisSection setup={tfSetup} />}
 
             {/* Performance */}
             <SectionCard

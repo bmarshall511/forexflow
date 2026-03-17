@@ -6,6 +6,10 @@ import type {
   PendingOrderData,
   ClosedTradeData,
   PositionPriceTick,
+  ZoneData,
+  CurveData,
+  TrendData,
+  TrendVisualSettings,
 } from "@fxflow/types"
 import { useChartTradeEditor } from "@/hooks/use-chart-trade-editor"
 import { useTradeActions } from "@/hooks/use-trade-actions"
@@ -37,6 +41,16 @@ interface TradeEditorPanelProps {
   tradeLevels?: TradeLevel[]
   /** Unix seconds to scroll/center the chart on after data loads */
   scrollToTime?: number
+  /** Supply/demand zones to render */
+  zones?: ZoneData[]
+  /** Current mid-price for zone nearest-highlight */
+  zoneCurrentPrice?: number | null
+  /** Curve overlay data */
+  curveData?: CurveData | null
+  /** Trend overlay data */
+  trendData?: TrendData | null
+  /** Trend visual settings */
+  trendVisuals?: TrendVisualSettings
 }
 
 export function TradeEditorPanel({
@@ -48,6 +62,11 @@ export function TradeEditorPanel({
   lastTick,
   tradeLevels,
   scrollToTime,
+  zones,
+  zoneCurrentPrice,
+  curveData,
+  trendData,
+  trendVisuals,
 }: TradeEditorPanelProps) {
   const { modifyTrade, modifyPendingOrder } = useTradeActions()
 
@@ -92,6 +111,11 @@ export function TradeEditorPanel({
         }}
         tradeLevels={tradeLevels}
         scrollToTime={scrollToTime}
+        zones={zones}
+        zoneCurrentPrice={zoneCurrentPrice}
+        curveData={curveData}
+        trendData={trendData}
+        trendVisuals={trendVisuals}
         height={260}
       />
 

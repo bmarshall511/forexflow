@@ -7,7 +7,7 @@ interface SetupScoreBreakdownProps {
   scores: TradeFinderScoreBreakdown
 }
 
-function ScoreRow({ label, score }: { label: string; score: OddsEnhancerScore }) {
+export function ScoreRow({ label, score }: { label: string; score: OddsEnhancerScore }) {
   const pct = score.max > 0 ? (score.value / score.max) * 100 : 0
   const colorClass =
     pct >= 80
