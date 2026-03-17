@@ -802,57 +802,84 @@ export class OandaTradeSyncer {
       )
     }
 
-    // Pre-seed the DB record WITH metadata BEFORE reconcile.
-    // This ensures the record exists with correct source attribution from the start,
-    // eliminating the race window where reconcile could fire callbacks before metadata is set.
+    // For MARKET orders that filled immediately, the sourceId is a correct trade ID
+    // (from orderFillTransaction.tradeOpened.tradeID). We can safely pre-seed.
+    // For unfilled LIMIT orders, sourceId is a TRANSACTION ID (orderCreateTransaction.id)
+    // which differs from the actual order ID in OANDA's GET /orders response.
+    // Pre-seeding with the wrong ID would cause removeStalePendingOrders to cancel it.
     const metadata = JSON.stringify({ placedVia })
-    let dbTrade: Awaited<ReturnType<typeof upsertTrade>> | null = await upsertTrade({
-      source: "oanda",
-      sourceTradeId: sourceId,
-      status: filled ? "open" : "pending",
-      instrument,
-      direction,
-      orderType,
-      entryPrice: fillPrice ?? entryPrice ?? 0,
-      initialUnits: units,
-      currentUnits: units,
-      openedAt: new Date(),
-      metadata,
-    })
-    console.log(
-      `[placeOrder] Pre-seeded DB record: id=${dbTrade.id}, sourceId=${sourceId}, placedVia=${placedVia}`,
-    )
+    let dbTrade: Awaited<ReturnType<typeof upsertTrade>> | null = null
 
-    // Now reconcile — the record already has metadata, so reconcile won't overwrite it
-    // (upsertTrade only updates metadata if explicitly provided, and reconcile omits it).
+    if (filled) {
+      // Market fills: sourceId is the correct trade ID — safe to pre-seed
+      dbTrade = await upsertTrade({
+        source: "oanda",
+        sourceTradeId: sourceId,
+        status: "open",
+        instrument,
+        direction,
+        orderType,
+        entryPrice: fillPrice ?? entryPrice ?? 0,
+        initialUnits: units,
+        currentUnits: units,
+        openedAt: new Date(),
+        metadata,
+      })
+      console.log(
+        `[placeOrder] Pre-seeded filled trade: id=${dbTrade.id}, sourceId=${sourceId}, placedVia=${placedVia}`,
+      )
+    }
+
+    // Reconcile to sync the canonical OANDA state into DB.
+    // For LIMIT orders this creates the DB record with the correct order ID.
     await this.reconcile()
 
-    // Re-fetch in case reconcile updated the sourceTradeId (e.g., order ID migration)
-    const refreshed = await getTradeBySourceId("oanda", sourceId)
-    if (refreshed) {
-      dbTrade = refreshed
+    // Find the DB record. For filled orders, re-fetch the pre-seeded record.
+    // For LIMIT orders, find by instrument + direction since we don't know the real order ID yet.
+    if (filled) {
+      const refreshed = await getTradeBySourceId("oanda", sourceId)
+      if (refreshed) dbTrade = refreshed
     } else {
-      // Fallback: find by instrument + direction + recent creation
+      // LIMIT order: the real order ID was assigned during reconcile.
+      // Find the record that reconcile just created.
       const { db: prisma } = await import("@fxflow/db")
       const recent = await prisma.trade.findFirst({
         where: {
           source: "oanda",
           instrument,
           direction,
-          status: filled ? "open" : "pending",
+          status: "pending",
           openedAt: { gte: new Date(Date.now() - 60_000) },
         },
         orderBy: { openedAt: "desc" },
       })
       if (recent) {
         dbTrade = recent
-        // Ensure metadata is on the correct record
-        if (!recent.metadata) {
-          await import("@fxflow/db").then(({ db: p }) =>
-            p.trade.update({ where: { id: recent.id }, data: { metadata } }),
-          )
-        }
+        console.log(
+          `[placeOrder] Found LIMIT order after reconcile: id=${recent.id}, sourceTradeId=${recent.sourceTradeId}`,
+        )
       }
+    }
+
+    // Set metadata on the correct record (post-reconcile for LIMIT orders)
+    if (dbTrade) {
+      try {
+        const { db: prisma } = await import("@fxflow/db")
+        await prisma.trade.update({
+          where: { id: dbTrade.id },
+          data: { metadata },
+        })
+        console.log(`[placeOrder] Metadata set: trade=${dbTrade.id}, placedVia=${placedVia}`)
+      } catch (metaErr) {
+        console.error(
+          `[placeOrder] FAILED to set metadata for ${dbTrade?.id}:`,
+          (metaErr as Error).message,
+        )
+      }
+    } else {
+      console.error(
+        `[placeOrder] NO DB RECORD FOUND — metadata not set for ${instrument} ${direction} (sourceId=${sourceId}, placedVia=${placedVia})`,
+      )
     }
 
     // Re-reconcile so the WS broadcast picks up the record with metadata
@@ -860,7 +887,22 @@ export class OandaTradeSyncer {
 
     // Create audit event and persist timeframe, notes, tags (best-effort)
     try {
-      if (!dbTrade) dbTrade = await getTradeBySourceId("oanda", sourceId)
+      if (!dbTrade) {
+        // Try sourceId first (works for filled MARKET orders), then fallback
+        dbTrade = await getTradeBySourceId("oanda", sourceId)
+        if (!dbTrade) {
+          const { db: prisma } = await import("@fxflow/db")
+          dbTrade = await prisma.trade.findFirst({
+            where: {
+              source: "oanda",
+              instrument,
+              direction,
+              openedAt: { gte: new Date(Date.now() - 60_000) },
+            },
+            orderBy: { openedAt: "desc" },
+          })
+        }
+      }
       if (dbTrade) {
         if (timeframe) {
           await updateTradeTimeframe(dbTrade.id, timeframe)
