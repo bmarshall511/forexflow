@@ -5,22 +5,46 @@ import { useTheme } from "next-themes"
 import { createChart, CandlestickSeries } from "lightweight-charts"
 import type { IChartApi, ISeriesApi, CandlestickData, Time } from "lightweight-charts"
 import { getDecimalPlaces } from "@fxflow/shared"
+import type { TradeFinderSetupData, TrendVisualSettings } from "@fxflow/types"
 import { getChartOptions, getCandlestickOptions } from "@/components/charts/chart-utils"
+import { ZonePrimitive } from "@/components/charts/zone-primitive"
+import { CurvePrimitive } from "@/components/charts/curve-primitive"
+import { TrendPrimitive } from "@/components/charts/trend-primitive"
 import type { ReplayCandle, ReplayTradeInfo } from "@/app/api/trades/[tradeId]/replay-candles/route"
 import { createOverlayLines, updateOverlayLines, type OverlayLines } from "./replay-overlay-lines"
+
+const REPLAY_TREND_VISUALS: TrendVisualSettings = {
+  showBoxes: false,
+  showLines: true,
+  showMarkers: true,
+  showLabels: true,
+  showControllingSwing: true,
+  boxOpacity: 0.1,
+}
 
 interface TradeReplayProps {
   candles: ReplayCandle[]
   tradeInfo: ReplayTradeInfo
   currentIndex: number
+  /** Trade Finder setup snapshot (zones, trend, curve) */
+  tfSetup?: TradeFinderSetupData | null
   height?: number
 }
 
-export function TradeReplay({ candles, tradeInfo, currentIndex, height = 320 }: TradeReplayProps) {
+export function TradeReplay({
+  candles,
+  tradeInfo,
+  currentIndex,
+  tfSetup,
+  height = 320,
+}: TradeReplayProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
   const overlayRef = useRef<OverlayLines | null>(null)
+  const zonePrimRef = useRef<ZonePrimitive | null>(null)
+  const curvePrimRef = useRef<CurvePrimitive | null>(null)
+  const trendPrimRef = useRef<TrendPrimitive | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme !== "light"
 
@@ -67,6 +91,19 @@ export function TradeReplay({ candles, tradeInfo, currentIndex, height = 320 }: 
     seriesRef.current = series
     overlayRef.current = createOverlayLines(chart, tradeInfo)
 
+    // Attach primitives for Trade Finder overlays
+    const zonePrim = new ZonePrimitive()
+    series.attachPrimitive(zonePrim)
+    zonePrimRef.current = zonePrim
+
+    const curvePrim = new CurvePrimitive()
+    series.attachPrimitive(curvePrim)
+    curvePrimRef.current = curvePrim
+
+    const trendPrim = new TrendPrimitive()
+    series.attachPrimitive(trendPrim)
+    trendPrimRef.current = trendPrim
+
     const observer = new ResizeObserver(() => {
       if (container) chart.applyOptions({ width: container.clientWidth })
     })
@@ -78,6 +115,9 @@ export function TradeReplay({ candles, tradeInfo, currentIndex, height = 320 }: 
       chartRef.current = null
       seriesRef.current = null
       overlayRef.current = null
+      zonePrimRef.current = null
+      curvePrimRef.current = null
+      trendPrimRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument, isDark, height, decimals, minMove])
@@ -91,6 +131,34 @@ export function TradeReplay({ candles, tradeInfo, currentIndex, height = 320 }: 
     series.setData(candles.slice(0, currentIndex + 1) as CandlestickData<Time>[])
     updateOverlayLines(overlay, candles, tradeInfo, currentIndex, entryCandleIdx, exitCandleIdx)
   }, [candles, currentIndex, tradeInfo, entryCandleIdx, exitCandleIdx])
+
+  // Sync Trade Finder zone/trend/curve overlays
+  useEffect(() => {
+    if (!zonePrimRef.current) return
+    if (tfSetup) {
+      zonePrimRef.current.setZones([tfSetup.zone], tfSetup.entryPrice, isDark, decimals)
+    } else {
+      zonePrimRef.current.clearAll()
+    }
+  }, [tfSetup, isDark, decimals])
+
+  useEffect(() => {
+    if (!curvePrimRef.current) return
+    if (tfSetup?.curveData) {
+      curvePrimRef.current.setCurve(tfSetup.curveData, isDark)
+    } else {
+      curvePrimRef.current.clearCurve()
+    }
+  }, [tfSetup, isDark])
+
+  useEffect(() => {
+    if (!trendPrimRef.current) return
+    if (tfSetup?.trendData) {
+      trendPrimRef.current.setTrend(tfSetup.trendData, REPLAY_TREND_VISUALS, isDark)
+    } else {
+      trendPrimRef.current.clearTrend()
+    }
+  }, [tfSetup, isDark])
 
   return <div ref={containerRef} className="h-full w-full" style={{ height }} />
 }

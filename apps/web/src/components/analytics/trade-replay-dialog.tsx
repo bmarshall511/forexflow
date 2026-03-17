@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import type { TradeFinderSetupData } from "@fxflow/types"
 import { useTradeReplay } from "@/hooks/use-trade-replay"
 import { TradeReplay } from "./trade-replay"
 import { ReplayControls } from "./replay-controls"
@@ -17,9 +18,16 @@ interface TradeReplayDialogProps {
   tradeId: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Trade Finder setup snapshot for zone/trend/curve overlays */
+  tfSetup?: TradeFinderSetupData | null
 }
 
-export function TradeReplayDialog({ tradeId, open, onOpenChange }: TradeReplayDialogProps) {
+export function TradeReplayDialog({
+  tradeId,
+  open,
+  onOpenChange,
+  tfSetup,
+}: TradeReplayDialogProps) {
   const { candles, tradeInfo, isLoading, error, currentIndex, isPlaying, speed, controls } =
     useTradeReplay(open ? tradeId : null)
 
@@ -70,6 +78,7 @@ export function TradeReplayDialog({ tradeId, open, onOpenChange }: TradeReplayDi
               candles={candles}
               tradeInfo={tradeInfo}
               currentIndex={currentIndex}
+              tfSetup={tfSetup}
               height={360}
             />
             <ReplayControls

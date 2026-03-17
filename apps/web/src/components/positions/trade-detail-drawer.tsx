@@ -148,7 +148,11 @@ export function TradeDetailDrawer({
       ? trade.sourceOrderId
       : trade.sourceTradeId
     : null
-  const { setup: tfSetup, isTradeFinderTrade } = useTradeFinderSetup(oandaSourceId, trade?.source)
+  const {
+    setup: tfSetup,
+    isTradeFinderTrade,
+    isLoading: tfSetupLoading,
+  } = useTradeFinderSetup(oandaSourceId, trade?.source)
 
   // Chart overlay toggles (only relevant when setup data exists)
   const [overlayVis, setOverlayVis] = useState<OverlayVisibility>({
@@ -387,6 +391,16 @@ export function TradeDetailDrawer({
                   hasCurve={tfSetup.curveData != null}
                   className="pt-1"
                 />
+              )}
+              {isTradeFinderTrade && tfSetupLoading && (
+                <p className="text-muted-foreground/60 px-1 pt-1 text-[10px]">
+                  Loading setup analysis…
+                </p>
+              )}
+              {isTradeFinderTrade && !tfSetupLoading && !tfSetup && (
+                <p className="text-muted-foreground/60 px-1 pt-1 text-[10px]">
+                  Setup analysis data no longer available (may have been cleaned up).
+                </p>
               )}
             </SectionCard>
 
@@ -785,7 +799,12 @@ export function TradeDetailDrawer({
 
       {/* Trade Replay Dialog */}
       {trade._type === "closed" && (
-        <TradeReplayDialog tradeId={tradeId} open={replayOpen} onOpenChange={setReplayOpen} />
+        <TradeReplayDialog
+          tradeId={tradeId}
+          open={replayOpen}
+          onOpenChange={setReplayOpen}
+          tfSetup={tfSetup}
+        />
       )}
     </>
   )
