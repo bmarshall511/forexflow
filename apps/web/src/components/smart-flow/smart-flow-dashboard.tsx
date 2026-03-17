@@ -20,12 +20,15 @@ import {
   Shield,
 } from "lucide-react"
 import { useSmartFlow } from "@/hooks/use-smart-flow"
+import { TradeBuilder } from "./trade-builder"
+import { ActiveTradesTab } from "./active-trades-tab"
+import { ConfigsTab } from "./configs-tab"
 
 type Tab = "trade" | "active" | "configs" | "history" | "rankings"
 
 export function SmartFlowDashboard() {
   const [tab, setTab] = useState<Tab>("trade")
-  const { configs, activeTrades, closedTrades, isLoading } = useSmartFlow()
+  const { configs, activeTrades, closedTrades, isLoading, refetch } = useSmartFlow()
 
   if (isLoading) {
     return (
@@ -139,36 +142,27 @@ export function SmartFlowDashboard() {
       </TabNav>
 
       <div className="space-y-4 px-4 py-6 md:px-6">
-        <TabPlaceholder tab={tab} />
+        {tab === "trade" ? (
+          <TradeBuilder
+            onComplete={() => {
+              refetch()
+              setTab("configs")
+            }}
+          />
+        ) : tab === "active" ? (
+          <ActiveTradesTab trades={activeTrades} />
+        ) : tab === "configs" ? (
+          <ConfigsTab configs={configs} onRefresh={refetch} />
+        ) : (
+          <TabPlaceholder tab={tab} />
+        )}
       </div>
     </div>
   )
 }
 
 function TabPlaceholder({ tab }: { tab: Tab }) {
-  if (tab === "trade") {
-    return (
-      <div className="mx-auto max-w-md space-y-4 py-12 text-center">
-        <div className="bg-primary/10 mx-auto flex size-12 items-center justify-center rounded-full">
-          <Zap className="text-primary size-6" />
-        </div>
-        <h3 className="text-foreground text-base font-semibold">Trade Builder Coming Soon</h3>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          The SmartFlow trade builder will let you pick a currency pair, choose a direction, select
-          a strategy, and place a managed trade — all in a few simple steps. SmartFlow will then
-          automatically manage your trade toward profit.
-        </p>
-        <p className="text-muted-foreground text-xs">
-          In the meantime, you can configure your settings and explore the other tabs.
-        </p>
-      </div>
-    )
-  }
   const msgs: Record<string, string> = {
-    active:
-      "Active SmartFlow trades will appear here once trades are running. Each trade shows its current phase, progress toward profit, and all management actions taken.",
-    configs:
-      "Your saved trade configurations will be listed here. Create configs for different currency pairs with different strategies, then activate them when ready.",
     history:
       "Closed SmartFlow trades will appear here with full details — profit/loss, how long they took, which safety nets fired, and how accurate the time estimate was.",
     rankings:
