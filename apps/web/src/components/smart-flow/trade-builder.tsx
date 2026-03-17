@@ -8,11 +8,32 @@ import type { SmartFlowPreset } from "@fxflow/types"
 import { PRESET_INFO } from "./trade-builder-presets"
 import { StepPair, StepDirection, StepStrategy, StepReview } from "./trade-builder-steps"
 
-// ─── Step labels ────────────────────────────────────────────────────────
+// ── Step metadata ────────────────────────────────────────────────────────
 
-const STEPS = ["Pick a Pair", "Pick Direction", "Choose Strategy", "Review & Confirm"] as const
+const STEPS = [
+  {
+    label: "Pick a Pair",
+    title: "Choose Your Currency Pair",
+    subtitle: "Pick the pair you want to trade. Majors are the safest for beginners.",
+  },
+  {
+    label: "Pick Direction",
+    title: "Which Way Will It Go?",
+    subtitle: "Choose whether you think the price will go up or down.",
+  },
+  {
+    label: "Choose Strategy",
+    title: "Pick Your Strategy",
+    subtitle: "Each strategy manages your trade differently. Start with Steady Growth if unsure.",
+  },
+  {
+    label: "Review & Confirm",
+    title: "Review Your Trade",
+    subtitle: "Everything looks good? Let SmartFlow handle the rest.",
+  },
+] as const
 
-// ─── Main component ─────────────────────────────────────────────────────
+// ── Main component ───────────────────────────────────────────────────────
 
 interface TradeBuilderProps {
   onComplete?: () => void
@@ -33,6 +54,7 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
     step === 3
 
   const pairLabel = pair.replace("_", "/")
+  const progress = ((step + 1) / STEPS.length) * 100
 
   async function handleSubmit() {
     if (!pair || !direction) return
@@ -43,7 +65,7 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           instrument: pair,
-          name: `${pairLabel} ${direction === "long" ? "Buy" : "Sell"} — ${PRESET_INFO[preset].label}`,
+          name: `${pairLabel} ${direction === "long" ? "Buy" : "Sell"} \u2014 ${PRESET_INFO[preset].label}`,
           direction,
           preset,
           isActive: true,
@@ -87,7 +109,7 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
       window.dispatchEvent(new Event("smart-flow-updated"))
       onComplete?.()
     } catch {
-      toast.error("Network error — could not save config")
+      toast.error("Network error \u2014 could not save config")
     } finally {
       setSubmitting(false)
     }
@@ -95,75 +117,111 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {/* Step indicator */}
-      <nav aria-label="Wizard progress" className="flex items-center justify-center gap-2">
-        {STEPS.map((label, i) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => i < step && setStep(i)}
-            disabled={i > step}
-            aria-current={i === step ? "step" : undefined}
-            className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium transition-colors ${
-              i === step
-                ? "bg-primary text-primary-foreground"
-                : i < step
-                  ? "bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
-                  : "bg-muted text-muted-foreground"
-            }`}
-          >
-            <span className="flex size-5 items-center justify-center rounded-full bg-black/10 text-[10px]">
-              {i < step ? <Check className="size-3" /> : i + 1}
-            </span>
-            <span className="hidden sm:inline">{label}</span>
-          </button>
+      {/* Step indicator with connecting lines */}
+      <nav aria-label="Wizard progress" className="flex items-center justify-center gap-0">
+        {STEPS.map(({ label }, i) => (
+          <div key={label} className="flex items-center">
+            {i > 0 && (
+              <div
+                className={`hidden h-0.5 w-6 sm:block ${i <= step ? "bg-primary" : "bg-muted"} transition-colors duration-300`}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => i < step && setStep(i)}
+              disabled={i > step}
+              aria-current={i === step ? "step" : undefined}
+              className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium transition-all duration-300 ${
+                i === step
+                  ? "bg-primary text-primary-foreground shadow-primary/30 shadow-sm"
+                  : i < step
+                    ? "bg-primary/15 text-primary hover:bg-primary/25 cursor-pointer"
+                    : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`flex size-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                  i < step
+                    ? "bg-primary text-primary-foreground"
+                    : i === step
+                      ? "bg-white/20"
+                      : "bg-black/10 dark:bg-white/10"
+                }`}
+              >
+                {i < step ? <Check className="size-3.5" /> : i + 1}
+              </span>
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          </div>
         ))}
       </nav>
 
-      {/* Step content */}
-      {step === 0 && (
-        <StepPair pair={pair} onSelect={setPair} search={search} onSearch={setSearch} />
-      )}
-      {step === 1 && <StepDirection direction={direction} onSelect={setDirection} />}
-      {step === 2 && <StepStrategy preset={preset} onSelect={setPreset} />}
-      {step === 3 && (
-        <StepReview
-          pair={pairLabel}
-          direction={direction!}
-          preset={preset}
-          submitting={submitting}
-          onSubmit={handleSubmit}
+      {/* Progress bar */}
+      <div
+        className="bg-muted h-1 overflow-hidden rounded-full"
+        role="progressbar"
+        aria-valuenow={step + 1}
+        aria-valuemin={1}
+        aria-valuemax={STEPS.length}
+      >
+        <div
+          className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${progress}%` }}
         />
-      )}
+      </div>
+
+      {/* Step title + subtitle */}
+      <div className="text-center transition-opacity duration-300">
+        <h2 className="text-lg font-bold">{STEPS[step]?.title}</h2>
+        <p className="text-muted-foreground mt-1 text-sm">{STEPS[step]?.subtitle}</p>
+      </div>
+
+      {/* Step content with fade transition */}
+      <div key={step} className="animate-fade-in">
+        {step === 0 && (
+          <StepPair pair={pair} onSelect={setPair} search={search} onSearch={setSearch} />
+        )}
+        {step === 1 && <StepDirection pair={pair} direction={direction} onSelect={setDirection} />}
+        {step === 2 && <StepStrategy preset={preset} onSelect={setPreset} />}
+        {step === 3 && (
+          <StepReview
+            pair={pairLabel}
+            direction={direction!}
+            preset={preset}
+            submitting={submitting}
+            onSubmit={handleSubmit}
+          />
+        )}
+      </div>
 
       {/* Navigation */}
       <div className="flex justify-between">
         <Button
           variant="ghost"
-          size="sm"
+          size="lg"
           onClick={() => setStep(step - 1)}
           disabled={step === 0}
-          className="min-h-[44px] gap-1.5"
+          className="min-h-[48px] gap-2 px-5"
         >
           <ChevronLeft className="size-4" /> Back
         </Button>
         {step < 3 ? (
           <Button
-            size="sm"
+            size="lg"
             onClick={() => setStep(step + 1)}
             disabled={!canNext}
-            className="min-h-[44px] gap-1.5"
+            className="min-h-[48px] gap-2 px-6"
           >
             Next <ChevronRight className="size-4" />
           </Button>
         ) : (
           <Button
-            size="sm"
+            size="lg"
             onClick={handleSubmit}
             disabled={submitting}
-            className="min-h-[44px] gap-1.5"
+            className="min-h-[48px] gap-2 px-6"
           >
-            {submitting ? "Saving…" : "Start SmartFlow Trade"} <Zap className="size-4" />
+            {submitting ? "Saving\u2026" : "Start SmartFlow Trade"} <Zap className="size-4" />
           </Button>
         )}
       </div>
