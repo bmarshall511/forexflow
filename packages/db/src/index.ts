@@ -317,6 +317,7 @@ export {
   deleteDatabaseFile,
   type ResetModule,
   type PreflightStatus,
+  type AutomationStatus,
   type ResetResult,
 } from "./reset-service"
 

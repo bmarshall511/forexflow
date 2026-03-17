@@ -8,6 +8,9 @@ import { toast } from "sonner"
 import type { PreflightStatus } from "@fxflow/db"
 import type { ResetLevel } from "./reset-level-selector"
 import { useTradeActions } from "@/hooks/use-trade-actions"
+import { useKillSwitch } from "@/hooks/use-kill-switch"
+import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
+import { useAiTraderConfig } from "@/hooks/use-ai-trader-config"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
@@ -30,17 +33,34 @@ export function PreflightChecks({
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const { closeAllTrades, cancelAllOrders } = useTradeActions()
 
+  // Automation hooks for disable actions
+  const { enabled: tvEnabled, isToggling: tvToggling, toggle: tvToggle } = useKillSwitch()
+  const { config: tfConfig, update: tfUpdate } = useTradeFinderConfig()
+  const { config: aiConfig, save: aiSave } = useAiTraderConfig()
+
   // Local overrides for optimistic UI updates after successful actions.
   // The DB roundtrip via onRefresh is unreliable due to daemon reconcile races.
   const [overrides, setOverrides] = useState<Partial<PreflightStatus>>({})
   const merged = { ...preflight, ...overrides }
+  const mergedAuto = { ...preflight.automation, ...overrides.automation }
 
   const hasOpenTrades = merged.openTrades > 0
   const hasPendingOrders = merged.pendingOrders > 0
   const hasRunningAnalyses = merged.runningAnalyses > 0
   const hasActiveConditions = merged.activeConditions > 0
+
+  // Use live hook state (more current than preflight snapshot)
+  const isTvEnabled = tvEnabled ?? mergedAuto.tvAlertsEnabled
+  const isTfEnabled = tfConfig?.autoTradeEnabled ?? mergedAuto.autoTradeEnabled
+  const isAiEnabled = aiConfig?.enabled ?? mergedAuto.aiTraderEnabled
+  const hasAutomationEnabled = isTvEnabled || isTfEnabled || isAiEnabled
+
   const allClear =
-    !hasOpenTrades && !hasPendingOrders && !hasRunningAnalyses && !hasActiveConditions
+    !hasOpenTrades &&
+    !hasPendingOrders &&
+    !hasRunningAnalyses &&
+    !hasActiveConditions &&
+    !hasAutomationEnabled
 
   async function handleCloseAllTrades() {
     setActionLoading("trades")
@@ -83,6 +103,33 @@ export function PreflightChecks({
       void onRefresh()
     } catch {
       toast.error("Failed to reach daemon")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleDisableTvAlerts() {
+    setActionLoading("tv_alerts")
+    try {
+      await tvToggle()
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleDisableAutoTrade() {
+    setActionLoading("auto_trade")
+    try {
+      await tfUpdate({ autoTradeEnabled: false })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleDisableAiTrader() {
+    setActionLoading("ai_trader")
+    try {
+      await aiSave({ enabled: false })
     } finally {
       setActionLoading(null)
     }
@@ -143,48 +190,122 @@ export function PreflightChecks({
     },
   ]
 
+  const automationChecks = [
+    {
+      key: "tv_alerts",
+      label: "TV Alerts",
+      enabled: isTvEnabled,
+      passed: !isTvEnabled,
+      action: isTvEnabled ? handleDisableTvAlerts : undefined,
+      loading: actionLoading === "tv_alerts" || tvToggling,
+    },
+    {
+      key: "auto_trade",
+      label: "Trade Finder Auto-Trade",
+      enabled: isTfEnabled,
+      passed: !isTfEnabled,
+      action: isTfEnabled ? handleDisableAutoTrade : undefined,
+      loading: actionLoading === "auto_trade",
+    },
+    {
+      key: "ai_trader",
+      label: "AI Trader",
+      enabled: isAiEnabled,
+      passed: !isAiEnabled,
+      action: isAiEnabled ? handleDisableAiTrader : undefined,
+      loading: actionLoading === "ai_trader",
+    },
+  ]
+
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Pre-flight Checks</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Ensure there are no active positions before resetting.
+          Disable all automation and close active positions before resetting.
         </p>
       </div>
 
-      <div className="space-y-2">
-        {checks.map((check) => (
-          <div
-            key={check.key}
-            className={cn(
-              "flex items-center justify-between rounded-lg border p-3",
-              check.passed ? "border-border" : "border-destructive/30 bg-destructive/5",
-            )}
-          >
-            <div className="flex items-center gap-2">
-              {check.passed ? (
-                <CheckCircle className="size-5 shrink-0 text-emerald-500" aria-hidden="true" />
-              ) : (
-                <XCircle className="size-5 shrink-0 text-red-500" aria-hidden="true" />
+      {/* Automation checks */}
+      <div className="space-y-1.5">
+        <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          Automation
+        </p>
+        <div className="space-y-2">
+          {automationChecks.map((check) => (
+            <div
+              key={check.key}
+              className={cn(
+                "flex items-center justify-between rounded-lg border p-3",
+                check.passed ? "border-border" : "border-destructive/30 bg-destructive/5",
               )}
-              <span className="text-sm font-medium">{check.label}</span>
-              <span className="text-muted-foreground text-sm">({check.count})</span>
-            </div>
-            {check.action && (
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={actionLoading !== null}
-                onClick={check.action}
-              >
-                {actionLoading === check.key && (
-                  <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+            >
+              <div className="flex items-center gap-2">
+                {check.passed ? (
+                  <CheckCircle className="size-5 shrink-0 text-emerald-500" aria-hidden="true" />
+                ) : (
+                  <XCircle className="size-5 shrink-0 text-red-500" aria-hidden="true" />
                 )}
-                {check.actionLabel}
-              </Button>
-            )}
-          </div>
-        ))}
+                <span className="text-sm font-medium">{check.label}</span>
+                <span className="text-muted-foreground text-sm">
+                  ({check.enabled ? "On" : "Off"})
+                </span>
+              </div>
+              {check.action && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={actionLoading !== null || check.loading}
+                  onClick={check.action}
+                >
+                  {check.loading && <Loader2 className="size-3 animate-spin" aria-hidden="true" />}
+                  Disable
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Position checks */}
+      <div className="space-y-1.5">
+        <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          Positions
+        </p>
+        <div className="space-y-2">
+          {checks.map((check) => (
+            <div
+              key={check.key}
+              className={cn(
+                "flex items-center justify-between rounded-lg border p-3",
+                check.passed ? "border-border" : "border-destructive/30 bg-destructive/5",
+              )}
+            >
+              <div className="flex items-center gap-2">
+                {check.passed ? (
+                  <CheckCircle className="size-5 shrink-0 text-emerald-500" aria-hidden="true" />
+                ) : (
+                  <XCircle className="size-5 shrink-0 text-red-500" aria-hidden="true" />
+                )}
+                <span className="text-sm font-medium">{check.label}</span>
+                <span className="text-muted-foreground text-sm">({check.count})</span>
+              </div>
+              {check.action && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={actionLoading !== null}
+                  onClick={check.action}
+                >
+                  {actionLoading === check.key && (
+                    <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+                  )}
+                  {check.actionLabel}
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {!allClear && (

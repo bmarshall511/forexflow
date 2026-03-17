@@ -18,11 +18,18 @@ export type ResetModule =
   | "notifications"
   | "chart_state"
 
+export interface AutomationStatus {
+  tvAlertsEnabled: boolean
+  autoTradeEnabled: boolean
+  aiTraderEnabled: boolean
+}
+
 export interface PreflightStatus {
   openTrades: number
   pendingOrders: number
   runningAnalyses: number
   activeConditions: number
+  automation: AutomationStatus
   moduleCounts: Record<ResetModule, number>
 }
 
@@ -117,17 +124,39 @@ export async function getModuleDataCounts(): Promise<Record<ResetModule, number>
   return Object.fromEntries(entries) as Record<ResetModule, number>
 }
 
-/** Get counts for pre-flight checks (open trades, running analyses, etc). */
+/** Get counts for pre-flight checks (open trades, running analyses, automation status, etc). */
 export async function getResetPreflightStatus(): Promise<PreflightStatus> {
-  const [openTrades, pendingOrders, runningAnalyses, activeConditions, moduleCounts] =
-    await Promise.all([
-      db.trade.count({ where: { status: "open" } }),
-      db.trade.count({ where: { status: "pending" } }),
-      db.aiAnalysis.count({ where: { status: { in: ["pending", "running"] } } }),
-      db.tradeCondition.count({ where: { status: "active" } }),
-      getModuleDataCounts(),
-    ])
-  return { openTrades, pendingOrders, runningAnalyses, activeConditions, moduleCounts }
+  const [
+    openTrades,
+    pendingOrders,
+    runningAnalyses,
+    activeConditions,
+    tvConfig,
+    tfConfig,
+    aiConfig,
+    moduleCounts,
+  ] = await Promise.all([
+    db.trade.count({ where: { status: "open" } }),
+    db.trade.count({ where: { status: "pending" } }),
+    db.aiAnalysis.count({ where: { status: { in: ["pending", "running"] } } }),
+    db.tradeCondition.count({ where: { status: "active" } }),
+    db.tVAlertsConfig.findFirst().then((c) => c?.enabled ?? false),
+    db.tradeFinderConfig.findFirst().then((c) => c?.autoTradeEnabled ?? false),
+    db.aiTraderConfig.findFirst().then((c) => c?.enabled ?? false),
+    getModuleDataCounts(),
+  ])
+  return {
+    openTrades,
+    pendingOrders,
+    runningAnalyses,
+    activeConditions,
+    automation: {
+      tvAlertsEnabled: tvConfig,
+      autoTradeEnabled: tfConfig,
+      aiTraderEnabled: aiConfig,
+    },
+    moduleCounts,
+  }
 }
 
 /** Reset a single module. Deletes children before parents for FK safety. */

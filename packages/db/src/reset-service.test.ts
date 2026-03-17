@@ -20,10 +20,10 @@ const mockCurveSnapshot = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn(
 const mockNotification = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
 const mockChartLayout = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
 const mockSettings = vi.hoisted(() => ({ deleteMany: vi.fn() }))
-const mockTVAlertsConfig = vi.hoisted(() => ({ deleteMany: vi.fn() }))
+const mockTVAlertsConfig = vi.hoisted(() => ({ deleteMany: vi.fn(), findFirst: vi.fn() }))
 const mockAiSettings = vi.hoisted(() => ({ deleteMany: vi.fn() }))
-const mockTradeFinderConfig = vi.hoisted(() => ({ deleteMany: vi.fn() }))
-const mockAiTraderConfig = vi.hoisted(() => ({ deleteMany: vi.fn() }))
+const mockTradeFinderConfig = vi.hoisted(() => ({ deleteMany: vi.fn(), findFirst: vi.fn() }))
+const mockAiTraderConfig = vi.hoisted(() => ({ deleteMany: vi.fn(), findFirst: vi.fn() }))
 const mockZoneSettings = vi.hoisted(() => ({ deleteMany: vi.fn() }))
 const mockTrendSettings = vi.hoisted(() => ({ deleteMany: vi.fn() }))
 const mock$transaction = vi.hoisted(() => vi.fn())
@@ -149,6 +149,9 @@ describe("reset-service", () => {
       mockCurveSnapshot.count.mockResolvedValue(0)
       mockNotification.count.mockResolvedValue(0)
       mockChartLayout.count.mockResolvedValue(0)
+      mockTVAlertsConfig.findFirst.mockResolvedValue({ enabled: true })
+      mockTradeFinderConfig.findFirst.mockResolvedValue({ autoTradeEnabled: false })
+      mockAiTraderConfig.findFirst.mockResolvedValue({ enabled: true })
 
       const status = await getResetPreflightStatus()
 
@@ -156,6 +159,11 @@ describe("reset-service", () => {
       expect(status.pendingOrders).toBe(1)
       expect(status.runningAnalyses).toBe(2)
       expect(status.activeConditions).toBe(1)
+      expect(status.automation).toEqual({
+        tvAlertsEnabled: true,
+        autoTradeEnabled: false,
+        aiTraderEnabled: true,
+      })
       expect(status.moduleCounts).toBeDefined()
     })
   })
