@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { DataTile } from "@/components/ui/data-tile"
@@ -31,7 +31,9 @@ type Tab = "trade" | "active" | "configs" | "activity" | "history" | "rankings"
 
 export function SmartFlowDashboard() {
   const [tab, setTab] = useState<Tab>("trade")
+  const [activityCount, setActivityCount] = useState(0)
   const { configs, activeTrades, closedTrades, isLoading, refetch } = useSmartFlow()
+  const handleEventCount = useCallback((count: number) => setActivityCount(count), [])
 
   if (isLoading) {
     return (
@@ -133,7 +135,8 @@ export function SmartFlowDashboard() {
           onClick={() => setTab("activity")}
           icon={<Radio className="size-3.5" />}
           label="Activity"
-          count={0}
+          count={activityCount}
+          pulse={activityCount > 0}
         />
         <TabNavButton
           active={tab === "history"}
@@ -166,7 +169,7 @@ export function SmartFlowDashboard() {
         ) : tab === "configs" ? (
           <ConfigsTab configs={configs} onRefresh={refetch} />
         ) : tab === "activity" ? (
-          <ActivityTab />
+          <ActivityTab activeConfigCount={activeConfigCount} onEventCount={handleEventCount} />
         ) : (
           <TabPlaceholder tab={tab} />
         )}

@@ -61,7 +61,7 @@ export function setSourcePriorityManager(manager: SourcePriorityManager): void {
   _sourcePriorityManager = manager
 }
 
-import { getActivityEvents } from "./smart-flow/activity-feed.js"
+import { getActivityEvents, emitActivity } from "./smart-flow/activity-feed.js"
 import type { SmartFlowManager } from "./smart-flow/manager.js"
 let _smartFlowManager: SmartFlowManager | null = null
 export function setSmartFlowManager(manager: SmartFlowManager): void {
@@ -1123,6 +1123,35 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "GET" && req.url === "/smart-flow/activity") {
       sendJson(res, 200, { ok: true, events: getActivityEvents() })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/smart-flow/log-activity") {
+      readBody(req)
+        .then((raw) => {
+          const { type, message, instrument, detail, severity, configId, tradeId } = JSON.parse(
+            raw,
+          ) as {
+            type: string
+            message: string
+            instrument?: string
+            detail?: string
+            severity?: "info" | "success" | "warning" | "error"
+            configId?: string
+            tradeId?: string
+          }
+          emitActivity(type as Parameters<typeof emitActivity>[0], message, {
+            instrument,
+            detail,
+            severity,
+            configId,
+            tradeId,
+          })
+          sendJson(res, 200, { ok: true })
+        })
+        .catch((err) => {
+          sendJson(res, 400, { ok: false, error: (err as Error).message })
+        })
       return
     }
 

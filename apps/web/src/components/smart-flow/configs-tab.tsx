@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import type { SmartFlowConfigData, SmartFlowPreset } from "@fxflow/types"
+import { useState, useEffect, useCallback } from "react"
+import type {
+  SmartFlowConfigData,
+  SmartFlowConfigRuntimeStatus,
+  SmartFlowActivityEvent,
+} from "@fxflow/types"
 import { toast } from "sonner"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { DirectionBadge } from "@/components/positions/direction-badge"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,17 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Layers, Trash2, ShieldCheck, TrendingUp, Target, Clock } from "lucide-react"
-import { cn } from "@/lib/utils"
-
-const PRESET_LABELS: Record<SmartFlowPreset, string> = {
-  momentum_catch: "Momentum Catch",
-  steady_growth: "Steady Growth",
-  swing_capture: "Swing Capture",
-  trend_rider: "Trend Rider",
-  recovery: "Recovery",
-  custom: "Custom",
-}
+import { Layers } from "lucide-react"
+import { logSmartFlowActivity } from "@/lib/smart-flow-activity"
+import { ConfigCard } from "./config-card"
 
 interface ConfigsTabProps {
   configs: SmartFlowConfigData[]
@@ -37,6 +29,54 @@ interface ConfigsTabProps {
 export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
+  const [runtimeMap, setRuntimeMap] = useState<Record<string, SmartFlowConfigRuntimeStatus>>({})
+  const [activityMap, setActivityMap] = useState<Record<string, SmartFlowActivityEvent>>({})
+
+  const fetchRuntime = useCallback(async () => {
+    try {
+      const res = await fetch("/api/daemon/smart-flow/config-runtime")
+      if (!res.ok) return
+      const json = (await res.json()) as {
+        ok: boolean
+        statuses?: SmartFlowConfigRuntimeStatus[]
+      }
+      if (json.ok && json.statuses) {
+        const map: Record<string, SmartFlowConfigRuntimeStatus> = {}
+        for (const s of json.statuses) map[s.configId] = s
+        setRuntimeMap(map)
+      }
+    } catch {
+      /* daemon may be down */
+    }
+  }, [])
+
+  const fetchActivity = useCallback(async () => {
+    try {
+      const res = await fetch("/api/daemon/smart-flow/activity")
+      if (!res.ok) return
+      const json = (await res.json()) as {
+        ok: boolean
+        events?: SmartFlowActivityEvent[]
+        data?: SmartFlowActivityEvent[]
+      }
+      const events = json.events ?? json.data ?? []
+      if (!json.ok || events.length === 0) return
+      const map: Record<string, SmartFlowActivityEvent> = {}
+      for (const e of events) {
+        if (e.configId) map[e.configId] = e
+      }
+      setActivityMap(map)
+    } catch {
+      /* daemon may be down */
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchRuntime()
+    void fetchActivity()
+    const id = setInterval(fetchRuntime, 10_000)
+    return () => clearInterval(id)
+  }, [fetchRuntime, fetchActivity])
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -48,6 +88,14 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
           return
         }
         toast.success("Configuration deleted")
+        const deleted = configs.find((c) => c.id === id)
+        if (deleted) {
+          logSmartFlowActivity("config_deleted", `Config deleted: ${deleted.name}`, {
+            instrument: deleted.instrument,
+            configId: deleted.id,
+            severity: "warning",
+          })
+        }
         onRefresh()
       } catch {
         toast.error("Something went wrong")
@@ -71,6 +119,15 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
           toast.error(json.error ?? `Failed to ${action}`)
           return
         }
+        const activityType = config.isActive ? "config_deactivated" : "config_activated"
+        const activityMsg = config.isActive
+          ? `Config paused: ${config.name}`
+          : `Config activated: ${config.name}`
+        logSmartFlowActivity(activityType, activityMsg, {
+          instrument: config.instrument,
+          configId: config.id,
+          severity: config.isActive ? "warning" : "success",
+        })
         toast.success(config.isActive ? "Configuration paused" : "Configuration activated")
         onRefresh()
       } catch {
@@ -116,6 +173,8 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
               <ConfigCard
                 key={config.id}
                 config={config}
+                runtime={runtimeMap[config.id] ?? null}
+                latestActivity={activityMap[config.id] ?? null}
                 toggling={toggling === config.id}
                 onToggle={() => handleToggle(config)}
                 onDelete={() => setDeleteId(config.id)}
@@ -146,75 +205,5 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
-}
-
-function ConfigCard({
-  config,
-  toggling,
-  onToggle,
-  onDelete,
-}: {
-  config: SmartFlowConfigData
-  toggling: boolean
-  onToggle: () => void
-  onDelete: () => void
-}) {
-  const fmtAtr = (v: number | null) => (v != null ? `${v.toFixed(1)}x ATR` : "--")
-
-  return (
-    <Card className={cn("transition-opacity", !config.isActive && "opacity-60")}>
-      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-semibold">{config.name}</span>
-          <DirectionBadge direction={config.direction} />
-        </div>
-        <Badge variant="outline" className="shrink-0 text-[10px]">
-          {PRESET_LABELS[config.preset] ?? config.preset}
-        </Badge>
-      </CardHeader>
-      <CardContent className="space-y-3 pb-3">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          <span className="text-muted-foreground flex items-center gap-1">
-            <Target className="size-3" /> SL: {fmtAtr(config.stopLossAtrMultiple)}
-          </span>
-          <span className="text-muted-foreground flex items-center gap-1">
-            <TrendingUp className="size-3" /> TP: {fmtAtr(config.takeProfitAtrMultiple)}
-          </span>
-          <span className="text-muted-foreground flex items-center gap-1">
-            <ShieldCheck className="size-3" /> BE: {config.breakevenEnabled ? "On" : "Off"}
-          </span>
-          <span className="text-muted-foreground flex items-center gap-1">
-            <Clock className="size-3" /> Trail: {config.trailingEnabled ? "On" : "Off"}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between border-t pt-2">
-          <span className="text-muted-foreground text-[10px]">
-            Created {new Date(config.createdAt).toLocaleDateString()}
-          </span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              disabled={toggling}
-              onClick={onToggle}
-            >
-              {config.isActive ? "Pause" : "Activate"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive h-7 px-2"
-              onClick={onDelete}
-              aria-label={`Delete ${config.name}`}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   )
 }

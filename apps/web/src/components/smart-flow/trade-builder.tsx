@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Check, Zap } from "lucide-react"
 import type { SmartFlowPreset } from "@fxflow/types"
 import { PRESET_INFO, PRESET_KEYS } from "./trade-builder-presets"
+import { logSmartFlowActivity } from "@/lib/smart-flow-activity"
 import { StepPair, StepDirection, StepStrategy, StepReview } from "./trade-builder-steps"
 import type { AiFullSuggestion } from "./step-pair"
 
@@ -121,6 +122,11 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
         toast.error(json.error ?? "Failed to create config")
         return
       }
+      const configName = `${pairLabel} ${direction === "long" ? "Buy" : "Sell"} — ${PRESET_INFO[preset].label}`
+      logSmartFlowActivity("config_created", `Config created: ${configName}`, {
+        instrument: pair,
+        severity: "success",
+      })
       toast.success(
         "Configuration saved! Trade placement will be available once the daemon endpoints are connected.",
       )

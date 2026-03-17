@@ -3473,8 +3473,10 @@ export interface SourcePriorityEventMessage extends DaemonMessage<SourcePriority
 export type SmartFlowActivityType =
   | "engine_started"
   | "engine_stopped"
+  | "config_created"
   | "config_activated"
   | "config_deactivated"
+  | "config_deleted"
   | "entry_placed"
   | "entry_filled"
   | "entry_blocked"

@@ -28,6 +28,7 @@ import {
   getSmartFlowConfigs,
 } from "@fxflow/db"
 import { computeATR, getPipSize } from "@fxflow/shared"
+import { emitActivity } from "./activity-feed.js"
 import type { StateManager } from "../state-manager.js"
 import { getRestUrl } from "../oanda/api-client.js"
 import { CandleCache, fetchOandaCandles } from "../trade-finder/candle-cache.js"
@@ -117,12 +118,16 @@ export class SmartFlowManager {
     console.log(
       `[smart-flow] Started: ${activeTrades.length} trades, ${this.activeInstruments.size} instruments`,
     )
+    emitActivity("engine_started", "SmartFlow engine started", {
+      detail: `${activeTrades.length} active trades recovered`,
+    })
   }
 
   stop(): void {
     this.atrCache.clear()
     this.activeInstruments.clear()
     console.log("[smart-flow] Stopped")
+    emitActivity("engine_stopped", "SmartFlow engine stopped")
   }
 
   onPriceTick(instrument: string, bid: number, ask: number): void {
@@ -144,7 +149,14 @@ export class SmartFlowManager {
 
     if (this.spm) {
       const check = await this.spm.canPlace(config.instrument, "smart_flow")
-      if (!check.allowed) return { success: false, error: check.reason }
+      if (!check.allowed) {
+        emitActivity("entry_blocked", check.reason, {
+          instrument: config.instrument,
+          severity: "warning",
+          configId: config.id,
+        })
+        return { success: false, error: check.reason }
+      }
     }
 
     try {
@@ -188,6 +200,16 @@ export class SmartFlowManager {
       this.activeInstruments.add(config.instrument)
       this.unlock(config.instrument)
       this.emitUpdate(trade, "placed", "Market entry placed")
+      emitActivity(
+        "entry_placed",
+        `Market order placed on ${config.instrument.replace("_", "/")}`,
+        {
+          instrument: config.instrument,
+          severity: "success",
+          configId: config.id,
+          tradeId: trade.id,
+        },
+      )
       console.log(
         `[smart-flow] Market entry: ${config.instrument} ${config.direction} (${result.sourceId})`,
       )
@@ -210,6 +232,14 @@ export class SmartFlowManager {
     })
     this.activeInstruments.add(config.instrument)
     this.emitUpdate(trade, "created", "Smart entry — waiting for conditions")
+    emitActivity(
+      "entry_placed",
+      `Smart entry created for ${config.instrument.replace("_", "/")} — waiting for conditions`,
+      {
+        instrument: config.instrument,
+        configId: config.id,
+      },
+    )
     console.log(`[smart-flow] Smart entry created: ${config.instrument} ${config.direction}`)
     return { success: true, trade }
   }
@@ -221,6 +251,15 @@ export class SmartFlowManager {
     if (!sf) return
     await updateSmartFlowTradeStatus(sf.id, "managing", { currentPhase: "entry" })
     this.emitUpdate(sf, "filled", "Order filled — management active")
+    emitActivity(
+      "entry_filled",
+      `Order filled on ${(sf.instrument ?? "UNKNOWN").replace("_", "/")}`,
+      {
+        instrument: sf.instrument ?? undefined,
+        severity: "success",
+        tradeId: sf.id,
+      },
+    )
     console.log(`[smart-flow] Filled: ${sf.instrument} (${sf.id})`)
   }
 
@@ -248,6 +287,14 @@ export class SmartFlowManager {
     }
     this.unlock(sf.instrument ?? "")
     this.emitUpdate(sf, "closed", "Trade closed")
+    emitActivity(
+      "trade_closed",
+      `Trade closed on ${(sf.instrument ?? "UNKNOWN").replace("_", "/")}`,
+      {
+        instrument: sf.instrument ?? undefined,
+        tradeId: sf.id,
+      },
+    )
     console.log(`[smart-flow] Closed: ${sf.instrument} (${sf.id})`)
   }
 
@@ -268,6 +315,15 @@ export class SmartFlowManager {
       }
       if (sf.instrument) this.unlock(sf.instrument)
       this.emitUpdate(sf, "cancelled", "Cancelled by user")
+      emitActivity(
+        "trade_closed",
+        `Trade cancelled on ${(sf.instrument ?? "UNKNOWN").replace("_", "/")}`,
+        {
+          instrument: sf.instrument ?? undefined,
+          severity: "warning",
+          tradeId: sf.id,
+        },
+      )
       console.log(`[smart-flow] Cancelled: ${sf.instrument} (${sf.id})`)
       return { success: true }
     } catch (err) {

@@ -8,7 +8,19 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { CheckCircle2, Info, AlertTriangle, XCircle, Trash2, ChevronDown } from "lucide-react"
+import {
+  CheckCircle2,
+  Info,
+  AlertTriangle,
+  XCircle,
+  Trash2,
+  ChevronDown,
+  Radio,
+  ShieldCheck,
+  TrendingUp,
+  Scissors,
+  ArrowUpDown,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const SEVERITY_CONFIG = {
@@ -18,7 +30,12 @@ const SEVERITY_CONFIG = {
   error: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10" },
 } as const
 
-export function ActivityTab() {
+interface ActivityTabProps {
+  activeConfigCount?: number
+  onEventCount?: (count: number) => void
+}
+
+export function ActivityTab({ activeConfigCount = 0, onEventCount }: ActivityTabProps) {
   const [events, setEvents] = useState<SmartFlowActivityEvent[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -26,8 +43,16 @@ export function ActivityTab() {
     try {
       const res = await fetch("/api/daemon/smart-flow/activity")
       if (!res.ok) return
-      const json = (await res.json()) as { ok: boolean; data?: SmartFlowActivityEvent[] }
-      if (json.ok && json.data) setEvents(json.data)
+      const json = (await res.json()) as {
+        ok: boolean
+        data?: SmartFlowActivityEvent[]
+        events?: SmartFlowActivityEvent[]
+      }
+      const fetched = json.events ?? json.data ?? []
+      if (json.ok && fetched.length > 0) {
+        setEvents(fetched)
+        onEventCount?.(fetched.length)
+      }
     } catch {
       /* daemon may be down */
     }
@@ -55,11 +80,41 @@ export function ActivityTab() {
   if (events.length === 0) {
     return (
       <Card>
-        <CardContent className="py-12 text-center">
-          <p className="text-muted-foreground text-sm">No activity yet.</p>
-          <p className="text-muted-foreground mt-1 text-xs">
-            SmartFlow events will appear here in real-time.
-          </p>
+        <CardContent className="py-10">
+          <div className="mx-auto max-w-sm space-y-4 text-center">
+            <div className="bg-primary/10 mx-auto flex size-10 items-center justify-center rounded-full">
+              <Radio className="text-primary size-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-foreground text-sm font-medium">No activity yet</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                SmartFlow activity will appear here as your trades are managed. Events show up in
+                real-time as they happen.
+              </p>
+            </div>
+            <ul className="text-muted-foreground mx-auto max-w-xs space-y-1.5 text-left text-xs">
+              <li className="flex items-center gap-2">
+                <ShieldCheck className="size-3 shrink-0" /> Breakeven triggers
+              </li>
+              <li className="flex items-center gap-2">
+                <ArrowUpDown className="size-3 shrink-0" /> Trailing stop moves
+              </li>
+              <li className="flex items-center gap-2">
+                <Scissors className="size-3 shrink-0" /> Partial close actions
+              </li>
+              <li className="flex items-center gap-2">
+                <TrendingUp className="size-3 shrink-0" /> Take profit and stop loss hits
+              </li>
+            </ul>
+            {activeConfigCount > 0 && (
+              <p className="text-muted-foreground text-xs">
+                You have{" "}
+                <span className="text-foreground font-medium">{activeConfigCount} active</span>{" "}
+                {activeConfigCount === 1 ? "config" : "configs"}. Once trades are placed, management
+                actions will appear here.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
     )
