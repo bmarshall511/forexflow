@@ -18,13 +18,16 @@ import {
   ListChecks,
   ScrollText,
   Shield,
+  Radio,
 } from "lucide-react"
 import { useSmartFlow } from "@/hooks/use-smart-flow"
 import { TradeBuilder } from "./trade-builder"
 import { ActiveTradesTab } from "./active-trades-tab"
 import { ConfigsTab } from "./configs-tab"
+import { ActivityTab } from "./activity-tab"
+import { HealthPanel } from "./health-panel"
 
-type Tab = "trade" | "active" | "configs" | "history" | "rankings"
+type Tab = "trade" | "active" | "configs" | "activity" | "history" | "rankings"
 
 export function SmartFlowDashboard() {
   const [tab, setTab] = useState<Tab>("trade")
@@ -126,6 +129,13 @@ export function SmartFlowDashboard() {
           count={configs.length}
         />
         <TabNavButton
+          active={tab === "activity"}
+          onClick={() => setTab("activity")}
+          icon={<Radio className="size-3.5" />}
+          label="Activity"
+          count={0}
+        />
+        <TabNavButton
           active={tab === "history"}
           onClick={() => setTab("history")}
           icon={<ScrollText className="size-3.5" />}
@@ -141,6 +151,8 @@ export function SmartFlowDashboard() {
         />
       </TabNav>
 
+      <HealthPanel />
+
       <div className="space-y-4 px-4 py-6 md:px-6">
         {tab === "trade" ? (
           <TradeBuilder
@@ -153,6 +165,8 @@ export function SmartFlowDashboard() {
           <ActiveTradesTab trades={activeTrades} />
         ) : tab === "configs" ? (
           <ConfigsTab configs={configs} onRefresh={refetch} />
+        ) : tab === "activity" ? (
+          <ActivityTab />
         ) : (
           <TabPlaceholder tab={tab} />
         )}

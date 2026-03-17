@@ -8,6 +8,8 @@ import type {
   SmartFlowStatusData,
   SmartFlowTradeData,
   SmartFlowTradeUpdateData,
+  SmartFlowHealthData,
+  SmartFlowConfigRuntimeStatus,
   TradeDirection,
 } from "@fxflow/types"
 import {
@@ -23,6 +25,7 @@ import {
   getSmartFlowTradeBySourceId,
   createTimeEstimate,
   countActiveConfigs,
+  getSmartFlowConfigs,
 } from "@fxflow/db"
 import { computeATR, getPipSize } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
@@ -72,6 +75,10 @@ export class SmartFlowManager {
   private candleCache = new CandleCache()
   private activeInstruments = new Set<string>()
   private enabled = false
+  private startedAt: number | null = null
+  private lastTickAt: number | null = null
+  private tickCount = 0
+  private tickWindowStart = Date.now()
 
   constructor(stateManager: StateManager, broadcast: (msg: AnyDaemonMessage) => void) {
     this.stateManager = stateManager
@@ -92,6 +99,7 @@ export class SmartFlowManager {
   }
 
   async start(): Promise<void> {
+    this.startedAt = Date.now()
     const settings = await getSmartFlowSettings()
     this.enabled = settings.enabled
     if (!this.enabled) {
@@ -119,6 +127,13 @@ export class SmartFlowManager {
 
   onPriceTick(instrument: string, bid: number, ask: number): void {
     if (!this.enabled || !this.activeInstruments.has(instrument)) return
+    this.lastTickAt = Date.now()
+    this.tickCount++
+    // Reset tick window every 60 seconds
+    if (Date.now() - this.tickWindowStart > 60_000) {
+      this.tickCount = 1
+      this.tickWindowStart = Date.now()
+    }
     this.engine?.evaluateTick(instrument, bid, ask)
   }
 
@@ -350,6 +365,62 @@ export class SmartFlowManager {
       }
     if (entry == null) return { stopLoss: null, takeProfit: null }
     return { stopLoss: long ? entry - sl : entry + sl, takeProfit: long ? entry + tp : entry - tp }
+  }
+
+  async getHealthData(): Promise<SmartFlowHealthData> {
+    const [openTrades, activeConfigCount] = await Promise.all([
+      countOpenSmartFlowTrades(),
+      countActiveConfigs(),
+    ])
+    const atrEntries = [...this.atrCache.entries()].map(([key, v]) => ({
+      instrument: key.split(":")[0] ?? key,
+      atr: v.atr,
+      fetchedAt: new Date(v.at).toISOString(),
+    }))
+    return {
+      engineRunning: this.enabled,
+      enabled: this.enabled,
+      subscribedInstruments: [...this.activeInstruments],
+      activeRuleCount: this.activeInstruments.size * 5, // 5 rule types per instrument
+      activeTrades: openTrades,
+      activeConfigs: activeConfigCount,
+      lastManagementAction: null, // TODO: wire from management engine
+      lastManagementActionAt: null,
+      lastTickAt: this.lastTickAt ? new Date(this.lastTickAt).toISOString() : null,
+      ticksPerSecond:
+        this.tickCount > 0
+          ? Math.round(this.tickCount / Math.max(1, (Date.now() - this.tickWindowStart) / 1000))
+          : 0,
+      atrCache: atrEntries,
+      spreadCache: [],
+      priorityMode: "manual",
+      aiDailySpend: 0,
+      aiDailyBudget: 1.0,
+      upSince: this.startedAt ? new Date(this.startedAt).toISOString() : null,
+    }
+  }
+
+  async getConfigRuntimeStatuses(): Promise<SmartFlowConfigRuntimeStatus[]> {
+    const configs = await getSmartFlowConfigs()
+    return configs.map((c) => {
+      const atrKey = `${c.instrument}:H1`
+      const atrEntry = this.atrCache.get(atrKey)
+      const hasActiveTrade = this.activeInstruments.has(c.instrument)
+      return {
+        configId: c.id,
+        receiving_ticks: hasActiveTrade,
+        lastTickAt:
+          this.lastTickAt && hasActiveTrade ? new Date(this.lastTickAt).toISOString() : null,
+        currentAtr: atrEntry?.atr ?? null,
+        currentSpread: null,
+        averageSpread: null,
+        spreadMultiple: null,
+        spreadStatus: "normal" as const,
+        activeTradeId: null,
+        managementPhase: null,
+        nextAiCheck: null,
+      }
+    })
   }
 
   private unlock(instrument: string): void {

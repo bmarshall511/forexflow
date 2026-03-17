@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { DirectionBadge } from "@/components/positions/direction-badge"
+import { TradeTimeline } from "./trade-timeline"
 import { ChevronDown, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -117,24 +118,7 @@ export function ActiveTradeCard({ trade, onCancel }: ActiveTradeCardProps) {
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <ul className="mt-2 space-y-1">
-                {lastLog.map((entry, i) => (
-                  <li key={i} className="text-muted-foreground flex items-start gap-2 text-[10px]">
-                    <span className="text-foreground/50 shrink-0 font-mono">
-                      {new Date(entry.at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    <span>
-                      <Badge variant="outline" className="mr-1 px-1 py-0 text-[9px]">
-                        {entry.source}
-                      </Badge>
-                      {entry.detail}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <TradeTimeline entries={lastLog} />
             </CollapsibleContent>
           </Collapsible>
         )}

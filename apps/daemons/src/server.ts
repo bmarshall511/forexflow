@@ -61,6 +61,7 @@ export function setSourcePriorityManager(manager: SourcePriorityManager): void {
   _sourcePriorityManager = manager
 }
 
+import { getActivityEvents } from "./smart-flow/activity-feed.js"
 import type { SmartFlowManager } from "./smart-flow/manager.js"
 let _smartFlowManager: SmartFlowManager | null = null
 export function setSmartFlowManager(manager: SmartFlowManager): void {
@@ -1117,6 +1118,39 @@ export async function startServer(port: number, deps: ServerDeps) {
           console.error("[server] smart-flow cancel error:", err)
           sendJson(res, 500, { ok: false, error: (err as Error).message })
         })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/activity") {
+      sendJson(res, 200, { ok: true, events: getActivityEvents() })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/health") {
+      if (!_smartFlowManager) {
+        sendJson(res, 503, { ok: false, error: "SmartFlow not initialized" })
+        return
+      }
+      try {
+        const health = _smartFlowManager.getHealthData()
+        sendJson(res, 200, { ok: true, health })
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      }
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/config-runtime") {
+      if (!_smartFlowManager) {
+        sendJson(res, 503, { ok: false, error: "SmartFlow not initialized" })
+        return
+      }
+      try {
+        const statuses = _smartFlowManager.getConfigRuntimeStatuses()
+        sendJson(res, 200, { ok: true, statuses })
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: (err as Error).message })
+      }
       return
     }
 

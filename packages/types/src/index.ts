@@ -793,6 +793,9 @@ export type DaemonMessageType =
   | "smart_flow_entry_triggered"
   | "smart_flow_safety_alert"
   | "smart_flow_ai_suggestion"
+  | "smart_flow_activity"
+  | "smart_flow_health"
+  | "smart_flow_config_runtime"
   // Source Priority
   | "source_priority_event"
 
@@ -3462,6 +3465,79 @@ export interface SmartFlowAiSuggestionMessage extends DaemonMessage<SmartFlowAiS
 /** WS message: Source priority event. */
 export interface SourcePriorityEventMessage extends DaemonMessage<SourcePriorityEventData> {
   type: "source_priority_event"
+}
+
+// ─── SmartFlow Activity Feed ────────────────────────────────────────────────
+
+/** SmartFlow activity event types for the real-time activity feed. */
+export type SmartFlowActivityType =
+  | "engine_started"
+  | "engine_stopped"
+  | "config_activated"
+  | "config_deactivated"
+  | "entry_placed"
+  | "entry_filled"
+  | "entry_blocked"
+  | "entry_delayed_spread"
+  | "breakeven_set"
+  | "trailing_activated"
+  | "trailing_moved"
+  | "partial_close"
+  | "safety_net_triggered"
+  | "trade_closed"
+  | "ai_suggestion"
+  | "ai_action_executed"
+  | "priority_blocked"
+  | "priority_replaced"
+  | "tick_subscribed"
+  | "tick_unsubscribed"
+
+/** A single activity event in the SmartFlow feed. */
+export interface SmartFlowActivityEvent {
+  id: string
+  type: SmartFlowActivityType
+  timestamp: string
+  instrument: string | null
+  message: string
+  detail: string | null
+  severity: "info" | "success" | "warning" | "error"
+  tradeId: string | null
+  configId: string | null
+}
+
+/** SmartFlow engine health data for the health panel. */
+export interface SmartFlowHealthData {
+  engineRunning: boolean
+  enabled: boolean
+  subscribedInstruments: string[]
+  activeRuleCount: number
+  activeTrades: number
+  activeConfigs: number
+  lastManagementAction: string | null
+  lastManagementActionAt: string | null
+  lastTickAt: string | null
+  ticksPerSecond: number
+  atrCache: { instrument: string; atr: number; fetchedAt: string }[]
+  spreadCache: { instrument: string; current: number; average: number; multiple: number }[]
+  priorityMode: string
+  aiDailySpend: number
+  aiDailyBudget: number
+  upSince: string | null
+}
+
+/** SmartFlow config runtime status (augments SmartFlowConfigData). */
+export interface SmartFlowConfigRuntimeStatus {
+  configId: string
+  receiving_ticks: boolean
+  lastTickAt: string | null
+  currentAtr: number | null
+  currentSpread: number | null
+  averageSpread: number | null
+  spreadMultiple: number | null
+  spreadStatus: "normal" | "elevated" | "blocked"
+  activeTradeId: string | null
+  managementPhase: string | null
+  nextAiCheck: string | null
 }
 
 // ─── Zod Schemas ────────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@ import type {
   SmartFlowPhase,
 } from "@fxflow/types"
 import type { PositionManager } from "../positions/position-manager.js"
+import { emitActivity } from "./activity-feed.js"
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -373,6 +374,14 @@ export class ManagementEngine {
       `[smart-flow-engine] Safety net triggered: ${safetyNet} for trade ${state.sourceTradeId} (${state.instrument})`,
     )
 
+    emitActivity("safety_net_triggered", `Safety net (${safetyNet}) on ${state.instrument}`, {
+      instrument: state.instrument,
+      tradeId: state.tradeId ?? undefined,
+      configId: state.configId,
+      detail: `Closed trade ${state.sourceTradeId} — ${safetyNet}`,
+      severity: "warning",
+    })
+
     try {
       await this.tradeSyncer.closeTrade(
         state.sourceTradeId,
@@ -438,6 +447,13 @@ export class ManagementEngine {
       console.log(
         `[smart-flow-engine] Breakeven set for ${state.sourceTradeId}: SL → ${newSL} (${state.instrument})`,
       )
+
+      emitActivity("breakeven_set", `Breakeven set on ${state.instrument} at ${newSL}`, {
+        instrument: state.instrument,
+        tradeId: state.tradeId ?? undefined,
+        configId: state.configId,
+        severity: "success",
+      })
 
       // Fire-and-forget DB updates
       void import("@fxflow/db")
@@ -508,6 +524,17 @@ export class ManagementEngine {
             ),
           )
 
+        emitActivity(
+          "trailing_activated",
+          `Trailing stop activated on ${state.instrument} at ${profitPips.toFixed(1)} pips`,
+          {
+            instrument: state.instrument,
+            tradeId: state.tradeId ?? undefined,
+            configId: state.configId,
+            severity: "success",
+          },
+        )
+
         this.logManagementEntry(state.smartFlowTradeId, {
           at: new Date().toISOString(),
           action: "trailing_activated",
@@ -541,6 +568,17 @@ export class ManagementEngine {
       await this.tradeSyncer.modifyTradeSLTP(state.sourceTradeId, roundedTrailSL, undefined)
       state.lastModifyAt = Date.now()
       state.currentSL = roundedTrailSL
+
+      emitActivity(
+        "trailing_moved",
+        `Trailing SL moved to ${roundedTrailSL} on ${state.instrument}`,
+        {
+          instrument: state.instrument,
+          tradeId: state.tradeId ?? undefined,
+          configId: state.configId,
+          severity: "info",
+        },
+      )
 
       this.logManagementEntry(state.smartFlowTradeId, {
         at: new Date().toISOString(),
@@ -594,6 +632,18 @@ export class ManagementEngine {
 
         console.log(
           `[smart-flow-engine] Partial close ${rule.closePercent}% (${unitsToClose} units) for ${state.sourceTradeId} at ${profitPips.toFixed(1)} pips`,
+        )
+
+        emitActivity(
+          "partial_close",
+          `Partial close ${rule.closePercent}% on ${state.instrument} at ${profitPips.toFixed(1)} pips`,
+          {
+            instrument: state.instrument,
+            tradeId: state.tradeId ?? undefined,
+            configId: state.configId,
+            detail: `Closed ${unitsToClose} units (${rule.closePercent}% at ${rule.atAtrMultiple}x ATR)`,
+            severity: "success",
+          },
         )
 
         // Fire-and-forget DB updates
