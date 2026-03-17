@@ -38,7 +38,7 @@ export function AiInsightsBar() {
       .then(async (res) => {
         const json = await res.json()
         if (!cancelled) {
-          setHasKey(!!json.data?.claudeApiKeySet)
+          setHasKey(!!json.data?.hasClaudeKey)
         }
       })
       .catch(() => {
