@@ -2,20 +2,12 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import type { AiUsageStats, AiSettingsData } from "@fxflow/types"
 import { formatCurrency } from "@fxflow/shared"
 import { cn } from "@/lib/utils"
-import { Sparkles, ChevronDown, Settings, ExternalLink } from "lucide-react"
+import { Sparkles, ChevronDown, Settings, ExternalLink, Zap, Brain } from "lucide-react"
 
-interface AiUsageData {
-  todayCost: number
-  weekCost: number
-  monthCost: number
-  todayCount: number
-  weekCount: number
-  monthCount: number
-}
-
-interface AiRecentAnalysis {
+interface RecentAnalysis {
   id: string
   instrument: string
   direction: string
@@ -25,35 +17,30 @@ interface AiRecentAnalysis {
 }
 
 export function AiInsightsBar() {
-  const [usage, setUsage] = useState<AiUsageData | null>(null)
-  const [analyses, setAnalyses] = useState<AiRecentAnalysis[]>([])
+  const [usage, setUsage] = useState<AiUsageStats | null>(null)
+  const [analyses, setAnalyses] = useState<RecentAnalysis[]>([])
   const [hasKey, setHasKey] = useState<boolean | null>(null)
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
-    // Check settings
     fetch("/api/ai/settings")
       .then(async (res) => {
-        const json = await res.json()
-        if (!cancelled) {
-          setHasKey(!!json.data?.hasClaudeKey)
-        }
+        const json = (await res.json()) as { ok: boolean; data?: AiSettingsData }
+        if (!cancelled) setHasKey(!!json.data?.hasClaudeKey)
       })
       .catch(() => {
         if (!cancelled) setHasKey(false)
       })
 
-    // Fetch usage
     fetch("/api/ai/usage")
       .then(async (res) => {
-        const json = await res.json()
-        if (!cancelled && json.ok) setUsage(json.data)
+        const json = (await res.json()) as { ok: boolean; data?: AiUsageStats }
+        if (!cancelled && json.ok && json.data) setUsage(json.data)
       })
       .catch(() => {})
 
-    // Fetch recent analyses
     fetch("/api/ai/analyses/list?pageSize=3&status=completed")
       .then(async (res) => {
         const json = await res.json()
@@ -66,7 +53,7 @@ export function AiInsightsBar() {
     }
   }, [])
 
-  // No API key configured
+  // No API key configured — setup prompt
   if (hasKey === false) {
     return (
       <div
@@ -91,10 +78,14 @@ export function AiInsightsBar() {
     )
   }
 
-  // Loading
-  if (hasKey === null || !usage) {
-    return null // Silently load — not critical for dashboard
-  }
+  // Loading — don't show a skeleton, just hide
+  if (hasKey === null || !usage) return null
+
+  const today = usage.byPeriod?.today ?? { count: 0, costUsd: 0 }
+  const week = usage.byPeriod?.thisWeek ?? { count: 0, costUsd: 0 }
+  const month = usage.byPeriod?.thisMonth ?? { count: 0, costUsd: 0 }
+
+  const hasActivity = usage.totalAnalyses > 0
 
   return (
     <div
@@ -109,29 +100,40 @@ export function AiInsightsBar() {
         type="button"
         onClick={() => setExpanded(!expanded)}
         className={cn(
-          "flex w-full items-center gap-4 px-4 py-3 text-left transition-colors",
+          "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
           "hover:bg-muted/50 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
         )}
         aria-expanded={expanded}
         aria-controls="ai-insights-detail"
       >
-        <Sparkles className="text-muted-foreground size-4 shrink-0" />
+        <Sparkles className="size-4 shrink-0 text-violet-500" />
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <span className="text-muted-foreground">
-            <span className="text-foreground font-medium">{formatCurrency(usage.todayCost)}</span>{" "}
-            today
-          </span>
-          <span className="text-muted-foreground hidden sm:inline">
-            <span className="font-mono tabular-nums">{usage.todayCount}</span> analyses
-          </span>
-          {usage.monthCost > 0 && (
-            <span className="text-muted-foreground hidden md:inline">
-              <span className="font-mono tabular-nums">{formatCurrency(usage.monthCost)}</span> this
-              month
+        {hasActivity ? (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            <span className="text-muted-foreground">
+              <span className="text-foreground font-medium tabular-nums">
+                {formatCurrency(today.costUsd)}
+              </span>{" "}
+              today
             </span>
-          )}
-        </div>
+            {today.count > 0 && (
+              <span className="text-muted-foreground hidden sm:inline">
+                <span className="font-mono tabular-nums">{today.count}</span>{" "}
+                {today.count === 1 ? "analysis" : "analyses"}
+              </span>
+            )}
+            {month.costUsd > 0 && (
+              <span className="text-muted-foreground hidden md:inline">
+                <span className="font-mono tabular-nums">{formatCurrency(month.costUsd)}</span> this
+                month
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-muted-foreground flex-1 text-xs">
+            AI Analysis is configured. Run your first analysis from a trade&apos;s detail view.
+          </span>
+        )}
 
         <div className="flex items-center gap-2">
           <Link
@@ -158,11 +160,33 @@ export function AiInsightsBar() {
           className="animate-in fade-in slide-in-from-top-1 border-t px-4 py-3 duration-200"
         >
           {/* Cost breakdown */}
-          <div className="mb-3 grid grid-cols-3 gap-3">
-            <CostTile label="Today" cost={usage.todayCost} count={usage.todayCount} />
-            <CostTile label="This Week" cost={usage.weekCost} count={usage.weekCount} />
-            <CostTile label="This Month" cost={usage.monthCost} count={usage.monthCount} accent />
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            <CostTile label="Today" cost={today.costUsd} count={today.count} />
+            <CostTile label="This Week" cost={week.costUsd} count={week.count} />
+            <CostTile label="This Month" cost={month.costUsd} count={month.count} accent />
           </div>
+
+          {/* Stats row */}
+          {hasActivity && (
+            <div className="mb-3 flex flex-wrap gap-3 text-xs">
+              {usage.avgWinProbability !== null && (
+                <StatPill
+                  icon={<Zap className="size-3 text-amber-500" />}
+                  label="Avg Win Prob"
+                  value={`${Math.round(usage.avgWinProbability)}%`}
+                />
+              )}
+              {usage.avgQualityScore !== null && (
+                <StatPill
+                  icon={<Brain className="size-3 text-violet-500" />}
+                  label="Avg Quality"
+                  value={`${usage.avgQualityScore.toFixed(1)}/10`}
+                />
+              )}
+              <StatPill label="Total" value={`${usage.totalAnalyses}`} />
+              {usage.autoCount > 0 && <StatPill label="Auto" value={`${usage.autoCount}`} />}
+            </div>
+          )}
 
           {/* Recent analyses */}
           {analyses.length > 0 && (
@@ -176,7 +200,7 @@ export function AiInsightsBar() {
                   <span
                     className={cn(
                       "text-[10px] font-semibold uppercase",
-                      a.direction === "long" ? "text-status-connected" : "text-status-disconnected",
+                      a.direction === "long" ? "text-green-500" : "text-red-500",
                     )}
                   >
                     {a.direction}
@@ -195,13 +219,20 @@ export function AiInsightsBar() {
               ))}
             </div>
           )}
+
+          {/* Empty state */}
+          {!hasActivity && (
+            <p className="text-muted-foreground py-2 text-center text-xs">
+              No analyses yet. Open a trade and tap the AI Analysis button to get started.
+            </p>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-// ─── Cost tile sub-component ─────────────────────────────────────────────────
+// ─── Sub-components ─────────────────────────────────────────────────────────
 
 function CostTile({
   label,
@@ -224,8 +255,26 @@ function CostTile({
       <span className="text-muted-foreground text-[10px] uppercase tracking-wider">{label}</span>
       <p className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(cost)}</p>
       <span className="text-muted-foreground/60 text-[10px] tabular-nums">
-        {count} analys{count !== 1 ? "es" : "is"}
+        {count} {count === 1 ? "analysis" : "analyses"}
       </span>
+    </div>
+  )
+}
+
+function StatPill({
+  icon,
+  label,
+  value,
+}: {
+  icon?: React.ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div className="bg-muted/50 flex items-center gap-1.5 rounded-full px-2.5 py-1">
+      {icon}
+      <span className="text-muted-foreground text-[10px]">{label}</span>
+      <span className="text-[10px] font-semibold tabular-nums">{value}</span>
     </div>
   )
 }
