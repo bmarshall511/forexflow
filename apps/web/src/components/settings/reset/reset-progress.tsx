@@ -1,7 +1,9 @@
 "use client"
 
+import { useEffect } from "react"
 import { Loader2, CheckCircle, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useNotificationContext } from "@/state/notification-context"
 import type { ResetResult } from "@fxflow/db"
 
 interface ResetProgressProps {
@@ -19,7 +21,15 @@ export function ResetProgress({
   executeError,
   onDone,
 }: ResetProgressProps) {
+  const { refresh: refreshNotifications } = useNotificationContext()
   const isDone = result !== null || freshInstallDone
+
+  // Refresh notification state after reset completes (DB was cleared but in-memory state is stale)
+  useEffect(() => {
+    if (isDone) {
+      void refreshNotifications()
+    }
+  }, [isDone, refreshNotifications])
   const hasError = executeError !== null || (result !== null && !result.success)
 
   return (

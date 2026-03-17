@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useDaemonStatus } from "./use-daemon-status"
 import { usePositions } from "./use-positions"
+import type { NotificationData } from "@fxflow/types"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,41 @@ export interface ActivityEvent {
 
 const MAX_EVENTS = 30
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function notificationToEvent(n: NotificationData): ActivityEvent {
+  let type: ActivityEventType = "order_placed"
+  if (n.source === "ai_analysis") type = "ai_analysis_completed"
+  else if (n.source === "trade_condition") type = "condition_triggered"
+  else if (n.source === "trade_finder") type = "trade_finder_setup"
+  else if (n.source === "ai_trader") type = "ai_opportunity"
+  else if (n.source === "tv_alerts") type = "tv_signal"
+  else if (n.title.toLowerCase().includes("closed") || n.title.toLowerCase().includes("hit"))
+    type = "trade_closed"
+  else if (n.title.toLowerCase().includes("fill") || n.title.toLowerCase().includes("opened"))
+    type = "trade_opened"
+
+  const intent =
+    n.severity === "critical"
+      ? "negative"
+      : n.severity === "warning"
+        ? "warning"
+        : type === "trade_closed" && n.title.toLowerCase().includes("loss")
+          ? "negative"
+          : type === "trade_closed"
+            ? "positive"
+            : "info"
+
+  return {
+    id: `notif-${n.id}`,
+    type,
+    title: n.title,
+    detail: n.message || undefined,
+    timestamp: n.createdAt,
+    intent,
+  }
+}
+
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
 export interface UseActivityFeedReturn {
@@ -48,6 +84,7 @@ export function useActivityFeed(): UseActivityFeedReturn {
   const { positions } = usePositions()
 
   const [events, setEvents] = useState<ActivityEvent[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const seenIds = useRef(new Set<string>())
   const prevClosedIds = useRef(new Set<string>())
   const initialized = useRef(false)
@@ -58,28 +95,32 @@ export function useActivityFeed(): UseActivityFeedReturn {
     setEvents((prev) => [event, ...prev].slice(0, MAX_EVENTS))
   }, [])
 
-  // Seed initial events from closed trades (on first positions load)
+  // Hydrate from persisted notifications on mount (survives page refresh)
   useEffect(() => {
-    if (!positions?.closed || initialized.current) return
+    if (initialized.current) return
     initialized.current = true
 
-    const closed = positions.closed.slice(0, 5)
-    prevClosedIds.current = new Set(positions.closed.map((t) => t.id))
+    fetch("/api/notifications?limit=20")
+      .then(async (res) => {
+        if (!res.ok) return
+        const json = await res.json()
+        if (!json.ok || !json.data?.notifications) return
+        const notifications = json.data.notifications as NotificationData[]
+        const hydrated = notifications.map(notificationToEvent)
+        for (const e of hydrated) seenIds.current.add(e.id)
+        setEvents(hydrated)
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [])
 
-    const initial: ActivityEvent[] = closed.map((t) => ({
-      id: `closed-${t.id}`,
-      type: "trade_closed" as const,
-      title: `${t.instrument.replace("_", "/")} ${t.direction} closed`,
-      detail: t.outcome === "win" ? "Profit" : t.outcome === "loss" ? "Loss" : "Breakeven",
-      timestamp: t.closedAt ?? t.openedAt,
-      intent: t.outcome === "win" ? "positive" : t.outcome === "loss" ? "negative" : "neutral",
-    }))
-    setEvents(initial)
-  }, [positions?.closed])
-
-  // Detect newly closed trades (real-time)
+  // Track closed trade IDs for real-time detection
   useEffect(() => {
     if (!positions?.closed) return
+    if (prevClosedIds.current.size === 0) {
+      prevClosedIds.current = new Set(positions.closed.map((t) => t.id))
+      return
+    }
     for (const trade of positions.closed) {
       if (prevClosedIds.current.has(trade.id)) continue
       prevClosedIds.current.add(trade.id)
@@ -96,7 +137,7 @@ export function useActivityFeed(): UseActivityFeedReturn {
     }
   }, [positions?.closed, addEvent])
 
-  // TV Alert signals (daemon broadcasts lightweight { signalId } — direction/instrument may be absent)
+  // TV Alert signals
   useEffect(() => {
     if (!lastTVSignal) return
     const dir = lastTVSignal.direction ? lastTVSignal.direction.toUpperCase() : "SIGNAL"
@@ -171,17 +212,8 @@ export function useActivityFeed(): UseActivityFeedReturn {
     const n = lastNotification
     // Skip if already tracked by specific handlers
     if (n.source === "ai_analysis" || n.source === "trade_condition") return
-
-    addEvent({
-      id: `notif-${n.id}`,
-      type: n.source === "oanda_stream" ? "trade_opened" : "order_placed",
-      title: n.title,
-      detail: n.message || undefined,
-      timestamp: n.createdAt,
-      intent:
-        n.severity === "critical" ? "negative" : n.severity === "warning" ? "warning" : "info",
-    })
+    addEvent(notificationToEvent(n))
   }, [lastNotification, addEvent])
 
-  return { events, isLoading: !initialized.current && !positions }
+  return { events, isLoading }
 }

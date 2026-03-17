@@ -11,6 +11,8 @@ import { useTradeActions } from "@/hooks/use-trade-actions"
 import { useKillSwitch } from "@/hooks/use-kill-switch"
 import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
 import { useAiTraderConfig } from "@/hooks/use-ai-trader-config"
+import { usePositions } from "@/hooks/use-positions"
+import { CloseAllConfirmation } from "./close-all-confirmation"
 
 const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
@@ -31,7 +33,9 @@ export function PreflightChecks({
 }: PreflightChecksProps) {
   const [forceReset, setForceReset] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<"trades" | "orders" | null>(null)
   const { closeAllTrades, cancelAllOrders } = useTradeActions()
+  const { positions } = usePositions()
 
   // Automation hooks for disable actions
   const { enabled: tvEnabled, isToggling: tvToggling, toggle: tvToggle } = useKillSwitch()
@@ -62,7 +66,8 @@ export function PreflightChecks({
     !hasActiveConditions &&
     !hasAutomationEnabled
 
-  async function handleCloseAllTrades() {
+  async function executeCloseAllTrades() {
+    setConfirmDialog(null)
     setActionLoading("trades")
     try {
       const result = await closeAllTrades(undefined)
@@ -75,7 +80,8 @@ export function PreflightChecks({
     }
   }
 
-  async function handleCancelAllOrders() {
+  async function executeCancelAllOrders() {
+    setConfirmDialog(null)
     setActionLoading("orders")
     try {
       const result = await cancelAllOrders(undefined)
@@ -161,7 +167,7 @@ export function PreflightChecks({
       label: "Open Trades",
       count: merged.openTrades,
       passed: !hasOpenTrades,
-      action: hasOpenTrades ? handleCloseAllTrades : undefined,
+      action: hasOpenTrades ? () => setConfirmDialog("trades") : undefined,
       actionLabel: "Close All",
     },
     {
@@ -169,7 +175,7 @@ export function PreflightChecks({
       label: "Pending Orders",
       count: merged.pendingOrders,
       passed: !hasPendingOrders,
-      action: hasPendingOrders ? handleCancelAllOrders : undefined,
+      action: hasPendingOrders ? () => setConfirmDialog("orders") : undefined,
       actionLabel: "Cancel All",
     },
     {
@@ -354,6 +360,22 @@ export function PreflightChecks({
           {level === "fresh_install" ? "Review" : "Next"}
         </Button>
       </div>
+
+      {/* Close All / Cancel All confirmation dialogs */}
+      <CloseAllConfirmation
+        open={confirmDialog === "trades"}
+        onOpenChange={(v) => !v && setConfirmDialog(null)}
+        variant="trades"
+        trades={positions?.open ?? []}
+        onConfirm={executeCloseAllTrades}
+      />
+      <CloseAllConfirmation
+        open={confirmDialog === "orders"}
+        onOpenChange={(v) => !v && setConfirmDialog(null)}
+        variant="orders"
+        orders={positions?.pending ?? []}
+        onConfirm={executeCancelAllOrders}
+      />
     </div>
   )
 }
