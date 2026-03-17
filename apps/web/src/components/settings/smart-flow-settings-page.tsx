@@ -434,26 +434,34 @@ export function SmartFlowSettingsPage() {
       </Card>
 
       {/* Recovery Mode Warning */}
-      <Card className="border-amber-500/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-amber-500">
-            <AlertTriangle className="size-4" />
-            About Recovery Mode
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-xs leading-relaxed">
-            Recovery Mode is an advanced strategy that adds to losing trades to lower your average
-            entry price. While it can help recover losses, it significantly increases risk because
-            you&apos;re putting more money into a trade that&apos;s already losing. Your maximum
-            possible loss is much larger than with other strategies.{" "}
-            <strong className="text-foreground">
-              Only use Recovery Mode if you fully understand the risks and have a large enough
-              account to handle multiple losing levels.
-            </strong>
-          </p>
-        </CardContent>
-      </Card>
+      <div className="overflow-hidden rounded-lg border border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/30">
+        <div className="flex items-start gap-3 p-4">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-500/15">
+            <AlertTriangle className="size-4 text-amber-500" />
+          </div>
+          <div className="min-w-0 space-y-2">
+            <h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+              About Recovery Mode
+            </h4>
+            <p className="text-xs leading-relaxed text-amber-900/70 dark:text-amber-200/70">
+              Recovery Mode is an advanced strategy that adds to losing trades to lower your average
+              entry price. While it can help recover losses, it{" "}
+              <strong className="font-semibold text-amber-900 dark:text-amber-100">
+                significantly increases risk
+              </strong>{" "}
+              because you&apos;re putting more money into a trade that&apos;s already losing.
+            </p>
+            <div className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2.5 dark:bg-amber-500/5">
+              <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <p className="text-[11px] font-medium leading-relaxed text-amber-800 dark:text-amber-200">
+                Only use Recovery Mode if you fully understand the risks and have a large enough
+                account to handle multiple losing levels. Your maximum possible loss is much larger
+                than with other strategies.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
