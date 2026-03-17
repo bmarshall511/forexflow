@@ -139,7 +139,7 @@ interface TradeRow {
  * Enrich the display source from DB metadata.
  * DB always stores source="oanda", but metadata.placedVia records the true origin.
  */
-function enrichSource(source: string, metadata?: string | null): TradeSource {
+export function enrichSource(source: string, metadata?: string | null): TradeSource {
   if (metadata) {
     try {
       const meta = JSON.parse(metadata) as Record<string, unknown>
@@ -200,7 +200,7 @@ function toClosedTradeData(row: TradeRow): ClosedTradeData {
       assignedAt: tt.assignedAt.toISOString(),
     })),
     openedAt: row.openedAt.toISOString(),
-    closedAt: row.closedAt?.toISOString() ?? row.openedAt.toISOString(),
+    closedAt: row.closedAt?.toISOString() ?? new Date().toISOString(),
   }
 }
 
@@ -420,35 +420,88 @@ export async function removeStalePendingOrders(
   return stale.length
 }
 
+/** Close details fetched from OANDA for an orphaned trade. */
+export interface OrphanCloseDetails {
+  exitPrice: number | null
+  closeReason: TradeCloseReason
+  realizedPL: number
+  financing: number
+  closedAt: Date
+}
+
+/** Callback type for fetching actual close details from OANDA before orphan close. */
+export type FetchOrphanCloseDetails = (sourceTradeId: string) => Promise<OrphanCloseDetails | null>
+
 /**
  * Mark orphaned "open" trades as closed (they disappeared from OANDA).
+ * If a fetchCloseDetails callback is provided, attempts to fetch the actual
+ * close data (P&L, exit price, close reason) from OANDA before marking closed.
+ * Falls back to UNKNOWN/$0 only if the fetch fails or returns null.
  * Creates an audit trail event for each orphaned trade.
  */
 export async function closeOrphanedTrades(
   source: TradeSource,
   activeSourceIds: string[],
-): Promise<number> {
+  fetchCloseDetails?: FetchOrphanCloseDetails,
+): Promise<{ count: number; closedTradeIds: string[] }> {
   const now = new Date()
   const orphans = await db.trade.findMany({
     where: { source, status: "open", sourceTradeId: { notIn: activeSourceIds } },
-    select: { id: true },
+    select: { id: true, sourceTradeId: true },
   })
-  if (orphans.length === 0) return 0
+  if (orphans.length === 0) return { count: 0, closedTradeIds: [] }
 
+  const closedTradeIds: string[] = []
   for (const trade of orphans) {
-    await db.trade.update({
-      where: { id: trade.id },
-      data: {
-        status: "closed",
-        closeReason: "UNKNOWN",
-        closedAt: now,
-        closeContext: JSON.stringify({
-          cancelledBy: "system",
-          cancelReason: "Trade disappeared from OANDA — closed externally",
-          cancelledAt: now.toISOString(),
-        }),
-      },
-    })
+    // Try to fetch actual close details from OANDA
+    let details: OrphanCloseDetails | null = null
+    if (fetchCloseDetails) {
+      try {
+        details = await fetchCloseDetails(trade.sourceTradeId)
+      } catch (err) {
+        console.warn(
+          `[closeOrphanedTrades] Failed to fetch close details for ${trade.sourceTradeId}:`,
+          (err as Error).message,
+        )
+      }
+    }
+
+    if (details) {
+      // Use actual close data from OANDA
+      await db.trade.update({
+        where: { id: trade.id },
+        data: {
+          status: "closed",
+          exitPrice: details.exitPrice,
+          closeReason: details.closeReason,
+          realizedPL: details.realizedPL,
+          financing: details.financing,
+          closedAt: details.closedAt,
+          closeContext: JSON.stringify({
+            cancelledBy: "system",
+            cancelReason: "Trade closed on OANDA — details recovered",
+            cancelledAt: details.closedAt.toISOString(),
+          }),
+        },
+      })
+    } else {
+      // Fallback: no details available
+      await db.trade.update({
+        where: { id: trade.id },
+        data: {
+          status: "closed",
+          closeReason: "UNKNOWN",
+          closedAt: now,
+          closeContext: JSON.stringify({
+            cancelledBy: "system",
+            cancelReason: "Trade disappeared from OANDA — closed externally (details unavailable)",
+            cancelledAt: now.toISOString(),
+          }),
+        },
+      })
+    }
+
+    closedTradeIds.push(trade.id)
 
     try {
       await db.tradeEvent.create({
@@ -457,8 +510,12 @@ export async function closeOrphanedTrades(
           eventType: "TRADE_CLOSED",
           detail: JSON.stringify({
             closedBy: "system",
-            reason: "Trade disappeared from OANDA — closed externally",
-            time: now.toISOString(),
+            reason: details
+              ? `Trade closed on OANDA: ${details.closeReason}, P&L: ${details.realizedPL}`
+              : "Trade disappeared from OANDA — closed externally",
+            realizedPL: details?.realizedPL ?? 0,
+            exitPrice: details?.exitPrice ?? null,
+            time: (details?.closedAt ?? now).toISOString(),
           }),
         },
       })
@@ -466,7 +523,7 @@ export async function closeOrphanedTrades(
       /* non-critical */
     }
   }
-  return orphans.length
+  return { count: orphans.length, closedTradeIds }
 }
 
 /**

@@ -292,10 +292,13 @@ export async function findExistingSetup(
 
 // ─── Auto-Trade Helpers ────────────────────────────────────────────────────
 
-/** Count currently pending auto-placed setups (placed but not yet filled/cancelled) */
+/**
+ * Count auto-placed setups that are still at risk (pending OR filled but still open).
+ * Both pending orders and open trades consume account risk.
+ */
 export async function countPendingAutoPlaced(): Promise<number> {
   return db.tradeFinderSetup.count({
-    where: { status: "placed", autoPlaced: true },
+    where: { status: { in: ["placed", "filled"] }, autoPlaced: true },
   })
 }
 
@@ -308,12 +311,15 @@ export async function getPendingAutoPlacedSetups(): Promise<TradeFinderSetupData
   return rows.map(toSetupData)
 }
 
-/** Get total risk pips across all pending auto-placed setups (for risk cap) */
+/**
+ * Get total risk pips across all auto-placed setups that are still at risk
+ * (pending orders AND filled/open trades). Both consume account risk.
+ */
 export async function getAutoPlacedTotalRiskPips(): Promise<
   { instrument: string; riskPips: number; positionSize: number }[]
 > {
   const rows = await db.tradeFinderSetup.findMany({
-    where: { status: "placed", autoPlaced: true },
+    where: { status: { in: ["placed", "filled"] }, autoPlaced: true },
     select: { instrument: true, riskPips: true, positionSize: true },
   })
   return rows

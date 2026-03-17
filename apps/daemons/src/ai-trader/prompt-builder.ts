@@ -77,6 +77,8 @@ export interface Tier3Context {
   config: AiTraderConfigData
   accountBalance: number
   openTradeCount: number
+  /** Account risk percent from settings (defaults to 1% if not provided). */
+  riskPercent?: number
 }
 
 export function buildTier3Prompt(ctx: Tier3Context): { system: string; user: string } {
@@ -90,7 +92,7 @@ export function buildTier3Prompt(ctx: Tier3Context): { system: string; user: str
     openTradeCount,
   } = ctx
 
-  const riskPercent = 1 // Default 1% risk per trade
+  const riskPercent = ctx.riskPercent ?? 1
   const riskAmount = accountBalance * (riskPercent / 100)
 
   return {
@@ -106,7 +108,6 @@ You are making the FINAL decision on whether to execute this trade. Respond with
   "adjustedEntry": number | null,
   "adjustedSL": number | null,
   "adjustedTP": number | null,
-  "positionSizeUnits": number,
   "scores": {
     "technical": number,
     "fundamental": number,
@@ -160,7 +161,7 @@ ${formatPerformance(performanceHistory)}
 - News protection: ${config.managementConfig.newsProtectionEnabled ? "ON" : "OFF"}
 
 IMPORTANT:
-- Set positionSizeUnits based on $${riskAmount.toFixed(2)} risk and the SL distance
+- Position sizing is calculated automatically by the system — do NOT include positionSizeUnits
 - If adjusting entry/SL/TP, ensure R:R >= ${signal.profile === "scalper" ? "1.5" : signal.profile === "intraday" ? "2.0" : "2.5"}
 - Confidence must be honest — 80+ should be truly exceptional setups
 - entryRationale must cite specific price levels but use plain English, not jargon

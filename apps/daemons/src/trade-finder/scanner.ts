@@ -396,7 +396,13 @@ export class TradeFinderScanner {
         instrument,
       )
 
-      if (positionSize <= 0) continue
+      if (positionSize <= 0) {
+        console.log(
+          `[trade-finder] Skipping ${instrument} ${zone.type} zone: calculated position size is 0 ` +
+            `(balance=${accountBalance}, riskPct=${riskPercent}, riskPips=${riskPips.toFixed(1)})`,
+        )
+        continue
+      }
 
       const distanceToEntry = Math.abs(currentPrice - zone.proximalLine) / pipSize
 

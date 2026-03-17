@@ -23,8 +23,9 @@ import {
   countOpenAiTrades,
   findOpportunityByResultTradeId,
   getTradeBySourceId,
+  getRiskPercent,
 } from "@fxflow/db"
-import { ALL_FOREX_PAIRS } from "@fxflow/shared"
+import { ALL_FOREX_PAIRS, getPipSize } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { PositionManager } from "../positions/position-manager.js"
@@ -786,6 +787,7 @@ export class AiTraderScanner {
     const overview = this.stateManager.getAccountOverview()
     const accountBalance = overview?.summary.balance ?? 10000
     const openTradeCount = await countOpenAiTrades()
+    const riskPercent = await getRiskPercent()
 
     const tier3Ctx: Tier3Context = {
       signal,
@@ -795,6 +797,7 @@ export class AiTraderScanner {
       config,
       accountBalance,
       openTradeCount,
+      riskPercent,
     }
 
     const tier3Prompt = buildTier3Prompt(tier3Ctx)
@@ -823,7 +826,7 @@ export class AiTraderScanner {
       adjustedEntry: number | null
       adjustedSL: number | null
       adjustedTP: number | null
-      positionSizeUnits: number
+      positionSizeUnits?: number // Legacy field — ignored, calculated deterministically
       scores: {
         technical: number
         fundamental: number
@@ -858,6 +861,21 @@ export class AiTraderScanner {
     const stopLoss = tier3Result.adjustedSL ?? signal.suggestedSL
     const takeProfit = tier3Result.adjustedTP ?? signal.suggestedTP
 
+    // Deterministic position sizing — calculated from account settings, never from LLM
+    const pipSize = getPipSize(signal.instrument)
+    const riskPipsForSizing = Math.abs(entryPrice - stopLoss) / pipSize
+    const riskAmount = accountBalance * (riskPercent / 100)
+    const positionSize =
+      riskPipsForSizing > 0
+        ? Math.max(1, Math.floor(riskAmount / (riskPipsForSizing * pipSize)))
+        : 0
+
+    if (positionSize <= 0) {
+      console.warn(`[ai-trader] Position size calculated as 0 for ${signal.instrument} — skipping`)
+      this.addLogEntry("gate_blocked", `${pairLabel}: Position size is 0 (risk calculation issue)`)
+      return "gate_blocked"
+    }
+
     const opportunity = await createOpportunity({
       instrument: signal.instrument,
       direction: signal.direction,
@@ -870,7 +888,7 @@ export class AiTraderScanner {
       riskPips: signal.riskPips,
       rewardPips: signal.rewardPips,
       riskRewardRatio: signal.riskRewardRatio,
-      positionSize: tier3Result.positionSizeUnits,
+      positionSize,
       regime: castRegime(signal.technicalSnapshot.regime),
       session: castSession(signal.technicalSnapshot.session),
       primaryTechnique: signal.primaryTechnique,

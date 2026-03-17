@@ -53,6 +53,7 @@ export {
 } from "./notification-service"
 
 export {
+  enrichSource,
   upsertTrade,
   closeTrade,
   migrateFilledPendingOrders,
@@ -79,6 +80,8 @@ export {
   type ListTradesOptions,
   type TradeListResponse,
   type CreateTradeEventInput,
+  type OrphanCloseDetails,
+  type FetchOrphanCloseDetails,
 } from "./trade-service"
 
 export {

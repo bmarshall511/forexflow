@@ -312,6 +312,12 @@ export interface OandaCreateOrderResponse {
   lastTransactionID: string
 }
 
+/** Response from GET /v3/accounts/{id}/trades/{tradeId} — includes closed trade details. */
+export interface OandaTradeDetailResponse {
+  trade: OandaTrade
+  lastTransactionID: string
+}
+
 export interface OandaCloseTradeResponse {
   orderFillTransaction?: {
     id: string

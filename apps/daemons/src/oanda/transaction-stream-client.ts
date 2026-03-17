@@ -2,7 +2,11 @@ import type { TradingMode } from "@fxflow/types"
 import type { StateManager } from "../state-manager.js"
 import type { AccountDataCollector } from "./account-data-collector.js"
 import type { OandaTradeSyncer } from "./trade-syncer.js"
-import { getRestUrl, type OandaTransactionStreamEvent } from "./api-client.js"
+import {
+  getRestUrl,
+  type OandaTransactionStreamEvent,
+  type OandaTransactionStreamHeartbeat,
+} from "./api-client.js"
 
 /**
  * Persistent stream connection to OANDA's transaction stream.
@@ -21,6 +25,11 @@ export class TransactionStreamClient {
   private heartbeatCheckInterval: ReturnType<typeof setInterval> | null = null
 
   private tradeSyncer: OandaTradeSyncer | null = null
+
+  /** Track the last seen transaction ID for catch-up after reconnection. */
+  private lastTransactionId: string | null = null
+  /** Whether we've ever connected (to avoid catch-up on first connect). */
+  private hasConnectedBefore = false
 
   constructor(
     private stateManager: StateManager,
@@ -65,8 +74,16 @@ export class TransactionStreamClient {
       }
 
       // Successfully connected
+      const wasReconnect = this.hasConnectedBefore
       this.reconnectAttempt = 0
+      this.hasConnectedBefore = true
       console.log("[tx-stream] Connected successfully")
+
+      // On reconnection, trigger immediate reconcile to catch up on missed events
+      if (wasReconnect && this.tradeSyncer) {
+        console.log("[tx-stream] Reconnected — triggering catch-up reconcile")
+        void this.tradeSyncer.refreshPositions()
+      }
 
       // Start heartbeat monitoring
       this.lastHeartbeat = Date.now()
@@ -113,6 +130,15 @@ export class TransactionStreamClient {
   }
 
   private handleMessage(msg: OandaTransactionStreamEvent): void {
+    // Track last transaction ID from all messages (heartbeats include lastTransactionID)
+    const hb = msg as OandaTransactionStreamHeartbeat
+    if (hb.lastTransactionID) {
+      this.lastTransactionId = hb.lastTransactionID
+    }
+    if (msg.id) {
+      this.lastTransactionId = msg.id
+    }
+
     if (msg.type === "HEARTBEAT") {
       this.lastHeartbeat = Date.now()
       return
