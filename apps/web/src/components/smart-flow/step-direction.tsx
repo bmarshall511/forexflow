@@ -7,6 +7,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
+  Check,
   ExternalLink,
 } from "lucide-react"
 
@@ -21,13 +23,19 @@ export function StepDirection({
   pair,
   direction,
   onSelect,
+  aiSuggestion: externalAiSuggestion,
 }: {
   pair: string
   direction: "long" | "short" | null
   onSelect: (v: "long" | "short") => void
+  aiSuggestion?: AiSuggestion | null
 }) {
-  const [aiState, setAiState] = useState<"idle" | "loading" | "done" | "no-key" | "error">("idle")
-  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null)
+  const [aiState, setAiState] = useState<"idle" | "loading" | "done" | "no-key" | "error">(
+    externalAiSuggestion ? "done" : "idle",
+  )
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(
+    externalAiSuggestion ?? null,
+  )
   const [aiExpanded, setAiExpanded] = useState(true)
   const [aiError, setAiError] = useState("")
 
@@ -113,13 +121,15 @@ export function StepDirection({
       {aiState === "loading" && (
         <div className="flex min-h-[60px] items-center gap-4 rounded-xl border-2 border-indigo-500/30 bg-indigo-500/5 p-4">
           <div className="size-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-          <span className="text-sm font-medium text-indigo-400">Analyzing {pairLabel}...</span>
+          <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+            Analyzing {pairLabel}...
+          </span>
         </div>
       )}
 
       {aiState === "no-key" && (
         <div className="rounded-xl border-2 border-amber-500/30 bg-amber-500/5 p-4">
-          <p className="text-sm text-amber-300">
+          <p className="text-sm text-amber-600 dark:text-amber-400">
             Set up your Claude API key in{" "}
             <a
               href="/settings/ai"
@@ -134,11 +144,11 @@ export function StepDirection({
 
       {aiState === "error" && (
         <div className="rounded-xl border-2 border-red-500/30 bg-red-500/5 p-4">
-          <p className="text-sm text-red-400">{aiError}</p>
+          <p className="text-sm text-red-600 dark:text-red-400">{aiError}</p>
           <button
             type="button"
             onClick={handleAiDecide}
-            className="mt-2 text-xs font-medium text-red-400 underline underline-offset-2"
+            className="mt-2 text-xs font-medium text-red-600 underline underline-offset-2 dark:text-red-400"
           >
             Try again
           </button>
@@ -205,7 +215,7 @@ function DirectionCard({
           className="absolute -right-1.5 -top-1.5 flex size-6 items-center justify-center rounded-full text-xs text-white"
           style={{ backgroundColor: isLong ? "rgb(16 185 129)" : "rgb(239 68 68)" }}
         >
-          ✓
+          <Check className="size-3" />
         </span>
       )}
     </button>
@@ -231,7 +241,7 @@ function AiSuggestionCard({
         className="flex min-h-[44px] w-full items-center gap-3 p-4 text-left"
         aria-expanded={expanded}
       >
-        <Sparkles className="size-4 text-indigo-400" />
+        <Sparkles className="size-4 text-indigo-600 dark:text-indigo-400" />
         <div className="flex-1">
           <span className="text-sm font-semibold">AI suggests: </span>
           <span
@@ -269,7 +279,7 @@ function AiSuggestionCard({
           <ul className="space-y-1.5" aria-label="AI reasoning">
             {suggestion.reasoning.map((r, i) => (
               <li key={i} className="flex items-start gap-2 text-xs">
-                <span className="text-muted-foreground mt-0.5 shrink-0">&#x2022;</span>
+                <ChevronRight className="text-muted-foreground mt-0.5 size-3 shrink-0" />
                 <span className="text-foreground/80">{r}</span>
               </li>
             ))}
@@ -279,7 +289,7 @@ function AiSuggestionCard({
             {suggestion.factors.map((f, i) => (
               <span
                 key={i}
-                className="rounded-md bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-indigo-400"
+                className="rounded-md bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400"
               >
                 {f}
               </span>

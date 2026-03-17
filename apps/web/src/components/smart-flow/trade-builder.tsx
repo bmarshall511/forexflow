@@ -5,8 +5,9 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Check, Zap } from "lucide-react"
 import type { SmartFlowPreset } from "@fxflow/types"
-import { PRESET_INFO } from "./trade-builder-presets"
+import { PRESET_INFO, PRESET_KEYS } from "./trade-builder-presets"
 import { StepPair, StepDirection, StepStrategy, StepReview } from "./trade-builder-steps"
+import type { AiFullSuggestion } from "./step-pair"
 
 // ── Step metadata ────────────────────────────────────────────────────────
 
@@ -46,6 +47,23 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
   const [preset, setPreset] = useState<Exclude<SmartFlowPreset, "custom">>("steady_growth")
   const [search, setSearch] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [aiSuggestion, setAiSuggestion] = useState<AiFullSuggestion | null>(null)
+
+  function handleAiQuickStart(result: AiFullSuggestion) {
+    setAiSuggestion(result)
+    // Auto-set direction from AI result
+    setDirection(result.direction)
+    // Auto-set strategy if the suggestion maps to a valid preset
+    const suggested = result.suggestedStrategy as Exclude<SmartFlowPreset, "custom"> | undefined
+    if (suggested && PRESET_KEYS.includes(suggested)) {
+      setPreset(suggested)
+      // All fields filled — skip to Review (step 3)
+      setStep(3)
+    } else {
+      // Direction set but no valid strategy — skip to Strategy (step 2)
+      setStep(2)
+    }
+  }
 
   const canNext =
     (step === 0 && pair !== "") ||
@@ -179,10 +197,39 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
       {/* Step content with fade transition */}
       <div key={step} className="animate-fade-in">
         {step === 0 && (
-          <StepPair pair={pair} onSelect={setPair} search={search} onSearch={setSearch} />
+          <StepPair
+            pair={pair}
+            onSelect={setPair}
+            search={search}
+            onSearch={setSearch}
+            onAiQuickStart={handleAiQuickStart}
+          />
         )}
-        {step === 1 && <StepDirection pair={pair} direction={direction} onSelect={setDirection} />}
-        {step === 2 && <StepStrategy preset={preset} onSelect={setPreset} />}
+        {step === 1 && (
+          <StepDirection
+            pair={pair}
+            direction={direction}
+            onSelect={setDirection}
+            aiSuggestion={
+              aiSuggestion
+                ? {
+                    direction: aiSuggestion.direction,
+                    confidence: aiSuggestion.confidence,
+                    reasoning: aiSuggestion.reasoning,
+                    factors: aiSuggestion.factors,
+                  }
+                : undefined
+            }
+          />
+        )}
+        {step === 2 && (
+          <StepStrategy
+            preset={preset}
+            onSelect={setPreset}
+            aiSuggestedStrategy={aiSuggestion?.suggestedStrategy}
+            aiStrategyReason={aiSuggestion?.strategyReason}
+          />
+        )}
         {step === 3 && (
           <StepReview
             pair={pairLabel}

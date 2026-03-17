@@ -3,10 +3,9 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, TrendingDown, Zap, Check, Info } from "lucide-react"
+import { TrendingUp, TrendingDown, Zap, Check, Info, Globe2 } from "lucide-react"
 import type { SmartFlowPreset } from "@fxflow/types"
 import { PRESET_INFO } from "./trade-builder-presets"
-import { getPairFlags } from "./currency-flags"
 
 export function StepReview({
   pair,
@@ -23,8 +22,6 @@ export function StepReview({
 }) {
   const info = PRESET_INFO[preset]
   const isLong = direction === "long"
-  const pairValue = pair.replace("/", "_")
-
   return (
     <div className="space-y-4">
       {/* Summary card */}
@@ -42,9 +39,7 @@ export function StepReview({
 
           {/* Visual pair display */}
           <div className="bg-muted/50 flex items-center justify-center gap-3 rounded-xl py-4">
-            <span className="text-2xl" aria-hidden="true">
-              {getPairFlags(pairValue)}
-            </span>
+            <Globe2 className="text-muted-foreground size-6" aria-hidden="true" />
             <span className="text-xl font-bold">{pair}</span>
           </div>
 
@@ -70,7 +65,7 @@ export function StepReview({
                 Strategy
               </div>
               <div className="flex items-center justify-center gap-1.5">
-                <span aria-hidden="true">{info.emoji}</span>
+                <info.icon className="size-4" aria-hidden="true" />
                 <span className="text-sm font-semibold">{info.label}</span>
               </div>
             </div>
