@@ -243,6 +243,7 @@ export type TradeSource =
   | "trade_finder_auto"
   | "ai_trader"
   | "ai_trader_manual"
+  | "smart_flow"
 
 /** OANDA order types, including dependent orders (SL/TP/TSL). */
 export type OrderType =
@@ -576,6 +577,7 @@ export interface PlaceOrderRequest {
     | "trade_finder_auto"
     | "ai_trader"
     | "ai_trader_manual"
+    | "smart_flow"
 }
 
 /** Response data after successful order placement */
@@ -684,6 +686,8 @@ export type NotificationSource =
   | "trade_finder"
   | "ai_trader"
   | "price_alert"
+  | "smart_flow"
+  | "source_priority"
 
 /** A notification displayed in the header notification panel. */
 export interface NotificationData {
@@ -783,6 +787,14 @@ export type DaemonMessageType =
   | "ai_trader_trade_placed"
   | "ai_trader_trade_managed"
   | "ai_trader_trade_closed"
+  // SmartFlow
+  | "smart_flow_status"
+  | "smart_flow_trade_update"
+  | "smart_flow_entry_triggered"
+  | "smart_flow_safety_alert"
+  | "smart_flow_ai_suggestion"
+  // Source Priority
+  | "source_priority_event"
 
 /**
  * Base WebSocket message envelope sent from daemon to clients.
@@ -1038,6 +1050,12 @@ export type AnyDaemonMessage =
   | AiTraderTradeManagedMessage
   | AiTraderTradeClosedMessage
   | PriceAlertTriggeredMessage
+  | SmartFlowStatusMessage
+  | SmartFlowTradeUpdateMessage
+  | SmartFlowEntryTriggeredMessage
+  | SmartFlowSafetyAlertMessage
+  | SmartFlowAiSuggestionMessage
+  | SourcePriorityEventMessage
 
 // ─── TradingView Alerts ────────────────────────────────────────────────────
 
@@ -3035,6 +3053,415 @@ export interface EquityCurvePoint {
   cumulativePL: number
   tradeCount: number
   balance?: number
+}
+
+// ─── Source Priority ─────────────────────────────────────────────────────
+
+/** Automation sources that participate in the priority system. */
+export type PlacementSource = "trade_finder" | "tv_alerts" | "ai_trader" | "smart_flow"
+
+/** How the priority order is determined. */
+export type SourcePriorityMode = "manual" | "auto_select"
+
+/** What happened when a source tried to place a trade. */
+export type SourcePriorityAction =
+  | "placed"
+  | "blocked_open"
+  | "blocked_pending"
+  | "replaced_pending"
+  | "blocked_manual"
+
+/** Source priority configuration stored in DB. */
+export interface SourcePriorityConfigData {
+  enabled: boolean
+  mode: SourcePriorityMode
+  priorityOrder: PlacementSource[]
+  autoSelectWindowDays: number
+  autoSelectRecalcMinutes: number
+}
+
+/** Auto-select ranking entry (computed from win rate). */
+export interface SourceAutoRank {
+  source: PlacementSource
+  winRate: number
+  trades: number
+  rank: number
+}
+
+/** A logged priority event (placement attempt result). */
+export interface SourcePriorityLogEntry {
+  id: string
+  instrument: string
+  requestingSource: string
+  existingSource: string | null
+  existingTradeId: string | null
+  action: SourcePriorityAction
+  reason: string
+  createdAt: string
+}
+
+// ─── SmartFlow ──────────────────────────────────────────────────────────
+
+/** Strategy preset identifiers. */
+export type SmartFlowPreset =
+  | "momentum_catch"
+  | "steady_growth"
+  | "swing_capture"
+  | "trend_rider"
+  | "recovery"
+  | "custom"
+
+/** SmartFlow trade lifecycle status. */
+export type SmartFlowTradeStatus =
+  | "waiting_entry"
+  | "pending"
+  | "open"
+  | "managing"
+  | "closing"
+  | "closed"
+
+/** Current management phase of a SmartFlow trade. */
+export type SmartFlowPhase =
+  | "entry"
+  | "breakeven"
+  | "trailing"
+  | "partial"
+  | "recovery"
+  | "safety_net"
+  | "target"
+
+/** Which safety net was triggered. */
+export type SmartFlowSafetyNet = "max_drawdown" | "max_hold" | "max_financing" | "margin_warning"
+
+/** Position sizing modes. */
+export type SmartFlowSizeMode = "risk_percent" | "fixed_units" | "fixed_lots" | "kelly"
+
+/** Entry mode for a SmartFlow config. */
+export type SmartFlowEntryMode = "market" | "smart_entry"
+
+/** AI assist operating mode. */
+export type SmartFlowAiMode = "off" | "suggest" | "auto_selective" | "full_auto"
+
+/** Off-session behavior for management rules. */
+export type SmartFlowOffSessionBehavior = "widen_thresholds" | "pause_management" | "normal"
+
+/** Partial close rule (ATR-relative). */
+export interface SmartFlowPartialCloseRule {
+  /** Profit in ATR multiples to trigger. */
+  atAtrMultiple: number
+  /** Percentage of remaining position to close. */
+  closePercent: number
+}
+
+/** Logged partial close execution. */
+export interface SmartFlowPartialCloseEntry {
+  at: string
+  atrMultiple: number
+  percent: number
+  units: number
+  pips: number
+  pnl: number
+}
+
+/** A management action logged during trade lifecycle. */
+export interface SmartFlowManagementEntry {
+  at: string
+  action: string
+  source: "rule" | "ai" | "user"
+  detail: string
+  priceBid?: number
+  priceAsk?: number
+  confidence?: number
+}
+
+/** AI action toggles (which actions AI can auto-execute). */
+export interface SmartFlowAiActionToggles {
+  moveSL?: boolean
+  moveTP?: boolean
+  breakeven?: boolean
+  partialClose?: boolean
+  closeProfit?: boolean
+  preemptiveSafetyClose?: boolean
+  cancelEntry?: boolean
+  adjustTrail?: boolean
+}
+
+/** Confidence thresholds per AI action (0-100). */
+export interface SmartFlowAiConfidenceThresholds {
+  moveSL?: number
+  moveTP?: number
+  breakeven?: number
+  partialClose?: number
+  closeProfit?: number
+  preemptiveSafetyClose?: number
+  cancelEntry?: number
+  adjustTrail?: number
+}
+
+/** AI suggestion from monitoring cycle. */
+export interface SmartFlowAiSuggestion {
+  id: string
+  at: string
+  action: string
+  params: Record<string, unknown>
+  confidence: number
+  rationale: string
+  autoExecuted: boolean
+  cost: number
+  model: string
+}
+
+/** Smart entry condition for triggering delayed entries. */
+export interface SmartFlowEntryCondition {
+  type: "price_level" | "zone_proximity" | "rsi_threshold" | "momentum"
+  value: Record<string, unknown>
+}
+
+/** Preset defaults definition (ATR-relative). */
+export interface SmartFlowPresetDefaults {
+  label: string
+  description: string
+  shortDescription: string
+  slAtrMultiple: number
+  tpAtrMultiple: number
+  minRR: number
+  breakevenEnabled: boolean
+  breakevenAtrMultiple: number
+  trailingEnabled: boolean
+  trailingAtrMultiple: number
+  trailingActivationAtr: number
+  partialCloseRules: SmartFlowPartialCloseRule[]
+  maxHoldHours: number
+  recoveryEnabled: boolean
+  sessionAwareManagement: boolean
+  weekendCloseEnabled: boolean
+  newsProtectionEnabled: boolean
+  riskLevel: "low" | "medium" | "high" | "advanced"
+}
+
+/** Global SmartFlow settings. */
+export interface SmartFlowSettingsData {
+  enabled: boolean
+  maxConcurrentTrades: number
+  maxMarginPercent: number
+  defaultPreset: SmartFlowPreset
+  correlationWarningEnabled: boolean
+  maxCorrelatedPairs: number
+  aiBudgetDailyUsd: number
+  aiBudgetMonthlyUsd: number
+  aiDefaultModel: string
+  defaultMaxDrawdownPercent: number
+  defaultMaxHoldHours: number
+  defaultMaxFinancingUsd: number
+  spreadProtectionEnabled: boolean
+  spreadProtectionMultiple: number
+}
+
+/** SmartFlow config data sent to UI. */
+export interface SmartFlowConfigData {
+  id: string
+  instrument: string
+  name: string
+  direction: "long" | "short"
+  preset: SmartFlowPreset
+  isActive: boolean
+  entryMode: SmartFlowEntryMode
+  entryPrice: number | null
+  entryConditions: SmartFlowEntryCondition[] | null
+  entryExpireHours: number | null
+  positionSizeMode: SmartFlowSizeMode
+  positionSizeValue: number
+  stopLossAtrMultiple: number | null
+  takeProfitAtrMultiple: number | null
+  stopLossPips: number | null
+  takeProfitPips: number | null
+  minRiskReward: number
+  breakevenEnabled: boolean
+  breakevenAtrMultiple: number
+  breakevenBufferPips: number
+  trailingEnabled: boolean
+  trailingAtrMultiple: number
+  trailingActivationAtr: number
+  partialCloseRules: SmartFlowPartialCloseRule[]
+  maxDrawdownPercent: number | null
+  maxDrawdownPips: number | null
+  maxHoldHours: number | null
+  maxFinancingUsd: number | null
+  sessionAwareManagement: boolean
+  offSessionBehavior: SmartFlowOffSessionBehavior
+  weekendCloseEnabled: boolean
+  newsProtectionEnabled: boolean
+  newsProtectionMinutes: number
+  recoveryEnabled: boolean
+  recoveryMaxLevels: number
+  recoveryAtrInterval: number
+  recoverySizeMultiplier: number
+  recoveryTpAtrMultiple: number
+  aiMode: SmartFlowAiMode
+  aiMonitorIntervalHours: number
+  aiModel: string | null
+  aiActionToggles: SmartFlowAiActionToggles
+  aiConfidenceThresholds: SmartFlowAiConfidenceThresholds
+  aiMaxActionsPerDay: number
+  aiCooldownAfterManualMins: number
+  aiGracePeriodMins: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** SmartFlow active trade data for UI display. */
+export interface SmartFlowTradeData {
+  id: string
+  configId: string
+  tradeId: string | null
+  sourceTradeId: string | null
+  status: SmartFlowTradeStatus
+  entryPrice: number | null
+  currentPhase: SmartFlowPhase
+  breakevenTriggered: boolean
+  trailingActivated: boolean
+  partialCloseLog: SmartFlowPartialCloseEntry[]
+  managementLog: SmartFlowManagementEntry[]
+  recoveryLevel: number
+  estimatedHours: number | null
+  estimatedLow: number | null
+  estimatedHigh: number | null
+  safetyNetTriggered: SmartFlowSafetyNet | null
+  financingAccumulated: number
+  entrySpread: number | null
+  aiActionsToday: number
+  aiTotalCost: number
+  aiSuggestions: SmartFlowAiSuggestion[]
+  createdAt: string
+  closedAt: string | null
+  /** Merged from config for display convenience */
+  instrument?: string
+  direction?: string
+  preset?: SmartFlowPreset
+  configName?: string
+}
+
+/** Pair safety score for the ranking display. */
+export interface PairSafetyScore {
+  instrument: string
+  totalScore: number
+  spreadCostScore: number
+  trendClarityScore: number
+  sessionAlignmentScore: number
+  historicalWinRateScore: number
+  volatilityConsistencyScore: number
+  currentSpread: number
+  atrDaily: number
+  trendDirection: "up" | "down" | "range" | null
+  sessionStatus: "primary" | "overlap" | "off" | null
+  winRate: number | null
+  tradeCount: number
+}
+
+/** Time estimation result. */
+export interface SmartFlowTimeEstimateResult {
+  estimatedHours: number
+  low: number
+  high: number
+  confidence: "low" | "medium" | "high"
+  dataPoints: number
+  method: "atr_bootstrap" | "historical"
+}
+
+/** Risk of ruin calculation result. */
+export interface RiskOfRuinResult {
+  riskPerTrade: number
+  riskPerTradePercent: number
+  maxConcurrent: number
+  maxTotalRisk: number
+  maxTotalRiskPercent: number
+  consecutiveLossesTo50Pct: number
+  probabilityOfRuin: number
+  assessment: "safe" | "moderate" | "high_risk"
+}
+
+/** SmartFlow status overview (broadcast via WS). */
+export interface SmartFlowStatusData {
+  enabled: boolean
+  activeConfigs: number
+  openTrades: number
+  waitingEntries: number
+  todayPL: number
+  todayTradeCount: number
+  aiCostToday: number
+}
+
+/** SmartFlow trade management event (broadcast via WS). */
+export interface SmartFlowTradeUpdateData {
+  smartFlowTradeId: string
+  tradeId: string | null
+  instrument: string
+  action: string
+  phase: SmartFlowPhase
+  detail: string
+}
+
+/** SmartFlow entry triggered event (broadcast via WS). */
+export interface SmartFlowEntryTriggeredData {
+  smartFlowTradeId: string
+  configId: string
+  instrument: string
+  direction: "long" | "short"
+  entryPrice: number
+  configName: string
+}
+
+/** SmartFlow safety alert event (broadcast via WS). */
+export interface SmartFlowSafetyAlertData {
+  smartFlowTradeId: string
+  instrument: string
+  safetyNet: SmartFlowSafetyNet
+  detail: string
+}
+
+/** SmartFlow AI suggestion event (broadcast via WS). */
+export interface SmartFlowAiSuggestionData {
+  smartFlowTradeId: string
+  instrument: string
+  suggestion: SmartFlowAiSuggestion
+}
+
+/** Source priority event data (broadcast via WS). */
+export interface SourcePriorityEventData {
+  instrument: string
+  requestingSource: string
+  action: SourcePriorityAction
+  reason: string
+}
+
+/** WS message: SmartFlow overall status update. */
+export interface SmartFlowStatusMessage extends DaemonMessage<SmartFlowStatusData> {
+  type: "smart_flow_status"
+}
+
+/** WS message: SmartFlow trade management update. */
+export interface SmartFlowTradeUpdateMessage extends DaemonMessage<SmartFlowTradeUpdateData> {
+  type: "smart_flow_trade_update"
+}
+
+/** WS message: SmartFlow entry triggered. */
+export interface SmartFlowEntryTriggeredMessage extends DaemonMessage<SmartFlowEntryTriggeredData> {
+  type: "smart_flow_entry_triggered"
+}
+
+/** WS message: SmartFlow safety net alert. */
+export interface SmartFlowSafetyAlertMessage extends DaemonMessage<SmartFlowSafetyAlertData> {
+  type: "smart_flow_safety_alert"
+}
+
+/** WS message: SmartFlow AI suggestion. */
+export interface SmartFlowAiSuggestionMessage extends DaemonMessage<SmartFlowAiSuggestionData> {
+  type: "smart_flow_ai_suggestion"
+}
+
+/** WS message: Source priority event. */
+export interface SourcePriorityEventMessage extends DaemonMessage<SourcePriorityEventData> {
+  type: "source_priority_event"
 }
 
 // ─── Zod Schemas ────────────────────────────────────────────────────────────

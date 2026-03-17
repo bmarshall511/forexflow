@@ -340,3 +340,51 @@ export {
   getEquityCurve,
   getSourceBreakdown,
 } from "./analytics-service"
+
+export {
+  getSourcePriorityConfig,
+  updateSourcePriorityConfig,
+  createPriorityLog,
+  listPriorityLogs,
+  cleanupOldPriorityLogs,
+  getWinRateBySource,
+  type CreatePriorityLogInput,
+} from "./source-priority-service"
+
+export { getSmartFlowSettings, updateSmartFlowSettings } from "./smart-flow-settings-service"
+
+export {
+  getSmartFlowConfigs,
+  getSmartFlowConfigsByInstrument,
+  getActiveSmartFlowConfig,
+  getSmartFlowConfig,
+  createSmartFlowConfig,
+  updateSmartFlowConfig,
+  deleteSmartFlowConfig,
+  activateSmartFlowConfig,
+  deactivateSmartFlowConfig,
+  countActiveConfigs,
+  type CreateSmartFlowConfigInput,
+  type UpdateSmartFlowConfigInput,
+} from "./smart-flow-config-service"
+
+export {
+  createSmartFlowTrade,
+  getSmartFlowTrade,
+  getSmartFlowTradeByTradeId,
+  getSmartFlowTradeBySourceId,
+  getActiveSmartFlowTrades,
+  getSmartFlowTradesByStatus,
+  updateSmartFlowTrade,
+  updateSmartFlowTradeStatus,
+  appendManagementLog,
+  appendPartialCloseLog,
+  appendAiSuggestion,
+  incrementAiCost,
+  resetDailyAiActions,
+  closeSmartFlowTrade,
+  countOpenSmartFlowTrades,
+  getSmartFlowTradeHistory,
+  createTimeEstimate,
+  getTimeEstimates,
+} from "./smart-flow-trade-service"

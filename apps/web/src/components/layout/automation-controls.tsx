@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useCallback, useState } from "react"
-import { Radio, Zap, Bot, Loader2, ChevronDown } from "lucide-react"
+import { Radio, Zap, Bot, Loader2, ChevronDown, Workflow } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useKillSwitch } from "@/hooks/use-kill-switch"
 import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
 import { useAiTraderConfig } from "@/hooks/use-ai-trader-config"
+import { useSmartFlow } from "@/hooks/use-smart-flow"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -93,9 +94,11 @@ export function AutomationControls() {
   const { enabled: tvEnabled, isToggling: tvToggling, toggle: tvToggle } = useKillSwitch()
   const { config: tfConfig, update: tfUpdate } = useTradeFinderConfig()
   const { config: aiConfig, save: aiSave } = useAiTraderConfig()
+  const { settings: sfSettings, refetch: sfRefetch } = useSmartFlow()
 
   const [tfToggling, setTfToggling] = useState(false)
   const [aiToggling, setAiToggling] = useState(false)
+  const [sfToggling, setSfToggling] = useState(false)
 
   const handleTvToggle = useCallback(async () => {
     try {
@@ -143,10 +146,31 @@ export function AutomationControls() {
     }
   }
 
+  const handleSfToggle = async () => {
+    if (!sfSettings) return
+    setSfToggling(true)
+    try {
+      const res = await fetch("/api/smart-flow/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !sfSettings.enabled }),
+      })
+      const json = (await res.json()) as { ok: boolean; error?: string }
+      if (!json.ok) throw new Error(json.error ?? "Failed")
+      toast.success(sfSettings.enabled ? "SmartFlow disabled" : "SmartFlow enabled")
+      sfRefetch()
+    } catch {
+      toast.error("Failed to toggle SmartFlow")
+    } finally {
+      setSfToggling(false)
+    }
+  }
+
   const tvActive = tvEnabled === true
   const tfActive = tfConfig?.autoTradeEnabled === true
   const aiActive = aiConfig?.enabled === true
-  const activeCount = [tvActive, tfActive, aiActive].filter(Boolean).length
+  const sfActive = sfSettings?.enabled === true
+  const activeCount = [tvActive, tfActive, aiActive, sfActive].filter(Boolean).length
 
   return (
     <Popover>
@@ -158,13 +182,14 @@ export function AutomationControls() {
             "relative h-8 gap-1.5 px-2 text-xs font-medium",
             activeCount > 0 ? "text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
-          aria-label={`Automation controls: ${activeCount} of 3 active`}
+          aria-label={`Automation controls: ${activeCount} of 4 active`}
         >
           {/* Status dots */}
           <div className="flex items-center gap-1">
             <StatusDot active={tvActive} color="bg-green-500" />
             <StatusDot active={tfActive} color="bg-teal-500" />
             <StatusDot active={aiActive} color="bg-violet-500" />
+            <StatusDot active={sfActive} color="bg-amber-500" />
           </div>
           <span className="@5xl/header:inline hidden whitespace-nowrap">Automation</span>
           <ChevronDown className="size-3 opacity-50" />
@@ -173,7 +198,7 @@ export function AutomationControls() {
       <PopoverContent align="end" className="w-72 p-2">
         <div className="mb-2 px-3 pt-1">
           <p className="text-foreground text-xs font-semibold">Automation Controls</p>
-          <p className="text-muted-foreground text-[10px]">{activeCount} of 3 systems active</p>
+          <p className="text-muted-foreground text-[10px]">{activeCount} of 4 systems active</p>
         </div>
         <div className="space-y-0.5">
           {tvEnabled !== null && (
@@ -210,6 +235,18 @@ export function AutomationControls() {
               onToggle={handleAiToggle}
               color="text-violet-500"
               dotColor="bg-violet-500"
+            />
+          )}
+          {sfSettings && (
+            <ToggleRow
+              icon={<Workflow className="size-4" />}
+              label="SmartFlow"
+              description="Intelligent trade management"
+              enabled={sfActive}
+              toggling={sfToggling}
+              onToggle={handleSfToggle}
+              color="text-amber-500"
+              dotColor="bg-amber-500"
             />
           )}
         </div>

@@ -14,6 +14,8 @@ import {
   setDigestGenerator,
   setAiTraderScanner,
   setAlertMonitor,
+  setSourcePriorityManager,
+  setSmartFlowManager,
 } from "./server.js"
 import { StateManager } from "./state-manager.js"
 import { CredentialWatcher } from "./db/credential-watcher.js"
@@ -39,6 +41,9 @@ import { AlertMonitor } from "./alerts/alert-monitor.js"
 import { CalendarFetcher } from "./calendar/calendar-fetcher.js"
 import { CleanupScheduler } from "./cleanup-scheduler.js"
 import { PlacementGate } from "./placement-gate.js"
+import { SourcePriorityManager } from "./source-priority-manager.js"
+import { SmartFlowManager } from "./smart-flow/manager.js"
+import { ManagementEngine } from "./smart-flow/management-engine.js"
 import { getConfig } from "./config.js"
 import type { AnyDaemonMessage } from "@fxflow/types"
 
@@ -215,12 +220,13 @@ async function main() {
   setConditionMonitor(conditionMonitor)
   await conditionMonitor.start()
 
-  // Wire price ticks to condition monitor + AI Trader + Alert Monitor (via PositionPriceTracker)
+  // Wire price ticks to condition monitor + AI Trader + Alert Monitor + SmartFlow (via PositionPriceTracker)
   positionPriceTracker.onPriceTick = (tick) => {
     conditionMonitor.onPriceTick(tick)
     alertMonitor.onPriceTick(tick.instrument, tick.bid, tick.ask)
     const mid = (tick.bid + tick.ask) / 2
     aiTraderScanner.onPriceTick(tick.instrument, mid)
+    smartFlowManager.onPriceTick(tick.instrument, tick.bid, tick.ask)
   }
 
   // 12c. Auto Analyzer — automatically analyzes trades on lifecycle events
@@ -249,6 +255,8 @@ async function main() {
     void tradeFinderScanner.onOrderFilled(tradeId)
     // Check if this fill corresponds to an AI Trader opportunity
     void aiTraderScanner.onOrderFilled(tradeId)
+    // Check if this fill corresponds to a SmartFlow trade
+    void smartFlowManager.onOrderFilled(tradeId, "")
   }
   tradeSyncer.onTradeClosing = (sourceTradeId) =>
     positionPriceTracker.persistMfeMaeForTrade(sourceTradeId)
@@ -275,6 +283,8 @@ async function main() {
           await resolveOutcomes(tradeId, outcome, trade.realizedPL)
           // Notify AI Trader of closed trade
           void aiTraderScanner.onTradeClosed(tradeId, trade.realizedPL)
+          // Notify SmartFlow of closed trade
+          void smartFlowManager.onTradeClosed(tradeId)
         }
       })
       .catch((err) =>
@@ -328,14 +338,40 @@ async function main() {
   setAiTraderScanner(aiTraderScanner)
   await aiTraderScanner.start()
 
-  // 12f. Economic calendar fetcher — periodic Finnhub calendar sync
+  // 12f. Source Priority Manager — coordinates placement across automation sources
+  const sourcePriorityBroadcast = (type: string, payload: unknown) => {
+    broadcast({
+      type: type as AnyDaemonMessage["type"],
+      timestamp: new Date().toISOString(),
+      data: payload,
+    } as AnyDaemonMessage)
+  }
+  const sourcePriorityManager = new SourcePriorityManager(positionManager, sourcePriorityBroadcast)
+  sourcePriorityManager.setTradeSyncer(tradeSyncer)
+  setSourcePriorityManager(sourcePriorityManager)
+  await sourcePriorityManager.loadConfig()
+
+  // 12g. SmartFlow Manager + Management Engine — trade lifecycle management
+  const managementEngine = new ManagementEngine(positionManager, sourcePriorityBroadcast)
+  managementEngine.setTradeSyncer(tradeSyncer)
+  await managementEngine.start()
+
+  const smartFlowManager = new SmartFlowManager(stateManager, broadcast)
+  smartFlowManager.setTradeSyncer(tradeSyncer)
+  smartFlowManager.setSourcePriorityManager(sourcePriorityManager)
+  smartFlowManager.setPositionManager(positionManager)
+  smartFlowManager.setManagementEngine(managementEngine)
+  setSmartFlowManager(smartFlowManager)
+  await smartFlowManager.start()
+
+  // 12i. Economic calendar fetcher — periodic Finnhub calendar sync
   const calendarFetcher = new CalendarFetcher(async () => {
     const { getDecryptedFinnhubKey } = await import("@fxflow/db")
     return getDecryptedFinnhubKey()
   })
   calendarFetcher.start()
 
-  // 12g. Cleanup scheduler — daily DB maintenance during market close hours
+  // 12j. Cleanup scheduler — daily DB maintenance during market close hours
   const cleanupScheduler = new CleanupScheduler()
   cleanupScheduler.start()
 
@@ -387,6 +423,7 @@ async function main() {
     digestGenerator.stop()
     tradeFinderScanner.stop()
     aiTraderScanner.stop()
+    smartFlowManager.stop()
     alertMonitor.stop()
     calendarFetcher.stop()
     cleanupScheduler.stop()

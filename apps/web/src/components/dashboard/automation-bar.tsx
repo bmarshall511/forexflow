@@ -6,7 +6,7 @@ import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { usePositions } from "@/hooks/use-positions"
 import { formatPnL } from "@fxflow/shared"
 import { cn } from "@/lib/utils"
-import { Radio, Search, Bot, Settings, MousePointer } from "lucide-react"
+import { Radio, Search, Bot, Settings, MousePointer, Workflow } from "lucide-react"
 import type { TradeSource } from "@fxflow/types"
 
 // ─── Source stats helper ────────────────────────────────────────────────────
@@ -185,8 +185,13 @@ function mergeStats(...sources: (SourceStats | undefined)[]): SourceStats | null
 // ─── Main bar ────────────────────────────────────────────────────────────────
 
 export function AutomationBar() {
-  const { tvAlertsStatus, tradeFinderScanStatus, lastAiTraderScanStatus, accountOverview } =
-    useDaemonStatus()
+  const {
+    tvAlertsStatus,
+    tradeFinderScanStatus,
+    lastAiTraderScanStatus,
+    lastSmartFlowStatus,
+    accountOverview,
+  } = useDaemonStatus()
   const sourceStats = useSourceStats()
   const currency = accountOverview?.summary.currency ?? "USD"
 
@@ -198,6 +203,9 @@ export function AutomationBar() {
 
   // AI Trader stats
   const aiStats = sourceStats.get("ai_trader") ?? null
+
+  // SmartFlow stats
+  const sfStats = sourceStats.get("smart_flow") ?? null
 
   // Manual stats (oanda + manual sources — trades placed via FXFlow or directly on OANDA)
   const manualStats = mergeStats(sourceStats.get("oanda"), sourceStats.get("manual"))
@@ -246,6 +254,20 @@ export function AutomationBar() {
       : "Disabled"
     : "Not configured"
 
+  // SmartFlow status
+  const sfStatus: Status = lastSmartFlowStatus
+    ? lastSmartFlowStatus.enabled
+      ? lastSmartFlowStatus.openTrades > 0
+        ? "active"
+        : "idle"
+      : "disabled"
+    : "disabled"
+  const sfLine1 = lastSmartFlowStatus
+    ? lastSmartFlowStatus.enabled
+      ? `${lastSmartFlowStatus.openTrades} trade${lastSmartFlowStatus.openTrades !== 1 ? "s" : ""} managed`
+      : "Disabled"
+    : "Not configured"
+
   // Manual status — always "active" since it's always available
   const manualLine1 = manualStats
     ? `${manualStats.openCount + manualStats.closedTodayCount} trade${manualStats.openCount + manualStats.closedTodayCount !== 1 ? "s" : ""} today`
@@ -254,7 +276,7 @@ export function AutomationBar() {
   return (
     <div
       className={cn(
-        "bg-card border-border/50 grid grid-cols-2 rounded-xl border xl:grid-cols-4",
+        "bg-card border-border/50 grid grid-cols-2 rounded-xl border lg:grid-cols-3 xl:grid-cols-5",
         "animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500",
       )}
       style={{ animationDelay: "200ms" }}
@@ -299,6 +321,16 @@ export function AutomationBar() {
         currency={currency}
         href="/ai-trader"
         settingsHref="/settings/ai-trader"
+      />
+      <ModuleSegment
+        icon={Workflow}
+        name="SmartFlow"
+        status={sfStatus}
+        line1={sfLine1}
+        stats={sfStats}
+        currency={currency}
+        href="/smart-flow"
+        settingsHref="/settings/smart-flow"
       />
     </div>
   )

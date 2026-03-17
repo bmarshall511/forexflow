@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 import type {
   DaemonStatusSnapshot,
   OandaHealthData,
@@ -25,6 +26,12 @@ import type {
   AiTraderScanProgressData,
   AiTraderScanLogEntry,
   PriceAlertData,
+  SmartFlowStatusData,
+  SmartFlowTradeUpdateData,
+  SmartFlowEntryTriggeredData,
+  SmartFlowSafetyAlertData,
+  SmartFlowAiSuggestionData,
+  SourcePriorityEventData,
   AnyDaemonMessage,
 } from "@fxflow/types"
 
@@ -132,6 +139,18 @@ export interface DaemonConnectionState {
   lastAiTraderEvent: Record<string, unknown> | null
   /** Most recent price alert triggered event */
   lastPriceAlertTriggered: PriceAlertData | null
+  /** Latest SmartFlow status */
+  lastSmartFlowStatus: SmartFlowStatusData | null
+  /** Most recent SmartFlow trade update */
+  lastSmartFlowTradeUpdate: SmartFlowTradeUpdateData | null
+  /** Most recent SmartFlow entry triggered event */
+  lastSmartFlowEntryTriggered: SmartFlowEntryTriggeredData | null
+  /** Most recent SmartFlow safety alert */
+  lastSmartFlowSafetyAlert: SmartFlowSafetyAlertData | null
+  /** Most recent SmartFlow AI suggestion */
+  lastSmartFlowAiSuggestion: SmartFlowAiSuggestionData | null
+  /** Most recent source priority event */
+  lastSourcePriorityEvent: SourcePriorityEventData | null
   /** True after the first connection attempt has completed (success or failure) */
   connectionAttempted: boolean
 }
@@ -192,6 +211,17 @@ export function useDaemonConnection(): DaemonConnectionState {
   const [lastPriceAlertTriggered, setLastPriceAlertTriggered] = useState<PriceAlertData | null>(
     null,
   )
+  const [lastSmartFlowStatus, setLastSmartFlowStatus] = useState<SmartFlowStatusData | null>(null)
+  const [lastSmartFlowTradeUpdate, setLastSmartFlowTradeUpdate] =
+    useState<SmartFlowTradeUpdateData | null>(null)
+  const [lastSmartFlowEntryTriggered, setLastSmartFlowEntryTriggered] =
+    useState<SmartFlowEntryTriggeredData | null>(null)
+  const [lastSmartFlowSafetyAlert, setLastSmartFlowSafetyAlert] =
+    useState<SmartFlowSafetyAlertData | null>(null)
+  const [lastSmartFlowAiSuggestion, setLastSmartFlowAiSuggestion] =
+    useState<SmartFlowAiSuggestionData | null>(null)
+  const [lastSourcePriorityEvent, setLastSourcePriorityEvent] =
+    useState<SourcePriorityEventData | null>(null)
   const [connectionAttempted, setConnectionAttempted] = useState(false)
   const [isReachable, setIsReachable] = useState(false)
 
@@ -386,6 +416,35 @@ export function useDaemonConnection(): DaemonConnectionState {
             case "price_alert_triggered":
               setLastPriceAlertTriggered(msg.data)
               break
+            case "smart_flow_status":
+              setLastSmartFlowStatus(msg.data)
+              window.dispatchEvent(new CustomEvent("smart-flow-status", { detail: msg.data }))
+              break
+            case "smart_flow_trade_update":
+              setLastSmartFlowTradeUpdate(msg.data)
+              window.dispatchEvent(new CustomEvent("smart-flow-trade-update", { detail: msg.data }))
+              break
+            case "smart_flow_entry_triggered":
+              setLastSmartFlowEntryTriggered(msg.data)
+              window.dispatchEvent(
+                new CustomEvent("smart-flow-entry-triggered", { detail: msg.data }),
+              )
+              toast.success(
+                `SmartFlow entry: ${msg.data.instrument} ${msg.data.direction} @ ${msg.data.entryPrice}`,
+              )
+              break
+            case "smart_flow_safety_alert":
+              setLastSmartFlowSafetyAlert(msg.data)
+              toast.warning(`SmartFlow safety: ${msg.data.instrument} — ${msg.data.detail}`)
+              break
+            case "smart_flow_ai_suggestion":
+              setLastSmartFlowAiSuggestion(msg.data)
+              toast.info(`SmartFlow AI: ${msg.data.instrument} — ${msg.data.suggestion.action}`)
+              break
+            case "source_priority_event":
+              setLastSourcePriorityEvent(msg.data)
+              toast.info(`Source priority: ${msg.data.instrument} — ${msg.data.reason}`)
+              break
             case "error":
               console.warn("[daemon-ws] Error from daemon:", msg.data.message)
               break
@@ -534,5 +593,11 @@ export function useDaemonConnection(): DaemonConnectionState {
     lastAiTraderScanLogEntry,
     lastAiTraderEvent,
     lastPriceAlertTriggered,
+    lastSmartFlowStatus,
+    lastSmartFlowTradeUpdate,
+    lastSmartFlowEntryTriggered,
+    lastSmartFlowSafetyAlert,
+    lastSmartFlowAiSuggestion,
+    lastSourcePriorityEvent,
   }
 }

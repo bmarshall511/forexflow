@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Shield,
   BookOpen,
+  Zap,
   type LucideIcon,
 } from "lucide-react"
 
@@ -54,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "TradingView Alerts", href: "/tv-alerts", icon: Radio, badgeKey: "tvAlerts" },
       { label: "AI Analysis", href: "/ai-analysis", icon: Sparkles, badgeKey: "aiAnalysis" },
       { label: "AI Trader", href: "/ai-trader", icon: Bot, badgeKey: "aiTrader" },
+      { label: "SmartFlow", href: "/smart-flow", icon: Zap },
       { label: "Alerts", href: "/alerts", icon: Bell },
     ],
   },

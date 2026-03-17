@@ -37,6 +37,10 @@ const SOURCE_CONFIG: Record<TradeSource, { label: string; className: string }> =
     label: "AI Trade (Manual)",
     className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
   },
+  smart_flow: {
+    label: "SmartFlow",
+    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+  },
 }
 
 interface SourceBadgeProps {

@@ -55,6 +55,18 @@ export function setAlertMonitor(monitor: AlertMonitor): void {
   _alertMonitor = monitor
 }
 
+import type { SourcePriorityManager } from "./source-priority-manager.js"
+let _sourcePriorityManager: SourcePriorityManager | null = null
+export function setSourcePriorityManager(manager: SourcePriorityManager): void {
+  _sourcePriorityManager = manager
+}
+
+import type { SmartFlowManager } from "./smart-flow/manager.js"
+let _smartFlowManager: SmartFlowManager | null = null
+export function setSmartFlowManager(manager: SmartFlowManager): void {
+  _smartFlowManager = manager
+}
+
 interface ServerDeps {
   stateManager: StateManager
   credentialWatcher: CredentialWatcher
@@ -934,6 +946,177 @@ export async function startServer(port: number, deps: ServerDeps) {
       void _alertMonitor.reload().then(() => {
         sendJson(res, 200, { ok: true })
       })
+      return
+    }
+
+    // ─── Source Priority Endpoints ──────────────────────────────────────
+
+    if (req.method === "GET" && req.url === "/source-priority/config") {
+      if (!_sourcePriorityManager) {
+        sendJson(res, 503, { ok: false, error: "Source Priority Manager not initialized" })
+        return
+      }
+      sendJson(res, 200, { ok: true, data: _sourcePriorityManager.getConfig() })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/source-priority/config") {
+      if (!_sourcePriorityManager) {
+        sendJson(res, 503, { ok: false, error: "Source Priority Manager not initialized" })
+        return
+      }
+      readBody(req)
+        .then(async (body) => {
+          const updates = JSON.parse(body)
+          const { updateSourcePriorityConfig } = await import("@fxflow/db")
+          await updateSourcePriorityConfig(updates)
+          const config = await _sourcePriorityManager!.loadConfig()
+          sendJson(res, 200, { ok: true, data: config })
+        })
+        .catch((err) => {
+          console.error("[server] source-priority config update error:", err)
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/source-priority/logs") {
+      if (!_sourcePriorityManager) {
+        sendJson(res, 503, { ok: false, error: "Source Priority Manager not initialized" })
+        return
+      }
+      _sourcePriorityManager
+        .getRecentLogs()
+        .then((logs) => sendJson(res, 200, { ok: true, data: logs }))
+        .catch((err) => sendJson(res, 500, { ok: false, error: (err as Error).message }))
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/source-priority/auto-ranks") {
+      if (!_sourcePriorityManager) {
+        sendJson(res, 503, { ok: false, error: "Source Priority Manager not initialized" })
+        return
+      }
+      sendJson(res, 200, { ok: true, data: _sourcePriorityManager.getAutoSelectRanks() })
+      return
+    }
+
+    // ─── SmartFlow Endpoints ────────────────────────────────────────────
+
+    if (req.method === "GET" && req.url === "/smart-flow/status") {
+      if (!_smartFlowManager) {
+        sendJson(res, 503, { ok: false, error: "SmartFlow not initialized" })
+        return
+      }
+      _smartFlowManager
+        .getStatus()
+        .then((status) => sendJson(res, 200, { ok: true, data: status }))
+        .catch((err) => sendJson(res, 500, { ok: false, error: (err as Error).message }))
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/configs") {
+      import("@fxflow/db")
+        .then(async ({ getSmartFlowConfigs }) => {
+          const configs = await getSmartFlowConfigs()
+          sendJson(res, 200, { ok: true, data: configs })
+        })
+        .catch((err) => {
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/smart-flow/configs") {
+      readBody(req)
+        .then(async (body) => {
+          const input = JSON.parse(body)
+          const { createSmartFlowConfig } = await import("@fxflow/db")
+          const config = await createSmartFlowConfig(input)
+          sendJson(res, 200, { ok: true, data: config })
+        })
+        .catch((err) => {
+          console.error("[server] smart-flow create config error:", err)
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/trades") {
+      import("@fxflow/db")
+        .then(async ({ getActiveSmartFlowTrades }) => {
+          const trades = await getActiveSmartFlowTrades()
+          sendJson(res, 200, { ok: true, data: trades })
+        })
+        .catch((err) => {
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        })
+      return
+    }
+
+    if (req.method === "POST" && req.url?.startsWith("/smart-flow/place/")) {
+      const configId = req.url.replace("/smart-flow/place/", "")
+      if (!_smartFlowManager) {
+        sendJson(res, 503, { ok: false, error: "SmartFlow not initialized" })
+        return
+      }
+      _smartFlowManager
+        .placeMarketEntry(configId)
+        .then((result) => {
+          if (result.success) {
+            sendJson(res, 200, { ok: true, data: result.trade })
+          } else {
+            sendJson(res, 400, { ok: false, error: result.error })
+          }
+        })
+        .catch((err) => {
+          console.error("[server] smart-flow place error:", err)
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        })
+      return
+    }
+
+    if (req.method === "POST" && req.url?.startsWith("/smart-flow/smart-entry/")) {
+      const configId = req.url.replace("/smart-flow/smart-entry/", "")
+      if (!_smartFlowManager) {
+        sendJson(res, 503, { ok: false, error: "SmartFlow not initialized" })
+        return
+      }
+      _smartFlowManager
+        .createSmartEntry(configId)
+        .then((result) => {
+          if (result.success) {
+            sendJson(res, 200, { ok: true, data: result.trade })
+          } else {
+            sendJson(res, 400, { ok: false, error: result.error })
+          }
+        })
+        .catch((err) => {
+          console.error("[server] smart-flow smart-entry error:", err)
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        })
+      return
+    }
+
+    if (req.method === "POST" && req.url?.startsWith("/smart-flow/cancel/")) {
+      const id = req.url.replace("/smart-flow/cancel/", "")
+      if (!_smartFlowManager) {
+        sendJson(res, 503, { ok: false, error: "SmartFlow not initialized" })
+        return
+      }
+      _smartFlowManager
+        .cancelSmartFlowTrade(id)
+        .then((result) => {
+          if (result.success) {
+            sendJson(res, 200, { ok: true })
+          } else {
+            sendJson(res, 400, { ok: false, error: result.error })
+          }
+        })
+        .catch((err) => {
+          console.error("[server] smart-flow cancel error:", err)
+          sendJson(res, 500, { ok: false, error: (err as Error).message })
+        })
       return
     }
 

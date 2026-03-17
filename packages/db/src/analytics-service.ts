@@ -12,7 +12,7 @@ const SRC: Record<TradeSource, string> = {
   oanda: "OANDA", manual: "FXFlow", automated: "Auto",
   ut_bot_alerts: "TradingView Alert", trade_finder: "Trade Finder (Manual)",
   trade_finder_auto: "Trade Finder (Automatic)", ai_trader: "AI Trade (Auto)",
-  ai_trader_manual: "AI Trade (Manual)",
+  ai_trader_manual: "AI Trade (Manual)", smart_flow: "SmartFlow",
 } // prettier-ignore
 
 const PLACED_VIA_MAP: Record<string, TradeSource> = {
@@ -21,6 +21,7 @@ const PLACED_VIA_MAP: Record<string, TradeSource> = {
   trade_finder_auto: "trade_finder_auto",
   ai_trader: "ai_trader",
   ai_trader_manual: "ai_trader_manual",
+  smart_flow: "smart_flow",
   fxflow: "manual",
 }
 

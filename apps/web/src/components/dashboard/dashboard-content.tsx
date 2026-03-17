@@ -9,6 +9,7 @@ import { MarketCalendarCard } from "./market-calendar-card"
 import { PerformanceCard } from "./performance-card"
 import { SourcePerformanceCard } from "./source-performance-card"
 import { AiInsightsBar } from "./ai-insights-bar"
+import { SmartFlowCard } from "./smart-flow-card"
 import { CardErrorBoundary } from "@/components/ui/card-error-boundary"
 
 /**
@@ -49,6 +50,13 @@ export function DashboardContent() {
       <div className="px-4 md:px-6">
         <CardErrorBoundary>
           <AutomationBar />
+        </CardErrorBoundary>
+      </div>
+
+      {/* ── Section 4b: SmartFlow Status ──────────────────────────────── */}
+      <div className="px-4 md:px-6">
+        <CardErrorBoundary>
+          <SmartFlowCard />
         </CardErrorBoundary>
       </div>
 
