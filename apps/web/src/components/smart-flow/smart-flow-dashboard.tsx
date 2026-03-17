@@ -59,7 +59,7 @@ export function SmartFlowDashboard() {
         bordered
         actions={
           <>
-            <Button size="sm" className="h-8 gap-1.5 text-xs">
+            <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setTab("trade")}>
               <Plus className="size-3.5" />
               <span className="hidden sm:inline">New Trade</span>
             </Button>
@@ -145,16 +145,38 @@ export function SmartFlowDashboard() {
   )
 }
 
-const tabPlaceholders: Record<Tab, string> = {
-  trade: "Trade builder coming in Phase 3b",
-  active: "Active SmartFlow trade cards will appear here once trades are running.",
-  configs: "Saved trade configurations will be listed here.",
-  history: "Closed SmartFlow trade history will appear here.",
-  rankings: "Pair safety scores and rankings will be displayed here.",
-}
-
 function TabPlaceholder({ tab }: { tab: Tab }) {
+  if (tab === "trade") {
+    return (
+      <div className="mx-auto max-w-md space-y-4 py-12 text-center">
+        <div className="bg-primary/10 mx-auto flex size-12 items-center justify-center rounded-full">
+          <Zap className="text-primary size-6" />
+        </div>
+        <h3 className="text-foreground text-base font-semibold">Trade Builder Coming Soon</h3>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          The SmartFlow trade builder will let you pick a currency pair, choose a direction, select
+          a strategy, and place a managed trade — all in a few simple steps. SmartFlow will then
+          automatically manage your trade toward profit.
+        </p>
+        <p className="text-muted-foreground text-xs">
+          In the meantime, you can configure your settings and explore the other tabs.
+        </p>
+      </div>
+    )
+  }
+  const msgs: Record<string, string> = {
+    active:
+      "Active SmartFlow trades will appear here once trades are running. Each trade shows its current phase, progress toward profit, and all management actions taken.",
+    configs:
+      "Your saved trade configurations will be listed here. Create configs for different currency pairs with different strategies, then activate them when ready.",
+    history:
+      "Closed SmartFlow trades will appear here with full details — profit/loss, how long they took, which safety nets fired, and how accurate the time estimate was.",
+    rankings:
+      "Currency pair safety rankings will be displayed here, showing which pairs are easiest to trade right now based on volatility, spread, trend clarity, and your past performance.",
+  }
   return (
-    <div className="text-muted-foreground py-12 text-center text-sm">{tabPlaceholders[tab]}</div>
+    <div className="text-muted-foreground py-12 text-center text-sm leading-relaxed">
+      {msgs[tab] ?? "Coming soon."}
+    </div>
   )
 }
