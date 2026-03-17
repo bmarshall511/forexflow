@@ -41,8 +41,14 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 
 - `Trade.source` in DB is always `"oanda"` (OANDA is the canonical trade repository).
 - True origin is in `Trade.metadata` JSON: `{ placedVia: "ut_bot_alerts" | "fxflow" }`.
-- `enrichSource(source, metadata)` resolves display-friendly source labels.
+- `enrichSource(source, metadata)` resolves display-friendly source labels. Exported from `trade-service.ts` for reuse in other modules (e.g., `trade-syncer.ts`).
 - Applied in `toClosedTradeData()`, `getTradeWithDetails()`, and at runtime in `reconcile()`.
+
+### closeOrphanedTrades
+
+- `closeOrphanedTrades()` accepts a `FetchOrphanCloseDetails` callback to fetch actual close details (P&L, exit price, close reason) from OANDA before marking trades closed.
+- Returns `{ count: number; closedTradeIds: string[] }` (not just a count).
+- New exported types: `OrphanCloseDetails`, `FetchOrphanCloseDetails`.
 
 ### Upsert
 

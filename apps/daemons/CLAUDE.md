@@ -39,14 +39,18 @@ src/
 
 - `api-client.ts` — HTTP calls (accounts, orders, trades, candles).
 - `stream-client.ts` — SSE pricing stream (EUR_USD only for heartbeat/status).
-- `transaction-stream-client.ts` — SSE transaction stream (fills, cancels, modifications).
+- `transaction-stream-client.ts` — SSE transaction stream (fills, cancels, modifications). Tracks `lastTransactionId` from stream events; on reconnection, triggers immediate reconcile to catch up on missed events.
 
 ## Trade Syncing
 
 - `trade-syncer.ts` reconciles OANDA state with DB every 2 minutes.
 - Per-instrument mutex prevents concurrent syncs on the same pair.
 - **Source pattern**: `Trade.source` is always `"oanda"`. True origin lives in `Trade.metadata = { placedVia: "ut_bot_alerts" | "fxflow" }`.
-- Metadata is pre-seeded via `upsertTrade()` BEFORE first reconcile when placing TV-alert orders.
+- Metadata is pre-seeded via `upsertTrade()` WITH metadata BEFORE the first reconcile when placing orders, eliminating the race window where reconcile could fire callbacks before metadata existed.
+- **Orphan close details**: when a trade disappears from OANDA, `closeOrphanedTrades()` fetches actual close details (P&L, exit price, close reason) from OANDA's API before marking closed, instead of recording UNKNOWN/$0.
+- **Metadata recovery**: `recoverSourceMetadata()` checks both `placeOrder` audit trail and TV Alert signals (`TVAlertSignal.resultTradeId`) to restore missing metadata.
+- **SL/TP pre-validation**: `placeOrder()` validates stop-loss and take-profit before submission — SL/TP must be on the correct side of entry, and neither can equal entry after rounding.
+- **Startup repair**: `repairOrphanedTrades()` runs on startup to fix existing trades with UNKNOWN close reason/$0 P&L, and repairs trades with null metadata by running recovery checks.
 
 ## Position Tracking
 
@@ -73,10 +77,15 @@ src/
 - `auto-trade-queue.ts` — pure functions for queue position computation + skip reason categorization.
 - Setup lifecycle: `active → approaching → placed → filled → invalidated/expired`.
 - Fill detection: dual path — event-driven via `tradeSyncer.onOrderFilled` + fallback via `checkPlacedSetups()`.
+- Risk cap counts BOTH pending AND filled auto-placed trades (`countPendingAutoPlaced()` + `getAutoPlacedTotalRiskPips()`), preventing cap bypass when orders fill.
 - Auto-trade events ring buffer (max 50) exposed via `GET /trade-finder/auto-trade-events`.
 - Skip reasons persisted to DB (`lastSkipReason` column) and broadcast via WS for accurate UI badges.
 - Queue system: eligible-but-capped setups are priority-ordered (score DESC, distance ASC). Reactive placement on slot open (fill/cancel/invalidation).
 - Cap utilization: `GET /trade-finder/caps` endpoint + `trade_finder_cap_utilization` WS message.
+
+## AI Trader
+
+- **Deterministic position sizing**: position size is calculated in code, NOT by the LLM. Uses `getRiskPercent()` from settings with formula `units = floor(riskAmount / (riskPips * pipSize))`, minimum 1 unit enforced.
 
 ## Market Hours
 
