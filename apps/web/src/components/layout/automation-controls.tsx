@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useCallback, useState } from "react"
-import { Radio, Zap, Bot, Loader2, ChevronDown, Workflow } from "lucide-react"
+import { Radio, Zap, Bot, Loader2, ChevronDown, Workflow, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useKillSwitch } from "@/hooks/use-kill-switch"
 import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
 import { useAiTraderConfig } from "@/hooks/use-ai-trader-config"
 import { useSmartFlow } from "@/hooks/use-smart-flow"
+import { useAiSettings } from "@/hooks/use-ai-settings"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -95,10 +96,16 @@ export function AutomationControls() {
   const { config: tfConfig, update: tfUpdate } = useTradeFinderConfig()
   const { config: aiConfig, save: aiSave } = useAiTraderConfig()
   const { settings: sfSettings, refetch: sfRefetch } = useSmartFlow()
+  const {
+    settings: aiAnalysisSettings,
+    savePreferences: aiAnalysisSave,
+    refetch: aiAnalysisRefetch,
+  } = useAiSettings()
 
   const [tfToggling, setTfToggling] = useState(false)
   const [aiToggling, setAiToggling] = useState(false)
   const [sfToggling, setSfToggling] = useState(false)
+  const [aaToggling, setAaToggling] = useState(false)
 
   const handleTvToggle = useCallback(async () => {
     try {
@@ -166,11 +173,27 @@ export function AutomationControls() {
     }
   }
 
+  const handleAaToggle = async () => {
+    if (!aiAnalysisSettings) return
+    setAaToggling(true)
+    try {
+      const newEnabled = !aiAnalysisSettings.autoAnalysis.enabled
+      await aiAnalysisSave({ enabled: newEnabled })
+      toast.success(newEnabled ? "AI Analysis enabled" : "AI Analysis disabled")
+      aiAnalysisRefetch()
+    } catch {
+      toast.error("Failed to toggle AI Analysis")
+    } finally {
+      setAaToggling(false)
+    }
+  }
+
   const tvActive = tvEnabled === true
   const tfActive = tfConfig?.autoTradeEnabled === true
   const aiActive = aiConfig?.enabled === true
   const sfActive = sfSettings?.enabled === true
-  const activeCount = [tvActive, tfActive, aiActive, sfActive].filter(Boolean).length
+  const aaActive = aiAnalysisSettings?.autoAnalysis.enabled === true
+  const activeCount = [tvActive, tfActive, aiActive, sfActive, aaActive].filter(Boolean).length
 
   return (
     <Popover>
@@ -182,13 +205,14 @@ export function AutomationControls() {
             "relative h-8 gap-1.5 px-2 text-xs font-medium",
             activeCount > 0 ? "text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
-          aria-label={`Automation controls: ${activeCount} of 4 active`}
+          aria-label={`Automation controls: ${activeCount} of 5 active`}
         >
           {/* Status dots */}
           <div className="flex items-center gap-1">
             <StatusDot active={tvActive} color="bg-green-500" />
             <StatusDot active={tfActive} color="bg-teal-500" />
             <StatusDot active={aiActive} color="bg-violet-500" />
+            <StatusDot active={aaActive} color="bg-blue-500" />
             <StatusDot active={sfActive} color="bg-amber-500" />
           </div>
           <span className="@5xl/header:inline hidden whitespace-nowrap">Automation</span>
@@ -198,7 +222,7 @@ export function AutomationControls() {
       <PopoverContent align="end" className="w-72 p-2">
         <div className="mb-2 px-3 pt-1">
           <p className="text-foreground text-xs font-semibold">Automation Controls</p>
-          <p className="text-muted-foreground text-[10px]">{activeCount} of 4 systems active</p>
+          <p className="text-muted-foreground text-[10px]">{activeCount} of 5 systems active</p>
         </div>
         <div className="space-y-0.5">
           {tvEnabled !== null && (
@@ -223,6 +247,18 @@ export function AutomationControls() {
               onToggle={handleTfToggle}
               color="text-teal-500"
               dotColor="bg-teal-500"
+            />
+          )}
+          {aiAnalysisSettings && (
+            <ToggleRow
+              icon={<Sparkles className="size-4" />}
+              label="AI Analysis"
+              description="Auto-analyze trades with Claude"
+              enabled={aaActive}
+              toggling={aaToggling}
+              onToggle={handleAaToggle}
+              color="text-blue-500"
+              dotColor="bg-blue-500"
             />
           )}
           {aiConfig && (
