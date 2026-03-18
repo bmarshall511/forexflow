@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type { SourcePriorityLog } from "@/hooks/use-source-priority"
+import type { SourcePriorityLogEntry } from "@fxflow/types"
 import { formatRelativeTime } from "@fxflow/shared"
 import { formatInstrument } from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
@@ -17,13 +17,13 @@ const ACTION_CONFIG: Record<string, { icon: typeof Check; color: string; border:
 }
 
 export function PriorityLogPanel() {
-  const [logs, setLogs] = useState<SourcePriorityLog[]>([])
+  const [logs, setLogs] = useState<SourcePriorityLogEntry[]>([])
 
   const fetchLogs = useCallback(async () => {
     try {
       const res = await fetch("/api/source-priority/logs")
       if (!res.ok) return
-      const json = (await res.json()) as { ok: boolean; data?: SourcePriorityLog[] }
+      const json = (await res.json()) as { ok: boolean; data?: SourcePriorityLogEntry[] }
       if (json.ok && json.data) setLogs(json.data)
     } catch {
       /* API may not be ready */
@@ -71,12 +71,12 @@ export function PriorityLogPanel() {
                 <Badge variant="outline" className={cn("px-1.5 py-0 text-[10px]", config.color)}>
                   {log.action}
                 </Badge>
-                <span className="text-muted-foreground text-[10px]">{log.winningSource}</span>
+                <span className="text-muted-foreground text-[10px]">{log.requestingSource}</span>
               </div>
               <p className="text-muted-foreground mt-0.5 truncate text-[11px]">{log.reason}</p>
             </div>
             <span className="text-muted-foreground mt-0.5 shrink-0 text-[10px]">
-              {formatRelativeTime(log.timestamp)}
+              {formatRelativeTime(log.createdAt)}
             </span>
           </div>
         )

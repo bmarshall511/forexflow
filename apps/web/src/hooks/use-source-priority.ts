@@ -2,49 +2,21 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
-
-// ─── Types ─────────────────────────────────────────────────────────
-// TODO: Move to @fxflow/types once source priority types are finalized
-
-export interface SourcePriorityConfig {
-  enabled: boolean
-  priorities: SourcePriorityEntry[]
-  conflictResolution: "highest_priority" | "most_recent" | "manual"
-  cooldownMinutes: number
-}
-
-export interface SourcePriorityEntry {
-  source: string
-  priority: number
-  enabled: boolean
-  label: string
-}
-
-export interface SourcePriorityLog {
-  id: string
-  timestamp: string
-  instrument: string
-  winningSource: string
-  losingSource: string
-  reason: string
-  action: "blocked" | "overridden" | "queued"
-}
+import type { SourcePriorityConfigData, SourcePriorityLogEntry } from "@fxflow/types"
 
 export interface UseSourcePriorityReturn {
-  config: SourcePriorityConfig | null
-  logs: SourcePriorityLog[]
+  config: SourcePriorityConfigData | null
+  logs: SourcePriorityLogEntry[]
   isLoading: boolean
-  updateConfig: (updates: Partial<SourcePriorityConfig>) => Promise<boolean>
+  updateConfig: (updates: Partial<SourcePriorityConfigData>) => Promise<boolean>
   refreshLogs: () => void
 }
 
 export function useSourcePriority(): UseSourcePriorityReturn {
-  const [config, setConfig] = useState<SourcePriorityConfig | null>(null)
-  const [logs, setLogs] = useState<SourcePriorityLog[]>([])
+  const [config, setConfig] = useState<SourcePriorityConfigData | null>(null)
+  const [logs, setLogs] = useState<SourcePriorityLogEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const hasFetchedOnce = useRef(false)
-
-  // ─── Fetch config + logs ────────────────────────────────────────
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -52,7 +24,7 @@ export function useSourcePriority(): UseSourcePriorityReturn {
       if (!res.ok) return
       const json = (await res.json()) as {
         ok: boolean
-        data?: SourcePriorityConfig
+        data?: SourcePriorityConfigData
         error?: string
       }
       if (json.ok && json.data) setConfig(json.data)
@@ -67,7 +39,7 @@ export function useSourcePriority(): UseSourcePriorityReturn {
       if (!res.ok) return
       const json = (await res.json()) as {
         ok: boolean
-        data?: SourcePriorityLog[]
+        data?: SourcePriorityLogEntry[]
         error?: string
       }
       if (json.ok && json.data) setLogs(json.data)
@@ -87,10 +59,8 @@ export function useSourcePriority(): UseSourcePriorityReturn {
     void fetchAll()
   }, [fetchAll])
 
-  // ─── Actions ────────────────────────────────────────────────────
-
   const updateConfig = useCallback(
-    async (updates: Partial<SourcePriorityConfig>): Promise<boolean> => {
+    async (updates: Partial<SourcePriorityConfigData>): Promise<boolean> => {
       try {
         const res = await fetch("/api/source-priority", {
           method: "POST",
@@ -99,7 +69,7 @@ export function useSourcePriority(): UseSourcePriorityReturn {
         })
         const json = (await res.json()) as {
           ok: boolean
-          data?: SourcePriorityConfig
+          data?: SourcePriorityConfigData
           error?: string
         }
         if (!json.ok) {
@@ -121,11 +91,5 @@ export function useSourcePriority(): UseSourcePriorityReturn {
     void fetchLogs()
   }, [fetchLogs])
 
-  return {
-    config,
-    logs,
-    isLoading,
-    updateConfig,
-    refreshLogs,
-  }
+  return { config, logs, isLoading, updateConfig, refreshLogs }
 }
