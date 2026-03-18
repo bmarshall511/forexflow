@@ -37,6 +37,8 @@ import { AutoAnalyzer } from "./ai/auto-analyzer.js"
 import { DigestGenerator } from "./ai/digest-generator.js"
 import { TradeFinderScanner } from "./trade-finder/scanner.js"
 import { TradeFinderTradeManager } from "./trade-finder/trade-manager.js"
+import { recordTradeFinderClose } from "./trade-finder/performance-tracker.js"
+import { evaluateAndTune } from "./trade-finder/adaptive-tuner.js"
 import { AiTraderScanner } from "./ai-trader/scanner.js"
 import { AlertMonitor } from "./alerts/alert-monitor.js"
 import { CalendarFetcher } from "./calendar/calendar-fetcher.js"
@@ -273,7 +275,7 @@ async function main() {
       .then(async ({ resolveOutcomes, db }) => {
         const trade = await db.trade.findUnique({
           where: { id: tradeId },
-          select: { realizedPL: true, exitPrice: true },
+          select: { realizedPL: true, exitPrice: true, sourceTradeId: true },
         })
         if (trade) {
           const outcome =
@@ -289,8 +291,15 @@ async function main() {
           void aiTraderScanner.onTradeClosed(tradeId, trade.realizedPL)
           // Notify SmartFlow of closed trade
           void smartFlowManager.onTradeClosed(tradeId)
-          // Stop managing Trade Finder trade
+          // Stop managing Trade Finder trade + record performance
           tradeFinderTradeManager.onTradeClosed(tradeId)
+          if (trade.sourceTradeId) {
+            void recordTradeFinderClose(
+              trade.sourceTradeId,
+              trade.realizedPL,
+              trade.exitPrice,
+            ).then(() => void evaluateAndTune())
+          }
         }
       })
       .catch((err) =>

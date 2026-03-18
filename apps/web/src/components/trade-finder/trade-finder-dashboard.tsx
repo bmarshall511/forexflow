@@ -17,15 +17,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Scan, Settings2, Zap, Trash2, Crosshair, History, Activity, Search } from "lucide-react"
+import {
+  Scan,
+  Settings2,
+  Zap,
+  Trash2,
+  Crosshair,
+  History,
+  Activity,
+  Search,
+  BarChart3,
+} from "lucide-react"
 import { SetupCard } from "./setup-card"
 import { AutoTradeLog } from "./auto-trade-log"
+import { PerformanceOverview } from "./performance-overview"
 import { toast } from "sonner"
 import { formatRelativeTime } from "@fxflow/shared"
 import { PageHeader } from "@/components/ui/page-header"
 import { cn } from "@/lib/utils"
 
-type Tab = "active" | "history" | "activity"
+type Tab = "active" | "history" | "activity" | "performance"
 
 export function TradeFinderDashboard() {
   const {
@@ -221,6 +232,13 @@ export function TradeFinderDashboard() {
             count={autoTradeEvents.length}
           />
         )}
+        <TabNavButton
+          active={tab === "performance"}
+          onClick={() => setTab("performance")}
+          icon={<BarChart3 className="size-3.5" />}
+          label="Performance"
+          count={0}
+        />
       </TabNav>
 
       {/* ─── Tab Content ─── */}
@@ -439,6 +457,8 @@ export function TradeFinderDashboard() {
             <AutoTradeLog events={autoTradeEvents} />
           </>
         )}
+
+        {tab === "performance" && <PerformanceOverview />}
 
         {/* Error banner */}
         {scanStatus?.error && (

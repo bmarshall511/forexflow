@@ -130,6 +130,26 @@ The Activity tab on the Trade Finder dashboard shows every auto-trade event in r
 
 This log is your audit trail. Check it regularly to understand what Trade Finder is doing on your behalf.
 
+## Performance Tab
+
+The Performance tab shows how your Trade Finder trades are performing over time. It tracks:
+
+- **Win rate** — percentage of trades that were profitable
+- **Total P&L** — cumulative profit/loss across all Trade Finder trades
+- **Profit Factor** — ratio of gross wins to gross losses (above 1.5 is good)
+- **Average R:R** — actual risk-reward achieved vs what was expected at placement
+
+Performance is broken down by:
+
+- **Score range** — do higher-score setups actually win more often?
+- **Timeframe** — which timeframe sets perform best?
+- **Instrument** — which currency pairs produce the best results?
+
+Use the period selector (7d, 30d, 90d, All) to zoom in on recent or long-term performance.
+
+> [!TIP]
+> If a specific score range or instrument consistently underperforms, the adaptive tuner will suggest raising thresholds or disabling those pairs.
+
 ## Trade Management
 
 Once a Trade Finder trade is filled (open), the system can actively manage it to protect profits and cut losses faster. These features are configured in Settings > Trade Finder > Trade Management.

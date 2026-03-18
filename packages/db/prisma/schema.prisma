@@ -431,6 +431,30 @@ model TradeFinderSetup {
   @@index([placedAt])
 }
 
+model TradeFinderPerformance {
+  id           String   @id @default(uuid())
+  dimension    String   // "overall" | "timeframe" | "instrument" | "score_range"
+  dimensionKey String?  // e.g. "hourly", "EUR_USD", "10-12" (null for overall)
+  periodStart  DateTime
+  periodEnd    DateTime
+  totalSetups  Int      @default(0)
+  placed       Int      @default(0)
+  filled       Int      @default(0)
+  wins         Int      @default(0)
+  losses       Int      @default(0)
+  breakevens   Int      @default(0)
+  totalPL      Float    @default(0)
+  avgRR        Float    @default(0) // Average actual R:R achieved
+  expectedRR   Float    @default(0) // Average expected R:R at placement
+  profitFactor Float    @default(0)
+  expectancy   Float    @default(0)
+  maxDrawdown  Float    @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@index([dimension, dimensionKey, periodStart])
+  @@index([dimension, periodStart])
+}
+
 // ─── AI Trader ──────────────────────────────────────────────────────────────
 
 model AiTraderConfig {

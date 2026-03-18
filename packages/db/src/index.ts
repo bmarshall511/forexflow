@@ -256,6 +256,15 @@ export {
 } from "./trade-finder-service"
 
 export {
+  getTradeFinderPerformance,
+  getTradeFinderOverallStats,
+  recordTradeFinderOutcome,
+  cleanupOldPerformance as cleanupOldTradeFinderPerformance,
+  type TradeFinderPerformanceData,
+  type RecordOutcomeInput as TradeFinderOutcomeInput,
+} from "./trade-finder-performance-service"
+
+export {
   getAiTraderConfig,
   updateAiTraderConfig,
   saveAiTraderApiKey,
