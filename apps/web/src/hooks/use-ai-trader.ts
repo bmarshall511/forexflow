@@ -17,6 +17,8 @@ export interface UseAiTraderReturn {
   opportunities: AiTraderOpportunityData[]
   operatingMode: AiTraderOperatingMode
   confidenceThreshold: number
+  dailyBudgetUsd: number
+  monthlyBudgetUsd: number
   isLoading: boolean
   triggerScan: () => Promise<void>
   pauseScanner: () => Promise<void>
@@ -33,6 +35,8 @@ export function useAiTrader(): UseAiTraderReturn {
   const [isLoading, setIsLoading] = useState(true)
   const [operatingMode, setOperatingMode] = useState<AiTraderOperatingMode>("manual")
   const [confidenceThreshold, setConfidenceThreshold] = useState(70)
+  const [dailyBudgetUsd, setDailyBudgetUsd] = useState(1)
+  const [monthlyBudgetUsd, setMonthlyBudgetUsd] = useState(20)
   const hasFetchedOnce = useRef(false)
 
   const {
@@ -69,12 +73,19 @@ export function useAiTrader(): UseAiTraderReturn {
       if (configRes.ok) {
         const json = (await configRes.json()) as {
           ok: boolean
-          data?: { operatingMode?: AiTraderOperatingMode; confidenceThreshold?: number }
+          data?: {
+            operatingMode?: AiTraderOperatingMode
+            confidenceThreshold?: number
+            dailyBudgetUsd?: number
+            monthlyBudgetUsd?: number
+          }
         }
         if (json.ok && json.data) {
           if (json.data.operatingMode) setOperatingMode(json.data.operatingMode)
           if (json.data.confidenceThreshold != null)
             setConfidenceThreshold(json.data.confidenceThreshold)
+          if (json.data.dailyBudgetUsd != null) setDailyBudgetUsd(json.data.dailyBudgetUsd)
+          if (json.data.monthlyBudgetUsd != null) setMonthlyBudgetUsd(json.data.monthlyBudgetUsd)
         }
       }
     } catch {
@@ -159,6 +170,8 @@ export function useAiTrader(): UseAiTraderReturn {
     opportunities,
     operatingMode,
     confidenceThreshold,
+    dailyBudgetUsd,
+    monthlyBudgetUsd,
     isLoading,
     triggerScan,
     pauseScanner,

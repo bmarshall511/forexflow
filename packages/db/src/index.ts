@@ -274,7 +274,9 @@ export {
   expireOldOpportunities,
   cleanupOldOpportunities,
   getOpportunitiesByProfile,
+  getAllOpportunities,
   type CreateOpportunityInput,
+  type OpportunityListFilters,
 } from "./ai-trader-opportunity-service"
 
 export {
@@ -294,6 +296,14 @@ export {
   type UpsertPerformanceInput,
   type TradeStatsInput,
 } from "./ai-trader-performance-service"
+
+export {
+  getAiTraderEquityCurve,
+  getAiTraderFunnelStats,
+  getAiTraderCostStats,
+  type AiTraderFunnelStats,
+  type AiTraderCostStats,
+} from "./ai-trader-analytics-service"
 
 export {
   createPriceAlert,
@@ -388,6 +398,8 @@ export {
   getSmartFlowTradeHistory,
   createTimeEstimate,
   getTimeEstimates,
+  getTodaySmartFlowAiCost,
+  getMonthlySmartFlowAiCost,
 } from "./smart-flow-trade-service"
 
 export {

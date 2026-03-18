@@ -362,6 +362,14 @@ async function main() {
   smartFlowManager.setPositionManager(positionManager)
   smartFlowManager.setManagementEngine(managementEngine)
   setSmartFlowManager(smartFlowManager)
+
+  // SmartFlow AI Monitor — periodic Claude-powered trade management suggestions
+  const { SmartFlowAiMonitor } = await import("./smart-flow/ai-monitor.js")
+  const sfAiMonitor = new SmartFlowAiMonitor(broadcast)
+  sfAiMonitor.setStateManager(stateManager)
+  sfAiMonitor.setTradeSyncer(tradeSyncer)
+  smartFlowManager.setAiMonitor(sfAiMonitor)
+
   // Initialize activity feed from DB before starting SmartFlow
   const { initActivityFeed } = await import("./smart-flow/activity-feed.js")
   await initActivityFeed()

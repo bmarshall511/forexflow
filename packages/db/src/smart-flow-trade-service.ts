@@ -363,6 +363,37 @@ export async function incrementAiCost(
   })
 }
 
+/**
+ * Sum AI cost across all SmartFlow trades with AI activity today.
+ *
+ * @returns Total AI spend in USD for today
+ */
+export async function getTodaySmartFlowAiCost(): Promise<number> {
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+  const rows = await db.smartFlowTrade.findMany({
+    where: { aiLastActionAt: { gte: startOfDay } },
+    select: { aiTotalCost: true },
+  })
+  return rows.reduce((sum, r) => sum + r.aiTotalCost, 0)
+}
+
+/**
+ * Sum AI cost across all SmartFlow trades with AI activity this month.
+ *
+ * @returns Total AI spend in USD for the current month
+ */
+export async function getMonthlySmartFlowAiCost(): Promise<number> {
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+  const rows = await db.smartFlowTrade.findMany({
+    where: { aiLastActionAt: { gte: startOfMonth } },
+    select: { aiTotalCost: true },
+  })
+  return rows.reduce((sum, r) => sum + r.aiTotalCost, 0)
+}
+
 /** Reset aiActionsToday to 0 for all active (non-closed) trades. Called daily. */
 export async function resetDailyAiActions(): Promise<void> {
   await db.smartFlowTrade.updateMany({

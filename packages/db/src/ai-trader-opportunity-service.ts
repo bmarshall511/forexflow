@@ -384,6 +384,82 @@ export async function getOpportunitiesByProfile(
   return rows.map(toOpportunityData)
 }
 
+// ─── Filtered + Paginated Query ──────────────────────────────────────────────
+
+/** Filters for the combined opportunity list. */
+export interface OpportunityListFilters {
+  status?: AiTraderOpportunityStatus[]
+  instrument?: string
+  profile?: AiTraderProfile
+  direction?: TradeDirection
+  search?: string
+  sort?: "confidence" | "detectedAt" | "realizedPL" | "riskRewardRatio"
+  sortDir?: "asc" | "desc"
+  page?: number
+  limit?: number
+}
+
+/**
+ * Get all opportunities with server-side filtering, sorting, and pagination.
+ *
+ * @param filters - Optional filter, sort, and pagination parameters
+ * @returns Paginated result with data array and total count
+ */
+export async function getAllOpportunities(
+  filters: OpportunityListFilters = {},
+): Promise<{ data: AiTraderOpportunityData[]; total: number }> {
+  const {
+    status,
+    instrument,
+    profile,
+    direction,
+    search,
+    sort = "detectedAt",
+    sortDir = "desc",
+    page = 1,
+    limit = 20,
+  } = filters
+
+  // Build where clause
+  const where: Record<string, unknown> = {}
+
+  if (status && status.length > 0) {
+    where.status = { in: status }
+  }
+  if (instrument) {
+    where.instrument = instrument
+  }
+  if (profile) {
+    where.profile = profile
+  }
+  if (direction) {
+    where.direction = direction
+  }
+  if (search) {
+    where.OR = [
+      { instrument: { contains: search } },
+      { entryRationale: { contains: search } },
+      { profile: { contains: search } },
+      { primaryTechnique: { contains: search } },
+    ]
+  }
+
+  const orderBy = { [sort]: sortDir }
+  const skip = (page - 1) * limit
+
+  const [rows, total] = await Promise.all([
+    db.aiTraderOpportunity.findMany({
+      where,
+      orderBy,
+      skip,
+      take: limit,
+    }),
+    db.aiTraderOpportunity.count({ where }),
+  ])
+
+  return { data: rows.map(toOpportunityData), total }
+}
+
 // ─── Cost Tracking ──────────────────────────────────────────────────────────
 
 /**

@@ -19,6 +19,7 @@ import {
   ScrollText,
   Shield,
   Radio,
+  Bot,
 } from "lucide-react"
 import { useSmartFlow } from "@/hooks/use-smart-flow"
 import { TradeBuilder } from "./trade-builder"
@@ -34,7 +35,8 @@ type Tab = "trade" | "active" | "configs" | "activity" | "history" | "rankings"
 export function SmartFlowDashboard() {
   const [tab, setTab] = useState<Tab>("configs") // Default to Trade Plans
   const [activityCount, setActivityCount] = useState(0)
-  const { configs, activeTrades, closedTrades, isLoading, refetch } = useSmartFlow()
+  const { configs, activeTrades, closedTrades, status, settings, isLoading, refetch } =
+    useSmartFlow()
   const handleEventCount = useCallback((count: number) => setActivityCount(count), [])
 
   if (isLoading) {
@@ -42,8 +44,8 @@ export function SmartFlowDashboard() {
       <div className="min-h-screen">
         <div className="space-y-6 border-b px-4 pb-8 pt-6 md:px-6">
           <Skeleton className="h-8 w-48" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-16" />
             ))}
           </div>
@@ -96,7 +98,7 @@ export function SmartFlowDashboard() {
           </>
         }
       >
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <DataTile
             label="Trade Plans"
             value={String(activeConfigCount)}
@@ -126,6 +128,26 @@ export function SmartFlowDashboard() {
             value={recentTrades.length > 0 ? `${successRate}%` : "--"}
             subtitle={recentTrades.length > 0 ? `Last ${recentTrades.length} trades` : undefined}
             icon={<Percent className="size-3" />}
+          />
+          <DataTile
+            label="AI Cost Today"
+            value={`$${(status?.aiCostToday ?? 0).toFixed(4)}`}
+            subtitle={
+              status?.aiBudgetDailyUsd
+                ? `of $${status.aiBudgetDailyUsd.toFixed(2)} budget`
+                : undefined
+            }
+            icon={<Bot className="size-3" />}
+          />
+          <DataTile
+            label="AI Cost Monthly"
+            value={`$${(status?.aiCostMonthly ?? 0).toFixed(4)}`}
+            subtitle={
+              status?.aiBudgetMonthlyUsd
+                ? `of $${status.aiBudgetMonthlyUsd.toFixed(2)} budget`
+                : undefined
+            }
+            icon={<Bot className="size-3" />}
           />
         </div>
       </PageHeader>

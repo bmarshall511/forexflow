@@ -23,8 +23,8 @@ import { toast } from "sonner"
 import { useAiTrader } from "@/hooks/use-ai-trader"
 import { ScannerStatusBar } from "./scanner-status-bar"
 import { ScanActivityLog } from "./scan-activity-log"
-import { OpportunityCard } from "./opportunity-card"
-import { PipelineExplainer } from "./pipeline-explainer"
+import { OpportunityList } from "./opportunity-list"
+import { PerformanceTab } from "./performance/performance-tab"
 
 type Tab = "opportunities" | "activity" | "performance"
 
@@ -39,6 +39,8 @@ export function AiTraderDashboard() {
     opportunities,
     operatingMode,
     confidenceThreshold,
+    dailyBudgetUsd,
+    monthlyBudgetUsd,
     isLoading,
     triggerScan,
     pauseScanner,
@@ -171,11 +173,15 @@ export function AiTraderDashboard() {
           <DataTile
             label="Today's AI Cost"
             value={`$${(status?.todayBudgetUsed ?? 0).toFixed(4)}`}
+            subtitle={dailyBudgetUsd > 0 ? `of $${dailyBudgetUsd.toFixed(2)} budget` : undefined}
             icon={<DollarSign className="size-3" />}
           />
           <DataTile
             label="Monthly AI Cost"
             value={`$${(status?.monthlyBudgetUsed ?? 0).toFixed(4)}`}
+            subtitle={
+              monthlyBudgetUsd > 0 ? `of $${monthlyBudgetUsd.toFixed(2)} budget` : undefined
+            }
             icon={<DollarSign className="size-3" />}
           />
         </div>
@@ -207,35 +213,9 @@ export function AiTraderDashboard() {
       </TabNav>
 
       <div className="space-y-4 px-4 py-6 md:px-6">
-        {tab === "opportunities" && (
-          <>
-            <PipelineExplainer />
-            {opportunities.length === 0 ? (
-              <div className="text-muted-foreground py-12 text-center text-sm">
-                No opportunities found yet. The AI scanner will discover trading setups on the next
-                scan cycle.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {opportunities.map((opp) => (
-                  <OpportunityCard
-                    key={opp.id}
-                    opportunity={opp}
-                    operatingMode={operatingMode}
-                    confidenceThreshold={confidenceThreshold}
-                    onAction={onAction}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
+        {tab === "opportunities" && <OpportunityList />}
         {tab === "activity" && <ScanActivityLog entries={scanLog} />}
-        {tab === "performance" && (
-          <div className="text-muted-foreground py-12 text-center text-sm">
-            Performance analytics coming soon
-          </div>
-        )}
+        {tab === "performance" && <PerformanceTab />}
       </div>
     </div>
   )

@@ -26,6 +26,8 @@ import {
   createTimeEstimate,
   countActiveConfigs,
   getSmartFlowConfigs,
+  getTodaySmartFlowAiCost,
+  getMonthlySmartFlowAiCost,
 } from "@fxflow/db"
 import { computeATR, getPipSize } from "@fxflow/shared"
 import { emitActivity, setActivityBroadcast } from "./activity-feed.js"
@@ -63,6 +65,13 @@ interface ManagementEngineRef {
   onEntryTriggered: ((configId: string, smartFlowTradeId: string) => void) | null
 }
 
+interface AiMonitorRef {
+  start(): Promise<void>
+  stop(): void
+  addTrade(trade: SmartFlowTradeData, config: SmartFlowConfigData): void
+  removeTrade(smartFlowTradeId: string): void
+}
+
 const ATR_TTL = 5 * 60 * 1000
 const ATR_PERIOD = 14
 const ATR_COUNT = 100
@@ -90,6 +99,7 @@ export class SmartFlowManager {
   private atrCache = new Map<string, { atr: number; at: number }>()
   private candleCache = new CandleCache()
   private activeInstruments = new Set<string>()
+  private aiMonitor: AiMonitorRef | null = null
   private enabled = false
   private startedAt: number | null = null
   private lastTickAt: number | null = null
@@ -120,6 +130,9 @@ export class SmartFlowManager {
   }
   setManagementEngine(engine: ManagementEngineRef): void {
     this.engine = engine
+  }
+  setAiMonitor(monitor: AiMonitorRef): void {
+    this.aiMonitor = monitor
   }
 
   async start(): Promise<void> {
@@ -175,6 +188,17 @@ export class SmartFlowManager {
             : undefined,
       },
     )
+
+    // Start AI monitor and register existing trades
+    if (this.aiMonitor) {
+      await this.aiMonitor.start()
+      for (const t of activeTrades) {
+        if (t.status !== "waiting_entry" && t.status !== "closed" && t.configId) {
+          const config = await getSmartFlowConfig(t.configId)
+          if (config) this.aiMonitor.addTrade(t, config)
+        }
+      }
+    }
 
     this.startMonitoringUpdates()
 
@@ -315,6 +339,13 @@ export class SmartFlowManager {
       (await getSmartFlowTradeBySourceId(sourceTradeId))
     if (!sf) return
     await updateSmartFlowTradeStatus(sf.id, "managing", { currentPhase: "entry" })
+
+    // Register with AI monitor for ongoing evaluation
+    if (this.aiMonitor && sf.configId) {
+      const config = await getSmartFlowConfig(sf.configId)
+      if (config) this.aiMonitor.addTrade(sf, config)
+    }
+
     this.emitUpdate(sf, "filled", "Order filled — management active")
     emitActivity(
       "entry_filled",
@@ -331,6 +362,7 @@ export class SmartFlowManager {
   async onTradeClosed(tradeId: string): Promise<void> {
     const sf = await getSmartFlowTradeByTradeId(tradeId)
     if (!sf) return
+    this.aiMonitor?.removeTrade(sf.id)
     await closeSmartFlowTrade(sf.id)
 
     if (sf.instrument && sf.preset && sf.direction && sf.entryPrice) {
@@ -399,9 +431,12 @@ export class SmartFlowManager {
   }
 
   async getStatus(): Promise<SmartFlowStatusData> {
-    const [openTrades, activeConfigs] = await Promise.all([
+    const [openTrades, activeConfigs, aiCostToday, aiCostMonthly, settings] = await Promise.all([
       countOpenSmartFlowTrades(),
       countActiveConfigs(),
+      getTodaySmartFlowAiCost(),
+      getMonthlySmartFlowAiCost(),
+      getSmartFlowSettings(),
     ])
     return {
       enabled: this.enabled,
@@ -410,7 +445,10 @@ export class SmartFlowManager {
       waitingEntries: 0,
       todayPL: 0,
       todayTradeCount: 0,
-      aiCostToday: 0,
+      aiCostToday,
+      aiCostMonthly,
+      aiBudgetDailyUsd: settings.aiBudgetDailyUsd,
+      aiBudgetMonthlyUsd: settings.aiBudgetMonthlyUsd,
     }
   }
 

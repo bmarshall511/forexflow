@@ -3418,6 +3418,9 @@ export interface SmartFlowStatusData {
   todayPL: number
   todayTradeCount: number
   aiCostToday: number
+  aiCostMonthly: number
+  aiBudgetDailyUsd: number
+  aiBudgetMonthlyUsd: number
 }
 
 /** SmartFlow trade management event (broadcast via WS). */

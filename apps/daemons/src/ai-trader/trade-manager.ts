@@ -2,6 +2,7 @@ import type {
   AiTraderManagementConfig,
   AiTraderManagementAction,
   AiTraderOpportunityData,
+  AiTraderProfile,
   AnyDaemonMessage,
 } from "@fxflow/types"
 import {
@@ -32,6 +33,16 @@ interface ManagedTrade {
   breakevenApplied: boolean
   partialCloseApplied: boolean
   openedAt: number // timestamp ms
+  atr: number // real ATR from Tier 1 analysis
+  profile: AiTraderProfile
+}
+
+/** Profile-specific maximum hold time in hours */
+const PROFILE_TIME_LIMITS: Record<AiTraderProfile, number> = {
+  scalper: 8,
+  intraday: 48,
+  swing: 168,
+  news: 4,
 }
 
 // ─── Trade Manager ───────────────────────────────────────────────────────────
@@ -91,6 +102,20 @@ export class TradeManager {
   trackOpportunity(opp: AiTraderOpportunityData): void {
     if (!opp.resultTradeId || !opp.resultSourceId) return
 
+    // Extract real ATR from the stored technical snapshot
+    let atr = getPipSize(opp.instrument) * 20 // fallback
+    try {
+      const snapshot =
+        typeof opp.technicalSnapshot === "string"
+          ? JSON.parse(opp.technicalSnapshot)
+          : opp.technicalSnapshot
+      if (snapshot?.atr && typeof snapshot.atr === "number") {
+        atr = snapshot.atr
+      }
+    } catch {
+      // Use fallback
+    }
+
     this.managedTrades.set(opp.resultTradeId, {
       opportunityId: opp.id,
       tradeId: opp.resultTradeId,
@@ -104,6 +129,8 @@ export class TradeManager {
       breakevenApplied: opp.managementLog.some((a) => a.action === "breakeven"),
       partialCloseApplied: opp.managementLog.some((a) => a.action === "partial_close"),
       openedAt: opp.filledAt ? new Date(opp.filledAt).getTime() : Date.now(),
+      atr,
+      profile: opp.profile,
     })
   }
 
@@ -245,10 +272,8 @@ export class TradeManager {
   ): Promise<void> {
     if (!mgmt.trailingStopEnabled || !managed.breakevenApplied) return
 
-    // Only trail after breakeven is applied
-    const pipSize = getPipSize(managed.instrument)
-    const atrEstimate = pipSize * 20 // Rough ATR estimate; TODO: use real ATR
-    const trailDistance = atrEstimate * mgmt.trailingStopAtrMultiplier
+    // Only trail after breakeven is applied — use real ATR from Tier 1 analysis
+    const trailDistance = managed.atr * mgmt.trailingStopAtrMultiplier
 
     let newSL: number
     if (managed.direction === "long") {
@@ -277,7 +302,8 @@ export class TradeManager {
     if (!mgmt.timeExitEnabled) return
 
     const hoursOpen = (Date.now() - managed.openedAt) / 3_600_000
-    if (hoursOpen >= mgmt.timeExitHours) {
+    const maxHours = PROFILE_TIME_LIMITS[managed.profile] ?? mgmt.timeExitHours
+    if (hoursOpen >= maxHours) {
       // Close the trade
       try {
         await this.tradeSyncer.closeTrade(managed.sourceTradeId)

@@ -45,6 +45,11 @@ export function HealthPanel() {
     statusText = `Watching ${pairNames}${extra} — prices updating ${tps}×/sec`
   }
 
+  // AI info
+  const hasAiData = health.aiDailyBudget > 0 || health.aiDailySpend > 0
+  const aiSpendPct =
+    health.aiDailyBudget > 0 ? Math.min((health.aiDailySpend / health.aiDailyBudget) * 100, 100) : 0
+
   return (
     <div className="border-b px-4 py-2 md:px-6">
       <div className="flex items-center gap-2 text-[11px]">
@@ -55,6 +60,30 @@ export function HealthPanel() {
           )}
         />
         <span className="text-muted-foreground">{statusText}</span>
+
+        {/* AI metrics */}
+        {running && hasAiData && (
+          <>
+            <span className="text-muted-foreground/30">|</span>
+            <span className="text-muted-foreground">
+              AI: ${health.aiDailySpend.toFixed(4)} / ${health.aiDailyBudget.toFixed(2)}
+            </span>
+            <div className="bg-muted h-1 w-12 overflow-hidden rounded-full">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-300",
+                  aiSpendPct >= 80
+                    ? "bg-red-500"
+                    : aiSpendPct >= 50
+                      ? "bg-amber-500"
+                      : "bg-emerald-500",
+                )}
+                style={{ width: `${aiSpendPct}%` }}
+              />
+            </div>
+          </>
+        )}
+
         {health.upSince && running && (
           <span className="text-muted-foreground/50 ml-auto">
             Up since{" "}
