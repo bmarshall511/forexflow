@@ -32,7 +32,7 @@ import { HistoryTab } from "./history-tab"
 type Tab = "trade" | "active" | "configs" | "activity" | "history" | "rankings"
 
 export function SmartFlowDashboard() {
-  const [tab, setTab] = useState<Tab>("configs")
+  const [tab, setTab] = useState<Tab>("configs") // Default to Trade Plans
   const [activityCount, setActivityCount] = useState(0)
   const { configs, activeTrades, closedTrades, isLoading, refetch } = useSmartFlow()
   const handleEventCount = useCallback((count: number) => setActivityCount(count), [])
