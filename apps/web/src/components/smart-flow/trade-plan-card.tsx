@@ -16,8 +16,6 @@ import {
   Zap,
   Rocket,
   RotateCcw,
-  Clock,
-  Radio,
   Activity,
   Pause,
   Play,
@@ -146,10 +144,10 @@ export function TradePlanCard({
 
       <div className="relative">
         {/* ── Top bar: status + pair + direction ────────────────── */}
-        <div className="flex items-center justify-between px-4 pt-4">
+        <div className="flex items-center justify-between px-3.5 pt-3.5">
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest",
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest",
               state.labelBg,
             )}
           >
@@ -159,36 +157,33 @@ export function TradePlanCard({
             />
             {state.label}
           </span>
-          <div className="flex items-center gap-2">
-            <span className="text-base font-bold tracking-tight">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold tracking-tight">
               {config.instrument.replace("_", "/")}
             </span>
             <DirectionBadge direction={config.direction} />
           </div>
         </div>
 
-        {/* ── Strategy pill ────────────────────────────────────── */}
-        <div className="px-4 pt-2.5">
-          <div
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1",
-              "bg" in preset ? preset.bg : "bg-muted",
-            )}
-          >
-            <PresetIcon className={cn("size-3", preset.color)} aria-hidden="true" />
-            <span className={cn("text-[11px] font-semibold", preset.color)}>{preset.label}</span>
+        {/* ── Strategy + status (combined for compactness) ───── */}
+        <div className="px-3.5 pt-2">
+          <div className="flex items-center gap-2">
+            <div
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5",
+                "bg" in preset ? preset.bg : "bg-muted",
+              )}
+            >
+              <PresetIcon className={cn("size-2.5", preset.color)} aria-hidden="true" />
+              <span className={cn("text-[10px] font-semibold", preset.color)}>{preset.label}</span>
+            </div>
           </div>
-        </div>
-
-        {/* ── Status message ───────────────────────────────────── */}
-        <div className="px-4 pt-3">
-          <p className="text-foreground text-[13px] leading-relaxed">{status.description}</p>
-          <p className="text-muted-foreground mt-0.5 text-[11px]">{status.strategyDesc}</p>
+          <p className="text-foreground mt-1.5 text-xs leading-snug">{status.description}</p>
         </div>
 
         {/* ── Trade levels (when actively trading) ─────────────── */}
         {isTrading && activeTrade != null && (
-          <div className="px-4 pt-4">
+          <div className="px-3.5 pt-3">
             <TradePlanLevels
               config={config}
               trade={activeTrade}
@@ -197,52 +192,36 @@ export function TradePlanCard({
           </div>
         )}
 
-        {/* ── Live stats bar ───────────────────────────────────── */}
-        {isActive && (
-          <div className="mx-4 mt-4 flex items-center gap-4 rounded-lg border px-3 py-2 text-[11px]">
+        {/* ── Live stats bar (only show when we have actual data) ── */}
+        {isActive && (hasTicks || runtime?.currentAtr != null) && (
+          <div className="mx-3.5 mt-2.5 flex items-center gap-3 text-[11px]">
             {runtime?.currentAtr != null && (
               <div className="flex items-center gap-1">
                 <BarChart3 className="text-muted-foreground size-3" aria-hidden="true" />
-                <span className="text-muted-foreground">ATR</span>
-                <span className="font-mono font-semibold">{runtime.currentAtr.toFixed(0)}p</span>
+                <span className="font-mono font-medium">{runtime.currentAtr.toFixed(0)}p</span>
               </div>
             )}
             {runtime?.currentSpread != null && (
               <div className="flex items-center gap-1">
                 <Gauge className="text-muted-foreground size-3" aria-hidden="true" />
-                <span className="text-muted-foreground">Spread</span>
-                <span className="font-mono font-semibold">{runtime.currentSpread.toFixed(1)}p</span>
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    runtime.spreadStatus === "normal"
-                      ? "bg-emerald-500"
-                      : runtime.spreadStatus === "elevated"
-                        ? "bg-amber-500"
-                        : "bg-red-500",
-                  )}
-                  aria-hidden="true"
-                />
+                <span className="font-mono font-medium">{runtime.currentSpread.toFixed(1)}p</span>
               </div>
             )}
-            <div className="ml-auto flex items-center gap-1">
-              <span
-                className={cn(
-                  "size-1.5 rounded-full",
-                  hasTicks ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/30",
-                )}
-                aria-hidden="true"
-              />
-              <span className={hasTicks ? "font-medium text-emerald-500" : "text-muted-foreground"}>
-                {hasTicks ? "Live" : "Offline"}
-              </span>
-            </div>
+            {hasTicks && (
+              <div className="flex items-center gap-1">
+                <span
+                  className="size-1.5 animate-pulse rounded-full bg-emerald-500"
+                  aria-hidden="true"
+                />
+                <span className="font-medium text-emerald-500">Live</span>
+              </div>
+            )}
           </div>
         )}
 
         {/* ── Protections row ──────────────────────────────────── */}
         {isActive && (
-          <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+          <div className="flex flex-wrap gap-1 px-3.5 pt-2.5">
             <Shield
               label="Break-even"
               active={config.breakevenEnabled}
@@ -262,7 +241,7 @@ export function TradePlanCard({
 
         {/* ── Recent actions (when trading) ─────────────────────── */}
         {isTrading && activeTrade != null && activeTrade.managementLog.length > 0 && (
-          <div className="mx-4 mt-3 space-y-1 border-t pt-3">
+          <div className="mx-3.5 mt-2 space-y-0.5 border-t pt-2">
             {activeTrade.managementLog
               .slice(-3)
               .reverse()
@@ -284,7 +263,7 @@ export function TradePlanCard({
 
         {/* ── Latest activity (watching/paused) ────────────────── */}
         {!isTrading && latestActivity && (
-          <div className="mx-4 mt-3 flex items-center gap-1.5 border-t pt-3 text-[11px]">
+          <div className="mx-3.5 mt-2 flex items-center gap-1.5 border-t pt-2 text-[11px]">
             <span
               className={cn("size-1.5 shrink-0 rounded-full", severityDot(latestActivity.severity))}
               aria-hidden="true"
@@ -297,7 +276,7 @@ export function TradePlanCard({
         )}
 
         {/* ── Footer: actions ──────────────────────────────────── */}
-        <div className="flex items-center justify-between px-4 pb-4 pt-4">
+        <div className="flex items-center justify-between px-3.5 pb-3 pt-3">
           <span className="text-muted-foreground/60 text-[10px]">
             {new Date(config.createdAt).toLocaleDateString()}
           </span>

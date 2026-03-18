@@ -167,36 +167,26 @@ export function ConfigsTab({ configs, activeTrades: propTrades, onRefresh }: Con
     )
   }
 
-  const grouped = configs.reduce<Record<string, SmartFlowConfigData[]>>((acc, c) => {
-    ;(acc[c.instrument] ??= []).push(c)
-    return acc
-  }, {})
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <p className="text-muted-foreground text-sm">
         {configs.length} trade {configs.length === 1 ? "plan" : "plans"}
       </p>
 
-      {Object.entries(grouped).map(([instrument, items]) => (
-        <div key={instrument} className="space-y-3">
-          <h3 className="text-foreground text-sm font-semibold">{instrument.replace("_", "/")}</h3>
-          <div className="grid gap-3 md:grid-cols-2">
-            {items.map((config) => (
-              <TradePlanCard
-                key={config.id}
-                config={config}
-                runtime={runtimeMap[config.id] ?? null}
-                latestActivity={activityMap[config.id] ?? null}
-                activeTrade={activeTradeMap[config.id]}
-                toggling={toggling === config.id}
-                onToggle={() => handleToggle(config)}
-                onDelete={() => setDeleteId(config.id)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {configs.map((config) => (
+          <TradePlanCard
+            key={config.id}
+            config={config}
+            runtime={runtimeMap[config.id] ?? null}
+            latestActivity={activityMap[config.id] ?? null}
+            activeTrade={activeTradeMap[config.id]}
+            toggling={toggling === config.id}
+            onToggle={() => handleToggle(config)}
+            onDelete={() => setDeleteId(config.id)}
+          />
+        ))}
+      </div>
 
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
