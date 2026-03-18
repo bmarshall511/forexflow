@@ -60,6 +60,9 @@ export async function getTradeFinderConfig(): Promise<TradeFinderConfigData> {
     autoTradeMaxRiskPercent: config.autoTradeMaxRiskPercent,
     autoTradeMinRR: config.autoTradeMinRR,
     autoTradeCancelOnInvalidation: config.autoTradeCancelOnInvalidation,
+    smartSizing: config.smartSizing,
+    entryConfirmation: config.entryConfirmation,
+    confirmationTimeout: config.confirmationTimeout,
     updatedAt: safeIso(config.updatedAt),
   }
 }
@@ -78,6 +81,9 @@ type UpdatableConfigFields = Pick<
   | "autoTradeMaxRiskPercent"
   | "autoTradeMinRR"
   | "autoTradeCancelOnInvalidation"
+  | "smartSizing"
+  | "entryConfirmation"
+  | "confirmationTimeout"
 >
 
 /**
@@ -107,6 +113,10 @@ export async function updateTradeFinderConfig(
   if (data.autoTradeMinRR !== undefined) updateData.autoTradeMinRR = data.autoTradeMinRR
   if (data.autoTradeCancelOnInvalidation !== undefined)
     updateData.autoTradeCancelOnInvalidation = data.autoTradeCancelOnInvalidation
+  if (data.smartSizing !== undefined) updateData.smartSizing = data.smartSizing
+  if (data.entryConfirmation !== undefined) updateData.entryConfirmation = data.entryConfirmation
+  if (data.confirmationTimeout !== undefined)
+    updateData.confirmationTimeout = data.confirmationTimeout
   if (data.pairs !== undefined) updateData.pairsJson = JSON.stringify(data.pairs)
 
   await db.tradeFinderConfig.update({

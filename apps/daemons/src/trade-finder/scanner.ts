@@ -41,6 +41,7 @@ import {
   getAutoPlacedTotalRiskPips,
   findSetupByResultSourceId,
   getPlacedAutoSetups,
+  updateSetupConfirmation,
   updateSetupSkipReason,
   getSetup,
   type CreateSetupInput,
@@ -50,6 +51,7 @@ import type { NotificationEmitter } from "../notification-emitter.js"
 import { getRestUrl } from "../oanda/api-client.js"
 import { CandleCache, fetchOandaCandles } from "./candle-cache.js"
 import { computeQueuePositions } from "./auto-trade-queue.js"
+import { detectConfirmationPattern } from "./entry-monitor.js"
 
 const CANDLE_COUNT_MAP: Record<string, number> = {
   M1: 500,
@@ -410,13 +412,18 @@ export class TradeFinderScanner {
       const rewardPips = Math.abs(takeProfit - entryPrice) / pipSize
       const rrRatio = riskPips > 0 ? (rewardPips / riskPips).toFixed(1) + ":1" : "0:1"
 
-      // Position sizing: risk% of balance / risk in account currency
+      // Position sizing: risk% of balance / risk in account currency (with smart sizing)
       const positionSize = this.calculatePositionSize(
         accountBalance,
         riskPercent,
         riskPips,
         pipSize,
         instrument,
+        {
+          enabled: config.smartSizing,
+          scoreTotal: extendedScores.total,
+          maxPossible: extendedScores.maxPossible,
+        },
       )
 
       if (positionSize <= 0) {
@@ -561,6 +568,11 @@ export class TradeFinderScanner {
             setup.riskPips,
             pipSize,
             setup.instrument,
+            {
+              enabled: config.smartSizing,
+              scoreTotal: setup.scores.total,
+              maxPossible: setup.scores.maxPossible,
+            },
           )
         : setup.positionSize
     if (freshPositionSize <= 0) {
@@ -960,16 +972,38 @@ export class TradeFinderScanner {
     }
   }
 
+  /**
+   * Calculate position size with optional smart sizing.
+   * Smart sizing scales the risk% DOWN based on score — never exceeds configured risk%.
+   *
+   * Score ranges (using maxPossible of 16):
+   * - 81-100% (13-16): 1.0× (full risk)
+   * - 63-80% (10-12): 0.75×
+   * - Below 63% (0-9): 0.50×
+   */
   private calculatePositionSize(
     balance: number,
     riskPercent: number,
     riskPips: number,
     pipSize: number,
     _instrument: string,
+    smartSizingOptions?: { enabled: boolean; scoreTotal: number; maxPossible: number },
   ): number {
     if (riskPips <= 0 || balance <= 0) return 0
 
-    const riskAmount = balance * (riskPercent / 100)
+    let effectiveRiskPercent = riskPercent
+    if (smartSizingOptions?.enabled && smartSizingOptions.maxPossible > 0) {
+      const scorePct = smartSizingOptions.scoreTotal / smartSizingOptions.maxPossible
+      if (scorePct >= 0.81) {
+        effectiveRiskPercent = riskPercent * 1.0
+      } else if (scorePct >= 0.63) {
+        effectiveRiskPercent = riskPercent * 0.75
+      } else {
+        effectiveRiskPercent = riskPercent * 0.5
+      }
+    }
+
+    const riskAmount = balance * (effectiveRiskPercent / 100)
     const pipValue = pipSize * 100_000
     if (pipValue <= 0) return 0
 
@@ -1048,7 +1082,39 @@ export class TradeFinderScanner {
       if (config.autoTradeEnabled && !setup.autoPlaced && !setup.resultSourceId) {
         const pair = config.pairs.find((p) => p.instrument === setup.instrument)
         if (pair && pair.autoTradeEnabled !== false) {
-          await this.tryAutoPlace(setup, config, pair)
+          // Entry confirmation: check for confirmation pattern before placing
+          if (config.entryConfirmation && newStatus === "approaching") {
+            const recentCandles = candles.slice(-6)
+            const confirmation = detectConfirmationPattern(
+              setup.zone,
+              recentCandles,
+              setup.direction,
+            )
+            if (
+              confirmation.confirmed &&
+              confirmation.refinedEntry !== null &&
+              confirmation.pattern
+            ) {
+              // Refined entry — update setup entry price
+              const refinedSetup = {
+                ...setup,
+                entryPrice: confirmation.refinedEntry,
+                confirmationPattern: confirmation.pattern,
+              }
+              await updateSetupConfirmation(
+                setup.id,
+                confirmation.refinedEntry,
+                confirmation.pattern,
+              ).catch(() => {})
+              console.log(
+                `[trade-finder] Entry confirmed: ${setup.instrument} ${confirmation.pattern} → entry ${confirmation.refinedEntry.toFixed(5)}`,
+              )
+              await this.tryAutoPlace(refinedSetup as TradeFinderSetupData, config, pair)
+            }
+            // No confirmation yet — skip placement, will retry next scan cycle
+          } else {
+            await this.tryAutoPlace(setup, config, pair)
+          }
         }
       }
     }

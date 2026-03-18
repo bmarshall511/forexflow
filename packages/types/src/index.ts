@@ -2361,6 +2361,12 @@ export interface TradeFinderConfigData {
   autoTradeMinRR: number
   /** Auto-cancel pending auto-placed orders when zone is invalidated */
   autoTradeCancelOnInvalidation: boolean
+  /** Scale position size down by setup score (never exceeds configured risk%) */
+  smartSizing: boolean
+  /** Wait for confirmation candle pattern before placing auto-trade */
+  entryConfirmation: boolean
+  /** Max candles to wait for confirmation before falling back to proximal entry */
+  confirmationTimeout: number
   updatedAt: string
 }
 
@@ -2426,6 +2432,8 @@ export interface TradeFinderSetupData {
   placedAt: string | null
   /** Why auto-trade was skipped on the most recent attempt (null = never skipped or eligible) */
   lastSkipReason: string | null
+  /** Entry confirmation pattern detected (e.g. "engulfing", "pin_bar", null = no confirmation yet) */
+  confirmationPattern: string | null
   /** Queue position when eligible but capped (null = not queued, 1 = next to be placed) */
   queuePosition: number | null
 }

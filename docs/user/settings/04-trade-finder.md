@@ -92,6 +92,32 @@ A ratio of 1.5:1 means the trade must have the potential to earn at least $1.50 
 
 When enabled, if the price moves in a way that "breaks" the reason the setup existed, FXFlow automatically cancels the pending order.
 
+## Smart Entry & Sizing
+
+### Smart Sizing
+
+When enabled, position size is scaled down based on the setup's score — high-quality setups get full risk, lower-quality setups get reduced risk. This never exceeds your configured risk percentage.
+
+| Score Range | Risk Multiplier | Example (2% risk) |
+| ----------- | --------------- | ----------------- |
+| 81–100%     | 1.0× (full)     | 2.0%              |
+| 63–80%      | 0.75×           | 1.5%              |
+| Below 63%   | 0.50×           | 1.0%              |
+
+### Entry Confirmation
+
+When enabled, the scanner waits for a confirmation candle pattern before placing auto-trades. Instead of entering at the raw zone edge, it looks for signs that price is actually reversing:
+
+- **Engulfing candle** — a strong reversal candle that engulfs the previous candle
+- **Pin bar / Hammer** — a candle with a long wick rejection from the zone
+- **Inside bar breakout** — an inside bar forms in the zone, then breaks out in the trade direction
+
+If no confirmation appears within the timeout (default 6 candles), the order is not placed for that scan cycle and will retry on the next scan.
+
+### Confirmation Timeout
+
+How many candles to wait for a confirmation pattern before giving up. Default is **6**. Lower values are more selective; higher values give more time but may delay entries.
+
 ### Cancel All Button
 
 Clicking **Cancel All** immediately cancels every auto-placed pending order. Use this if you want to stop all auto-trading activity right now.

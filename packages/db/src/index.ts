@@ -248,6 +248,7 @@ export {
   getPlacedAutoSetups,
   clearActiveSetups,
   clearSetupHistory,
+  updateSetupConfirmation,
   updateSetupSkipReason,
   type CreateSetupInput,
 } from "./trade-finder-service"

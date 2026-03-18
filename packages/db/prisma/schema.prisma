@@ -376,6 +376,9 @@ model TradeFinderConfig {
   autoTradeMaxRiskPercent       Float    @default(6.0) // Total risk cap across auto-trades
   autoTradeMinRR               Float    @default(1.5) // Minimum R:R ratio for auto-trade (e.g. 1.5 = 1.5:1)
   autoTradeCancelOnInvalidation Boolean  @default(true) // Cancel pending auto-orders when zone invalidated
+  smartSizing                   Boolean  @default(true) // Scale position size down by score (never up)
+  entryConfirmation             Boolean  @default(true) // Wait for confirmation candle pattern before placing
+  confirmationTimeout           Int      @default(6) // Max candles to wait for confirmation before fallback
   pairsJson                     String   @default("[]") // JSON: TradeFinderPairConfig[]
   updatedAt                     DateTime @updatedAt
 }
@@ -403,6 +406,7 @@ model TradeFinderSetup {
   autoPlaced       Boolean  @default(false) // Whether auto-traded
   placedAt         DateTime? // When auto-trade placed the order (for daily cap)
   lastSkipReason   String? // Why auto-trade was most recently skipped
+  confirmationPattern String? // Entry confirmation pattern detected (e.g. "engulfing", "pin_bar")
   detectedAt       DateTime @default(now())
   lastUpdatedAt    DateTime @default(now())
   expiredAt        DateTime?

@@ -403,6 +403,82 @@ export function TradeFinderSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Smart Entry & Sizing */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Smart Entry & Sizing</CardTitle>
+          <CardDescription>
+            Improve entry precision and scale position size by setup quality.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Smart Sizing */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Smart Sizing</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Scale position size down by score — high-score setups get full risk, lower scores
+                get reduced risk. Never exceeds your configured risk %.
+              </p>
+            </div>
+            <Button
+              variant={config.smartSizing ? "default" : "outline"}
+              size="sm"
+              className="h-8 min-w-[80px] text-xs"
+              onClick={() => handleUpdate({ smartSizing: !config.smartSizing })}
+              disabled={saving}
+            >
+              {config.smartSizing ? "Enabled" : "Disabled"}
+            </Button>
+          </div>
+
+          {/* Entry Confirmation */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Entry Confirmation</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Wait for a confirmation candle pattern (engulfing, pin bar, inside bar) before
+                placing auto-trades. Improves entry price and filters false setups.
+              </p>
+            </div>
+            <Button
+              variant={config.entryConfirmation ? "default" : "outline"}
+              size="sm"
+              className="h-8 min-w-[80px] text-xs"
+              onClick={() => handleUpdate({ entryConfirmation: !config.entryConfirmation })}
+              disabled={saving}
+            >
+              {config.entryConfirmation ? "Enabled" : "Disabled"}
+            </Button>
+          </div>
+
+          {config.entryConfirmation && (
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Confirmation Timeout</Label>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Max candles to wait for confirmation before falling back to proximal entry
+                </p>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                step={1}
+                defaultValue={config.confirmationTimeout}
+                onBlur={(e) => {
+                  const num = parseInt(e.target.value)
+                  if (!isNaN(num) && num >= 1 && num <= 20) {
+                    handleUpdate({ confirmationTimeout: num })
+                  }
+                }}
+                className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Pair Selection */}
       <Card>
         <CardHeader>

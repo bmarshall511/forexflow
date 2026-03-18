@@ -62,6 +62,7 @@ function toSetupData(row: {
   autoPlaced: boolean
   placedAt: Date | null
   lastSkipReason: string | null
+  confirmationPattern: string | null
   detectedAt: Date
   lastUpdatedAt: Date
 }): TradeFinderSetupData {
@@ -94,6 +95,7 @@ function toSetupData(row: {
     autoPlaced: row.autoPlaced,
     placedAt: row.placedAt ? safeIso(row.placedAt) : null,
     lastSkipReason: row.lastSkipReason ?? null,
+    confirmationPattern: row.confirmationPattern ?? null,
     queuePosition: null, // Computed at runtime by the daemon scanner
   }
 }
@@ -239,6 +241,18 @@ export async function updateSetupScores(
   if (positionSize !== undefined) data.positionSize = positionSize
 
   await db.tradeFinderSetup.update({ where: { id }, data })
+}
+
+/** Update setup entry price and confirmation pattern after entry confirmation */
+export async function updateSetupConfirmation(
+  id: string,
+  entryPrice: number,
+  confirmationPattern: string,
+): Promise<void> {
+  await db.tradeFinderSetup.update({
+    where: { id },
+    data: { entryPrice, confirmationPattern, lastUpdatedAt: new Date() },
+  })
 }
 
 /** Update the last skip reason for a setup (null to clear) */
