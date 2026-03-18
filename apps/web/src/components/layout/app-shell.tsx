@@ -6,6 +6,7 @@ import { Header } from "./header"
 import { Sidebar } from "./sidebar"
 import { MobileSidebar } from "./mobile-sidebar"
 import { OfflineBanner } from "./offline-banner"
+import { AiErrorBanner } from "./ai-error-banner"
 import { AppFooter } from "./app-footer"
 import { CommandPalette } from "@/components/ui/command-palette"
 import { ShortcutsHelp } from "@/components/ui/shortcuts-help"
@@ -53,6 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <MobileSidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <Header />
+            <AiErrorBanner />
             <main id="main-content" className="flex-1" role="main">
               {children}
             </main>

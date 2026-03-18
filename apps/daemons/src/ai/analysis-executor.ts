@@ -8,6 +8,7 @@ import type {
   TradeConditionTriggerType,
   TradeConditionActionType,
 } from "@fxflow/types"
+import { classifyAiError } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { ConditionMonitor } from "./condition-monitor.js"
@@ -957,6 +958,22 @@ export async function executeAnalysis(opts: {
   } catch (err) {
     const errorMessage = (err as Error).message
     console.error(`[ai-executor] Analysis ${analysisId} failed:`, errorMessage)
+
+    // Classify and broadcast actionable AI API errors
+    const classified = classifyAiError(err)
+    if (classified.category !== "unknown") {
+      broadcast({
+        type: "ai_error_alert",
+        timestamp: new Date().toISOString(),
+        data: {
+          category: classified.category,
+          message: classified.message,
+          detail: classified.detail,
+          source: "ai_analysis",
+          retryable: classified.retryable,
+        },
+      })
+    }
 
     // Wrap in try-catch so the broadcast ALWAYS fires, even if DB update fails
     try {

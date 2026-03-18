@@ -787,6 +787,8 @@ export type DaemonMessageType =
   | "ai_trader_trade_placed"
   | "ai_trader_trade_managed"
   | "ai_trader_trade_closed"
+  // AI Error Alerts
+  | "ai_error_alert"
   // SmartFlow
   | "smart_flow_status"
   | "smart_flow_trade_update"
@@ -1020,6 +1022,22 @@ export interface TradeFinderAutoTradeEvent {
   timestamp: string
 }
 
+/** Broadcast when an AI system (analysis, trader, smart flow) encounters a classified API error. */
+export interface AiErrorAlertMessage extends DaemonMessage<{
+  /** AiErrorCategory value */
+  category: string
+  /** User-friendly message */
+  message: string
+  /** Technical detail for logging */
+  detail: string
+  /** Which AI subsystem raised the error */
+  source: "ai_analysis" | "ai_trader" | "smart_flow"
+  /** Whether retrying makes sense */
+  retryable: boolean
+}> {
+  type: "ai_error_alert"
+}
+
 /** Discriminated union of all possible WebSocket messages from the daemon. Used for type-safe message handling. */
 export type AnyDaemonMessage =
   | StatusSnapshotMessage
@@ -1064,6 +1082,7 @@ export type AnyDaemonMessage =
   | SmartFlowAiSuggestionMessage
   | SmartFlowActivityMessage
   | SourcePriorityEventMessage
+  | AiErrorAlertMessage
 
 // ─── TradingView Alerts ────────────────────────────────────────────────────
 

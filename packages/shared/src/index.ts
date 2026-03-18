@@ -190,3 +190,5 @@ export {
 } from "./deployment"
 
 export { parseFrontmatter, slugify, type DocFrontmatter } from "./markdown"
+
+export { classifyAiError, type AiErrorCategory, type ClassifiedAiError } from "./ai-errors"

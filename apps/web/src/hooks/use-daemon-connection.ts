@@ -151,6 +151,8 @@ export interface DaemonConnectionState {
   lastSmartFlowAiSuggestion: SmartFlowAiSuggestionData | null
   /** Most recent source priority event */
   lastSourcePriorityEvent: SourcePriorityEventData | null
+  /** Most recent AI error alert (quota, rate limit, overload, invalid key, etc.) */
+  lastAiErrorAlert: Record<string, unknown> | null
   /** True after the first connection attempt has completed (success or failure) */
   connectionAttempted: boolean
 }
@@ -222,6 +224,7 @@ export function useDaemonConnection(): DaemonConnectionState {
     useState<SmartFlowAiSuggestionData | null>(null)
   const [lastSourcePriorityEvent, setLastSourcePriorityEvent] =
     useState<SourcePriorityEventData | null>(null)
+  const [lastAiErrorAlert, setLastAiErrorAlert] = useState<Record<string, unknown> | null>(null)
   const [connectionAttempted, setConnectionAttempted] = useState(false)
   const [isReachable, setIsReachable] = useState(false)
 
@@ -448,6 +451,22 @@ export function useDaemonConnection(): DaemonConnectionState {
               setLastSourcePriorityEvent(msg.data)
               toast.info(`Source priority: ${msg.data.instrument} — ${msg.data.reason}`)
               break
+            case "ai_error_alert": {
+              const alertData = msg.data as {
+                category: string
+                message: string
+                source: string
+                retryable: boolean
+              }
+              setLastAiErrorAlert(alertData as Record<string, unknown>)
+              window.dispatchEvent(new CustomEvent("ai-error-alert", { detail: alertData }))
+              if (alertData.category === "quota_exceeded" || alertData.category === "invalid_key") {
+                toast.error(alertData.message, { duration: 10_000 })
+              } else {
+                toast.warning(alertData.message, { duration: 5_000 })
+              }
+              break
+            }
             case "error":
               console.warn("[daemon-ws] Error from daemon:", msg.data.message)
               break
@@ -602,5 +621,6 @@ export function useDaemonConnection(): DaemonConnectionState {
     lastSmartFlowSafetyAlert,
     lastSmartFlowAiSuggestion,
     lastSourcePriorityEvent,
+    lastAiErrorAlert,
   }
 }

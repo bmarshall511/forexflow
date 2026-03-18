@@ -25,7 +25,7 @@ import {
   getTradeBySourceId,
   getRiskPercent,
 } from "@fxflow/db"
-import { ALL_FOREX_PAIRS, getPipSize, priceToPips } from "@fxflow/shared"
+import { ALL_FOREX_PAIRS, getPipSize, priceToPips, classifyAiError } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { PositionManager } from "../positions/position-manager.js"
@@ -567,9 +567,24 @@ export class AiTraderScanner {
           } catch (err) {
             const errMsg = (err as Error).message
             console.warn(`[ai-trader] Tier 2/3 error for ${signal.instrument}:`, errMsg)
+            // Classify and broadcast actionable AI API errors
+            const classified = classifyAiError(err)
+            if (classified.category !== "unknown") {
+              this.broadcast({
+                type: "ai_error_alert",
+                timestamp: new Date().toISOString(),
+                data: {
+                  category: classified.category,
+                  message: classified.message,
+                  detail: classified.detail,
+                  source: "ai_trader",
+                  retryable: classified.retryable,
+                },
+              })
+            }
             this.addLogEntry(
               "tier2_fail",
-              `${signal.instrument.replace("_", "/")}: Tier 2/3 error`,
+              `${signal.instrument.replace("_", "/")}: ${classified.category !== "unknown" ? classified.message : "Tier 2/3 error"}`,
               errMsg,
               {
                 instrument: signal.instrument,
@@ -630,8 +645,24 @@ export class AiTraderScanner {
     } catch (err) {
       this.lastError = (err as Error).message
       console.error("[ai-trader] Scan error:", this.lastError)
-      this.updateProgress("error", `Scan error: ${this.lastError}`)
-      this.addLogEntry("scan_error", `Scan error: ${this.lastError}`)
+      // Classify and broadcast actionable AI API errors
+      const classified = classifyAiError(err)
+      if (classified.category !== "unknown") {
+        this.broadcast({
+          type: "ai_error_alert",
+          timestamp: new Date().toISOString(),
+          data: {
+            category: classified.category,
+            message: classified.message,
+            detail: classified.detail,
+            source: "ai_trader",
+            retryable: classified.retryable,
+          },
+        })
+      }
+      const displayError = classified.category !== "unknown" ? classified.message : this.lastError
+      this.updateProgress("error", `Scan error: ${displayError}`)
+      this.addLogEntry("scan_error", `Scan error: ${displayError}`, this.lastError)
       this.scheduleScan(60_000)
     } finally {
       this.scanning = false
