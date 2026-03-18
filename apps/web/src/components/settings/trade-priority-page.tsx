@@ -90,7 +90,7 @@ export function TradePriorityPage() {
           <div className="space-y-3">
             <Label className="text-xs">Priority Ranking</Label>
             <ol className="space-y-2">
-              {config.priorities
+              {(config.priorities ?? [])
                 .sort((a, b) => a.priority - b.priority)
                 .map((entry) => (
                   <li
