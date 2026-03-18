@@ -98,8 +98,30 @@ export function ReplayTradeInfoPanel({ trade }: ReplayTradeInfoProps) {
       {trade.mae != null && (
         <Stat label="Worst" value={`-${trade.mae.toFixed(1)}p`} color="text-red-400" />
       )}
+
+      {/* Close reason in plain English */}
+      {trade.closeReason && (
+        <div className="text-muted-foreground basis-full text-[11px]">
+          <span className="font-medium">Why it ended:</span>{" "}
+          {getCloseReasonText(trade.closeReason, isWin)}
+        </div>
+      )}
     </div>
   )
+}
+
+function getCloseReasonText(reason: string, isWin: boolean): string {
+  const map: Record<string, string> = {
+    STOP_LOSS_ORDER:
+      "Price hit the safety exit (stop loss) — trade closed automatically to limit losses",
+    TAKE_PROFIT_ORDER: "Price reached the profit target — trade closed automatically with a win!",
+    TRAILING_STOP_LOSS_ORDER:
+      "The trailing stop was hit — profits were locked in as price reversed",
+    MARKET_ORDER: "Trade was closed manually",
+    MARKET_ORDER_TRADE_CLOSE: "Trade was closed manually",
+    MARKET_IF_TOUCHED_ORDER: "A pending order triggered and then closed",
+  }
+  return map[reason] ?? (isWin ? "Trade closed with a profit" : "Trade closed with a loss")
 }
 
 function Stat({

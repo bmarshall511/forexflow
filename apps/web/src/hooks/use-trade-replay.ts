@@ -62,6 +62,10 @@ export function useTradeReplay(tradeId: string | null) {
           setCandles(json.candles)
           setTradeInfo(json.trade)
           candleCountRef.current = json.candles.length
+          // Start at entry candle so pre-entry candles are visible as market context
+          const entryTime = Math.floor(new Date(json.trade.openedAt).getTime() / 1000)
+          const entryIdx = json.candles.findIndex((c) => c.time >= entryTime)
+          setCurrentIndex(entryIdx >= 0 ? entryIdx : 0)
         },
       )
       .catch((err: Error) => {
