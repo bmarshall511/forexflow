@@ -248,6 +248,8 @@ export {
   getPlacedAutoSetups,
   clearActiveSetups,
   clearSetupHistory,
+  updateSetupManagement,
+  getFilledSetups,
   updateSetupConfirmation,
   updateSetupSkipReason,
   type CreateSetupInput,

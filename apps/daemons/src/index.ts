@@ -36,6 +36,7 @@ import { ConditionMonitor } from "./ai/condition-monitor.js"
 import { AutoAnalyzer } from "./ai/auto-analyzer.js"
 import { DigestGenerator } from "./ai/digest-generator.js"
 import { TradeFinderScanner } from "./trade-finder/scanner.js"
+import { TradeFinderTradeManager } from "./trade-finder/trade-manager.js"
 import { AiTraderScanner } from "./ai-trader/scanner.js"
 import { AlertMonitor } from "./alerts/alert-monitor.js"
 import { CalendarFetcher } from "./calendar/calendar-fetcher.js"
@@ -227,6 +228,7 @@ async function main() {
     const mid = (tick.bid + tick.ask) / 2
     aiTraderScanner.onPriceTick(tick.instrument, mid)
     smartFlowManager.onPriceTick(tick.instrument, tick.bid, tick.ask)
+    void tradeFinderTradeManager.onPriceTick(tick)
   }
 
   // 12c. Auto Analyzer — automatically analyzes trades on lifecycle events
@@ -253,6 +255,8 @@ async function main() {
     void autoAnalyzer.onOrderFilled(tradeId)
     // Check if this fill corresponds to a Trade Finder auto-placed setup
     void tradeFinderScanner.onOrderFilled(tradeId)
+    // Start managing the filled Trade Finder trade
+    void tradeFinderTradeManager.onOrderFilled(tradeId)
     // Check if this fill corresponds to an AI Trader opportunity
     void aiTraderScanner.onOrderFilled(tradeId)
     // Check if this fill corresponds to a SmartFlow trade
@@ -285,6 +289,8 @@ async function main() {
           void aiTraderScanner.onTradeClosed(tradeId, trade.realizedPL)
           // Notify SmartFlow of closed trade
           void smartFlowManager.onTradeClosed(tradeId)
+          // Stop managing Trade Finder trade
+          tradeFinderTradeManager.onTradeClosed(tradeId)
         }
       })
       .catch((err) =>
@@ -331,6 +337,15 @@ async function main() {
   )
 
   await tradeFinderScanner.start()
+
+  // 12d-ii. Trade Finder Trade Manager — post-fill management (breakeven, partial, trailing)
+  const tradeFinderTradeManager = new TradeFinderTradeManager(broadcast)
+  tradeFinderTradeManager.setCallbacks(
+    (sourceTradeId, sl, tp) => tradeSyncer.modifyTradeSLTP(sourceTradeId, sl, tp),
+    (sourceTradeId, units, reason) => tradeSyncer.closeTrade(sourceTradeId, units, reason),
+    () => positionManager.getPositions().open,
+  )
+  await tradeFinderTradeManager.initialize()
 
   // 12e. AI Trader Scanner — autonomous trade discovery and management
   const aiTraderScanner = new AiTraderScanner(stateManager, tradeSyncer, positionManager, broadcast)

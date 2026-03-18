@@ -63,6 +63,14 @@ export async function getTradeFinderConfig(): Promise<TradeFinderConfigData> {
     smartSizing: config.smartSizing,
     entryConfirmation: config.entryConfirmation,
     confirmationTimeout: config.confirmationTimeout,
+    breakevenEnabled: config.breakevenEnabled,
+    partialCloseEnabled: config.partialCloseEnabled,
+    partialClosePercent: config.partialClosePercent,
+    partialCloseRR: config.partialCloseRR,
+    trailingStopEnabled: config.trailingStopEnabled,
+    trailingStopCandles: config.trailingStopCandles,
+    timeExitEnabled: config.timeExitEnabled,
+    timeExitCandles: config.timeExitCandles,
     updatedAt: safeIso(config.updatedAt),
   }
 }
@@ -84,6 +92,14 @@ type UpdatableConfigFields = Pick<
   | "smartSizing"
   | "entryConfirmation"
   | "confirmationTimeout"
+  | "breakevenEnabled"
+  | "partialCloseEnabled"
+  | "partialClosePercent"
+  | "partialCloseRR"
+  | "trailingStopEnabled"
+  | "trailingStopCandles"
+  | "timeExitEnabled"
+  | "timeExitCandles"
 >
 
 /**
@@ -117,6 +133,18 @@ export async function updateTradeFinderConfig(
   if (data.entryConfirmation !== undefined) updateData.entryConfirmation = data.entryConfirmation
   if (data.confirmationTimeout !== undefined)
     updateData.confirmationTimeout = data.confirmationTimeout
+  if (data.breakevenEnabled !== undefined) updateData.breakevenEnabled = data.breakevenEnabled
+  if (data.partialCloseEnabled !== undefined)
+    updateData.partialCloseEnabled = data.partialCloseEnabled
+  if (data.partialClosePercent !== undefined)
+    updateData.partialClosePercent = data.partialClosePercent
+  if (data.partialCloseRR !== undefined) updateData.partialCloseRR = data.partialCloseRR
+  if (data.trailingStopEnabled !== undefined)
+    updateData.trailingStopEnabled = data.trailingStopEnabled
+  if (data.trailingStopCandles !== undefined)
+    updateData.trailingStopCandles = data.trailingStopCandles
+  if (data.timeExitEnabled !== undefined) updateData.timeExitEnabled = data.timeExitEnabled
+  if (data.timeExitCandles !== undefined) updateData.timeExitCandles = data.timeExitCandles
   if (data.pairs !== undefined) updateData.pairsJson = JSON.stringify(data.pairs)
 
   await db.tradeFinderConfig.update({

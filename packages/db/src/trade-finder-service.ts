@@ -63,6 +63,9 @@ function toSetupData(row: {
   placedAt: Date | null
   lastSkipReason: string | null
   confirmationPattern: string | null
+  breakevenMoved: boolean
+  partialTaken: boolean
+  managementLog: string | null
   detectedAt: Date
   lastUpdatedAt: Date
 }): TradeFinderSetupData {
@@ -96,6 +99,8 @@ function toSetupData(row: {
     placedAt: row.placedAt ? safeIso(row.placedAt) : null,
     lastSkipReason: row.lastSkipReason ?? null,
     confirmationPattern: row.confirmationPattern ?? null,
+    breakevenMoved: row.breakevenMoved,
+    partialTaken: row.partialTaken,
     queuePosition: null, // Computed at runtime by the daemon scanner
   }
 }
@@ -241,6 +246,26 @@ export async function updateSetupScores(
   if (positionSize !== undefined) data.positionSize = positionSize
 
   await db.tradeFinderSetup.update({ where: { id }, data })
+}
+
+/** Update setup management state (breakeven, partial taken) */
+export async function updateSetupManagement(
+  id: string,
+  data: { breakevenMoved?: boolean; partialTaken?: boolean; managementLog?: string },
+): Promise<void> {
+  await db.tradeFinderSetup.update({
+    where: { id },
+    data: { ...data, lastUpdatedAt: new Date() },
+  })
+}
+
+/** Get all filled Trade Finder setups (for trade management) */
+export async function getFilledSetups(): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: { status: "filled" },
+    orderBy: { lastUpdatedAt: "desc" },
+  })
+  return rows.map(toSetupData)
 }
 
 /** Update setup entry price and confirmation pattern after entry confirmation */

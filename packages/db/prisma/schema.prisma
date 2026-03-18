@@ -379,6 +379,14 @@ model TradeFinderConfig {
   smartSizing                   Boolean  @default(true) // Scale position size down by score (never up)
   entryConfirmation             Boolean  @default(true) // Wait for confirmation candle pattern before placing
   confirmationTimeout           Int      @default(6) // Max candles to wait for confirmation before fallback
+  breakevenEnabled              Boolean  @default(true) // Move SL to entry at 1:1 R:R
+  partialCloseEnabled           Boolean  @default(true) // Close portion at partial target
+  partialClosePercent           Float    @default(50) // % of position to close at partial target
+  partialCloseRR                Float    @default(1.5) // R:R target for partial close
+  trailingStopEnabled           Boolean  @default(true) // Trail SL behind recent candles
+  trailingStopCandles           Int      @default(3) // Number of candles to trail behind
+  timeExitEnabled               Boolean  @default(false) // Close if no progress after N candles
+  timeExitCandles               Int      @default(20) // Max candles before time-based exit
   pairsJson                     String   @default("[]") // JSON: TradeFinderPairConfig[]
   updatedAt                     DateTime @updatedAt
 }
@@ -407,6 +415,9 @@ model TradeFinderSetup {
   placedAt         DateTime? // When auto-trade placed the order (for daily cap)
   lastSkipReason   String? // Why auto-trade was most recently skipped
   confirmationPattern String? // Entry confirmation pattern detected (e.g. "engulfing", "pin_bar")
+  breakevenMoved     Boolean  @default(false) // SL moved to breakeven
+  partialTaken       Boolean  @default(false) // Partial profit taken
+  managementLog      String?  // JSON array of management actions taken
   detectedAt       DateTime @default(now())
   lastUpdatedAt    DateTime @default(now())
   expiredAt        DateTime?

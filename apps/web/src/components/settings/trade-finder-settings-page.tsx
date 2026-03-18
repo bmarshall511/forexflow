@@ -479,6 +479,163 @@ export function TradeFinderSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Trade Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Trade Management</CardTitle>
+          <CardDescription>
+            Active management of open Trade Finder trades. Protects profits and cuts losers faster.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Breakeven */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Breakeven Move</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Move stop loss to entry + spread when trade reaches 1:1 risk-reward
+              </p>
+            </div>
+            <Button
+              variant={config.breakevenEnabled ? "default" : "outline"}
+              size="sm"
+              className="h-8 min-w-[80px] text-xs"
+              onClick={() => handleUpdate({ breakevenEnabled: !config.breakevenEnabled })}
+              disabled={saving}
+            >
+              {config.breakevenEnabled ? "Enabled" : "Disabled"}
+            </Button>
+          </div>
+
+          {/* Partial Close */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Partial Profit</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Close a portion of the position at the partial R:R target
+              </p>
+            </div>
+            <Button
+              variant={config.partialCloseEnabled ? "default" : "outline"}
+              size="sm"
+              className="h-8 min-w-[80px] text-xs"
+              onClick={() => handleUpdate({ partialCloseEnabled: !config.partialCloseEnabled })}
+              disabled={saving}
+            >
+              {config.partialCloseEnabled ? "Enabled" : "Disabled"}
+            </Button>
+          </div>
+
+          {config.partialCloseEnabled && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Close %</Label>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    Percentage of position to close at partial target
+                  </p>
+                </div>
+                <input
+                  type="number"
+                  min={10}
+                  max={90}
+                  step={10}
+                  defaultValue={config.partialClosePercent}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value)
+                    if (!isNaN(num) && num >= 10 && num <= 90)
+                      handleUpdate({ partialClosePercent: num })
+                  }}
+                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Partial R:R Target</Label>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    Take partial profit at this risk-reward ratio
+                  </p>
+                </div>
+                <input
+                  type="number"
+                  min={0.5}
+                  max={10}
+                  step={0.5}
+                  defaultValue={config.partialCloseRR}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value)
+                    if (!isNaN(num) && num >= 0.5 && num <= 10)
+                      handleUpdate({ partialCloseRR: num })
+                  }}
+                  className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Trailing Stop */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Trailing Stop</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Trail stop loss behind price after partial profit (or 2:1 R:R if partials disabled)
+              </p>
+            </div>
+            <Button
+              variant={config.trailingStopEnabled ? "default" : "outline"}
+              size="sm"
+              className="h-8 min-w-[80px] text-xs"
+              onClick={() => handleUpdate({ trailingStopEnabled: !config.trailingStopEnabled })}
+              disabled={saving}
+            >
+              {config.trailingStopEnabled ? "Enabled" : "Disabled"}
+            </Button>
+          </div>
+
+          {/* Time Exit */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Time-Based Exit</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Close trade if no meaningful progress after a number of candles
+              </p>
+            </div>
+            <Button
+              variant={config.timeExitEnabled ? "default" : "outline"}
+              size="sm"
+              className="h-8 min-w-[80px] text-xs"
+              onClick={() => handleUpdate({ timeExitEnabled: !config.timeExitEnabled })}
+              disabled={saving}
+            >
+              {config.timeExitEnabled ? "Enabled" : "Disabled"}
+            </Button>
+          </div>
+
+          {config.timeExitEnabled && (
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Exit After (candles)</Label>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Close if trade hasn&apos;t reached 0.5:1 R:R after this many LTF candles
+                </p>
+              </div>
+              <input
+                type="number"
+                min={5}
+                max={100}
+                step={5}
+                defaultValue={config.timeExitCandles}
+                onBlur={(e) => {
+                  const num = parseInt(e.target.value)
+                  if (!isNaN(num) && num >= 5 && num <= 100) handleUpdate({ timeExitCandles: num })
+                }}
+                className="bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Pair Selection */}
       <Card>
         <CardHeader>

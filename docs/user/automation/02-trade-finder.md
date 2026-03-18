@@ -130,6 +130,29 @@ The Activity tab on the Trade Finder dashboard shows every auto-trade event in r
 
 This log is your audit trail. Check it regularly to understand what Trade Finder is doing on your behalf.
 
+## Trade Management
+
+Once a Trade Finder trade is filled (open), the system can actively manage it to protect profits and cut losses faster. These features are configured in Settings > Trade Finder > Trade Management.
+
+### Breakeven Move
+
+When your trade reaches **1:1 risk-reward** (it has moved in your favor by the same amount it could have lost), the stop loss is automatically moved to your entry price plus a small buffer. This means you can no longer lose money on this trade.
+
+### Partial Profit
+
+After the breakeven move, when the trade reaches a configurable R:R target (default 1.5:1), a portion of the position is closed to lock in profits. The remaining position continues to run toward the full take profit.
+
+### Trailing Stop
+
+After partial profit is taken, the stop loss trails behind the current price. As price moves further in your favor, the stop loss follows — locking in more profit. It never moves backward.
+
+### Time-Based Exit
+
+If a trade hasn't made meaningful progress after a configurable number of candles, it is closed at market. Good supply/demand zones produce immediate reactions — if price stalls, the zone thesis may be weakening.
+
+> [!NOTE]
+> Each management action is shown as a badge on the setup card: "BE Locked" (breakeven), "Partial Taken", etc.
+
 ## Reviewing Trade Finder Trades
 
 When a Trade Finder setup becomes a live trade (or closes), you can view the full setup context from the **Positions** page. Click on any trade with a "Trade Finder" source badge to open the detail drawer, which includes:

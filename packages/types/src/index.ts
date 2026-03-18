@@ -2367,6 +2367,22 @@ export interface TradeFinderConfigData {
   entryConfirmation: boolean
   /** Max candles to wait for confirmation before falling back to proximal entry */
   confirmationTimeout: number
+  /** Move SL to breakeven at 1:1 R:R */
+  breakevenEnabled: boolean
+  /** Close a portion of position at partial target */
+  partialCloseEnabled: boolean
+  /** % of position to close at partial target (e.g. 50) */
+  partialClosePercent: number
+  /** R:R target for partial close (e.g. 1.5) */
+  partialCloseRR: number
+  /** Trail SL behind recent swing structure */
+  trailingStopEnabled: boolean
+  /** Number of candles to trail behind */
+  trailingStopCandles: number
+  /** Close trade if no progress after N candles */
+  timeExitEnabled: boolean
+  /** Max candles before time-based exit */
+  timeExitCandles: number
   updatedAt: string
 }
 
@@ -2434,6 +2450,10 @@ export interface TradeFinderSetupData {
   lastSkipReason: string | null
   /** Entry confirmation pattern detected (e.g. "engulfing", "pin_bar", null = no confirmation yet) */
   confirmationPattern: string | null
+  /** Whether SL has been moved to breakeven */
+  breakevenMoved: boolean
+  /** Whether partial profit has been taken */
+  partialTaken: boolean
   /** Queue position when eligible but capped (null = not queued, 1 = next to be placed) */
   queuePosition: number | null
 }

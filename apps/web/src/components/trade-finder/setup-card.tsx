@@ -237,6 +237,23 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                       Auto
                     </Badge>
                   )}
+                  {/* Management status badges for filled trades */}
+                  {setup.breakevenMoved && (
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-green-500/20 bg-green-500/10 px-1.5 py-0 text-[10px] text-green-600 dark:text-green-400"
+                    >
+                      BE Locked
+                    </Badge>
+                  )}
+                  {setup.partialTaken && (
+                    <Badge
+                      variant="outline"
+                      className="gap-0.5 border-blue-500/20 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-600 dark:text-blue-400"
+                    >
+                      Partial Taken
+                    </Badge>
+                  )}
                   {/* Auto-trade status badge: Eligible / Queued / Blocked */}
                   {autoTradeStatus?.type === "eligible" && (
                     <Badge

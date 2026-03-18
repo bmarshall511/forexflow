@@ -266,6 +266,14 @@ export const TradeFinderConfigUpdateSchema = z
     smartSizing: z.boolean().optional(),
     entryConfirmation: z.boolean().optional(),
     confirmationTimeout: z.number().int().min(1).max(20).optional(),
+    breakevenEnabled: z.boolean().optional(),
+    partialCloseEnabled: z.boolean().optional(),
+    partialClosePercent: z.number().min(10).max(90).optional(),
+    partialCloseRR: z.number().min(0.5).max(10).optional(),
+    trailingStopEnabled: z.boolean().optional(),
+    trailingStopCandles: z.number().int().min(1).max(20).optional(),
+    timeExitEnabled: z.boolean().optional(),
+    timeExitCandles: z.number().int().min(5).max(100).optional(),
   })
   .strict()
 
