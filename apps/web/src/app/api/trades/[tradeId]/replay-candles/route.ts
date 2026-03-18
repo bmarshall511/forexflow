@@ -39,6 +39,7 @@ export interface ReplayCandle {
   high: number
   low: number
   close: number
+  volume: number
 }
 
 export interface ReplayTradeInfo {
@@ -134,6 +135,7 @@ export async function GET(
         high: parseFloat(c.mid.h),
         low: parseFloat(c.mid.l),
         close: parseFloat(c.mid.c),
+        volume: c.volume,
       }))
 
     const tradeInfo: ReplayTradeInfo = {

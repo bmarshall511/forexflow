@@ -8,6 +8,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
 import type { TradeFinderSetupData } from "@fxflow/types"
 import { useTradeReplay } from "@/hooks/use-trade-replay"
 import { TradeReplay } from "./trade-replay"
@@ -15,7 +16,10 @@ import { ReplayControls } from "./replay-controls"
 import { ReplayTradeInfoPanel } from "./replay-trade-info"
 import { ReplayCandleInfo } from "./replay-candle-info"
 import { ReplayOverlayLegend, type OverlayVisibility } from "./replay-overlay-legend"
-import { Loader2 } from "lucide-react"
+import { ReplayScoreCard } from "./replay-score-card"
+import { ReplayAiCommentary } from "./replay-ai-commentary"
+import { Loader2, Camera } from "lucide-react"
+import { toast } from "sonner"
 
 interface TradeReplayDialogProps {
   tradeId: string | null
@@ -33,8 +37,17 @@ export function TradeReplayDialog({
   onOpenChange,
   tfSetup,
 }: TradeReplayDialogProps) {
-  const { candles, tradeInfo, isLoading, error, currentIndex, isPlaying, speed, controls } =
-    useTradeReplay(open ? tradeId : null)
+  const {
+    candles,
+    tradeInfo,
+    isLoading,
+    error,
+    currentIndex,
+    isPlaying,
+    speed,
+    timeframe,
+    controls,
+  } = useTradeReplay(open ? tradeId : null)
 
   const [overlayVisibility, setOverlayVisibility] = useState<OverlayVisibility>({
     entry: true,
@@ -47,6 +60,20 @@ export function TradeReplayDialog({
   const toggleOverlay = useCallback((key: keyof OverlayVisibility) => {
     setOverlayVisibility((prev) => ({ ...prev, [key]: !prev[key] }))
   }, [])
+
+  // Screenshot: grab the canvas from the chart container
+  const handleScreenshot = useCallback(() => {
+    const container = document.querySelector("[data-replay-chart]")
+    if (!container) return
+    const canvas = container.querySelector("canvas")
+    if (!canvas) return
+    const pair = tradeInfo?.instrument.replace("_", "/") ?? "trade"
+    const link = document.createElement("a")
+    link.download = `replay-${pair.replace("/", "-")}-${new Date().toISOString().slice(0, 10)}.png`
+    link.href = canvas.toDataURL("image/png")
+    link.click()
+    toast.success("Screenshot saved!")
+  }, [tradeInfo])
 
   // Keyboard controls (Space, arrows, Home)
   useEffect(() => {
@@ -105,13 +132,23 @@ export function TradeReplayDialog({
   const pair = tradeInfo?.instrument.replace("_", "/") ?? ""
   const dirLabel = tradeInfo?.direction === "long" ? "Long" : "Short"
 
-  // Determine entry candle for hasEnteredTrade calculation
+  // Entry/exit times for elapsed display and score card visibility
   const entryTime = tradeInfo ? Math.floor(new Date(tradeInfo.openedAt).getTime() / 1000) : 0
+  const exitTime = tradeInfo?.closedAt
+    ? Math.floor(new Date(tradeInfo.closedAt).getTime() / 1000)
+    : null
+
   const entryCandleIdx = useMemo(
     () => candles.findIndex((c) => c.time >= entryTime),
     [candles, entryTime],
   )
+  const exitCandleIdx = useMemo(
+    () => (exitTime !== null ? candles.findIndex((c) => c.time >= exitTime) : -1),
+    [candles, exitTime],
+  )
+
   const hasEnteredTrade = entryCandleIdx >= 0 && currentIndex >= entryCandleIdx
+  const showScoreCard = exitCandleIdx >= 0 && currentIndex >= exitCandleIdx + 5
 
   const currentCandle = candles[currentIndex] ?? null
 
@@ -121,16 +158,34 @@ export function TradeReplayDialog({
         side="bottom"
         className="flex h-[85vh] flex-col gap-3 overflow-y-auto p-4 sm:p-6"
       >
-        <SheetHeader>
-          <SheetTitle className="text-base">
-            {pair ? `Replay: ${pair} ${dirLabel}` : "Trade Replay"}
-          </SheetTitle>
-          <SheetDescription className="text-xs">
-            {tradeInfo
-              ? "Watch how this trade played out candle by candle"
-              : "Loading replay data..."}
-          </SheetDescription>
-        </SheetHeader>
+        {/* Header row: title + screenshot + AI commentary */}
+        <div className="flex items-start justify-between gap-3">
+          <SheetHeader className="flex-1">
+            <SheetTitle className="text-base">
+              {pair ? `Replay: ${pair} ${dirLabel}` : "Trade Replay"}
+            </SheetTitle>
+            <SheetDescription className="text-xs">
+              {tradeInfo
+                ? "Watch how this trade played out candle by candle"
+                : "Loading replay data..."}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex shrink-0 items-center gap-2 pt-1">
+            {tradeId && tradeInfo && <ReplayAiCommentary tradeId={tradeId} />}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-[11px]"
+              onClick={handleScreenshot}
+              aria-label="Save chart as PNG screenshot"
+              disabled={!tradeInfo}
+            >
+              <Camera className="size-3.5" aria-hidden="true" />
+              Screenshot
+            </Button>
+          </div>
+        </div>
 
         {isLoading && (
           <div className="flex flex-1 items-center justify-center">
@@ -180,6 +235,9 @@ export function TradeReplayDialog({
               />
             </div>
 
+            {/* Score card — shown once replay passes 5 candles after exit */}
+            {showScoreCard && <ReplayScoreCard trade={tradeInfo} candles={candles} visible />}
+
             {/* Transport controls */}
             <ReplayControls
               controls={controls}
@@ -188,6 +246,10 @@ export function TradeReplayDialog({
               isPlaying={isPlaying}
               speed={speed}
               currentTime={currentTime}
+              timeframe={timeframe}
+              entryTime={entryTime}
+              exitTime={exitTime}
+              currentCandleTime={currentCandle?.time ?? null}
             />
 
             {/* Keyboard shortcut hint */}

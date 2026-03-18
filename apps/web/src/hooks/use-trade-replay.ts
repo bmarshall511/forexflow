@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import type { ReplayCandle, ReplayTradeInfo } from "@/app/api/trades/[tradeId]/replay-candles/route"
 
 export type ReplaySpeed = 1 | 2 | 5 | 10
+export type ReplayTimeframe = "M1" | "M5" | "M15" | "M30" | "H1" | "H4"
 
 const SPEED_INTERVALS: Record<ReplaySpeed, number> = {
   1: 500,
@@ -18,6 +19,7 @@ export interface ReplayControls {
   setSpeed: (speed: ReplaySpeed) => void
   seekTo: (index: number) => void
   reset: () => void
+  setTimeframe: (tf: ReplayTimeframe) => void
 }
 
 export function useTradeReplay(tradeId: string | null) {
@@ -28,10 +30,11 @@ export function useTradeReplay(tradeId: string | null) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speed, setSpeedState] = useState<ReplaySpeed>(1)
+  const [timeframe, setTimeframeState] = useState<ReplayTimeframe | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const candleCountRef = useRef(0)
 
-  // Fetch replay data
+  // Fetch replay data — re-runs when tradeId or timeframe changes
   useEffect(() => {
     if (!tradeId) {
       setCandles([])
@@ -45,7 +48,8 @@ export function useTradeReplay(tradeId: string | null) {
     setIsPlaying(false)
     setCurrentIndex(0)
 
-    fetch(`/api/trades/${tradeId}/replay-candles`)
+    const tfParam = timeframe ? `?timeframe=${timeframe}` : ""
+    fetch(`/api/trades/${tradeId}/replay-candles${tfParam}`)
       .then((res) => res.json())
       .then(
         (json: {
@@ -61,6 +65,8 @@ export function useTradeReplay(tradeId: string | null) {
           }
           setCandles(json.candles)
           setTradeInfo(json.trade)
+          // Sync timeframe state to what the server returned (covers the initial load)
+          if (!timeframe) setTimeframeState(json.trade.timeframe as ReplayTimeframe)
           candleCountRef.current = json.candles.length
           // Start at entry candle so pre-entry candles are visible as market context
           const entryTime = Math.floor(new Date(json.trade.openedAt).getTime() / 1000)
@@ -78,7 +84,7 @@ export function useTradeReplay(tradeId: string | null) {
     return () => {
       cancelled = true
     }
-  }, [tradeId])
+  }, [tradeId, timeframe])
 
   // Auto-advance when playing
   useEffect(() => {
@@ -126,7 +132,20 @@ export function useTradeReplay(tradeId: string | null) {
       setIsPlaying(false)
       setCurrentIndex(0)
     }, []),
+    setTimeframe: useCallback((tf: ReplayTimeframe) => {
+      setTimeframeState(tf)
+    }, []),
   }
 
-  return { candles, tradeInfo, isLoading, error, currentIndex, isPlaying, speed, controls }
+  return {
+    candles,
+    tradeInfo,
+    isLoading,
+    error,
+    currentIndex,
+    isPlaying,
+    speed,
+    timeframe,
+    controls,
+  }
 }

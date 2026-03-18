@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useMemo } from "react"
 import { useTheme } from "next-themes"
-import { createChart, CandlestickSeries, createSeriesMarkers } from "lightweight-charts"
+import {
+  createChart,
+  CandlestickSeries,
+  HistogramSeries,
+  createSeriesMarkers,
+} from "lightweight-charts"
 import type {
   IChartApi,
   ISeriesApi,
@@ -60,6 +65,7 @@ export function TradeReplay({
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null)
   const overlayRef = useRef<OverlayLines | null>(null)
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const zonePrimRef = useRef<ZonePrimitive | null>(null)
@@ -112,6 +118,19 @@ export function TradeReplay({
       getCandlestickOptions(isDark, decimals, minMove),
     )
     seriesRef.current = series
+
+    // Volume histogram — rendered in the bottom 15% of the chart pane
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: "volume" },
+      priceScaleId: "volume",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    chart.priceScale("volume").applyOptions({
+      scaleMargins: { top: 0.85, bottom: 0 },
+    })
+    volumeSeriesRef.current = volumeSeries
+
     overlayRef.current = createOverlayLines(chart, tradeInfo)
 
     // Attach primitives for Trade Finder overlays
@@ -140,6 +159,7 @@ export function TradeReplay({
       chart.remove()
       chartRef.current = null
       seriesRef.current = null
+      volumeSeriesRef.current = null
       overlayRef.current = null
       markersRef.current = null
       zonePrimRef.current = null
@@ -155,7 +175,26 @@ export function TradeReplay({
     const overlay = overlayRef.current
     if (!series || !overlay || candles.length === 0) return
 
-    series.setData(candles.slice(0, currentIndex + 1) as CandlestickData<Time>[])
+    const visibleCandles = candles.slice(0, currentIndex + 1)
+    series.setData(visibleCandles as unknown as CandlestickData<Time>[])
+
+    // Update volume bars
+    if (volumeSeriesRef.current) {
+      volumeSeriesRef.current.setData(
+        visibleCandles.map((c) => ({
+          time: c.time as Time,
+          value: c.volume,
+          color:
+            c.close >= c.open
+              ? isDark
+                ? "rgba(34, 197, 94, 0.3)"
+                : "rgba(34, 197, 94, 0.2)"
+              : isDark
+                ? "rgba(239, 68, 68, 0.3)"
+                : "rgba(239, 68, 68, 0.2)",
+        })),
+      )
+    }
     updateOverlayLines(
       overlay,
       candles,
@@ -211,6 +250,7 @@ export function TradeReplay({
   return (
     <div
       ref={containerRef}
+      data-replay-chart
       className="h-full w-full"
       style={height !== 0 ? { height } : undefined}
     />

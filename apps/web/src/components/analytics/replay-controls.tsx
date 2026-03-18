@@ -2,9 +2,23 @@
 
 import { Button } from "@/components/ui/button"
 import { Play, Pause, SkipBack, SkipForward, RotateCcw } from "lucide-react"
-import type { ReplayControls as ReplayControlsType, ReplaySpeed } from "@/hooks/use-trade-replay"
+import type {
+  ReplayControls as ReplayControlsType,
+  ReplaySpeed,
+  ReplayTimeframe,
+} from "@/hooks/use-trade-replay"
 
 const SPEEDS: ReplaySpeed[] = [1, 2, 5, 10]
+const TIMEFRAMES: ReplayTimeframe[] = ["M1", "M5", "M15", "M30", "H1", "H4"]
+
+function formatElapsed(seconds: number): string {
+  const days = Math.floor(seconds / 86400)
+  const hrs = Math.floor(seconds / 3600)
+  const mins = Math.floor(seconds / 60)
+  if (days > 0) return `Day ${days + 1}`
+  if (hrs > 0) return `${hrs}h ${mins % 60}m in`
+  return `${mins}m in`
+}
 
 interface ReplayControlsProps {
   controls: ReplayControlsType
@@ -13,6 +27,10 @@ interface ReplayControlsProps {
   isPlaying: boolean
   speed: ReplaySpeed
   currentTime: string | null
+  timeframe: ReplayTimeframe | null
+  entryTime?: number
+  exitTime?: number | null
+  currentCandleTime?: number | null
 }
 
 export function ReplayControls({
@@ -22,8 +40,17 @@ export function ReplayControls({
   isPlaying,
   speed,
   currentTime,
+  timeframe,
+  entryTime,
+  exitTime: _exitTime,
+  currentCandleTime,
 }: ReplayControlsProps) {
   const maxIndex = Math.max(0, totalCandles - 1)
+
+  const elapsedSeconds =
+    entryTime != null && currentCandleTime != null && currentCandleTime >= entryTime
+      ? currentCandleTime - entryTime
+      : null
 
   return (
     <div className="flex flex-col gap-2">
@@ -37,6 +64,23 @@ export function ReplayControls({
         className="bg-muted accent-primary h-2 w-full cursor-pointer appearance-none rounded-full"
         aria-label="Replay progress"
       />
+
+      {/* Timeframe selector */}
+      <div className="flex items-center gap-0.5" role="group" aria-label="Timeframe">
+        {TIMEFRAMES.map((tf) => (
+          <Button
+            key={tf}
+            variant={timeframe === tf ? "secondary" : "ghost"}
+            size="sm"
+            className="h-6 px-1.5 font-mono text-[10px]"
+            onClick={() => controls.setTimeframe(tf)}
+            aria-label={`Switch to ${tf} timeframe`}
+            aria-pressed={timeframe === tf}
+          >
+            {tf}
+          </Button>
+        ))}
+      </div>
 
       <div className="flex items-center gap-2">
         {/* Transport buttons */}
@@ -82,7 +126,7 @@ export function ReplayControls({
         </div>
 
         {/* Speed selector */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5" role="group" aria-label="Playback speed">
           {SPEEDS.map((s) => (
             <Button
               key={s}
@@ -99,6 +143,16 @@ export function ReplayControls({
         </div>
 
         <div className="flex-1" />
+
+        {/* Elapsed time indicator */}
+        {elapsedSeconds != null && elapsedSeconds > 0 && (
+          <span
+            className="text-muted-foreground font-mono text-[10px] tabular-nums"
+            aria-label={`${formatElapsed(elapsedSeconds)} since entry`}
+          >
+            {formatElapsed(elapsedSeconds)}
+          </span>
+        )}
 
         {/* Time + counter */}
         <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
