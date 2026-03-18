@@ -11,6 +11,10 @@ import { PerformanceSessions } from "./performance-sessions"
 import { PerformanceTechniques } from "./performance-techniques"
 import { PerformanceFunnel } from "./performance-funnel"
 import { PerformanceCosts } from "./performance-costs"
+import { PerformanceRegimes } from "./performance-regimes"
+import { PerformanceConfidence } from "./performance-confidence"
+import { PerformanceMfeMae } from "./performance-mfe-mae"
+import { PerformanceTradeLog } from "./performance-trade-log"
 
 const PERIODS: { label: string; value: PeriodDays }[] = [
   { label: "7D", value: 7 },
@@ -20,8 +24,20 @@ const PERIODS: { label: string; value: PeriodDays }[] = [
 ]
 
 export function PerformanceTab() {
-  const { stats, overall, equityCurve, funnel, costs, period, setPeriod, isLoading } =
-    useAiTraderPerformance()
+  const {
+    stats,
+    overall,
+    equityCurve,
+    funnel,
+    costs,
+    regimeStats,
+    confidenceBuckets,
+    mfeMaeData,
+    closedTrades,
+    period,
+    setPeriod,
+    isLoading,
+  } = useAiTraderPerformance()
 
   if (isLoading) {
     return (
@@ -77,7 +93,14 @@ export function PerformanceTab() {
         <PerformanceTechniques stats={stats} />
       </div>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <PerformanceRegimes data={regimeStats} />
+        <PerformanceConfidence data={confidenceBuckets} />
+      </div>
+
+      <PerformanceMfeMae data={mfeMaeData} />
       <PerformanceCosts costs={costs} />
+      <PerformanceTradeLog trades={closedTrades} />
     </div>
   )
 }

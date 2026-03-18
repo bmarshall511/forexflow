@@ -59,3 +59,47 @@ export const ALL_FOREX_PAIRS = FOREX_PAIR_GROUPS.flatMap((g) => g.pairs)
 export function formatInstrument(instrument: string): string {
   return instrument.replace("_", "/")
 }
+
+// ─── Typical spreads (pips) for R:R validation ──────────────────────────────
+
+const TYPICAL_SPREADS: Record<string, number> = {
+  // Majors (tight spreads)
+  EUR_USD: 1.0,
+  GBP_USD: 1.2,
+  USD_JPY: 1.0,
+  USD_CHF: 1.3,
+  AUD_USD: 1.2,
+  NZD_USD: 1.5,
+  USD_CAD: 1.3,
+  // Minors (moderate spreads)
+  EUR_GBP: 1.5,
+  EUR_JPY: 1.8,
+  GBP_JPY: 2.5,
+  EUR_AUD: 2.0,
+  EUR_CHF: 1.8,
+  GBP_CHF: 3.0,
+  AUD_NZD: 2.5,
+  // Crosses (wider spreads)
+  EUR_CAD: 2.5,
+  EUR_NZD: 3.0,
+  GBP_AUD: 3.0,
+  GBP_CAD: 3.0,
+  GBP_NZD: 3.5,
+  AUD_CAD: 2.5,
+  AUD_JPY: 2.0,
+  CAD_JPY: 2.0,
+  CHF_JPY: 2.5,
+  NZD_JPY: 2.5,
+  NZD_CAD: 3.0,
+  AUD_CHF: 2.5,
+  CAD_CHF: 2.5,
+  NZD_CHF: 3.0,
+}
+
+/** Default spread for unknown pairs */
+const DEFAULT_SPREAD_PIPS = 3.0
+
+/** Get typical spread in pips for an instrument. Used for spread-aware R:R filtering. */
+export function getTypicalSpread(instrument: string): number {
+  return TYPICAL_SPREADS[instrument] ?? DEFAULT_SPREAD_PIPS
+}

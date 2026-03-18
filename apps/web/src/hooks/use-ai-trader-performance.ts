@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { AiTraderStrategyPerformanceData, EquityCurvePoint } from "@fxflow/types"
-import type { AiTraderFunnelStats, AiTraderCostStats } from "@fxflow/db"
+import type {
+  AiTraderFunnelStats,
+  AiTraderCostStats,
+  AiTraderRegimeStat,
+  AiTraderConfidenceBucket,
+  AiTraderMfeMaePoint,
+  AiTraderClosedTrade,
+} from "@fxflow/db"
 
 export type PeriodDays = 7 | 30 | 90 | 0
 
@@ -12,6 +19,10 @@ export interface UseAiTraderPerformanceReturn {
   equityCurve: EquityCurvePoint[]
   funnel: AiTraderFunnelStats
   costs: AiTraderCostStats | null
+  regimeStats: AiTraderRegimeStat[]
+  confidenceBuckets: AiTraderConfidenceBucket[]
+  mfeMaeData: AiTraderMfeMaePoint[]
+  closedTrades: AiTraderClosedTrade[]
   period: PeriodDays
   setPeriod: (p: PeriodDays) => void
   isLoading: boolean
@@ -36,6 +47,10 @@ export function useAiTraderPerformance(): UseAiTraderPerformanceReturn {
   const [equityCurve, setEquityCurve] = useState<EquityCurvePoint[]>([])
   const [funnel, setFunnel] = useState<AiTraderFunnelStats | null>(null)
   const [costs, setCosts] = useState<AiTraderCostStats | null>(null)
+  const [regimeStats, setRegimeStats] = useState<AiTraderRegimeStat[]>([])
+  const [confidenceBuckets, setConfidenceBuckets] = useState<AiTraderConfidenceBucket[]>([])
+  const [mfeMaeData, setMfeMaeData] = useState<AiTraderMfeMaePoint[]>([])
+  const [closedTrades, setClosedTrades] = useState<AiTraderClosedTrade[]>([])
   const [period, setPeriod] = useState<PeriodDays>(90)
   const [isLoading, setIsLoading] = useState(true)
   const hasFetched = useRef(false)
@@ -53,6 +68,10 @@ export function useAiTraderPerformance(): UseAiTraderPerformanceReturn {
           equityCurve: EquityCurvePoint[]
           funnel: AiTraderFunnelStats
           costs: AiTraderCostStats
+          regimeStats: AiTraderRegimeStat[]
+          confidenceBuckets: AiTraderConfidenceBucket[]
+          mfeMaeData: AiTraderMfeMaePoint[]
+          closedTrades: AiTraderClosedTrade[]
         }
       }
       if (json.ok && json.data) {
@@ -61,6 +80,10 @@ export function useAiTraderPerformance(): UseAiTraderPerformanceReturn {
         setEquityCurve(json.data.equityCurve)
         setFunnel(json.data.funnel)
         setCosts(json.data.costs)
+        setRegimeStats(json.data.regimeStats ?? [])
+        setConfidenceBuckets(json.data.confidenceBuckets ?? [])
+        setMfeMaeData(json.data.mfeMaeData ?? [])
+        setClosedTrades(json.data.closedTrades ?? [])
       }
     } catch {
       // API may be unavailable
@@ -80,6 +103,10 @@ export function useAiTraderPerformance(): UseAiTraderPerformanceReturn {
     equityCurve,
     funnel: funnel ?? EMPTY_FUNNEL,
     costs,
+    regimeStats,
+    confidenceBuckets,
+    mfeMaeData,
+    closedTrades,
     period,
     setPeriod,
     isLoading,

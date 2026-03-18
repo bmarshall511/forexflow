@@ -49,6 +49,7 @@ export {
   FOREX_PAIR_GROUPS,
   ALL_FOREX_PAIRS,
   formatInstrument,
+  getTypicalSpread,
   type ForexPairGroup,
 } from "./forex-pairs"
 

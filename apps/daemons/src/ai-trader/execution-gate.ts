@@ -1,7 +1,8 @@
-import type { AiTraderConfigData, AiTraderOperatingMode } from "@fxflow/types"
+import type { AiTraderConfigData, AiTraderOperatingMode, AiTraderProfile } from "@fxflow/types"
 import { countOpenAiTrades } from "@fxflow/db"
 import { isMarketExpectedOpen } from "@fxflow/shared"
 import type { CostTracker } from "./cost-tracker.js"
+import type { PerformanceTracker } from "./performance-tracker.js"
 
 // ─── Gate Result ─────────────────────────────────────────────────────────────
 
@@ -143,17 +144,68 @@ export class ExecutionGate {
   }
 
   /**
-   * Pre-Tier-3 gate: checks kill switch + constraints (not confidence).
+   * Regime-aware gate: block or raise bar in unfavorable market conditions.
+   * Called pre-Tier-3 to avoid wasting API budget in poor conditions.
+   */
+  /**
+   * Self-learning gate: skip pair+profile combos with poor historical performance.
+   * Requires 10+ closed trades to have enough data, then blocks if win rate < 30%.
+   */
+  async checkHistoricalPerformance(
+    profile: AiTraderProfile,
+    instrument: string,
+    performanceTracker: PerformanceTracker,
+  ): Promise<GateResult> {
+    const stats = await performanceTracker.getHistoricalStats(profile, instrument)
+    if (!stats || stats.length === 0) return { allowed: true, reason: null }
+
+    const relevant = stats.find((s) => s.instrument === instrument)
+    if (!relevant || relevant.totalTrades < 10) return { allowed: true, reason: null }
+
+    const winRate = relevant.totalTrades > 0 ? relevant.wins / relevant.totalTrades : 0
+    if (winRate < 0.3) {
+      return {
+        allowed: false,
+        reason: `Poor historical performance on ${instrument}/${profile}: ${(winRate * 100).toFixed(0)}% win rate over ${relevant.totalTrades} trades`,
+      }
+    }
+
+    return { allowed: true, reason: null }
+  }
+
+  regimeCheck(regime: string | null, tier1Confidence: number): GateResult {
+    if (regime === "low_volatility") {
+      return { allowed: false, reason: "Low volatility regime — no setups" }
+    }
+    if (regime === "ranging" && tier1Confidence < 75) {
+      return {
+        allowed: false,
+        reason: `Ranging market requires confidence >= 75% (got ${tier1Confidence}%)`,
+      }
+    }
+    return { allowed: true, reason: null }
+  }
+
+  /**
+   * Pre-Tier-3 gate: checks kill switch + regime + constraints (not final confidence).
    * Call this BEFORE Tier 3 to avoid wasting API budget on blocked trades.
    */
   async preTier3Check(
     config: AiTraderConfigData,
     instrument: string,
     hasExistingPosition: (instrument: string) => boolean,
+    regime?: string | null,
+    tier1Confidence?: number,
   ): Promise<GateResult> {
     // Kill switch
     if (await this.isKillSwitchEngaged()) {
       return { allowed: false, reason: "Kill switch is engaged" }
+    }
+
+    // Regime gate (before spending on Tier 3)
+    if (regime !== undefined && tier1Confidence !== undefined) {
+      const regimeResult = this.regimeCheck(regime, tier1Confidence)
+      if (!regimeResult.allowed) return regimeResult
     }
 
     return this.canProceedToTier3(config, instrument, hasExistingPosition)

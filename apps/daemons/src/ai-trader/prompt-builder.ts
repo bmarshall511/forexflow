@@ -79,6 +79,10 @@ export interface Tier3Context {
   openTradeCount: number
   /** Account risk percent from settings (defaults to 1% if not provided). */
   riskPercent?: number
+  /** Number of consecutive losing trades (for self-awareness). */
+  consecutiveLosses?: number
+  /** Win rate for this specific pair+profile combo (null if no data). */
+  pairProfileWinRate?: number | null
 }
 
 export function buildTier3Prompt(ctx: Tier3Context): { system: string; user: string } {
@@ -160,6 +164,7 @@ ${formatPerformance(performanceHistory)}
 - Time exit: ${config.managementConfig.timeExitEnabled ? `ON (${config.managementConfig.timeExitHours}h)` : "OFF"}
 - News protection: ${config.managementConfig.newsProtectionEnabled ? "ON" : "OFF"}
 
+${buildRiskWarning(ctx)}
 IMPORTANT:
 - Position sizing is calculated automatically by the system — do NOT include positionSizeUnits
 - If adjusting entry/SL/TP, ensure R:R >= ${signal.profile === "scalper" ? "1.5" : signal.profile === "intraday" ? "2.0" : "2.5"}
@@ -252,6 +257,13 @@ function formatTechnicalSnapshot(s: TechnicalSnapshot): string {
   if (s.atr !== null) lines.push(`- ATR(14): ${s.atr.toFixed(5)}`)
   if (s.regime) lines.push(`- Regime: ${s.regime}`)
   if (s.session) lines.push(`- Session: ${s.session}${s.isKillZone ? " (Kill Zone)" : ""}`)
+  // Multi-timeframe context
+  if (s.htfEma20 !== null) lines.push(`- HTF EMA20: ${s.htfEma20.toFixed(5)}`)
+  if (s.htfEma50 !== null) lines.push(`- HTF EMA50: ${s.htfEma50.toFixed(5)}`)
+  if (s.htfTrendBullish !== null)
+    lines.push(`- HTF Trend: ${s.htfTrendBullish ? "Bullish" : "Bearish"}`)
+  if (s.secondaryRsi !== null) lines.push(`- Secondary TF RSI: ${s.secondaryRsi.toFixed(1)}`)
+  if (s.secondaryRegime) lines.push(`- Secondary TF Regime: ${s.secondaryRegime}`)
   return lines.join("\n")
 }
 
@@ -295,5 +307,32 @@ function formatPerformance(history: AiTraderStrategyPerformanceData[]): string {
       `- ${label}: ${h.totalTrades} trades, ${(h.winRate * 100).toFixed(0)}% WR, PF ${h.profitFactor.toFixed(2)}, Exp $${h.expectancy.toFixed(2)}`,
     )
   }
+  return lines.join("\n")
+}
+
+function buildRiskWarning(ctx: Tier3Context): string {
+  const lines: string[] = []
+  const losses = ctx.consecutiveLosses ?? 0
+  const winRate = ctx.pairProfileWinRate
+
+  if (losses >= 2 || (winRate !== null && winRate !== undefined && winRate < 0.4)) {
+    lines.push("### Risk Warning")
+    lines.push(`- Consecutive losses: ${losses}`)
+    if (winRate !== null && winRate !== undefined) {
+      lines.push(`- This pair+profile win rate: ${(winRate * 100).toFixed(0)}%`)
+    }
+    if (losses >= 2) {
+      lines.push(
+        "CAUTION: We are in a losing streak. Be more conservative. Only approve high-confidence setups with 3+ strong reasons.",
+      )
+    }
+    if (winRate !== null && winRate !== undefined && winRate < 0.4) {
+      lines.push(
+        "WARNING: This pair+profile combination has a poor track record. Consider rejecting unless the setup is exceptional.",
+      )
+    }
+    lines.push("")
+  }
+
   return lines.join("\n")
 }

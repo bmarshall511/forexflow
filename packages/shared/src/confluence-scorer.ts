@@ -16,14 +16,16 @@ export interface ConfluenceInput {
   trendAligned: boolean
   /** Whether EMA crossover/alignment confirms the trade direction. */
   emaAligned: boolean
-  /** Current RSI value. For longs, < 40 is favorable; for shorts, > 60. */
+  /** Current RSI value. For longs, < 30 is favorable (oversold); for shorts, > 70 (overbought). */
   rsiSignal: number | null
-  /** Current MACD histogram value. Positive = bullish, negative = bearish. */
+  /** Current MACD histogram value. Must exceed minimum magnitude threshold. */
   macdSignal: number | null
   /** Whether a price/indicator divergence supports the trade direction. */
   divergencePresent: boolean
   /** Current Williams %R value. For longs, < -80 is favorable; for shorts, > -20. */
   williamsRSignal: number | null
+  /** Current ADX value. > 25 indicates a strong trend. */
+  adxValue: number | null
   /** Market regime favorability score (0-100). */
   regimeScore: number | null
   /** Session suitability score (0-100). */
@@ -54,16 +56,20 @@ const SIGNALS = [
   def("trend", 10, (i) => i.trendAligned),
   def("ema_alignment", 8, (i) => i.emaAligned),
   def("rsi", 6, (i, d) =>
-    i.rsiSignal === null ? null : d === "long" ? i.rsiSignal < 40 : i.rsiSignal > 60,
+    i.rsiSignal === null ? null : d === "long" ? i.rsiSignal < 30 : i.rsiSignal > 70,
   ),
-  def("macd", 5, (i, d) =>
-    i.macdSignal === null ? null : d === "long" ? i.macdSignal > 0 : i.macdSignal < 0,
-  ),
+  def("macd", 5, (i, d) => {
+    if (i.macdSignal === null) return null
+    const MIN_MAGNITUDE = 0.00005
+    if (Math.abs(i.macdSignal) < MIN_MAGNITUDE) return false
+    return d === "long" ? i.macdSignal > 0 : i.macdSignal < 0
+  }),
   def("divergence", 8, (i) => i.divergencePresent),
   def("williams_r", 4, (i, d) => {
     if (i.williamsRSignal === null) return null
     return d === "long" ? i.williamsRSignal < -80 : i.williamsRSignal > -20
   }),
+  def("adx_trend", 6, (i) => (i.adxValue === null ? null : i.adxValue > 25)),
 ]
 
 function addBonus(

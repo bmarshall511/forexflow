@@ -301,8 +301,16 @@ export {
   getAiTraderEquityCurve,
   getAiTraderFunnelStats,
   getAiTraderCostStats,
+  getAiTraderRegimeStats,
+  getAiTraderConfidenceBuckets,
+  getAiTraderMfeMaeData,
+  getAiTraderClosedTrades,
   type AiTraderFunnelStats,
   type AiTraderCostStats,
+  type AiTraderRegimeStat,
+  type AiTraderConfidenceBucket,
+  type AiTraderMfeMaePoint,
+  type AiTraderClosedTrade,
 } from "./ai-trader-analytics-service"
 
 export {

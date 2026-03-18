@@ -22,6 +22,7 @@ import {
   isInOTEZone,
   findFibonacciFromSwings,
   getPipSize,
+  getTypicalSpread,
   priceToPips,
   type Candle,
   type ConfluenceInput,
@@ -43,6 +44,12 @@ export interface TechnicalSnapshot {
   regime: string | null
   session: string | null
   isKillZone: boolean
+  // Multi-timeframe fields
+  htfEma20: number | null
+  htfEma50: number | null
+  htfTrendBullish: boolean | null
+  secondaryRsi: number | null
+  secondaryRegime: string | null
 }
 
 export interface Tier1Signal {
@@ -118,8 +125,8 @@ const PROFILE_CONFIGS: Record<AiTraderProfile, ProfileConfig> = {
 export function analyzeTier1(
   instrument: string,
   primaryCandles: ZoneCandle[],
-  _secondaryCandles: ZoneCandle[],
-  _htfCandles: ZoneCandle[],
+  secondaryCandles: ZoneCandle[],
+  htfCandles: ZoneCandle[],
   profile: AiTraderProfile,
   enabledTechniques: Record<AiTraderTechnique, boolean>,
 ): Tier1Signal[] {
@@ -130,7 +137,7 @@ export function analyzeTier1(
   const lastPrice = candles[candles.length - 1]!.close
   const pipSize = getPipSize(instrument)
 
-  // ─── Compute all indicators ────────────────────────────────────────
+  // ─── Compute primary indicators ──────────────────────────────────
   const rsi = computeRSI(candles, 14)
   const macd = computeMACD(candles)
   const ema20 = computeEMA(candles, 20)
@@ -146,6 +153,20 @@ export function analyzeTier1(
   const session = getCurrentSession()
   const killZoneActive = isKillZone()
   const sessionScoreVal = getSessionScore(instrument, session.session)
+
+  // ─── Regime gate: reject low-volatility markets ──────────────────
+  if (regime.regime === "low_volatility") return []
+
+  // ─── Multi-timeframe analysis ────────────────────────────────────
+  const secCandles = secondaryCandles.map(toCandle)
+  const htfCandlesMapped = htfCandles.map(toCandle)
+
+  const secondaryRsi = secCandles.length >= 14 ? computeRSI(secCandles, 14) : null
+  const secondaryRegimeResult = secCandles.length >= 20 ? detectRegime(secCandles) : null
+
+  const htfEma20 = htfCandlesMapped.length >= 20 ? computeEMA(htfCandlesMapped, 20) : null
+  const htfEma50 = htfCandlesMapped.length >= 50 ? computeEMA(htfCandlesMapped, 50) : null
+  const htfTrendBullish = htfEma20 !== null && htfEma50 !== null ? htfEma20 > htfEma50 : null
 
   const snapshot: TechnicalSnapshot = {
     rsi,
@@ -163,6 +184,11 @@ export function analyzeTier1(
     regime: regime.regime,
     session: session.session,
     isKillZone: killZoneActive,
+    htfEma20,
+    htfEma50,
+    htfTrendBullish,
+    secondaryRsi,
+    secondaryRegime: secondaryRegimeResult?.regime ?? null,
   }
 
   // ─── SMC analysis ──────────────────────────────────────────────────
@@ -319,6 +345,18 @@ export function analyzeTier1(
     const techs = direction === "long" ? longTechs : shortTechs
     if (reasons.length < 2) continue
 
+    // ─── HTF trend filter: skip if higher timeframe disagrees ──────
+    if (htfTrendBullish !== null) {
+      if (direction === "long" && !htfTrendBullish) continue
+      if (direction === "short" && htfTrendBullish) continue
+    }
+
+    // ─── Secondary TF filter: skip if already overextended ─────────
+    if (secondaryRsi !== null) {
+      if (direction === "long" && secondaryRsi > 65) continue
+      if (direction === "short" && secondaryRsi < 35) continue
+    }
+
     const confluenceInput: ConfluenceInput = {
       smcBias: direction === "long" ? (smcBias ?? null) : smcBias !== null ? 100 - smcBias : null,
       fvgPresent: direction === "long" ? fvgBull : fvgBear,
@@ -331,6 +369,7 @@ export function analyzeTier1(
       macdSignal: macd ? macd.histogram : null,
       divergencePresent: direction === "long" ? bullDiv : bearDiv,
       williamsRSignal: williamsR,
+      adxValue: adx?.adx ?? null,
       regimeScore: regime.confidence ?? null,
       sessionScore: sessionScoreVal,
     }
@@ -339,11 +378,14 @@ export function analyzeTier1(
     if (result.score < 30) continue
 
     const atrVal = atr ?? pipSize * 20
+    // Widen SL in volatile regimes to avoid noise-triggered stops
+    const slMultiplier =
+      regime.regime === "volatile"
+        ? profileConfig.atrSlMultiplier * 1.5
+        : profileConfig.atrSlMultiplier
     const entryPrice = lastPrice
     const sl =
-      direction === "long"
-        ? entryPrice - atrVal * profileConfig.atrSlMultiplier
-        : entryPrice + atrVal * profileConfig.atrSlMultiplier
+      direction === "long" ? entryPrice - atrVal * slMultiplier : entryPrice + atrVal * slMultiplier
     const tp =
       direction === "long"
         ? entryPrice + atrVal * profileConfig.atrTpMultiplier
@@ -351,7 +393,13 @@ export function analyzeTier1(
 
     const riskPips = priceToPips(instrument, Math.abs(entryPrice - sl))
     const rewardPips = priceToPips(instrument, Math.abs(tp - entryPrice))
-    const rr = riskPips > 0 ? rewardPips / riskPips : 0
+
+    // ─── Spread-aware R:R: reject if spread eats too much risk ─────
+    const spreadPips = getTypicalSpread(instrument)
+    if (spreadPips > riskPips * 0.2) continue // Spread > 20% of risk
+    const effectiveRisk = riskPips + spreadPips
+    const effectiveReward = rewardPips - spreadPips
+    const rr = effectiveRisk > 0 ? effectiveReward / effectiveRisk : 0
     if (rr < profileConfig.minRR) continue
 
     const sorted = [...techs].sort((a, b) => b.str - a.str)

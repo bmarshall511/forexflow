@@ -424,7 +424,7 @@ model AiTraderConfig {
   operatingMode          String   @default("manual") // "manual" | "semi_auto" | "full_auto"
   scanIntervalMinutes    Int      @default(30)
   confidenceThreshold    Int      @default(70) // For semi/full auto execution
-  minimumConfidence      Int      @default(50) // Below this, never suggest
+  minimumConfidence      Int      @default(60) // Below this, never suggest
   maxConcurrentTrades    Int      @default(5)
   pairWhitelist          String   @default("[]") // JSON: string[]
   enabledProfiles        String   @default("{}") // JSON: Record<AiTraderProfile, boolean>

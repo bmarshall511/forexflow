@@ -41,6 +41,33 @@ import { buildTier2Prompt, buildTier3Prompt, type Tier3Context } from "./prompt-
 
 const MAX_SCAN_LOG_ENTRIES = 100
 
+/**
+ * Limit correlated signals: max N positions with the same currency in the same direction.
+ * E.g., EUR_USD long + EUR_GBP long = 2 EUR long exposure. Prevents over-concentration.
+ */
+function filterCorrelatedSignals(signals: Tier1Signal[], maxPerCurrency: number): Tier1Signal[] {
+  const exposure = new Map<string, number>() // "EUR_long" → count
+  const result: Tier1Signal[] = []
+
+  for (const sig of signals) {
+    const [base, quote] = sig.instrument.split("_") as [string, string]
+    // Long EUR_USD = long EUR, short USD
+    const baseKey = `${base}_${sig.direction}`
+    const quoteKey = `${quote}_${sig.direction === "long" ? "short" : "long"}`
+
+    const baseCount = exposure.get(baseKey) ?? 0
+    const quoteCount = exposure.get(quoteKey) ?? 0
+
+    if (baseCount >= maxPerCurrency || quoteCount >= maxPerCurrency) continue
+
+    exposure.set(baseKey, baseCount + 1)
+    exposure.set(quoteKey, quoteCount + 1)
+    result.push(sig)
+  }
+
+  return result
+}
+
 /** Extract JSON from a model response that may be wrapped in markdown code blocks.
  *  Also handles truncated responses where the closing brace/fence is missing. */
 function extractJSON<T>(text: string): T {
@@ -105,6 +132,10 @@ export class AiTraderScanner {
   private nextScanAt: string | null = null
   private lastError: string | null = null
   private paused = false
+
+  // Cool-down after consecutive losses
+  private consecutiveLosses = 0
+  private cooldownUntil: number | null = null
 
   // Scan progress tracking
   private scanProgress: AiTraderScanProgressData | null = null
@@ -267,6 +298,22 @@ export class AiTraderScanner {
 
   async onTradeClosed(tradeId: string, realizedPL: number): Promise<void> {
     await this.tradeManager.onTradeClosed(tradeId, realizedPL)
+
+    // Track consecutive losses for cool-down
+    if (realizedPL < 0) {
+      this.consecutiveLosses++
+      if (this.consecutiveLosses >= 2) {
+        const COOLDOWN_MS = 30 * 60_000 // 30 minutes
+        this.cooldownUntil = Date.now() + COOLDOWN_MS
+        this.addLogEntry(
+          "scan_skip",
+          `Cooldown activated: ${this.consecutiveLosses} consecutive losses — pausing for 30 minutes`,
+        )
+      }
+    } else if (realizedPL > 0) {
+      this.consecutiveLosses = 0
+      this.cooldownUntil = null
+    }
   }
 
   isAiTrade(tradeId: string): boolean {
@@ -341,6 +388,21 @@ export class AiTraderScanner {
 
   private async runScan(): Promise<void> {
     if (this.scanning || this.paused) return
+
+    // Cool-down check after consecutive losses
+    if (this.cooldownUntil && Date.now() < this.cooldownUntil) {
+      const remaining = Math.ceil((this.cooldownUntil - Date.now()) / 60_000)
+      this.addLogEntry(
+        "scan_skip",
+        `Cooling down after ${this.consecutiveLosses} consecutive losses (${remaining} min remaining)`,
+      )
+      this.scheduleScan(60_000) // Re-check in 1 minute
+      return
+    }
+    // Clear expired cooldown
+    if (this.cooldownUntil && Date.now() >= this.cooldownUntil) {
+      this.cooldownUntil = null
+    }
 
     const startedAt = new Date().toISOString()
     this.scanProgress = {
@@ -440,9 +502,19 @@ export class AiTraderScanner {
 
       const allSignals: Tier1Signal[] = []
 
+      // Get current session for profile filtering
+      const { getCurrentSession } = await import("@fxflow/shared")
+      const currentSession = getCurrentSession()
+      const sessionName = currentSession.session
+
       for (let i = 0; i < pairs.length; i++) {
         const pair = pairs[i]!
         for (const profile of enabledProfiles) {
+          // ─── Smart session/profile filtering ───────────────────────
+          const isActiveSession =
+            sessionName === "london" || sessionName === "ny" || sessionName === "london_ny_overlap"
+          if (profile === "scalper" && !isActiveSession) continue
+
           try {
             const profileConfig = getProfileConfig(profile)
             const tf = profileConfig.scanTimeframes
@@ -537,7 +609,10 @@ export class AiTraderScanner {
       console.log(`[ai-trader] Tier 1 found ${allSignals.length} candidates`)
 
       allSignals.sort((a, b) => b.confidence - a.confidence)
-      const topCandidates = allSignals.slice(0, 10)
+
+      // ─── Correlation guard: limit same-currency same-direction ──
+      const filtered = filterCorrelatedSignals(allSignals, 2)
+      const topCandidates = filtered.slice(0, 10)
 
       // ─── Analyze candidates with AI ─────────────────────────
       let tier2Passed = 0
@@ -763,6 +838,8 @@ export class AiTraderScanner {
       config,
       signal.instrument,
       hasExistingPosition,
+      signal.technicalSnapshot.regime,
+      signal.confidence,
     )
 
     if (!preTier3.allowed) {
@@ -820,6 +897,15 @@ export class AiTraderScanner {
     const openTradeCount = await countOpenAiTrades()
     const riskPercent = await getRiskPercent()
 
+    // Extract pair+profile win rate for self-awareness
+    const pairPerfMatch = performanceHistory.find(
+      (s) => s.instrument === signal.instrument && s.profile === signal.profile,
+    )
+    const pairProfileWinRate =
+      pairPerfMatch && pairPerfMatch.totalTrades > 0
+        ? pairPerfMatch.wins / pairPerfMatch.totalTrades
+        : null
+
     const tier3Ctx: Tier3Context = {
       signal,
       tier2Response: tier2Text,
@@ -829,6 +915,8 @@ export class AiTraderScanner {
       accountBalance,
       openTradeCount,
       riskPercent,
+      consecutiveLosses: this.consecutiveLosses,
+      pairProfileWinRate,
     }
 
     const tier3Prompt = buildTier3Prompt(tier3Ctx)
