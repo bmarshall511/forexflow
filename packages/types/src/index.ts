@@ -2373,6 +2373,12 @@ export interface TradeFinderScoreBreakdown {
   curve: OddsEnhancerScore
   profitZone: OddsEnhancerScore
   commodityCorrelation: OddsEnhancerScore
+  /** Session timing bonus (0-1): is the pair being traded during its optimal session? */
+  session: OddsEnhancerScore
+  /** Key level confluence (0-2): round numbers, prev day/week high-low near entry */
+  keyLevel: OddsEnhancerScore
+  /** Volatility regime (0-1): is the market in a favorable regime for zone trading? */
+  volatilityRegime: OddsEnhancerScore
   total: number
   maxPossible: number
 }

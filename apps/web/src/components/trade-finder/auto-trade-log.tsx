@@ -93,7 +93,7 @@ export function AutoTradeLog({ events }: AutoTradeLogProps) {
                   {config.label}
                 </Badge>
                 {event.score > 0 && (
-                  <span className="text-muted-foreground text-[10px]">{event.score}/12</span>
+                  <span className="text-muted-foreground text-[10px]">{event.score}/16</span>
                 )}
               </div>
               {event.reason && (

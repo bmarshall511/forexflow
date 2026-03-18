@@ -15,7 +15,7 @@ The toggle at the top turns the entire Trade Finder on or off. When disabled, it
 
 ## Minimum Score
 
-Every setup Trade Finder discovers gets a score from 1 to 12. Higher scores mean the setup looks more promising.
+Every setup Trade Finder discovers gets a score from 1 to 16 across 10 dimensions. Higher scores mean the setup looks more promising.
 
 - **Default: 7** — a good balance between seeing enough setups and filtering out weak ones
 - Set it higher (like 9 or 10) to only see the best-looking setups
@@ -55,7 +55,7 @@ Flip this toggle to let Trade Finder place real orders on your behalf. When disa
 
 ### Auto-Trade Min Score
 
-This is a separate, higher threshold just for automatic trades. The default is **9** (out of 12).
+This is a separate, higher threshold just for automatic trades. The default is **9** (out of 16).
 
 Even if your display minimum is 7, auto-trade will only act on setups scoring 9 or above. This extra filter keeps auto-trading conservative.
 

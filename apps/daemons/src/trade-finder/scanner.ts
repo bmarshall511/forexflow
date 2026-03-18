@@ -23,6 +23,10 @@ import {
   isMarketExpectedOpen,
   getCorrelation,
   getPipSize,
+  getCurrentSession,
+  getSessionScore,
+  scoreKeyLevels,
+  detectRegime,
 } from "@fxflow/shared"
 import {
   getTradeFinderConfig,
@@ -317,7 +321,17 @@ export class TradeFinderScanner {
       }
     }
 
-    // 6. Score each LTF zone with extended scoring
+    // 6. Fetch daily/weekly candles for key level scoring (use cache, low overhead)
+    const [dailyCandles, weeklyCandles] = await Promise.all([
+      fetchOandaCandles(instrument, "D", 5, apiUrl, token, this.cache),
+      fetchOandaCandles(instrument, "W", 3, apiUrl, token, this.cache),
+    ])
+    // Previous completed candle = second-to-last (last is still forming)
+    const prevDailyCandle = dailyCandles.length >= 2 ? dailyCandles[dailyCandles.length - 2]! : null
+    const prevWeeklyCandle =
+      weeklyCandles.length >= 2 ? weeklyCandles[weeklyCandles.length - 2]! : null
+
+    // 7. Score each LTF zone with extended scoring
     const pipSize = getPipSize(instrument)
     const atrArr = computeATR(ltfCandles, 14)
     const atr = atrArr.length > 0 ? atrArr[atrArr.length - 1]! : 0
@@ -334,13 +348,14 @@ export class TradeFinderScanner {
       const existing = await findExistingSetup(instrument, direction, pair.timeframeSet)
       if (existing) continue
 
-      // Extended scoring
+      // Extended scoring with session, key level, and volatility regime context
       const extendedScores = this.computeExtendedScores(
         zone,
         ltfResult.zones,
         trendData,
         curveData,
         commodityZones,
+        { instrument, ltfCandles, prevDailyCandle, prevWeeklyCandle },
       )
       if (extendedScores.total < config.minScore) continue
 
@@ -442,7 +457,7 @@ export class TradeFinderScanner {
       })
 
       console.log(
-        `[trade-finder] New setup: ${instrument} ${direction} (score: ${extendedScores.total}/12, R:R ${rrRatio})`,
+        `[trade-finder] New setup: ${instrument} ${direction} (score: ${extendedScores.total}/16, R:R ${rrRatio})`,
       )
 
       // ── Auto-trade: attempt to place if eligible ──
@@ -634,7 +649,7 @@ export class TradeFinderScanner {
       const dir = setup.direction === "long" ? "Long" : "Short"
       void this.notificationEmitter?.emitTradeFinder(
         "Auto-Trade Placed",
-        `${pair} ${dir} LIMIT @ ${setup.entryPrice.toFixed(5)} (score ${setup.scores.total}/12)`,
+        `${pair} ${dir} LIMIT @ ${setup.entryPrice.toFixed(5)} (score ${setup.scores.total}/16)`,
       )
     } catch (err) {
       const reason = `Placement failed: ${(err as Error).message}`
@@ -696,6 +711,19 @@ export class TradeFinderScanner {
     trendData: TrendData | null,
     curveData: CurveData | null,
     commodityZones: ZoneData[] | null,
+    context?: {
+      instrument: string
+      ltfCandles: {
+        open: number
+        high: number
+        low: number
+        close: number
+        time: number
+        volume?: number
+      }[]
+      prevDailyCandle: { open: number; high: number; low: number; close: number } | null
+      prevWeeklyCandle: { open: number; high: number; low: number; close: number } | null
+    },
   ): TradeFinderScoreBreakdown {
     const { strength, time, freshness } = zone.scores
 
@@ -708,6 +736,58 @@ export class TradeFinderScanner {
       commodityZones,
     )
 
+    // Session scoring: is this pair optimal for the current session?
+    const sessionInfo = getCurrentSession()
+    const sessionScore = context ? getSessionScore(context.instrument, sessionInfo.session) : 0
+    const session =
+      sessionScore >= 70
+        ? {
+            value: 1,
+            max: 1,
+            label: "Best",
+            explanation: `${sessionInfo.session} session — optimal for this pair`,
+          }
+        : {
+            value: 0,
+            max: 1,
+            label: "Poor",
+            explanation:
+              sessionScore > 0 ? `${sessionInfo.session} session — suboptimal` : "Off-session",
+          }
+
+    // Key level scoring: round numbers, prev day/week high-low near entry
+    const keyLevel = context
+      ? scoreKeyLevels(
+          zone.proximalLine,
+          context.instrument,
+          context.prevDailyCandle,
+          context.prevWeeklyCandle,
+        )
+      : { value: 0, max: 2, label: "Poor", explanation: "No key level data" }
+
+    // Volatility regime scoring: normal regime is best for zone trading
+    let volatilityRegime = { value: 0, max: 1, label: "Poor", explanation: "No regime data" }
+    if (context && context.ltfCandles.length >= 50) {
+      // detectRegime expects Candle with volume — map with 0 volume fallback
+      const regimeCandles = context.ltfCandles.map((c) => ({ ...c, volume: c.volume ?? 0 }))
+      const regime = detectRegime(regimeCandles)
+      if (regime.regime === "ranging" || regime.regime === "trending") {
+        volatilityRegime = {
+          value: 1,
+          max: 1,
+          label: "Best",
+          explanation: `${regime.regime} regime — favorable for zones`,
+        }
+      } else {
+        volatilityRegime = {
+          value: 0,
+          max: 1,
+          label: "Poor",
+          explanation: `${regime.regime} regime — risky for zones`,
+        }
+      }
+    }
+
     const total =
       strength.value +
       time.value +
@@ -715,7 +795,10 @@ export class TradeFinderScanner {
       trend.value +
       curve.value +
       profitZone.value +
-      commodityCorrelation.value
+      commodityCorrelation.value +
+      session.value +
+      keyLevel.value +
+      volatilityRegime.value
 
     return {
       strength,
@@ -725,8 +808,11 @@ export class TradeFinderScanner {
       curve,
       profitZone,
       commodityCorrelation,
+      session,
+      keyLevel,
+      volatilityRegime,
       total,
-      maxPossible: 12,
+      maxPossible: 16,
     }
   }
 

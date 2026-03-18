@@ -28,16 +28,29 @@ In forex, a supply zone is where sellers took over before. When price returns th
 
 ## Setup Scores
 
-When Trade Finder identifies a zone, it gives it a **score from 1 to 12**. This score reflects how strong and reliable the setup looks:
+When Trade Finder identifies a zone, it gives it a **score from 1 to 16**. This score reflects how strong and reliable the setup looks across 10 dimensions:
 
 | Score Range | Quality  | What It Means                             |
 | ----------- | -------- | ----------------------------------------- |
-| 1–4         | Weak     | Zone exists but signals are not strong    |
-| 5–8         | Moderate | Decent zone with reasonable confirmation  |
-| 9–12        | Strong   | High-quality zone, multiple factors align |
+| 1–5         | Weak     | Zone exists but signals are not strong    |
+| 6–10        | Moderate | Decent zone with reasonable confirmation  |
+| 11–16       | Strong   | High-quality zone, multiple factors align |
+
+The 10 scoring dimensions are:
+
+1. **Strength** (0–2) — how explosively price left the zone
+2. **Time** (0–1) — how few candles the base has (fewer = better)
+3. **Freshness** (0–2) — has the zone been tested? (untested = best)
+4. **Trend** (0–2) — is the medium-timeframe trend aligned?
+5. **Curve** (0–1) — is price in the right area of the higher-timeframe curve?
+6. **Profit Zone** (0–3) — risk-to-reward ratio to the nearest opposing zone
+7. **Commodity** (0–1) — does the correlated commodity confirm?
+8. **Session** (0–1) — is this pair optimal for the current trading session?
+9. **Key Level** (0–2) — is entry near a round number or previous day/week high-low?
+10. **Volatility** (0–1) — is the market in a favorable regime for zone trading?
 
 > [!TIP]
-> Higher scores do not guarantee success, but they have better historical probability. Most traders set their auto-trade threshold at 7 or above.
+> Higher scores do not guarantee success, but they have better historical probability. Most traders set their auto-trade threshold at 9 or above.
 
 ## Setup Lifecycle
 

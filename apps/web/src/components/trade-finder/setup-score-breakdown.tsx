@@ -41,6 +41,9 @@ export function SetupScoreBreakdown({ scores }: SetupScoreBreakdownProps) {
       <ScoreRow label="Curve" score={scores.curve} />
       <ScoreRow label="Profit Zone" score={scores.profitZone} />
       <ScoreRow label="Commodity" score={scores.commodityCorrelation} />
+      {scores.session && <ScoreRow label="Session" score={scores.session} />}
+      {scores.keyLevel && <ScoreRow label="Key Level" score={scores.keyLevel} />}
+      {scores.volatilityRegime && <ScoreRow label="Volatility" score={scores.volatilityRegime} />}
       <div className="flex items-center gap-2 border-t pt-1 text-xs">
         <span className="w-28 shrink-0 font-medium">Total</span>
         <div className="flex-1" />

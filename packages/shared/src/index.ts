@@ -193,3 +193,5 @@ export {
 export { parseFrontmatter, slugify, type DocFrontmatter } from "./markdown"
 
 export { classifyAiError, type AiErrorCategory, type ClassifiedAiError } from "./ai-errors"
+
+export { findNearbyKeyLevels, scoreKeyLevels, type KeyLevel } from "./key-levels"
