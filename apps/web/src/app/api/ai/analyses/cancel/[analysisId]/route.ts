@@ -11,9 +11,15 @@ export async function POST(
     const { analysisId } = await params
 
     try {
-      await fetch(`${DAEMON_URL}/actions/ai/cancel/${analysisId}`, { method: "POST" })
+      const res = await fetch(`${DAEMON_URL}/actions/ai/cancel/${analysisId}`, { method: "POST" })
+      if (!res.ok) {
+        return NextResponse.json(
+          { ok: false, error: `Daemon returned ${res.status}` },
+          { status: 502 },
+        )
+      }
     } catch {
-      console.warn("[POST /api/ai/analyses/cancel/[analysisId]] Daemon unreachable")
+      return NextResponse.json({ ok: false, error: "Daemon unreachable" }, { status: 502 })
     }
 
     return NextResponse.json({ ok: true })

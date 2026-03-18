@@ -220,6 +220,21 @@ export const CreateConditionSchema = z
     }
   })
 
+// ─── AI Condition Suggestion Validation ─────────────────────────────────────
+// Used to validate condition suggestions from Claude output before creating conditions.
+
+export const AiConditionSuggestionSchema = z.object({
+  label: z.string().min(1),
+  triggerType: TradeConditionTriggerTypeSchema,
+  triggerValue: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, {
+    message: "triggerValue must have at least one key",
+  }),
+  actionType: TradeConditionActionTypeSchema,
+  actionParams: z.record(z.string(), z.unknown()).default({}),
+  confidence: z.enum(["high", "medium", "low"]).optional(),
+  rationale: z.string().optional(),
+})
+
 // ─── Trade Finder Config (PUT) ──────────────────────────────────────────────
 
 const TradeFinderPairConfigSchema = z.object({

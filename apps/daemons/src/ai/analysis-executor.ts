@@ -411,11 +411,31 @@ export async function executeAnalysis(opts: {
           stream.abort()
           // Distinguish timeout from user cancellation
           const isTimeout = rawResponse.length > 0
+          const abortError = isTimeout
+            ? `Analysis timed out after ${STREAM_TIMEOUT_MS / 1000} seconds`
+            : "Analysis cancelled by user"
           await updateAnalysisStatus(
             analysisId,
             isTimeout ? "failed" : "cancelled",
-            isTimeout ? `Analysis timed out after ${STREAM_TIMEOUT_MS / 1000} seconds` : undefined,
+            isTimeout ? abortError : undefined,
           )
+
+          // Broadcast completion so the UI clears its spinner
+          broadcast({
+            type: "ai_analysis_completed",
+            timestamp: new Date().toISOString(),
+            data: {
+              analysisId,
+              tradeId,
+              sections: null,
+              inputTokens,
+              outputTokens,
+              costUsd: 0,
+              durationMs: Date.now() - startTime,
+              error: abortError,
+            },
+          })
+
           activeControllers.delete(analysisId)
           return
         }
@@ -464,8 +484,23 @@ export async function executeAnalysis(opts: {
 
     // ─── Handle parse failure ──────────────────────────────────────────
     if (!sections) {
-      const parseError = "Failed to parse analysis results from AI response"
-      await updateAnalysisStatus(analysisId, "failed", parseError)
+      // Categorize the parse error for better debugging
+      let parseError: string
+      if (rawResponse.trim().length === 0) {
+        parseError = "AI returned an empty response"
+      } else {
+        // Check if truncated (unbalanced braces)
+        const openBraces = (rawResponse.match(/\{/g) ?? []).length
+        const closeBraces = (rawResponse.match(/\}/g) ?? []).length
+        if (openBraces > closeBraces + 1) {
+          parseError = "AI response was truncated (may have exceeded token limit)"
+        } else {
+          parseError = "AI response contained invalid JSON structure"
+        }
+      }
+
+      // Save rawResponse to DB even on failure so users can debug
+      await updateAnalysisStatus(analysisId, "failed", parseError, rawResponse || undefined)
 
       broadcast({
         type: "ai_analysis_completed",
@@ -482,7 +517,7 @@ export async function executeAnalysis(opts: {
         },
       })
 
-      sendProgress("Analysis complete!", 100)
+      sendProgress("Analysis failed", 100)
 
       const pairLabel = context.trade.instrument.replace("_", "/")
       await createNotification({
@@ -656,6 +691,7 @@ export async function executeAnalysis(opts: {
 
           if (trade) {
             const appliedIds: string[] = []
+            const autoApplyErrors: Array<{ actionId: string; label: string; error: string }> = []
             let tradeClosed = false
 
             for (const action of sections.immediateActions) {
@@ -834,10 +870,9 @@ export async function executeAnalysis(opts: {
                     break
                 }
               } catch (actionErr) {
-                console.warn(
-                  `[ai-executor] Failed to auto-apply action "${action.label}":`,
-                  (actionErr as Error).message,
-                )
+                const errMsg = (actionErr as Error).message
+                console.warn(`[ai-executor] Failed to auto-apply action "${action.label}":`, errMsg)
+                autoApplyErrors.push({ actionId: action.id, label: action.label, error: errMsg })
               }
             }
 
@@ -845,6 +880,12 @@ export async function executeAnalysis(opts: {
               sections.autoAppliedActionIds = appliedIds
               console.log(
                 `[ai-executor] Auto-applied ${appliedIds.length} action(s) for trade ${tradeId}`,
+              )
+            }
+            if (autoApplyErrors.length > 0) {
+              sections.autoApplyErrors = autoApplyErrors
+              console.warn(
+                `[ai-executor] ${autoApplyErrors.length} auto-apply error(s) for trade ${tradeId}`,
               )
             }
           }
@@ -862,6 +903,7 @@ export async function executeAnalysis(opts: {
     const costUsd = calculateCost(model, inputTokens, outputTokens)
 
     // ─── Broadcast completion ──────────────────────────────────────────
+    const STREAM_TRUNCATION_THRESHOLD = 100_000 // 100KB, matches client-side limit
     broadcast({
       type: "ai_analysis_completed",
       timestamp: new Date().toISOString(),
@@ -873,6 +915,8 @@ export async function executeAnalysis(opts: {
         outputTokens,
         costUsd,
         durationMs,
+        streamTruncated: rawResponse.length >= STREAM_TRUNCATION_THRESHOLD,
+        autoApplyErrors: sections.autoApplyErrors,
       },
     })
 

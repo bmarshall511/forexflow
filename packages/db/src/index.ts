@@ -131,6 +131,7 @@ export {
   resetStuckAnalyses,
   deleteAnalysis,
   clearAllAnalyses,
+  getAnalysisRawResponse,
 } from "./ai-analysis-service"
 export type { RecentAnalysisSummary } from "./ai-analysis-service"
 

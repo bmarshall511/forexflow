@@ -900,6 +900,10 @@ export interface AiAnalysisCompletedMessage extends DaemonMessage<{
   costUsd: number
   durationMs: number
   error?: string
+  /** Whether the streamed response was truncated due to size limits */
+  streamTruncated?: boolean
+  /** Errors that occurred during auto-apply of actions */
+  autoApplyErrors?: Array<{ actionId: string; label: string; error: string }>
 }> {
   type: "ai_analysis_completed"
 }
@@ -1605,6 +1609,8 @@ export interface AiAnalysisSections {
   postMortem?: string
   /** Action IDs that were auto-executed by the daemon (set post-analysis, not by AI) */
   autoAppliedActionIds?: string[]
+  /** Errors that occurred during auto-apply of actions (set post-analysis, not by AI) */
+  autoApplyErrors?: Array<{ actionId: string; label: string; error: string }>
 }
 
 /** Complete AI analysis record, persisted in the database and returned by the analysis API. */

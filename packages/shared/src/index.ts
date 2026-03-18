@@ -165,6 +165,21 @@ export {
   ValidationError,
 } from "./errors"
 
+export {
+  extractPriceFromParams,
+  extractPriceFromText,
+  extractUnitsFromParams,
+  priceMatch,
+} from "./ai-param-utils"
+
+export {
+  getAnalysisStatusConfig,
+  isStuckAnalysis,
+  MODEL_LABELS,
+  DEPTH_LABELS,
+  type AnalysisStatusConfig,
+} from "./ai-status-utils"
+
 export { Logger } from "./logger"
 
 export {

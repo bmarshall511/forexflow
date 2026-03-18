@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { Loader2, Square } from "lucide-react"
+import { Loader2, Square, AlertTriangle } from "lucide-react"
 import type { AiAnalysisProgress } from "@/hooks/use-ai-analysis"
 
 interface AnalysisProgressProps {
@@ -14,6 +14,8 @@ interface AnalysisProgressProps {
   estimatedSec?: number
   /** Date.now() timestamp when the analysis was triggered */
   startedAt?: number
+  /** Whether the stream text was truncated */
+  streamTruncated?: boolean
 }
 
 export function AnalysisProgressDisplay({
@@ -22,6 +24,7 @@ export function AnalysisProgressDisplay({
   onCancel,
   estimatedSec,
   startedAt,
+  streamTruncated,
 }: AnalysisProgressProps) {
   const [remaining, setRemaining] = useState<number | null>(null)
 
@@ -43,7 +46,14 @@ export function AnalysisProgressDisplay({
     remaining === null ? null : remaining > 0 ? `~${remaining}s remaining` : "Almost done…"
 
   return (
-    <div className="bg-card space-y-3 rounded-lg border p-4">
+    <div
+      className="bg-card space-y-3 rounded-lg border p-4"
+      role="progressbar"
+      aria-valuenow={progress.progress}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="AI analysis progress"
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Loader2 className="text-primary size-4 animate-spin" />
@@ -58,6 +68,7 @@ export function AnalysisProgressDisplay({
             size="sm"
             className="text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60 h-7 gap-1.5 text-xs"
             onClick={() => onCancel(analysisId)}
+            aria-label="Stop analysis"
           >
             <Square className="size-3 fill-current" />
             Stop
@@ -72,6 +83,13 @@ export function AnalysisProgressDisplay({
           <pre className="text-muted-foreground whitespace-pre-wrap font-mono text-[10px] leading-relaxed">
             {progress.streamText}
           </pre>
+        </div>
+      )}
+
+      {(streamTruncated || progress.streamTruncated) && (
+        <div className="flex items-center gap-1.5 text-[10px] text-amber-600">
+          <AlertTriangle className="size-3" />
+          Response preview truncated at 100KB
         </div>
       )}
     </div>

@@ -126,16 +126,34 @@ export async function createAnalysis(input: {
  * @param id - Analysis ID
  * @param status - New status to set
  * @param errorMessage - Optional error message for failed analyses
+ * @param rawResponse - Optional raw response to persist (e.g., on parse failure)
  */
 export async function updateAnalysisStatus(
   id: string,
   status: AiAnalysisStatus,
   errorMessage?: string,
+  rawResponse?: string,
 ): Promise<void> {
   await db.aiAnalysis.update({
     where: { id },
-    data: { status, ...(errorMessage ? { errorMessage } : {}) },
+    data: {
+      status,
+      ...(errorMessage ? { errorMessage } : {}),
+      ...(rawResponse ? { rawResponse } : {}),
+    },
   })
+}
+
+/**
+ * Fetch only the raw response text for a given analysis.
+ * Loaded on-demand since responses can be large.
+ */
+export async function getAnalysisRawResponse(analysisId: string): Promise<string | null> {
+  const row = await db.aiAnalysis.findUnique({
+    where: { id: analysisId },
+    select: { rawResponse: true },
+  })
+  return row?.rawResponse ?? null
 }
 
 /**

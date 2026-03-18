@@ -1,6 +1,12 @@
 "use client"
 
-import { ANALYSIS_STUCK_THRESHOLD_MS, type AiAnalysisData } from "@fxflow/types"
+import type { AiAnalysisData } from "@fxflow/types"
+import {
+  isStuckAnalysis,
+  getAnalysisStatusConfig,
+  MODEL_LABELS,
+  DEPTH_LABELS,
+} from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -20,40 +26,37 @@ interface AnalysisHistoryProps {
   onSelect: (analysis: AiAnalysisData) => void
 }
 
-const MODEL_LABELS: Record<string, string> = {
-  "claude-haiku-4-5-20251001": "Haiku",
-  "claude-sonnet-4-6": "Sonnet",
-  "claude-opus-4-6": "Opus",
-}
-
-const DEPTH_LABELS: Record<string, string> = {
-  quick: "Quick",
-  standard: "Standard",
-  deep: "Deep",
-}
-
-/** An analysis is considered stuck if it's been pending/running for > 2 minutes */
-function isStuck(analysis: AiAnalysisData): boolean {
-  if (analysis.status !== "pending" && analysis.status !== "running") return false
-  const age = Date.now() - new Date(analysis.createdAt).getTime()
-  return age > ANALYSIS_STUCK_THRESHOLD_MS
-}
+const ICON_MAP = {
+  "check-circle-2": CheckCircle2,
+  "alert-circle": AlertCircle,
+  "x-circle": XCircle,
+  clock: Clock,
+  "alert-triangle": AlertTriangle,
+} as const
 
 function StatusIcon({ analysis }: { analysis: AiAnalysisData }) {
-  if (isStuck(analysis)) {
-    return <AlertTriangle className="size-3 text-amber-500" />
-  }
-  switch (analysis.status) {
-    case "completed":
-      return <CheckCircle2 className="size-3 text-emerald-500" />
-    case "failed":
-      return <AlertCircle className="size-3 text-red-500" />
-    case "cancelled":
-      return <XCircle className="text-muted-foreground size-3" />
-    case "running":
-    case "pending":
-      return <Clock className="size-3 animate-pulse text-blue-500" />
-  }
+  const config = getAnalysisStatusConfig(
+    analysis.status as Parameters<typeof getAnalysisStatusConfig>[0],
+    {
+      createdAt: analysis.createdAt,
+    },
+  )
+  const Icon = ICON_MAP[config.iconName]
+  const animate = analysis.status === "running" || analysis.status === "pending"
+  return (
+    <Icon
+      className={cn(
+        "size-3",
+        config.colorClass,
+        animate &&
+          !isStuckAnalysis(
+            analysis.createdAt,
+            analysis.status as Parameters<typeof isStuckAnalysis>[1],
+          ) &&
+          "animate-pulse",
+      )}
+    />
+  )
 }
 
 export function AnalysisHistory({ history, selectedId, onSelect }: AnalysisHistoryProps) {
@@ -68,7 +71,10 @@ export function AnalysisHistory({ history, selectedId, onSelect }: AnalysisHisto
   return (
     <div className="space-y-1">
       {history.map((analysis) => {
-        const stuck = isStuck(analysis)
+        const stuck = isStuckAnalysis(
+          analysis.createdAt,
+          analysis.status as Parameters<typeof isStuckAnalysis>[1],
+        )
         return (
           <Button
             key={analysis.id}
@@ -106,7 +112,6 @@ export function AnalysisHistory({ history, selectedId, onSelect }: AnalysisHisto
                     <span>{(analysis.durationMs / 1000).toFixed(1)}s</span>
                   )}
                 </div>
-                {/* Show error message preview for failed analyses */}
                 {analysis.status === "failed" && analysis.errorMessage && (
                   <p className="mt-0.5 max-w-[300px] truncate text-[10px] text-red-500/80">
                     {analysis.errorMessage}

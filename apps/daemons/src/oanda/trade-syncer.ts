@@ -1367,7 +1367,10 @@ export class OandaTradeSyncer {
         )
       }
 
-      await removeStalePendingOrders(activeOrderIds, "oanda", reconcileTimestamp)
+      // NOTE: removeStalePendingOrders is called AFTER upserts (below) to avoid
+      // a race condition where an order filling during the API fetch would be
+      // temporarily absent from both the pending and open lists. Moving it after
+      // upserts ensures that filled orders are migrated before stale removal runs.
 
       // Group pending orders and open trades by instrument for parallel processing.
       // Each instrument's DB upserts are serialized via its own mutex, but different
@@ -1493,6 +1496,12 @@ export class OandaTradeSyncer {
       )
 
       await Promise.all(instrumentPromises)
+
+      // Remove stale pending orders AFTER upserts complete. This prevents the race
+      // condition where an order filling during the API fetch window is temporarily
+      // absent from both pending and open lists — the upsert above will have already
+      // created the open trade record, so migration can match correctly.
+      await removeStalePendingOrders(activeOrderIds, "oanda", reconcileTimestamp)
 
       // Fire lifecycle callbacks sequentially after all instrument upserts complete.
       // This avoids races between callbacks and the shared known-ID sets above.

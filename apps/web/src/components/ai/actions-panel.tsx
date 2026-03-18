@@ -1,10 +1,12 @@
 "use client"
 
+import { useRef, useEffect } from "react"
 import type { AiAnalysisSections, AiActionButton } from "@fxflow/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { CheckCircle2, Sparkles, Zap, Undo2 } from "lucide-react"
+import { CheckCircle2, Sparkles, Zap, Undo2, AlertTriangle } from "lucide-react"
+import { toast } from "sonner"
 
 /** Metadata stored for each applied action so we can undo it */
 interface AppliedAction {
@@ -119,6 +121,20 @@ export function ActionsPanel({
   onUndoAction,
   autoApplyMinConfidence,
 }: ActionsPanelProps) {
+  // Show toast for auto-apply errors on first render (ref-guarded)
+  const toastedErrorsRef = useRef(false)
+  useEffect(() => {
+    if (
+      !toastedErrorsRef.current &&
+      sections?.autoApplyErrors &&
+      sections.autoApplyErrors.length > 0
+    ) {
+      toastedErrorsRef.current = true
+      for (const err of sections.autoApplyErrors) {
+        toast.warning(`Auto-apply failed: ${err.label}`, { description: err.error })
+      }
+    }
+  }, [sections?.autoApplyErrors])
   // Filter out condition-type actions (they belong in the Conditions tab)
   const conditionTypes = new Set(["add_condition", "adjust_tp_partial"])
   const actions = (sections?.immediateActions ?? []).filter((a) => !conditionTypes.has(a.type))
@@ -168,6 +184,21 @@ export function ActionsPanel({
             Actions at or above <strong>{autoApplyMinConfidence}</strong> confidence were
             auto-applied.
           </span>
+        </div>
+      )}
+
+      {/* Auto-apply error warnings */}
+      {sections.autoApplyErrors && sections.autoApplyErrors.length > 0 && (
+        <div className="space-y-1 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
+            <AlertTriangle className="size-3 shrink-0" />
+            {sections.autoApplyErrors.length} auto-apply action(s) failed
+          </div>
+          {sections.autoApplyErrors.map((err) => (
+            <p key={err.actionId} className="text-[10px] text-amber-600/80">
+              {err.label}: {err.error}
+            </p>
+          ))}
         </div>
       )}
 
