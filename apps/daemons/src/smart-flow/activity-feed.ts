@@ -55,6 +55,14 @@ export function emitActivity(
     context?: SmartFlowActivityContext
   },
 ): SmartFlowActivityEvent {
+  // Deduplicate: skip if same type emitted within 60s (prevents spam on frequent restarts)
+  if (type === "engine_started" || type === "engine_stopped" || type === "monitoring_update") {
+    const last = cache[cache.length - 1]
+    if (last && last.type === type && Date.now() - new Date(last.timestamp).getTime() < 60_000) {
+      return last // Return the existing event, don't duplicate
+    }
+  }
+
   const event: SmartFlowActivityEvent = {
     id: `sf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type,

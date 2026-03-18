@@ -26,6 +26,10 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getTradePlanStatus } from "./trade-plan-status"
+import { TradePlanLevels } from "./trade-plan-levels"
+import { TradePlanMarketData } from "./trade-plan-market-data"
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const FALLBACK_PRESET = { label: "Custom", icon: Activity, color: "text-gray-500" } as const
 
@@ -65,6 +69,8 @@ const STATE_STYLES = {
   },
 }
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface TradePlanCardProps {
   config: SmartFlowConfigData
   runtime: SmartFlowConfigRuntimeStatus | null
@@ -74,6 +80,8 @@ interface TradePlanCardProps {
   onToggle: () => void
   onDelete: () => void
 }
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function TradePlanCard({
   config,
@@ -88,16 +96,18 @@ export function TradePlanCard({
   const PresetIcon = presetMeta.icon
   const status = getTradePlanStatus(config, runtime, activeTrade)
   const style = STATE_STYLES[status.state]
+  const isActive = config.isActive
+  const isTrading = status.state === "trading" && activeTrade != null
 
   return (
     <Card
       className={cn(
         "overflow-hidden border-l-4 transition-all",
         style.border,
-        !config.isActive && "opacity-70",
+        !isActive && "opacity-60",
       )}
     >
-      {/* Header */}
+      {/* Header row */}
       <div className="flex items-center justify-between px-4 pb-1 pt-4">
         <div className="flex items-center gap-2">
           <span className={cn("size-2 rounded-full", style.dot)} aria-hidden="true" />
@@ -126,47 +136,96 @@ export function TradePlanCard({
         <p className="text-muted-foreground mt-0.5 text-[11px]">{status.strategyDesc}</p>
       </div>
 
-      {/* Protection badges (when active) */}
-      {config.isActive && (
-        <div className="flex flex-wrap gap-1.5 px-4 pt-3">
-          <ProtectionBadge
-            icon={ShieldCheck}
-            label="Break-even"
-            active={config.breakevenEnabled}
-            triggered={activeTrade?.breakevenTriggered}
+      {/* Content sections */}
+      <div className="space-y-3 px-4 pt-3">
+        {/* Trade levels — only when actively trading with an entry price */}
+        {isTrading && activeTrade != null && (
+          <TradePlanLevels
+            config={config}
+            trade={activeTrade}
+            currentAtr={runtime?.currentAtr ?? null}
           />
-          <ProtectionBadge
-            icon={TrendingUp}
-            label="Trailing"
-            active={config.trailingEnabled}
-            triggered={activeTrade?.trailingActivated}
-          />
-          {config.newsProtectionEnabled && <ProtectionBadge icon={Radio} label="News" active />}
-          {config.recoveryEnabled && <ProtectionBadge icon={RotateCcw} label="Recovery" active />}
-          {config.maxHoldHours != null && (
-            <ProtectionBadge icon={Clock} label={formatHoldTime(config.maxHoldHours)} active />
-          )}
-        </div>
-      )}
+        )}
 
-      {/* Latest activity */}
-      {latestActivity && (
-        <div className="mx-4 mt-2.5 flex items-center gap-1.5 text-[11px]">
-          <span
-            className={cn(
-              "inline-block size-1.5 shrink-0 rounded-full",
-              severityColor(latestActivity.severity),
-            )}
-            aria-hidden="true"
-          />
-          <span className="text-muted-foreground truncate">{latestActivity.message}</span>
-          <span className="text-muted-foreground/60 shrink-0">
-            {formatRelativeTime(latestActivity.timestamp)}
-          </span>
-        </div>
-      )}
+        {/* Live market data */}
+        {isActive && <TradePlanMarketData runtime={runtime} />}
 
-      {/* Footer actions */}
+        {/* Protections */}
+        {isActive && (
+          <div className="space-y-1.5">
+            <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+              Protections
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <ProtectionBadge
+                icon={ShieldCheck}
+                label="Break-even"
+                active={config.breakevenEnabled}
+                triggered={activeTrade?.breakevenTriggered}
+              />
+              <ProtectionBadge
+                icon={TrendingUp}
+                label="Trailing"
+                active={config.trailingEnabled}
+                triggered={activeTrade?.trailingActivated}
+              />
+              {config.newsProtectionEnabled && <ProtectionBadge icon={Radio} label="News" active />}
+              {config.recoveryEnabled && (
+                <ProtectionBadge icon={RotateCcw} label="Recovery" active />
+              )}
+              {config.maxHoldHours != null && (
+                <ProtectionBadge icon={Clock} label={formatHoldTime(config.maxHoldHours)} active />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Recent management actions (when trading) */}
+        {isTrading && activeTrade != null && activeTrade.managementLog.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+              Recent Actions
+            </p>
+            <div className="space-y-0.5">
+              {activeTrade.managementLog
+                .slice(-3)
+                .reverse()
+                .map((entry, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px]">
+                    <span className="text-muted-foreground w-12 shrink-0 font-mono">
+                      {new Date(entry.at).toLocaleTimeString(undefined, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {entry.detail || entry.action.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Latest activity (watching/paused — no active trade) */}
+        {!isTrading && latestActivity && (
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <span
+              className={cn(
+                "inline-block size-1.5 shrink-0 rounded-full",
+                severityColor(latestActivity.severity),
+              )}
+              aria-hidden="true"
+            />
+            <span className="text-muted-foreground truncate">{latestActivity.message}</span>
+            <span className="text-muted-foreground/60 shrink-0">
+              {formatRelativeTime(latestActivity.timestamp)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
       <div className="flex items-center justify-between px-4 pb-3 pt-3">
         <span className="text-muted-foreground text-[10px]">
           Created {new Date(config.createdAt).toLocaleDateString()}
@@ -179,7 +238,7 @@ export function TradePlanCard({
             disabled={toggling}
             onClick={onToggle}
           >
-            {config.isActive ? (
+            {isActive ? (
               <>
                 <Pause className="size-3" aria-hidden="true" /> Pause
               </>

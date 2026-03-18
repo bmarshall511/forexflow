@@ -69,6 +69,18 @@ const ATR_COUNT = 100
 const ATR_TF = "H1"
 type PlaceResult = { success: boolean; trade?: SmartFlowTradeData; error?: string }
 
+function formatPreset(preset: string): string {
+  const labels: Record<string, string> = {
+    momentum_catch: "Momentum Catch",
+    steady_growth: "Steady Growth",
+    swing_capture: "Swing Capture",
+    trend_rider: "Trend Rider",
+    recovery: "Recovery",
+    custom: "Custom",
+  }
+  return labels[preset] ?? preset
+}
+
 export class SmartFlowManager {
   private stateManager: StateManager
   private broadcast: (msg: AnyDaemonMessage) => void
@@ -165,6 +177,10 @@ export class SmartFlowManager {
     )
 
     this.startMonitoringUpdates()
+
+    // Auto-place trades for active configs that have no associated trade yet.
+    // Delayed 5s to allow OANDA connection to fully establish.
+    setTimeout(() => void this.autoPlaceActiveConfigs(), 5_000)
   }
 
   stop(): void {
@@ -399,6 +415,85 @@ export class SmartFlowManager {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Check all active configs and auto-place trades for any that don't have
+   * an associated active trade. Called on startup after OANDA connects, and
+   * can be called again when configs are activated.
+   */
+  private async autoPlaceActiveConfigs(): Promise<void> {
+    if (!this.tradeSyncer) return
+
+    try {
+      const configs = await getSmartFlowConfigs()
+      const activeConfigs = configs.filter((c) => c.isActive)
+      const activeTrades = await getActiveSmartFlowTrades()
+
+      // Build set of configIds that already have active trades
+      const configsWithTrades = new Set(activeTrades.map((t) => t.configId).filter(Boolean))
+
+      for (const config of activeConfigs) {
+        if (configsWithTrades.has(config.id)) {
+          emitActivity(
+            "monitoring_update",
+            `${config.instrument.replace("_", "/")} — trade is active, managing with ${formatPreset(config.preset)} strategy`,
+            { instrument: config.instrument, configId: config.id },
+          )
+          continue
+        }
+
+        // Active config with no trade — log intent and attempt placement
+        emitActivity(
+          "entry_watching",
+          `${config.instrument.replace("_", "/")} — checking market conditions to place your trade`,
+          { instrument: config.instrument, configId: config.id },
+        )
+
+        if (config.entryMode === "smart_entry") {
+          const result = await this.createSmartEntry(config.id)
+          if (result.success) {
+            emitActivity(
+              "entry_watching",
+              `${config.instrument.replace("_", "/")} — watching for entry price${config.entryPrice != null ? ` at ${config.entryPrice}` : ""}`,
+              { instrument: config.instrument, configId: config.id, severity: "success" },
+            )
+          } else {
+            emitActivity(
+              "entry_blocked",
+              `${config.instrument.replace("_", "/")} — couldn't set up smart entry: ${result.error}`,
+              { instrument: config.instrument, configId: config.id, severity: "warning" },
+            )
+          }
+        } else {
+          const result = await this.placeMarketEntry(config.id)
+          if (result.success) {
+            emitActivity(
+              "entry_placed",
+              `${config.instrument.replace("_", "/")} — trade placed! SmartFlow is now managing it`,
+              { instrument: config.instrument, configId: config.id, severity: "success" },
+            )
+          } else {
+            emitActivity(
+              "entry_blocked",
+              `${config.instrument.replace("_", "/")} — couldn't place trade: ${result.error}`,
+              { instrument: config.instrument, configId: config.id, severity: "warning" },
+            )
+          }
+        }
+      }
+
+      const pausedCount = configs.filter((c) => !c.isActive).length
+      if (pausedCount > 0) {
+        emitActivity(
+          "monitoring_update",
+          `${pausedCount} trade plan${pausedCount > 1 ? "s are" : " is"} paused`,
+          { detail: "Activate them from the Trade Plans tab to start trading" },
+        )
+      }
+    } catch (err) {
+      console.error("[smart-flow] Auto-place failed:", (err as Error).message)
+    }
+  }
 
   private async handleSmartEntryTriggered(
     configId: string,
