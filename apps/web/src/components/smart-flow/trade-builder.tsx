@@ -9,6 +9,7 @@ import { PRESET_INFO, PRESET_KEYS } from "./trade-builder-presets"
 import { logSmartFlowActivity } from "@/lib/smart-flow-activity"
 import { StepPair, StepDirection, StepStrategy, StepReview } from "./trade-builder-steps"
 import type { AiFullSuggestion } from "./step-pair"
+import { StepEntryTiming } from "./step-entry-timing"
 
 // ── Step metadata ────────────────────────────────────────────────────────
 
@@ -29,6 +30,11 @@ const STEPS = [
     subtitle: "Each strategy manages your trade differently. Start with Steady Growth if unsure.",
   },
   {
+    label: "Entry Timing",
+    title: "When Should SmartFlow Enter?",
+    subtitle: "Enter immediately at market price, or set a target price and wait.",
+  },
+  {
     label: "Review & Confirm",
     title: "Review Your Trade",
     subtitle: "Everything looks good? Let SmartFlow handle the rest.",
@@ -46,6 +52,9 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
   const [pair, setPair] = useState("")
   const [direction, setDirection] = useState<"long" | "short" | null>(null)
   const [preset, setPreset] = useState<Exclude<SmartFlowPreset, "custom">>("steady_growth")
+  const [entryMode, setEntryMode] = useState<"market" | "smart_entry">("market")
+  const [entryPrice, setEntryPrice] = useState("")
+  const [entryExpireHours, setEntryExpireHours] = useState("")
   const [search, setSearch] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [aiSuggestion, setAiSuggestion] = useState<AiFullSuggestion | null>(null)
@@ -58,7 +67,7 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
     const suggested = result.suggestedStrategy as Exclude<SmartFlowPreset, "custom"> | undefined
     if (suggested && PRESET_KEYS.includes(suggested)) {
       setPreset(suggested)
-      // All fields filled — skip to Review (step 3)
+      // All fields filled — skip to Entry Timing (step 3)
       setStep(3)
     } else {
       // Direction set but no valid strategy — skip to Strategy (step 2)
@@ -70,7 +79,8 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
     (step === 0 && pair !== "") ||
     (step === 1 && direction !== null) ||
     (step === 2 && preset !== null) ||
-    step === 3
+    (step === 3 && (entryMode === "market" || (entryPrice !== "" && entryExpireHours !== ""))) ||
+    step === 4
 
   const pairLabel = pair.replace("_", "/")
   const progress = ((step + 1) / STEPS.length) * 100
@@ -88,7 +98,13 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
           direction,
           preset,
           isActive: true,
-          entryMode: "market",
+          entryMode,
+          ...(entryMode === "smart_entry" && entryPrice !== ""
+            ? { entryPrice: parseFloat(entryPrice) }
+            : {}),
+          ...(entryMode === "smart_entry" && entryExpireHours !== ""
+            ? { entryExpireHours: parseInt(entryExpireHours, 10) }
+            : {}),
           positionSizeMode: "risk_percent",
           positionSizeValue: 1,
           minRiskReward: preset === "swing_capture" ? 3 : preset === "momentum_catch" ? 1.6 : 2,
@@ -117,19 +133,47 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
           aiGracePeriodMins: 30,
         }),
       })
-      const json = (await res.json()) as { ok: boolean; error?: string }
+      const json = (await res.json()) as { ok: boolean; error?: string; data?: { id: string } }
       if (!json.ok) {
-        toast.error(json.error ?? "Failed to create config")
+        toast.error(json.error ?? "Failed to create trade plan")
         return
       }
+      const configId = json.data?.id
       const configName = `${pairLabel} ${direction === "long" ? "Buy" : "Sell"} — ${PRESET_INFO[preset].label}`
-      logSmartFlowActivity("config_created", `Config created: ${configName}`, {
+      logSmartFlowActivity("config_created", `Trade plan created: ${configName}`, {
         instrument: pair,
         severity: "success",
       })
-      toast.success(
-        "Configuration saved! Trade placement will be available once the daemon endpoints are connected.",
-      )
+
+      // Auto-place trade via daemon
+      if (configId) {
+        const endpoint =
+          entryMode === "smart_entry"
+            ? `/api/daemon/smart-flow/smart-entry/${configId}`
+            : `/api/daemon/smart-flow/place/${configId}`
+        try {
+          const placeRes = await fetch(endpoint, { method: "POST" })
+          const placeJson = (await placeRes.json()) as { ok: boolean; error?: string }
+          if (placeJson.ok) {
+            toast.success(
+              entryMode === "smart_entry"
+                ? "Trade plan active! SmartFlow is watching for your target price."
+                : "Trade plan active! SmartFlow placed your trade and is managing it.",
+            )
+          } else {
+            toast.warning(
+              `Trade plan saved but couldn't place trade: ${placeJson.error ?? "daemon unavailable"}`,
+            )
+          }
+        } catch {
+          toast.warning(
+            "Trade plan saved — SmartFlow will place the trade when the daemon connects.",
+          )
+        }
+      } else {
+        toast.success("Trade plan created!")
+      }
+
       window.dispatchEvent(new Event("smart-flow-updated"))
       onComplete?.()
     } catch {
@@ -237,10 +281,25 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
           />
         )}
         {step === 3 && (
+          <StepEntryTiming
+            pair={pair}
+            direction={direction ?? "long"}
+            entryMode={entryMode}
+            entryPrice={entryPrice}
+            entryExpireHours={entryExpireHours}
+            onEntryModeChange={setEntryMode}
+            onEntryPriceChange={setEntryPrice}
+            onEntryExpireHoursChange={setEntryExpireHours}
+          />
+        )}
+        {step === 4 && (
           <StepReview
             pair={pairLabel}
             direction={direction!}
             preset={preset}
+            entryMode={entryMode}
+            entryPrice={entryPrice}
+            entryExpireHours={entryExpireHours}
             submitting={submitting}
             onSubmit={handleSubmit}
           />
@@ -258,7 +317,7 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
         >
           <ChevronLeft className="size-4" /> Back
         </Button>
-        {step < 3 ? (
+        {step < 4 ? (
           <Button
             size="lg"
             onClick={() => setStep(step + 1)}
@@ -274,7 +333,7 @@ export function TradeBuilder({ onComplete }: TradeBuilderProps) {
             disabled={submitting}
             className="min-h-[48px] gap-2 px-6"
           >
-            {submitting ? "Saving\u2026" : "Start SmartFlow Trade"} <Zap className="size-4" />
+            {submitting ? "Activating\u2026" : "Activate Trade Plan"} <Zap className="size-4" />
           </Button>
         )}
       </div>

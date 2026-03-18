@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, TrendingDown, Zap, Check, Info, Globe2 } from "lucide-react"
+import { TrendingUp, TrendingDown, Zap, Check, Info, Globe2, Eye } from "lucide-react"
 import type { SmartFlowPreset } from "@fxflow/types"
 import { PRESET_INFO } from "./trade-builder-presets"
 
@@ -11,12 +11,18 @@ export function StepReview({
   pair,
   direction,
   preset,
+  entryMode = "market",
+  entryPrice,
+  entryExpireHours,
   submitting,
   onSubmit,
 }: {
   pair: string
   direction: "long" | "short"
   preset: Exclude<SmartFlowPreset, "custom">
+  entryMode?: "market" | "smart_entry"
+  entryPrice?: string
+  entryExpireHours?: string
   submitting: boolean
   onSubmit: () => void
 }) {
@@ -68,6 +74,27 @@ export function StepReview({
                 <info.icon className="size-4" aria-hidden="true" />
                 <span className="text-sm font-semibold">{info.label}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Entry mode row */}
+          <div className="bg-muted/50 flex items-center gap-2 rounded-xl p-3">
+            <Eye className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+            <div className="text-xs">
+              {entryMode === "market" ? (
+                <span>
+                  <span className="font-medium">Entry:</span>{" "}
+                  <span className="text-foreground/80">Right now at market price</span>
+                </span>
+              ) : (
+                <span>
+                  <span className="font-medium">Entry:</span>{" "}
+                  <span className="text-foreground/80">
+                    Wait for price{entryPrice ? ` → ${entryPrice}` : ""}
+                    {entryExpireHours ? ` (expires in ${entryExpireHours}h)` : ""}
+                  </span>
+                </span>
+              )}
             </div>
           </div>
 

@@ -1062,6 +1062,7 @@ export type AnyDaemonMessage =
   | SmartFlowEntryTriggeredMessage
   | SmartFlowSafetyAlertMessage
   | SmartFlowAiSuggestionMessage
+  | SmartFlowActivityMessage
   | SourcePriorityEventMessage
 
 // ─── TradingView Alerts ────────────────────────────────────────────────────
@@ -3473,6 +3474,11 @@ export interface SourcePriorityEventMessage extends DaemonMessage<SourcePriority
   type: "source_priority_event"
 }
 
+/** WS message: SmartFlow activity event. */
+export interface SmartFlowActivityMessage extends DaemonMessage<SmartFlowActivityEvent> {
+  type: "smart_flow_activity"
+}
+
 // ─── SmartFlow Activity Feed ────────────────────────────────────────────────
 
 /** SmartFlow activity event types for the real-time activity feed. */
@@ -3499,6 +3505,36 @@ export type SmartFlowActivityType =
   | "priority_replaced"
   | "tick_subscribed"
   | "tick_unsubscribed"
+  | "entry_watching"
+  | "entry_progress"
+  | "entry_triggered"
+  | "entry_expired"
+  | "monitoring_update"
+  | "market_status"
+
+/** Structured metadata for rich activity event rendering. */
+export interface SmartFlowActivityContext {
+  /** Current price at time of event. */
+  currentPrice?: number
+  /** Entry price target. */
+  entryPrice?: number
+  /** Distance in pips to entry. */
+  distancePips?: number
+  /** Percentage progress toward target. */
+  progressPercent?: number
+  /** Current profit in pips. */
+  profitPips?: number
+  /** Current profit in account currency. */
+  profitAmount?: number
+  /** Stop loss price. */
+  stopLoss?: number
+  /** Take profit price. */
+  takeProfit?: number
+  /** Strategy/preset name. */
+  strategy?: string
+  /** Summary of all active trades for monitoring updates. */
+  tradeSummaries?: Array<{ instrument: string; direction: string; profitPips: number }>
+}
 
 /** A single activity event in the SmartFlow feed. */
 export interface SmartFlowActivityEvent {
@@ -3511,6 +3547,8 @@ export interface SmartFlowActivityEvent {
   severity: "info" | "success" | "warning" | "error"
   tradeId: string | null
   configId: string | null
+  /** Structured context for rich UI rendering. */
+  context?: SmartFlowActivityContext | null
 }
 
 /** SmartFlow engine health data for the health panel. */

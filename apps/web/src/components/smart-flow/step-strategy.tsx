@@ -87,7 +87,20 @@ export function StepStrategy({
                   )}
                 </div>
                 <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{info.desc}</p>
-                <div className="mt-1.5 flex items-center gap-1 text-[10px]">
+                <ul className="mt-2 space-y-0.5" aria-label={`${info.label} highlights`}>
+                  {info.bullets.map((bullet, i) => (
+                    <li
+                      key={i}
+                      className="text-muted-foreground flex items-start gap-1.5 text-[11px]"
+                    >
+                      <span className="mt-px text-[10px] leading-none" aria-hidden="true">
+                        ›
+                      </span>
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 flex items-center gap-1 text-[10px]">
                   <Clock className="text-muted-foreground size-3" aria-hidden="true" />
                   <span className="text-muted-foreground">Typical hold: {info.holdTime}</span>
                 </div>

@@ -5,6 +5,7 @@ import type {
   SmartFlowConfigData,
   SmartFlowConfigRuntimeStatus,
   SmartFlowActivityEvent,
+  SmartFlowTradeData,
 } from "@fxflow/types"
 import { toast } from "sonner"
 import {
@@ -19,18 +20,20 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Layers } from "lucide-react"
 import { logSmartFlowActivity } from "@/lib/smart-flow-activity"
-import { ConfigCard } from "./config-card"
+import { TradePlanCard } from "./trade-plan-card"
 
 interface ConfigsTabProps {
   configs: SmartFlowConfigData[]
+  activeTrades?: SmartFlowTradeData[]
   onRefresh: () => void
 }
 
-export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
+export function ConfigsTab({ configs, activeTrades: propTrades, onRefresh }: ConfigsTabProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
   const [runtimeMap, setRuntimeMap] = useState<Record<string, SmartFlowConfigRuntimeStatus>>({})
   const [activityMap, setActivityMap] = useState<Record<string, SmartFlowActivityEvent>>({})
+  const [activeTradeMap, setActiveTradeMap] = useState<Record<string, SmartFlowTradeData>>({})
 
   const fetchRuntime = useCallback(async () => {
     try {
@@ -71,10 +74,20 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
     }
   }, [])
 
+  // Build active trade map from props
+  useEffect(() => {
+    if (!propTrades) return
+    const map: Record<string, SmartFlowTradeData> = {}
+    for (const t of propTrades) map[t.configId] = t
+    setActiveTradeMap(map)
+  }, [propTrades])
+
   useEffect(() => {
     void fetchRuntime()
     void fetchActivity()
-    const id = setInterval(fetchRuntime, 10_000)
+    const id = setInterval(() => {
+      void fetchRuntime()
+    }, 10_000)
     return () => clearInterval(id)
   }, [fetchRuntime, fetchActivity])
 
@@ -145,10 +158,10 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
         <div className="bg-primary/10 mx-auto flex size-12 items-center justify-center rounded-full">
           <Layers className="text-primary size-6" />
         </div>
-        <h3 className="text-foreground text-base font-semibold">No configurations yet</h3>
+        <h3 className="text-foreground text-base font-semibold">No trade plans yet</h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Create one from the Trade tab. Configurations save your strategy settings for a currency
-          pair so you can reuse them.
+          Create one from the New Plan tab. Each trade plan tells SmartFlow which currency pair to
+          trade and which strategy to use.
         </p>
       </div>
     )
@@ -162,7 +175,7 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        {configs.length} {configs.length === 1 ? "configuration" : "configurations"}
+        {configs.length} trade {configs.length === 1 ? "plan" : "plans"}
       </p>
 
       {Object.entries(grouped).map(([instrument, items]) => (
@@ -170,11 +183,12 @@ export function ConfigsTab({ configs, onRefresh }: ConfigsTabProps) {
           <h3 className="text-foreground text-sm font-semibold">{instrument.replace("_", "/")}</h3>
           <div className="grid gap-3 md:grid-cols-2">
             {items.map((config) => (
-              <ConfigCard
+              <TradePlanCard
                 key={config.id}
                 config={config}
                 runtime={runtimeMap[config.id] ?? null}
                 latestActivity={activityMap[config.id] ?? null}
+                activeTrade={activeTradeMap[config.id]}
                 toggling={toggling === config.id}
                 onToggle={() => handleToggle(config)}
                 onDelete={() => setDeleteId(config.id)}

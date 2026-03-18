@@ -22,11 +22,13 @@ import { getCurrentSession } from "@fxflow/shared"
 import type {
   SmartFlowTradeData,
   SmartFlowConfigData,
+  SmartFlowEntryCondition,
   SmartFlowManagementEntry,
   SmartFlowPartialCloseEntry,
   SmartFlowPartialCloseRule,
   SmartFlowTradeUpdateData,
   SmartFlowPhase,
+  SmartFlowActivityType,
 } from "@fxflow/types"
 import type { PositionManager } from "../positions/position-manager.js"
 import { emitActivity } from "./activity-feed.js"
@@ -37,6 +39,20 @@ import { emitActivity } from "./activity-feed.js"
 interface TradeSyncerLike {
   modifyTradeSLTP(sourceTradeId: string, stopLoss?: number, takeProfit?: number): Promise<unknown>
   closeTrade(sourceTradeId: string, units?: number, reason?: string): Promise<void>
+}
+
+/** In-memory state tracked per waiting smart entry. */
+interface SmartFlowWaitingEntryState {
+  smartFlowTradeId: string
+  configId: string
+  instrument: string
+  direction: "long" | "short"
+  entryConditions: SmartFlowEntryCondition[]
+  entryPrice: number | null
+  entryExpireHours: number | null
+  createdAt: number // epoch ms
+  /** Epoch ms of last proximity event emission. */
+  lastProximityEmitAt: number
 }
 
 /** In-memory state tracked per active SmartFlow trade. */
@@ -88,6 +104,12 @@ export class ManagementEngine {
 
   /** In-memory state per active SmartFlow trade, keyed by smartFlowTradeId. */
   private readonly states = new Map<string, SmartFlowTradeState>()
+
+  /** In-memory state per waiting smart entry, keyed by smartFlowTradeId. */
+  private readonly waitingEntries = new Map<string, SmartFlowWaitingEntryState>()
+
+  /** Callback when a smart entry condition is met. Set by SmartFlowManager. */
+  onEntryTriggered: ((configId: string, smartFlowTradeId: string) => void) | null = null
 
   /** Cached ATR values per instrument, set by parent SmartFlowManager. */
   private readonly atrMap = new Map<string, number>()
@@ -150,7 +172,29 @@ export class ManagementEngine {
         })
       }
 
-      console.log(`[smart-flow-engine] Loaded ${this.states.size} active trade(s)`)
+      // Also load waiting entries
+      for (const trade of trades) {
+        if (trade.status !== "waiting_entry" || !trade.instrument || !trade.direction) continue
+        const waitingConfig = await getSmartFlowConfig(trade.configId)
+        if (waitingConfig) {
+          this.configCache.set(waitingConfig.id, waitingConfig)
+          this.waitingEntries.set(trade.id, {
+            smartFlowTradeId: trade.id,
+            configId: waitingConfig.id,
+            instrument: waitingConfig.instrument,
+            direction: waitingConfig.direction as "long" | "short",
+            entryConditions: waitingConfig.entryConditions ?? [],
+            entryPrice: waitingConfig.entryPrice ?? null,
+            entryExpireHours: waitingConfig.entryExpireHours ?? null,
+            createdAt: new Date(trade.createdAt).getTime(),
+            lastProximityEmitAt: 0,
+          })
+        }
+      }
+
+      console.log(
+        `[smart-flow-engine] Loaded ${this.states.size} active trade(s), ${this.waitingEntries.size} waiting entr(ies)`,
+      )
     } catch (err) {
       console.error("[smart-flow-engine] Failed to load state from DB:", (err as Error).message)
     }
@@ -183,6 +227,24 @@ export class ManagementEngine {
         openedAt: new Date(trade.createdAt).getTime(),
         currentSL: oandaTrade?.stopLoss ?? null,
         currentTP: oandaTrade?.takeProfit ?? null,
+      })
+    }
+
+    // Also load waiting entries from the cached config
+    for (const trade of trades) {
+      if (trade.status !== "waiting_entry" || !trade.instrument || !trade.direction) continue
+      const config = this.configCache.get(trade.configId)
+      if (!config) continue
+      this.waitingEntries.set(trade.id, {
+        smartFlowTradeId: trade.id,
+        configId: config.id,
+        instrument: config.instrument,
+        direction: config.direction as "long" | "short",
+        entryConditions: config.entryConditions ?? [],
+        entryPrice: config.entryPrice ?? null,
+        entryExpireHours: config.entryExpireHours ?? null,
+        createdAt: new Date(trade.createdAt).getTime(),
+        lastProximityEmitAt: 0,
       })
     }
   }
@@ -220,6 +282,28 @@ export class ManagementEngine {
   /** Remove a trade from tick management (e.g. on close). */
   removeTrade(smartFlowTradeId: string): void {
     this.states.delete(smartFlowTradeId)
+  }
+
+  /** Register a new smart entry for condition evaluation. */
+  addWaitingEntry(trade: SmartFlowTradeData, config: SmartFlowConfigData): void {
+    if (!config.instrument || !config.direction) return
+    this.configCache.set(config.id, config)
+    this.waitingEntries.set(trade.id, {
+      smartFlowTradeId: trade.id,
+      configId: config.id,
+      instrument: config.instrument,
+      direction: config.direction as "long" | "short",
+      entryConditions: config.entryConditions ?? [],
+      entryPrice: config.entryPrice ?? null,
+      entryExpireHours: config.entryExpireHours ?? null,
+      createdAt: new Date(trade.createdAt).getTime(),
+      lastProximityEmitAt: 0,
+    })
+  }
+
+  /** Remove a waiting entry (e.g. on trigger or expiry). */
+  removeWaitingEntry(smartFlowTradeId: string): void {
+    this.waitingEntries.delete(smartFlowTradeId)
   }
 
   /** Update cached config (e.g. when user edits settings). */
@@ -260,6 +344,8 @@ export class ManagementEngine {
    */
   async evaluateTick(instrument: string, bid: number, ask: number): Promise<void> {
     if (!this.tradeSyncer) return
+
+    await this.evaluateWaitingEntries(instrument, bid, ask)
 
     const atr = this.atrMap.get(instrument)
     if (!atr || atr <= 0) return
@@ -684,6 +770,119 @@ export class ManagementEngine {
           (err as Error).message,
         )
       }
+    }
+  }
+
+  // ─── Waiting Entry Evaluation ────────────────────────────────────────────
+
+  /** Evaluate entry conditions for waiting smart entries. */
+  private async evaluateWaitingEntries(
+    instrument: string,
+    bid: number,
+    ask: number,
+  ): Promise<void> {
+    for (const entry of this.waitingEntries.values()) {
+      if (entry.instrument !== instrument) continue
+
+      const config = this.configCache.get(entry.configId)
+      if (!config) continue
+
+      // Check expiry
+      if (entry.entryExpireHours != null && entry.entryExpireHours > 0) {
+        const elapsedHours = (Date.now() - entry.createdAt) / 3_600_000
+        if (elapsedHours >= entry.entryExpireHours) {
+          emitActivity(
+            "trade_closed",
+            `Smart entry expired for ${instrument.replace("_", "/")} — waited ${Math.round(elapsedHours)} hours`,
+            {
+              instrument,
+              severity: "warning",
+              configId: entry.configId,
+              tradeId: entry.smartFlowTradeId,
+            },
+          )
+          void import("@fxflow/db")
+            .then(({ closeSmartFlowTrade }) => closeSmartFlowTrade(entry.smartFlowTradeId))
+            .catch((err) =>
+              console.error("[smart-flow-engine] DB expire error:", (err as Error).message),
+            )
+          this.waitingEntries.delete(entry.smartFlowTradeId)
+          continue
+        }
+      }
+
+      // Buying at ask, selling at bid
+      const currentPrice = entry.direction === "long" ? ask : bid
+
+      // Check price_level condition (primary smart entry condition)
+      if (entry.entryPrice != null && entry.entryPrice > 0) {
+        const pip = getPipSize(instrument)
+        const distancePips = Math.abs(currentPrice - entry.entryPrice) / pip
+
+        // Trigger when within 2 pips
+        if (distancePips <= 2) {
+          this.onEntryTriggered?.(entry.configId, entry.smartFlowTradeId)
+          this.waitingEntries.delete(entry.smartFlowTradeId)
+          continue
+        }
+
+        // Emit proximity updates (max once per 30s) when within 50 pips
+        if (Date.now() - entry.lastProximityEmitAt > 30_000 && distancePips < 50) {
+          entry.lastProximityEmitAt = Date.now()
+          const formattedPair = instrument.replace("_", "/")
+          const decimals = pip < 0.01 ? 5 : 3
+          emitActivity(
+            "entry_watching" as SmartFlowActivityType,
+            `${formattedPair} at ${currentPrice.toFixed(decimals)} — ${distancePips.toFixed(0)} pips from entry target ${entry.entryPrice.toFixed(decimals)}`,
+            {
+              instrument,
+              configId: entry.configId,
+              tradeId: entry.smartFlowTradeId,
+            },
+          )
+        }
+      }
+
+      // Check additional entry conditions from config
+      if (entry.entryConditions.length > 0) {
+        for (const condition of entry.entryConditions) {
+          if (this.evaluateEntryCondition(condition, currentPrice, instrument)) {
+            this.onEntryTriggered?.(entry.configId, entry.smartFlowTradeId)
+            this.waitingEntries.delete(entry.smartFlowTradeId)
+            break
+          }
+        }
+      }
+    }
+  }
+
+  /** Evaluate a single entry condition against the current price. */
+  private evaluateEntryCondition(
+    condition: SmartFlowEntryCondition,
+    currentPrice: number,
+    instrument: string,
+  ): boolean {
+    switch (condition.type) {
+      case "price_level": {
+        const target = condition.value.price as number | undefined
+        const pip = getPipSize(instrument)
+        if (target != null) return Math.abs(currentPrice - target) / pip <= 2
+        return false
+      }
+      case "zone_proximity": {
+        const upper = condition.value.upper as number | undefined
+        const lower = condition.value.lower as number | undefined
+        if (upper != null && lower != null) return currentPrice >= lower && currentPrice <= upper
+        return false
+      }
+      case "rsi_threshold":
+        // RSI not available on tick — skip (would need indicator data)
+        return false
+      case "momentum":
+        // Momentum not available on tick — skip
+        return false
+      default:
+        return false
     }
   }
 

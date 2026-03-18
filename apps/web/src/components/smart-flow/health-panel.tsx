@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react"
 import type { SmartFlowHealthData } from "@fxflow/types"
-import { formatRelativeTime } from "@fxflow/shared"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 
 export function HealthPanel() {
@@ -30,63 +27,43 @@ export function HealthPanel() {
   if (!health) return null
 
   const running = health.engineRunning
-  const budgetPct =
-    health.aiDailyBudget > 0 ? Math.min(100, (health.aiDailySpend / health.aiDailyBudget) * 100) : 0
+  const pairs = health.subscribedInstruments.length
+  const tps = health.ticksPerSecond
+
+  // Build plain English status
+  let statusText: string
+  if (!running) {
+    statusText = "SmartFlow is stopped"
+  } else if (pairs === 0) {
+    statusText = "SmartFlow is running — no trade plans active"
+  } else {
+    const pairNames = health.subscribedInstruments
+      .slice(0, 3)
+      .map((i) => i.replace("_", "/"))
+      .join(", ")
+    const extra = pairs > 3 ? ` +${pairs - 3} more` : ""
+    statusText = `Watching ${pairNames}${extra} — prices updating ${tps}×/sec`
+  }
 
   return (
-    <div className="border-b px-4 py-3 md:px-6">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] sm:grid-cols-4 lg:grid-cols-7">
-        {/* Engine Status */}
-        <div className="flex items-center gap-1.5">
-          <div className={cn("size-2 rounded-full", running ? "bg-green-500" : "bg-red-500")} />
-          <span className="text-muted-foreground">Engine:</span>
-          <span className="text-foreground font-medium">{running ? "Running" : "Stopped"}</span>
-        </div>
-
-        {/* Instruments */}
-        <div className="flex items-center gap-1.5" title={health.subscribedInstruments.join(", ")}>
-          <span className="text-muted-foreground">Instruments:</span>
-          <span className="text-foreground font-medium">{health.subscribedInstruments.length}</span>
-        </div>
-
-        {/* Active Rules */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Rules:</span>
-          <span className="text-foreground font-medium">{health.activeRuleCount}</span>
-        </div>
-
-        {/* Last Action */}
-        <div className="flex items-center gap-1.5 truncate">
-          <span className="text-muted-foreground">Last:</span>
-          <span className="text-foreground truncate font-medium">
-            {health.lastManagementActionAt
-              ? formatRelativeTime(health.lastManagementActionAt)
-              : "--"}
+    <div className="border-b px-4 py-2 md:px-6">
+      <div className="flex items-center gap-2 text-[11px]">
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            running ? "animate-pulse bg-emerald-500" : "bg-red-500",
+          )}
+        />
+        <span className="text-muted-foreground">{statusText}</span>
+        {health.upSince && running && (
+          <span className="text-muted-foreground/50 ml-auto">
+            Up since{" "}
+            {new Date(health.upSince).toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </span>
-        </div>
-
-        {/* Tick Rate */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Ticks:</span>
-          <span className="text-foreground font-medium">{health.ticksPerSecond}</span>
-        </div>
-
-        {/* AI Budget */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">AI:</span>
-          <Progress value={budgetPct} className="h-1.5 w-16" />
-          <span className="text-foreground font-mono text-[10px]">
-            ${health.aiDailySpend.toFixed(2)}
-          </span>
-        </div>
-
-        {/* Priority */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Priority:</span>
-          <Badge variant="outline" className="px-1 py-0 text-[10px]">
-            {health.priorityMode}
-          </Badge>
-        </div>
+        )}
       </div>
     </div>
   )

@@ -18,6 +18,7 @@ apps/
       components/       # React components organized by domain
         ui/             # Shared UI primitives (shadcn/ui, custom)
         ai/             # AI analysis UI
+        smart-flow/     # SmartFlow automated trading UI
         trade-finder/   # Trade finder UI
         tv-alerts/      # TradingView alerts UI
       hooks/            # Custom React hooks (use-*.ts)
@@ -27,6 +28,7 @@ apps/
     src/
       oanda/            # OANDA API client, streaming, account management
       ai/               # AI analysis pipeline (context, executor, monitor)
+      smart-flow/       # SmartFlow management engine, trade lifecycle, activity feed
       trade-finder/     # Scanner, setup detection, auto-trade
       tv-alerts/        # Signal processor, webhook handling
   desktop/              # Electron macOS app — wraps web + daemon for end users

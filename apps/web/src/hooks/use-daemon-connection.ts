@@ -416,6 +416,9 @@ export function useDaemonConnection(): DaemonConnectionState {
             case "price_alert_triggered":
               setLastPriceAlertTriggered(msg.data)
               break
+            case "smart_flow_activity":
+              window.dispatchEvent(new CustomEvent("smart-flow-activity", { detail: msg.data }))
+              break
             case "smart_flow_status":
               setLastSmartFlowStatus(msg.data)
               window.dispatchEvent(new CustomEvent("smart-flow-status", { detail: msg.data }))

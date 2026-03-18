@@ -28,7 +28,7 @@ import {
   getSmartFlowConfigs,
 } from "@fxflow/db"
 import { computeATR, getPipSize } from "@fxflow/shared"
-import { emitActivity } from "./activity-feed.js"
+import { emitActivity, setActivityBroadcast } from "./activity-feed.js"
 import type { StateManager } from "../state-manager.js"
 import { getRestUrl } from "../oanda/api-client.js"
 import { CandleCache, fetchOandaCandles } from "../trade-finder/candle-cache.js"
@@ -58,6 +58,9 @@ interface SourcePriorityManagerRef {
 interface ManagementEngineRef {
   evaluateTick(instrument: string, bid: number, ask: number): void
   loadActiveTrades(trades: SmartFlowTradeData[]): void
+  addWaitingEntry(trade: SmartFlowTradeData, config: SmartFlowConfigData): void
+  removeWaitingEntry(smartFlowTradeId: string): void
+  onEntryTriggered: ((configId: string, smartFlowTradeId: string) => void) | null
 }
 
 const ATR_TTL = 5 * 60 * 1000
@@ -80,10 +83,18 @@ export class SmartFlowManager {
   private lastTickAt: number | null = null
   private tickCount = 0
   private tickWindowStart = Date.now()
+  private monitoringInterval: ReturnType<typeof setInterval> | null = null
 
   constructor(stateManager: StateManager, broadcast: (msg: AnyDaemonMessage) => void) {
     this.stateManager = stateManager
     this.broadcast = broadcast
+    setActivityBroadcast((type, data) => {
+      this.broadcast({
+        type,
+        timestamp: new Date().toISOString(),
+        data,
+      } as unknown as AnyDaemonMessage)
+    })
   }
 
   setTradeSyncer(syncer: TradeSyncerRef): void {
@@ -112,18 +123,55 @@ export class SmartFlowManager {
     for (const t of activeTrades) if (t.instrument) this.activeInstruments.add(t.instrument)
     if (this.engine && activeTrades.length > 0) this.engine.loadActiveTrades(activeTrades)
 
+    // Load waiting entries into the engine
+    if (this.engine) {
+      for (const t of activeTrades) {
+        if (t.status === "waiting_entry" && t.instrument && t.configId) {
+          const config = await getSmartFlowConfig(t.configId)
+          if (config) this.engine.addWaitingEntry(t, config)
+        }
+      }
+    }
+
+    // Wire the smart entry trigger callback
+    if (this.engine) {
+      this.engine.onEntryTriggered = (configId: string, smartFlowTradeId: string) => {
+        void this.handleSmartEntryTriggered(configId, smartFlowTradeId)
+      }
+    }
+
     if (this.stateManager.getCredentials()) {
       await Promise.allSettled([...this.activeInstruments].map((i) => this.calculateAtr(i)))
     }
     console.log(
       `[smart-flow] Started: ${activeTrades.length} trades, ${this.activeInstruments.size} instruments`,
     )
-    emitActivity("engine_started", "SmartFlow engine started", {
-      detail: `${activeTrades.length} active trades recovered`,
-    })
+
+    const configCount = await countActiveConfigs()
+    const instrumentList = [...this.activeInstruments].map((i) => i.replace("_", "/")).join(", ")
+    emitActivity(
+      "engine_started",
+      this.activeInstruments.size > 0
+        ? `SmartFlow is running — watching ${instrumentList}`
+        : configCount > 0
+          ? `SmartFlow is running — ${configCount} trade plan${configCount > 1 ? "s" : ""} ready`
+          : "SmartFlow is running — create a trade plan to get started",
+      {
+        detail:
+          activeTrades.length > 0
+            ? `${activeTrades.length} active trade${activeTrades.length > 1 ? "s" : ""} recovered`
+            : undefined,
+      },
+    )
+
+    this.startMonitoringUpdates()
   }
 
   stop(): void {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval)
+      this.monitoringInterval = null
+    }
     this.atrCache.clear()
     this.activeInstruments.clear()
     console.log("[smart-flow] Stopped")
@@ -231,6 +279,7 @@ export class SmartFlowManager {
       currentPhase: "entry",
     })
     this.activeInstruments.add(config.instrument)
+    if (this.engine) this.engine.addWaitingEntry(trade, config)
     this.emitUpdate(trade, "created", "Smart entry — waiting for conditions")
     emitActivity(
       "entry_placed",
@@ -350,6 +399,33 @@ export class SmartFlowManager {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  private async handleSmartEntryTriggered(
+    configId: string,
+    smartFlowTradeId: string,
+  ): Promise<void> {
+    console.log(`[smart-flow] Smart entry triggered for config ${configId}`)
+    emitActivity("entry_placed", `Entry conditions met — placing order now`, {
+      configId,
+      tradeId: smartFlowTradeId,
+      severity: "success",
+    })
+    const result = await this.placeMarketEntry(configId)
+    if (result.success) {
+      void closeSmartFlowTrade(smartFlowTradeId).catch((err) =>
+        console.error(
+          "[smart-flow] Failed to close waiting_entry trade after trigger:",
+          (err as Error).message,
+        ),
+      )
+    } else {
+      emitActivity("entry_blocked", `Smart entry failed: ${result.error ?? "unknown error"}`, {
+        configId,
+        tradeId: smartFlowTradeId,
+        severity: "error",
+      })
+    }
+  }
 
   async calculateAtr(instrument: string, timeframe = ATR_TF): Promise<number | null> {
     const key = `${instrument}:${timeframe}`
@@ -477,6 +553,42 @@ export class SmartFlowManager {
         nextAiCheck: null,
       }
     })
+  }
+
+  private startMonitoringUpdates(): void {
+    if (this.monitoringInterval) clearInterval(this.monitoringInterval)
+    this.monitoringInterval = setInterval(
+      () => {
+        void this.emitMonitoringSummary()
+      },
+      5 * 60 * 1000,
+    ) // every 5 minutes
+  }
+
+  private async emitMonitoringSummary(): Promise<void> {
+    if (!this.enabled) return
+    const trades = await getActiveSmartFlowTrades()
+    const activeTrades = trades.filter((t) => t.status !== "waiting_entry" && t.status !== "closed")
+    const waitingTrades = trades.filter((t) => t.status === "waiting_entry")
+
+    if (activeTrades.length === 0 && waitingTrades.length === 0) return
+
+    const parts: string[] = []
+    if (activeTrades.length > 0) {
+      parts.push(`${activeTrades.length} active trade${activeTrades.length > 1 ? "s" : ""}`)
+    }
+    if (waitingTrades.length > 0) {
+      parts.push(`${waitingTrades.length} watching for entry`)
+    }
+
+    emitActivity("monitoring_update", `SmartFlow update: ${parts.join(", ")}`, {
+      detail: `Watching ${this.activeInstruments.size} currency pairs — prices updating ${this.getTickRate()}/sec`,
+    })
+  }
+
+  private getTickRate(): number {
+    if (this.tickCount === 0) return 0
+    return Math.round(this.tickCount / Math.max(1, (Date.now() - this.tickWindowStart) / 1000))
   }
 
   private unlock(instrument: string): void {

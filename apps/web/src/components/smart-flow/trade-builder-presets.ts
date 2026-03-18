@@ -11,6 +11,7 @@ export const PRESET_INFO: Record<
     riskColor: string
     icon: typeof Zap
     holdTime: string
+    bullets: string[]
     protections: string[]
     howItWorks: string[]
   }
@@ -22,6 +23,12 @@ export const PRESET_INFO: Record<
     riskColor: "text-amber-500",
     icon: Zap,
     holdTime: "~8 hours",
+    bullets: [
+      "Set a safety exit below your entry",
+      "Move safety to break-even quickly",
+      "Close if nothing happens in ~8 hours",
+      "Protect during news events",
+    ],
     protections: [
       "Breakeven protection after initial move",
       "Session-aware stop management",
@@ -43,6 +50,13 @@ export const PRESET_INFO: Record<
     riskColor: "text-emerald-500",
     icon: ShieldCheck,
     holdTime: "2-3 days",
+    bullets: [
+      "Set a safety exit at a comfortable distance",
+      "Move to break-even when profitable",
+      "Take half your profit partway through",
+      "Trail your safety exit to lock in gains",
+      "Close after 3 days if needed",
+    ],
     protections: [
       "Breakeven protection after first move",
       "Partial profit at halfway point",
@@ -64,6 +78,12 @@ export const PRESET_INFO: Record<
     riskColor: "text-amber-500",
     icon: TrendingUp,
     holdTime: "1-2 weeks",
+    bullets: [
+      "Give the trade room to breathe",
+      "Move to break-even at 1× ATR profit",
+      "Take partial profits at two levels",
+      "Trail your safety exit for big moves",
+    ],
     protections: [
       "Wide stops for breathing room",
       "Graduated exit strategy (33% at two levels)",
@@ -85,6 +105,13 @@ export const PRESET_INFO: Record<
     riskColor: "text-amber-500",
     icon: Rocket,
     holdTime: "Up to 30 days",
+    bullets: [
+      "Follow the trend with no fixed target",
+      "Move to break-even after 1× ATR profit",
+      "Take small profits at 3 levels",
+      "Trail closely to ride the trend",
+      "Hold up to 30 days",
+    ],
     protections: [
       "Dynamic trailing stop follows the trend",
       "Volatility-adaptive thresholds",
@@ -106,6 +133,12 @@ export const PRESET_INFO: Record<
     riskColor: "text-red-500",
     icon: RotateCcw,
     holdTime: "Varies",
+    bullets: [
+      "⚠️ Adds to losing positions",
+      "Up to 3 levels of averaging down",
+      "Small profit targets to exit quickly",
+      "Higher risk — can multiply losses",
+    ],
     protections: [
       "Averaged entry levels (max 3 additions)",
       "Quick take-profit from averaged position",

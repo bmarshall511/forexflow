@@ -5,8 +5,9 @@
     { "id": "trading", "label": "Trading", "icon": "TrendingUp", "order": 3 },
     { "id": "analytics", "label": "Analytics & Risk", "icon": "BarChart3", "order": 4 },
     { "id": "automation", "label": "Automation", "icon": "Zap", "order": 5 },
-    { "id": "ai-trader", "label": "AI Trader Deep Dive", "icon": "Brain", "order": 6 },
-    { "id": "settings", "label": "Settings", "icon": "Settings", "order": 7 },
-    { "id": "reference", "label": "Reference", "icon": "BookOpen", "order": 8 }
+    { "id": "smart-flow", "label": "SmartFlow", "icon": "Zap", "order": 6 },
+    { "id": "ai-trader", "label": "AI Trader Deep Dive", "icon": "Brain", "order": 7 },
+    { "id": "settings", "label": "Settings", "icon": "Settings", "order": 8 },
+    { "id": "reference", "label": "Reference", "icon": "BookOpen", "order": 9 }
   ]
 }

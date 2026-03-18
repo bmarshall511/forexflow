@@ -25,11 +25,11 @@ All WebSocket message types are defined in `packages/types` as `DaemonMessageTyp
 { type: DaemonMessageType; payload: <type-specific data> }
 ```
 
-Categories: price ticks, position updates, account snapshots, signal events, AI analysis events, trade finder events (setup updates, auto-trade events, cap utilization), notifications.
+Categories: price ticks, position updates, account snapshots, signal events, AI analysis events, trade finder events (setup updates, auto-trade events, cap utilization), SmartFlow events (`smart_flow_activity`, `smart_flow_trade_update`, `smart_flow_status`), notifications.
 
 ### Connect-Time Snapshots
 
-On WebSocket client connect, the daemon sends initial state snapshots so the UI has data immediately without waiting for the next broadcast cycle. This includes `tv_alerts_status` (signal count, config status) alongside existing position and account snapshots.
+On WebSocket client connect, the daemon sends initial state snapshots so the UI has data immediately without waiting for the next broadcast cycle. This includes `tv_alerts_status` (signal count, config status) and `smart_flow_status` (enabled state, active config count, open trade count) alongside existing position and account snapshots.
 
 ## Adding a New WebSocket Event
 
@@ -71,4 +71,6 @@ REST polling (5s interval) supplements WebSocket when WS is unavailable, keeping
 - **Trade events**: Daemon → `position_update` → TradeContext → tables re-render
 - **Signals**: CF Worker → Daemon WS → SignalProcessor → `signal_update` broadcast → TV Alerts UI
 - **AI analysis**: Daemon → `ai_analysis_update` / `ai_analysis_completed` → AI sheet
+- **SmartFlow activity**: Daemon `activity-feed.ts` → `smart_flow_activity` broadcast → `ActivityTab` dispatches `window.dispatchEvent("smart-flow-activity")` → real-time event log
+- **SmartFlow trade updates**: Daemon → `smart_flow_trade_update` → SmartFlow dashboard
 - **Notifications**: Daemon → `notification` → NotificationContext → toast + bell badge

@@ -34,6 +34,7 @@ Here's a quick look at FXFlow's main features:
 | ---------------------- | --------------------------------------------------------------------------- |
 | **Dashboard**          | See all your trades, account balance, and profit/loss at a glance           |
 | **Charts**             | View live currency price charts and place trades directly                   |
+| **SmartFlow**          | Create trade plans and let SmartFlow handle entry, protection, and exit     |
 | **TradingView Alerts** | Receive trading signals from TradingView and act on them automatically      |
 | **Trade Finder**       | Scans the market for trading opportunities so you don't have to             |
 | **AI Analysis**        | Ask AI to analyze any trade and explain what's happening in plain language  |

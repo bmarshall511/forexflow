@@ -8,12 +8,24 @@
  * @module activity-feed
  */
 
-import type { SmartFlowActivityEvent, SmartFlowActivityType } from "@fxflow/types"
+import type {
+  SmartFlowActivityEvent,
+  SmartFlowActivityType,
+  SmartFlowActivityContext,
+} from "@fxflow/types"
 import { createActivityLog, getActivityLogs, clearActivityLogs } from "@fxflow/db"
 
 const MAX_CACHED = 100
 let cache: SmartFlowActivityEvent[] = []
 let initialized = false
+
+type BroadcastFn = (type: string, data: unknown) => void
+let broadcastFn: BroadcastFn | null = null
+
+/** Set the broadcast function for WebSocket delivery. */
+export function setActivityBroadcast(fn: BroadcastFn): void {
+  broadcastFn = fn
+}
 
 /** Load recent activity from DB into memory cache. Call once on daemon startup. */
 export async function initActivityFeed(): Promise<void> {
@@ -40,6 +52,7 @@ export function emitActivity(
     severity?: "info" | "success" | "warning" | "error"
     tradeId?: string
     configId?: string
+    context?: SmartFlowActivityContext
   },
 ): SmartFlowActivityEvent {
   const event: SmartFlowActivityEvent = {
@@ -52,7 +65,11 @@ export function emitActivity(
     severity: opts?.severity ?? "info",
     tradeId: opts?.tradeId ?? null,
     configId: opts?.configId ?? null,
+    context: opts?.context ?? null,
   }
+
+  // Broadcast via WebSocket for real-time UI updates
+  broadcastFn?.("smart_flow_activity", event)
 
   // Append to in-memory cache
   cache.push(event)

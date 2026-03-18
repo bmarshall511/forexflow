@@ -14,7 +14,7 @@ import {
   Layers,
   TrendingUp,
   DollarSign,
-  Clock,
+  Percent,
   ListChecks,
   ScrollText,
   Shield,
@@ -26,11 +26,13 @@ import { ActiveTradesTab } from "./active-trades-tab"
 import { ConfigsTab } from "./configs-tab"
 import { ActivityTab } from "./activity-tab"
 import { HealthPanel } from "./health-panel"
+import { SmartFlowOnboarding } from "./smart-flow-onboarding"
+import { HistoryTab } from "./history-tab"
 
 type Tab = "trade" | "active" | "configs" | "activity" | "history" | "rankings"
 
 export function SmartFlowDashboard() {
-  const [tab, setTab] = useState<Tab>("trade")
+  const [tab, setTab] = useState<Tab>("configs")
   const [activityCount, setActivityCount] = useState(0)
   const { configs, activeTrades, closedTrades, isLoading, refetch } = useSmartFlow()
   const handleEventCount = useCallback((count: number) => setActivityCount(count), [])
@@ -51,25 +53,39 @@ export function SmartFlowDashboard() {
   }
 
   const activeConfigCount = configs.filter((c) => c.isActive).length
-  const todayPL = 0 // Will be derived from WS status data later
-  const avgHrs =
-    closedTrades.length > 0
-      ? closedTrades.reduce((sum, t) => sum + (t.estimatedHours ?? 0), 0) / closedTrades.length
-      : 0
-  const fmtHrs = (h: number) => (h < 1 ? `${Math.round(h * 60)}m` : `${h.toFixed(1)}h`)
+  const hasConfigs = configs.length > 0
+
+  // Calculate today's P&L from closed trades
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const todayTrades = closedTrades.filter((t) => t.closedAt && new Date(t.closedAt) >= todayStart)
+  const todayPL = todayTrades.reduce((sum, _t) => {
+    // TODO: wire actual P&L from linked Trade records
+    return sum
+  }, 0)
+
+  // Calculate success rate from closed trades
+  const recentTrades = closedTrades.slice(0, 30)
+  const wins = recentTrades.filter((t) => t.safetyNetTriggered == null).length
+  const successRate = recentTrades.length > 0 ? Math.round((wins / recentTrades.length) * 100) : 0
+
+  const activeSummary =
+    activeTrades.length > 0
+      ? `${activeTrades.filter((t) => t.status === "waiting_entry").length} watching, ${activeTrades.filter((t) => t.status !== "waiting_entry").length} trading`
+      : undefined
 
   return (
     <div className="min-h-screen">
       <PageHeader
         title="SmartFlow"
-        subtitle="Smart, managed trades that work toward profit"
+        subtitle="Your automated trading assistant — set up a plan and SmartFlow handles the rest"
         icon={Zap}
         bordered
         actions={
           <>
             <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setTab("trade")}>
               <Plus className="size-3.5" />
-              <span className="hidden sm:inline">New Trade</span>
+              <span className="hidden sm:inline">New Plan</span>
             </Button>
             <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" asChild>
               <Link href="/settings/smart-flow">
@@ -82,27 +98,34 @@ export function SmartFlowDashboard() {
       >
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <DataTile
-            label="Active Configs"
+            label="Trade Plans"
             value={String(activeConfigCount)}
+            subtitle={activeSummary}
             icon={<Layers className="size-3" />}
             variant={activeConfigCount > 0 ? "accent" : "muted"}
           />
           <DataTile
-            label="Open Trades"
-            value={String(activeTrades.length)}
+            label="Live Trades"
+            value={String(activeTrades.filter((t) => t.status !== "waiting_entry").length)}
             icon={<TrendingUp className="size-3" />}
             variant={activeTrades.length > 0 ? "accent" : "default"}
           />
           <DataTile
             label="Today's P&L"
-            value={`$${todayPL.toFixed(2)}`}
+            value={todayPL === 0 ? "--" : `$${todayPL.toFixed(2)}`}
+            subtitle={
+              todayTrades.length > 0
+                ? `${todayTrades.length} trade${todayTrades.length > 1 ? "s" : ""} today`
+                : undefined
+            }
             icon={<DollarSign className="size-3" />}
             variant={todayPL > 0 ? "positive" : todayPL < 0 ? "negative" : "default"}
           />
           <DataTile
-            label="Avg Completion"
-            value={closedTrades.length > 0 ? fmtHrs(avgHrs) : "--"}
-            icon={<Clock className="size-3" />}
+            label="Success Rate"
+            value={recentTrades.length > 0 ? `${successRate}%` : "--"}
+            subtitle={recentTrades.length > 0 ? `Last ${recentTrades.length} trades` : undefined}
+            icon={<Percent className="size-3" />}
           />
         </div>
       </PageHeader>
@@ -111,8 +134,8 @@ export function SmartFlowDashboard() {
         <TabNavButton
           active={tab === "trade"}
           onClick={() => setTab("trade")}
-          icon={<Zap className="size-3.5" />}
-          label="Trade"
+          icon={<Plus className="size-3.5" />}
+          label="New Plan"
           count={0}
         />
         <TabNavButton
@@ -127,7 +150,7 @@ export function SmartFlowDashboard() {
           active={tab === "configs"}
           onClick={() => setTab("configs")}
           icon={<Layers className="size-3.5" />}
-          label="Configurations"
+          label="Trade Plans"
           count={configs.length}
         />
         <TabNavButton
@@ -157,7 +180,9 @@ export function SmartFlowDashboard() {
       <HealthPanel />
 
       <div className="space-y-4 px-4 py-6 md:px-6">
-        {tab === "trade" ? (
+        {!hasConfigs && tab === "configs" ? (
+          <SmartFlowOnboarding onCreatePlan={() => setTab("trade")} />
+        ) : tab === "trade" ? (
           <TradeBuilder
             onComplete={() => {
               refetch()
@@ -167,9 +192,11 @@ export function SmartFlowDashboard() {
         ) : tab === "active" ? (
           <ActiveTradesTab trades={activeTrades} />
         ) : tab === "configs" ? (
-          <ConfigsTab configs={configs} onRefresh={refetch} />
+          <ConfigsTab configs={configs} activeTrades={activeTrades} onRefresh={refetch} />
         ) : tab === "activity" ? (
           <ActivityTab activeConfigCount={activeConfigCount} onEventCount={handleEventCount} />
+        ) : tab === "history" ? (
+          <HistoryTab trades={closedTrades} />
         ) : (
           <TabPlaceholder tab={tab} />
         )}
@@ -181,9 +208,9 @@ export function SmartFlowDashboard() {
 function TabPlaceholder({ tab }: { tab: Tab }) {
   const msgs: Record<string, string> = {
     history:
-      "Closed SmartFlow trades will appear here with full details — profit/loss, how long they took, which safety nets fired, and how accurate the time estimate was.",
+      "Closed SmartFlow trades will appear here with full details — profit/loss, duration, which protections fired, and the complete management timeline.",
     rankings:
-      "Currency pair safety rankings will be displayed here, showing which pairs are easiest to trade right now based on volatility, spread, trend clarity, and your past performance.",
+      "Currency pair rankings will show which pairs are easiest to trade right now based on volatility, spread, trend clarity, and your past performance.",
   }
   return (
     <div className="text-muted-foreground py-12 text-center text-sm leading-relaxed">

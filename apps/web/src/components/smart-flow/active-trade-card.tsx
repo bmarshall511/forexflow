@@ -7,6 +7,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { DirectionBadge } from "@/components/positions/direction-badge"
 import { TradeTimeline } from "./trade-timeline"
 import { ChevronDown, X } from "lucide-react"
@@ -126,15 +137,36 @@ export function ActiveTradeCard({ trade, onCancel }: ActiveTradeCardProps) {
 
       {onCancel && (
         <CardFooter className="border-t pt-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive h-7 gap-1.5 text-xs"
-            onClick={() => onCancel(trade.id)}
-          >
-            <X className="size-3" />
-            Cancel
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive h-7 gap-1 text-[11px]"
+              >
+                <X className="size-3" />
+                Cancel Trade
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel this trade?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will close your {instrument} trade immediately. Any unrealized profit or loss
+                  will be locked in.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep Trading</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onCancel(trade.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Yes, Cancel Trade
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardFooter>
       )}
     </Card>
