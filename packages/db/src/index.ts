@@ -241,6 +241,7 @@ export {
   pruneSetupHistory,
   findExistingSetup,
   countPendingAutoPlaced,
+  countTodayAutoPlaced,
   getPendingAutoPlacedSetups,
   getAutoPlacedTotalRiskPips,
   findSetupByResultSourceId,

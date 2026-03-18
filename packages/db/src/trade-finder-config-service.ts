@@ -56,6 +56,7 @@ export async function getTradeFinderConfig(): Promise<TradeFinderConfigData> {
     autoTradeEnabled: config.autoTradeEnabled,
     autoTradeMinScore: config.autoTradeMinScore,
     autoTradeMaxConcurrent: config.autoTradeMaxConcurrent,
+    autoTradeMaxDaily: config.autoTradeMaxDaily,
     autoTradeMaxRiskPercent: config.autoTradeMaxRiskPercent,
     autoTradeMinRR: config.autoTradeMinRR,
     autoTradeCancelOnInvalidation: config.autoTradeCancelOnInvalidation,
@@ -73,6 +74,7 @@ type UpdatableConfigFields = Pick<
   | "autoTradeEnabled"
   | "autoTradeMinScore"
   | "autoTradeMaxConcurrent"
+  | "autoTradeMaxDaily"
   | "autoTradeMaxRiskPercent"
   | "autoTradeMinRR"
   | "autoTradeCancelOnInvalidation"
@@ -99,6 +101,7 @@ export async function updateTradeFinderConfig(
   if (data.autoTradeMinScore !== undefined) updateData.autoTradeMinScore = data.autoTradeMinScore
   if (data.autoTradeMaxConcurrent !== undefined)
     updateData.autoTradeMaxConcurrent = data.autoTradeMaxConcurrent
+  if (data.autoTradeMaxDaily !== undefined) updateData.autoTradeMaxDaily = data.autoTradeMaxDaily
   if (data.autoTradeMaxRiskPercent !== undefined)
     updateData.autoTradeMaxRiskPercent = data.autoTradeMaxRiskPercent
   if (data.autoTradeMinRR !== undefined) updateData.autoTradeMinRR = data.autoTradeMinRR

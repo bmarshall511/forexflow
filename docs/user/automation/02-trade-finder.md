@@ -70,7 +70,9 @@ You can also run Trade Finder in manual mode, where it shows you the setups but 
 Auto-trading without limits is dangerous, so Trade Finder has several safety settings:
 
 - **Max concurrent orders** — how many pending orders can exist at once
+- **Max daily auto-trades** — how many auto-trades can be placed per day (0 = unlimited)
 - **Max risk per trade** — maximum percentage of your account to risk on each setup
+- **Max total risk %** — stop auto-trading if total risk across all auto-orders exceeds this % of your balance
 - **Minimum R:R** — minimum reward-to-risk ratio (e.g., 2:1 means the potential profit must be at least twice the potential loss)
 
 > [!WARNING]

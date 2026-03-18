@@ -355,6 +355,18 @@ export async function findSetupByResultSourceId(
   return row ? toSetupData(row) : null
 }
 
+/** Count auto-placed setups placed today (UTC day) for daily cap enforcement */
+export async function countTodayAutoPlaced(): Promise<number> {
+  const startOfDay = new Date()
+  startOfDay.setUTCHours(0, 0, 0, 0)
+  return db.tradeFinderSetup.count({
+    where: {
+      autoPlaced: true,
+      placedAt: { gte: startOfDay },
+    },
+  })
+}
+
 /** Get all "placed" auto-placed setups (for fill/cancel detection during validation) */
 export async function getPlacedAutoSetups(): Promise<TradeFinderSetupData[]> {
   const rows = await db.tradeFinderSetup.findMany({

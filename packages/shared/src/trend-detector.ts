@@ -73,7 +73,7 @@ export function detectTrend(
 
   // Step 1: Compute ATR for noise filtering
   const atrValues = computeATR(candles, 14)
-  const _currentAtr = atrValues[atrValues.length - 1] ?? 0
+  const currentAtr = atrValues[atrValues.length - 1] ?? 0
 
   // Step 2: Detect raw swing points
   const rawSwings = detectSwingPoints(candles, strength)
@@ -98,7 +98,13 @@ export function detectTrend(
   const segments = buildSegments(swings, instrument)
 
   // Step 6: Identify trend direction and status (right-to-left scan)
-  const { direction, status, controllingSwing } = identifyTrend(swings, currentPrice)
+  // Use 25% of ATR as termination buffer to prevent noise wicks from triggering false terminations
+  const terminationBuffer = currentAtr * 0.25
+  const { direction, status, controllingSwing } = identifyTrend(
+    swings,
+    currentPrice,
+    terminationBuffer,
+  )
 
   // Step 7: Label swing points based on trend context
   labelSwingPoints(swings, direction)
@@ -303,8 +309,14 @@ interface TrendIdentification {
  *   where LH < H and LL < L
  *
  * Then checks if the trend has been terminated (price crossed controlling swing).
+ * Termination requires breaching beyond a buffer (25% of ATR) to prevent
+ * noise wicks from triggering false terminations.
  */
-function identifyTrend(swings: SwingPoint[], currentPrice: number): TrendIdentification {
+function identifyTrend(
+  swings: SwingPoint[],
+  currentPrice: number,
+  terminationBuffer = 0,
+): TrendIdentification {
   // We need at least 4 swing points to identify a trend
   if (swings.length < 4) {
     return { direction: null, status: "forming", controllingSwing: null }
@@ -329,11 +341,11 @@ function identifyTrend(swings: SwingPoint[], currentPrice: number): TrendIdentif
   }
 
   // Check for uptrend: Higher Lows + Higher Highs
-  const uptrendResult = checkUptrend(recentLows, recentHighs, currentPrice)
+  const uptrendResult = checkUptrend(recentLows, recentHighs, currentPrice, terminationBuffer)
   if (uptrendResult) return uptrendResult
 
   // Check for downtrend: Lower Highs + Lower Lows
-  const downtrendResult = checkDowntrend(recentLows, recentHighs, currentPrice)
+  const downtrendResult = checkDowntrend(recentLows, recentHighs, currentPrice, terminationBuffer)
   if (downtrendResult) return downtrendResult
 
   // No clear trend
@@ -344,6 +356,7 @@ function checkUptrend(
   lows: SwingPoint[],
   highs: SwingPoint[],
   currentPrice: number,
+  terminationBuffer: number,
 ): TrendIdentification | null {
   if (lows.length < 2 || highs.length < 2) return null
 
@@ -363,8 +376,8 @@ function checkUptrend(
   // Controlling swing is the most recent higher low
   const controllingSwing = lastLow
 
-  // Check for termination: price has crossed below the controlling swing low
-  if (currentPrice < controllingSwing.price) {
+  // Termination: price must breach beyond controlling swing + buffer to filter noise wicks
+  if (currentPrice < controllingSwing.price - terminationBuffer) {
     return { direction: "up", status: "terminated", controllingSwing }
   }
 
@@ -375,6 +388,7 @@ function checkDowntrend(
   lows: SwingPoint[],
   highs: SwingPoint[],
   currentPrice: number,
+  terminationBuffer: number,
 ): TrendIdentification | null {
   if (lows.length < 2 || highs.length < 2) return null
 
@@ -394,8 +408,8 @@ function checkDowntrend(
   // Controlling swing is the most recent lower high
   const controllingSwing = lastHigh
 
-  // Check for termination: price has crossed above the controlling swing high
-  if (currentPrice > controllingSwing.price) {
+  // Termination: price must breach beyond controlling swing + buffer to filter noise wicks
+  if (currentPrice > controllingSwing.price + terminationBuffer) {
     return { direction: "down", status: "terminated", controllingSwing }
   }
 

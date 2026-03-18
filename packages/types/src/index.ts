@@ -2353,6 +2353,8 @@ export interface TradeFinderConfigData {
   autoTradeMinScore: number
   /** Max pending auto-placed orders at once */
   autoTradeMaxConcurrent: number
+  /** Max auto-trades placed per day (0 = unlimited) */
+  autoTradeMaxDaily: number
   /** Max total risk % across all auto-placed pending orders */
   autoTradeMaxRiskPercent: number
   /** Minimum risk:reward ratio for auto-trade (e.g. 2 = 2:1) */

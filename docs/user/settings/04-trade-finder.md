@@ -65,6 +65,12 @@ The maximum number of auto-placed orders that can be open at the same time. Defa
 
 If the limit is reached, additional eligible setups are queued by priority (score, then distance to entry). When a slot opens (order fills, cancels, or zone invalidates), the top queued setup is placed automatically.
 
+### Max Daily Auto-Trades
+
+The maximum number of auto-trades that can be placed in a single day. Default is **5**. Set to **0** for unlimited.
+
+This prevents runaway placement during volatile sessions where many zones form and trigger simultaneously.
+
 ### Max Total Risk %
 
 The maximum percentage of your account that all auto-trades combined can put at risk. Default is **6%**.

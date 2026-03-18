@@ -33,6 +33,7 @@ import {
   findExistingSetup,
   pruneSetupHistory,
   countPendingAutoPlaced,
+  countTodayAutoPlaced,
   getAutoPlacedTotalRiskPips,
   findSetupByResultSourceId,
   getPlacedAutoSetups,
@@ -343,11 +344,18 @@ export class TradeFinderScanner {
       )
       if (extendedScores.total < config.minScore) continue
 
+      // Compute entry with spread buffer (shorts fill at ask, longs fill at bid)
+      const entryBuffer = spread * 0.5
+      const entryPrice =
+        zone.type === "demand"
+          ? zone.proximalLine - entryBuffer // Longs: enter slightly below proximal (bid side)
+          : zone.proximalLine + entryBuffer // Shorts: enter slightly above proximal (ask side)
+
       // Compute SL/TP
       const slBuffer = atr * 0.02 + spread
       const stopLoss =
         zone.type === "demand" ? zone.distalLine - slBuffer : zone.distalLine + slBuffer
-      const riskPips = Math.abs(zone.proximalLine - stopLoss) / pipSize
+      const riskPips = Math.abs(entryPrice - stopLoss) / pipSize
 
       // Find TP: opposing fresh zone (meeting min R:R) or min-R:R fallback
       const opposingType = zone.type === "demand" ? "supply" : "demand"
@@ -368,7 +376,7 @@ export class TradeFinderScanner {
       for (const oz of freshOpposing) {
         const candidateTP =
           zone.type === "demand" ? oz.proximalLine - spread : oz.proximalLine + spread
-        const candidateReward = Math.abs(candidateTP - zone.proximalLine) / pipSize
+        const candidateReward = Math.abs(candidateTP - entryPrice) / pipSize
         if (candidateReward / riskPips >= minRRMultiplier) {
           takeProfit = candidateTP
           break
@@ -377,14 +385,14 @@ export class TradeFinderScanner {
 
       if (takeProfit === null) {
         // Fallback: place TP at min R:R distance
-        const riskDistance = Math.abs(zone.proximalLine - stopLoss)
+        const riskDistance = Math.abs(entryPrice - stopLoss)
         takeProfit =
           zone.type === "demand"
-            ? zone.proximalLine + riskDistance * minRRMultiplier
-            : zone.proximalLine - riskDistance * minRRMultiplier
+            ? entryPrice + riskDistance * minRRMultiplier
+            : entryPrice - riskDistance * minRRMultiplier
       }
 
-      const rewardPips = Math.abs(takeProfit - zone.proximalLine) / pipSize
+      const rewardPips = Math.abs(takeProfit - entryPrice) / pipSize
       const rrRatio = riskPips > 0 ? (rewardPips / riskPips).toFixed(1) + ":1" : "0:1"
 
       // Position sizing: risk% of balance / risk in account currency
@@ -404,13 +412,13 @@ export class TradeFinderScanner {
         continue
       }
 
-      const distanceToEntry = Math.abs(currentPrice - zone.proximalLine) / pipSize
+      const distanceToEntry = Math.abs(currentPrice - entryPrice) / pipSize
 
       const setupInput: CreateSetupInput = {
         instrument,
         direction,
         timeframeSet: pair.timeframeSet,
-        entryPrice: zone.proximalLine,
+        entryPrice,
         stopLoss,
         takeProfit,
         riskPips,
@@ -491,6 +499,18 @@ export class TradeFinderScanner {
       return
     }
 
+    // 3b. Daily cap check
+    if (config.autoTradeMaxDaily > 0) {
+      const todayCount = await countTodayAutoPlaced()
+      if (todayCount >= config.autoTradeMaxDaily) {
+        await this.skipAutoTrade(
+          setup,
+          `Daily auto-trade limit reached (${todayCount}/${config.autoTradeMaxDaily})`,
+        )
+        return
+      }
+    }
+
     // 4. Max total risk % check
     const snapshot = this.stateManager.getSnapshot()
     const balance = snapshot.accountOverview?.summary.balance ?? 0
@@ -501,7 +521,7 @@ export class TradeFinderScanner {
         const ps = getPipSize(entry.instrument)
         totalRiskDollars += entry.positionSize * entry.riskPips * ps
       }
-      // Add this setup's risk
+      // Add this setup's risk (use fresh position size for accurate cap check)
       const thisRiskDollars = setup.positionSize * setup.riskPips * getPipSize(setup.instrument)
       totalRiskDollars += thisRiskDollars
       const totalRiskPercent = (totalRiskDollars / balance) * 100
@@ -514,7 +534,25 @@ export class TradeFinderScanner {
       }
     }
 
-    // All checks passed — place the order (with single retry for transient errors)
+    // All checks passed — recalculate position size with fresh balance before placing
+    const freshBalance = snapshot.accountOverview?.summary.balance ?? 0
+    const riskPercent = config.riskPercent
+    const pipSize = getPipSize(setup.instrument)
+    const freshPositionSize =
+      freshBalance > 0 && setup.riskPips > 0
+        ? this.calculatePositionSize(
+            freshBalance,
+            riskPercent,
+            setup.riskPips,
+            pipSize,
+            setup.instrument,
+          )
+        : setup.positionSize
+    if (freshPositionSize <= 0) {
+      await this.skipAutoTrade(setup, "Position size is 0 after recalculation with current balance")
+      return
+    }
+
     try {
       const tfMap = TIMEFRAME_SET_MAP[setup.timeframeSet]
       const ltfTimeframe = (tfMap?.ltf ?? null) as Timeframe | null
@@ -523,7 +561,7 @@ export class TradeFinderScanner {
         instrument: setup.instrument,
         direction: setup.direction,
         orderType: "LIMIT" as const,
-        units: setup.positionSize,
+        units: freshPositionSize,
         entryPrice: setup.entryPrice,
         stopLoss: setup.stopLoss,
         takeProfit: setup.takeProfit,
@@ -564,11 +602,19 @@ export class TradeFinderScanner {
           entryPrice: setup.entryPrice,
           stopLoss: setup.stopLoss,
           takeProfit: setup.takeProfit,
-          positionSize: setup.positionSize,
+          positionSize: freshPositionSize,
           score: setup.scores.total,
           sourceId: result.sourceId,
         },
       })
+
+      // Persist fresh position size to setup record
+      await updateSetupScores(
+        setup.id,
+        setup.scores,
+        setup.distanceToEntryPips,
+        freshPositionSize,
+      ).catch(() => {})
 
       this.pushAutoTradeEvent({
         type: "placed",
