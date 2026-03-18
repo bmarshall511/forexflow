@@ -2,8 +2,14 @@
 
 import { useEffect, useRef, useMemo } from "react"
 import { useTheme } from "next-themes"
-import { createChart, CandlestickSeries } from "lightweight-charts"
-import type { IChartApi, ISeriesApi, CandlestickData, Time } from "lightweight-charts"
+import { createChart, CandlestickSeries, createSeriesMarkers } from "lightweight-charts"
+import type {
+  IChartApi,
+  ISeriesApi,
+  ISeriesMarkersPluginApi,
+  CandlestickData,
+  Time,
+} from "lightweight-charts"
 import { getDecimalPlaces } from "@fxflow/shared"
 import type { TradeFinderSetupData, TrendVisualSettings } from "@fxflow/types"
 import { getChartOptions, getCandlestickOptions } from "@/components/charts/chart-utils"
@@ -11,7 +17,13 @@ import { ZonePrimitive } from "@/components/charts/zone-primitive"
 import { CurvePrimitive } from "@/components/charts/curve-primitive"
 import { TrendPrimitive } from "@/components/charts/trend-primitive"
 import type { ReplayCandle, ReplayTradeInfo } from "@/app/api/trades/[tradeId]/replay-candles/route"
-import { createOverlayLines, updateOverlayLines, type OverlayLines } from "./replay-overlay-lines"
+import {
+  createOverlayLines,
+  updateOverlayLines,
+  getReplayMarkers,
+  type OverlayLines,
+} from "./replay-overlay-lines"
+import type { OverlayVisibility } from "./replay-overlay-legend"
 
 const REPLAY_TREND_VISUALS: TrendVisualSettings = {
   showBoxes: false,
@@ -28,6 +40,12 @@ interface TradeReplayProps {
   currentIndex: number
   /** Trade Finder setup snapshot (zones, trend, curve) */
   tfSetup?: TradeFinderSetupData | null
+  /** Controls which overlay lines are rendered */
+  overlayVisibility?: OverlayVisibility
+  /**
+   * Fixed pixel height. Pass 0 to have the component fill its flex container
+   * (the container must have a defined height from the parent).
+   */
   height?: number
 }
 
@@ -36,12 +54,14 @@ export function TradeReplay({
   tradeInfo,
   currentIndex,
   tfSetup,
+  overlayVisibility,
   height = 320,
 }: TradeReplayProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
   const overlayRef = useRef<OverlayLines | null>(null)
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const zonePrimRef = useRef<ZonePrimitive | null>(null)
   const curvePrimRef = useRef<CurvePrimitive | null>(null)
   const trendPrimRef = useRef<TrendPrimitive | null>(null)
@@ -71,13 +91,16 @@ export function TradeReplay({
     [candles, exitTime],
   )
 
-  // Create chart once
+  // Create chart once — recreate when theme/decimals/height change
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
+    // When height === 0, use the container's flex-driven height
+    const chartHeight = height === 0 ? container.offsetHeight || 400 : height
+
     const chart = createChart(container, {
-      ...getChartOptions(isDark, height),
+      ...getChartOptions(isDark, chartHeight),
       width: container.clientWidth,
       handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
       handleScale: { mouseWheel: true, pinch: true },
@@ -105,7 +128,10 @@ export function TradeReplay({
     trendPrimRef.current = trendPrim
 
     const observer = new ResizeObserver(() => {
-      if (container) chart.applyOptions({ width: container.clientWidth })
+      if (!container) return
+      const w = container.clientWidth
+      const h = height === 0 ? container.offsetHeight : height
+      chart.applyOptions({ width: w, height: h || undefined })
     })
     observer.observe(container)
 
@@ -115,6 +141,7 @@ export function TradeReplay({
       chartRef.current = null
       seriesRef.current = null
       overlayRef.current = null
+      markersRef.current = null
       zonePrimRef.current = null
       curvePrimRef.current = null
       trendPrimRef.current = null
@@ -122,15 +149,36 @@ export function TradeReplay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrument, isDark, height, decimals, minMove])
 
-  // Update visible candles when currentIndex changes (progressive reveal)
+  // Update visible candles + overlay lines + markers when playback position changes
   useEffect(() => {
     const series = seriesRef.current
     const overlay = overlayRef.current
     if (!series || !overlay || candles.length === 0) return
 
     series.setData(candles.slice(0, currentIndex + 1) as CandlestickData<Time>[])
-    updateOverlayLines(overlay, candles, tradeInfo, currentIndex, entryCandleIdx, exitCandleIdx)
-  }, [candles, currentIndex, tradeInfo, entryCandleIdx, exitCandleIdx])
+    updateOverlayLines(
+      overlay,
+      candles,
+      tradeInfo,
+      currentIndex,
+      entryCandleIdx,
+      exitCandleIdx,
+      overlayVisibility,
+    )
+
+    const markers = getReplayMarkers(
+      candles,
+      tradeInfo,
+      currentIndex,
+      entryCandleIdx,
+      exitCandleIdx,
+    )
+    if (markersRef.current) {
+      markersRef.current.setMarkers(markers)
+    } else if (markers.length > 0) {
+      markersRef.current = createSeriesMarkers(series, markers)
+    }
+  }, [candles, currentIndex, tradeInfo, entryCandleIdx, exitCandleIdx, overlayVisibility])
 
   // Sync Trade Finder zone/trend/curve overlays
   useEffect(() => {
@@ -160,5 +208,11 @@ export function TradeReplay({
     }
   }, [tfSetup, isDark])
 
-  return <div ref={containerRef} className="h-full w-full" style={{ height }} />
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      style={height !== 0 ? { height } : undefined}
+    />
+  )
 }

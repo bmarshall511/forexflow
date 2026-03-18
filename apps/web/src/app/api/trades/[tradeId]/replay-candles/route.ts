@@ -53,6 +53,13 @@ export interface ReplayTradeInfo {
   closeReason: string | null
   instrument: string
   timeframe: string
+  // Additional context fields
+  realizedPL: number
+  units: number
+  mfe: number | null
+  mae: number | null
+  financing: number
+  source: string
 }
 
 export interface ReplayResponse {
@@ -141,6 +148,12 @@ export async function GET(
       closeReason: detail.closeReason,
       instrument: detail.instrument,
       timeframe,
+      realizedPL: detail.realizedPL,
+      units: detail.initialUnits,
+      mfe: detail.mfe ?? null,
+      mae: detail.mae ?? null,
+      financing: detail.financing ?? 0,
+      source: detail.source,
     }
 
     return NextResponse.json(

@@ -1,6 +1,8 @@
 import { LineSeries, LineStyle } from "lightweight-charts"
 import type { IChartApi, ISeriesApi, Time } from "lightweight-charts"
+import type { SeriesMarker } from "lightweight-charts"
 import type { ReplayCandle, ReplayTradeInfo } from "@/app/api/trades/[tradeId]/replay-candles/route"
+import type { OverlayVisibility } from "./replay-overlay-legend"
 
 /** Shared options for all overlay line series (no markers, no price line) */
 function baseLineOptions(color: string, style: number) {
@@ -44,7 +46,7 @@ export function createOverlayLines(chart: IChartApi, tradeInfo: ReplayTradeInfo)
   return { entry, sl, tp, exit }
 }
 
-/** Update overlay line data based on current playback index */
+/** Update overlay line data based on current playback index, respecting visibility toggles */
 export function updateOverlayLines(
   lines: OverlayLines,
   candles: ReplayCandle[],
@@ -52,13 +54,21 @@ export function updateOverlayLines(
   currentIndex: number,
   entryCandleIdx: number,
   exitCandleIdx: number,
+  visibility?: OverlayVisibility,
 ): void {
-  const slice = (fromIdx: number) => candles.slice(fromIdx, currentIndex + 1)
+  const vis: OverlayVisibility = visibility ?? {
+    entry: true,
+    stopLoss: true,
+    takeProfit: true,
+    exit: true,
+    zones: true,
+  }
 
+  const slice = (fromIdx: number) => candles.slice(fromIdx, currentIndex + 1)
   const entryVisible = entryCandleIdx >= 0 && currentIndex >= entryCandleIdx
 
   // Entry line
-  if (entryVisible) {
+  if (entryVisible && vis.entry) {
     lines.entry.setData(
       slice(entryCandleIdx).map((c) => ({ time: c.time as Time, value: tradeInfo.entryPrice })),
     )
@@ -67,7 +77,7 @@ export function updateOverlayLines(
   }
 
   // SL line
-  if (lines.sl && tradeInfo.stopLoss !== null && entryVisible) {
+  if (lines.sl && tradeInfo.stopLoss !== null && entryVisible && vis.stopLoss) {
     lines.sl.setData(
       slice(entryCandleIdx).map((c) => ({ time: c.time as Time, value: tradeInfo.stopLoss! })),
     )
@@ -76,7 +86,7 @@ export function updateOverlayLines(
   }
 
   // TP line
-  if (lines.tp && tradeInfo.takeProfit !== null && entryVisible) {
+  if (lines.tp && tradeInfo.takeProfit !== null && entryVisible && vis.takeProfit) {
     lines.tp.setData(
       slice(entryCandleIdx).map((c) => ({ time: c.time as Time, value: tradeInfo.takeProfit! })),
     )
@@ -89,7 +99,8 @@ export function updateOverlayLines(
     lines.exit &&
     tradeInfo.exitPrice !== null &&
     exitCandleIdx >= 0 &&
-    currentIndex >= exitCandleIdx
+    currentIndex >= exitCandleIdx &&
+    vis.exit
   ) {
     lines.exit.setData(
       slice(exitCandleIdx).map((c) => ({ time: c.time as Time, value: tradeInfo.exitPrice! })),
@@ -97,4 +108,49 @@ export function updateOverlayLines(
   } else if (lines.exit) {
     lines.exit.setData([])
   }
+}
+
+/**
+ * Build entry/exit arrow markers to set on the candlestick series.
+ * Returns markers sorted by time (required by lightweight-charts).
+ */
+export function getReplayMarkers(
+  candles: ReplayCandle[],
+  tradeInfo: ReplayTradeInfo,
+  currentIndex: number,
+  entryCandleIdx: number,
+  exitCandleIdx: number,
+): SeriesMarker<Time>[] {
+  const markers: SeriesMarker<Time>[] = []
+  const isLong = tradeInfo.direction === "long"
+
+  // Entry arrow
+  if (entryCandleIdx >= 0 && currentIndex >= entryCandleIdx) {
+    const candle = candles[entryCandleIdx]
+    if (candle) {
+      markers.push({
+        time: candle.time as Time,
+        position: isLong ? "belowBar" : "aboveBar",
+        color: "#f59e0b",
+        shape: isLong ? "arrowUp" : "arrowDown",
+        text: `${isLong ? "BUY" : "SELL"} @ ${tradeInfo.entryPrice}`,
+      })
+    }
+  }
+
+  // Exit arrow
+  if (exitCandleIdx >= 0 && currentIndex >= exitCandleIdx && tradeInfo.exitPrice !== null) {
+    const candle = candles[exitCandleIdx]
+    if (candle) {
+      markers.push({
+        time: candle.time as Time,
+        position: isLong ? "aboveBar" : "belowBar",
+        color: "#a855f7",
+        shape: isLong ? "arrowDown" : "arrowUp",
+        text: `EXIT @ ${tradeInfo.exitPrice}`,
+      })
+    }
+  }
+
+  return markers
 }
