@@ -1235,6 +1235,26 @@ export async function startServer(port: number, deps: ServerDeps) {
       )
     }
 
+    // Send SmartFlow status so dashboard has config state immediately
+    if (_smartFlowManager) {
+      _smartFlowManager
+        .getStatus()
+        .then((status) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: "smart_flow_status",
+                timestamp: new Date().toISOString(),
+                data: status,
+              }),
+            )
+          }
+        })
+        .catch(() => {
+          /* non-critical */
+        })
+    }
+
     ws.on("close", () => {
       connectedClients.delete(ws)
       console.log(`[ws] Client disconnected (${connectedClients.size} total)`)
