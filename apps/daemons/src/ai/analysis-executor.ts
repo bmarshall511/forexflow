@@ -174,21 +174,34 @@ const STAGES: ProgressStage[] = [
 // ─── In-progress tracking ─────────────────────────────────────────────────────
 
 const activeControllers = new Map<string, AbortController>()
+const activeStreams = new Map<string, { abort: () => void }>()
 
-export function cancelActiveAnalysis(analysisId: string): void {
+function abortAnalysis(analysisId: string): void {
   const controller = activeControllers.get(analysisId)
   if (controller) {
     controller.abort()
     activeControllers.delete(analysisId)
   }
+  const stream = activeStreams.get(analysisId)
+  if (stream) {
+    try {
+      stream.abort()
+    } catch {
+      // stream may already be closed — safe to ignore
+    }
+    activeStreams.delete(analysisId)
+  }
+}
+
+export function cancelActiveAnalysis(analysisId: string): void {
+  abortAnalysis(analysisId)
 }
 
 /** Cancel every in-flight analysis and return the count aborted. */
 export function cancelAllActiveAnalyses(): number {
   const count = activeControllers.size
-  for (const [id, controller] of activeControllers) {
-    controller.abort()
-    activeControllers.delete(id)
+  for (const id of [...activeControllers.keys()]) {
+    abortAnalysis(id)
   }
   return count
 }
@@ -394,14 +407,23 @@ export async function executeAnalysis(opts: {
     }
 
     const stream = anthropic.messages.stream(streamOpts)
+    activeStreams.set(analysisId, stream)
 
-    // Set a timeout that aborts the stream if it takes too long
+    // Set a timeout that aborts BOTH the controller AND the stream directly.
+    // The controller.abort() alone isn't sufficient because the `for await` loop
+    // blocks waiting for the next event — if the API hangs and never yields,
+    // the abort signal check inside the loop body never executes.
     const streamTimeout = setTimeout(() => {
       if (!controller.signal.aborted) {
         console.warn(
           `[ai-executor] Analysis ${analysisId} timed out after ${STREAM_TIMEOUT_MS / 1000}s`,
         )
         controller.abort()
+        try {
+          stream.abort() // Break the stream iterator directly
+        } catch {
+          // stream.abort() may throw if already closed — safe to ignore
+        }
       }
     }, STREAM_TIMEOUT_MS)
 
@@ -936,7 +958,12 @@ export async function executeAnalysis(opts: {
     const errorMessage = (err as Error).message
     console.error(`[ai-executor] Analysis ${analysisId} failed:`, errorMessage)
 
-    await updateAnalysisStatus(analysisId, "failed", errorMessage)
+    // Wrap in try-catch so the broadcast ALWAYS fires, even if DB update fails
+    try {
+      await updateAnalysisStatus(analysisId, "failed", errorMessage)
+    } catch (dbErr) {
+      console.error("[ai-executor] Failed to update analysis status:", (dbErr as Error).message)
+    }
 
     broadcast({
       type: "ai_analysis_completed",
@@ -967,6 +994,7 @@ export async function executeAnalysis(opts: {
     }
   } finally {
     activeControllers.delete(analysisId)
+    activeStreams.delete(analysisId)
   }
 }
 
