@@ -43,6 +43,7 @@ import { useTradeFinderSetup } from "@/hooks/use-trade-finder-setup"
 import { useTags } from "@/hooks/use-tags"
 import { ChartOverlayToggles } from "./chart-overlay-toggles"
 import type { OverlayVisibility } from "./chart-overlay-toggles"
+import { useTradeDetailTrend } from "@/hooks/use-trade-detail-trend"
 import { SetupAnalysisSection } from "./setup-analysis-section"
 import { DurationDisplay } from "./duration-display"
 import { cn } from "@/lib/utils"
@@ -211,10 +212,21 @@ export function TradeDetailDrawer({
     [],
   )
 
-  // The setup's trend was computed on the MTF timeframe (e.g., Daily for "weekly" set).
-  // Pass it as higherTfTrendData since the chart displays LTF candles (e.g., H1).
-  // This renders at 40% opacity behind primary content, matching the charts page pattern.
-  const setupHigherTfTrendData = overlayVis.showTrend ? (tfSetup?.trendData ?? null) : null
+  // Compute a fresh trend on the chart's active timeframe so swing points align
+  // with the loaded candle data (unlike the setup's MTF trend which was computed
+  // on a different timeframe and doesn't render correctly on the LTF chart).
+  const trendPrice = trade
+    ? trade._type === "open" && trade.currentPrice != null
+      ? trade.currentPrice
+      : trade.entryPrice
+    : null
+  const freshTrendData = useTradeDetailTrend(
+    trade?.instrument ?? null,
+    tradeTimeframe,
+    trendPrice,
+    isTradeFinderTrade && overlayVis.showTrend,
+  )
+
   const setupCurveData = overlayVis.showCurve ? (tfSetup?.curveData ?? null) : null
   const setupZonePrice = trade
     ? trade._type === "open" && trade.currentPrice != null
@@ -361,7 +373,7 @@ export function TradeDetailDrawer({
                   zones={setupZones}
                   zoneCurrentPrice={setupZonePrice}
                   curveData={setupCurveData}
-                  higherTfTrendData={setupHigherTfTrendData}
+                  trendData={freshTrendData}
                   trendVisuals={setupTrendVisuals}
                 />
               ) : (
@@ -380,7 +392,7 @@ export function TradeDetailDrawer({
                   zones={setupZones}
                   zoneCurrentPrice={setupZonePrice}
                   curveData={setupCurveData}
-                  higherTfTrendData={setupHigherTfTrendData}
+                  trendData={freshTrendData}
                   trendVisuals={setupTrendVisuals}
                   height={260}
                 />
