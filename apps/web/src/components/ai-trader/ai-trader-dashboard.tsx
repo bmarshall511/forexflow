@@ -62,14 +62,6 @@ export function AiTraderDashboard() {
     setActionInFlight(false)
   }
   prevScanningRef.current = !!isScanning
-  const scannerLabel = !status?.enabled
-    ? isPaused
-      ? "Paused"
-      : "Off"
-    : isScanning
-      ? "Scanning"
-      : "Idle"
-
   const onScanNow = async () => {
     setActionInFlight(true)
     setTab("activity")
@@ -166,15 +158,7 @@ export function AiTraderDashboard() {
       >
         <ScannerStatusBar status={status} progress={progress} />
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <DataTile
-            label="Scanner"
-            value={scannerLabel}
-            icon={<Bot className="size-3" />}
-            variant={
-              isScanning ? "accent" : isPaused ? "muted" : status?.enabled ? "positive" : "muted"
-            }
-          />
+        <div className="mt-4 grid grid-cols-3 gap-3">
           <DataTile
             label="Open AI Trades"
             value={String(status?.openAiTradeCount ?? 0)}
