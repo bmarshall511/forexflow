@@ -48,10 +48,12 @@ Anything between these two thresholds is shown to you for a manual decision (in 
 
 ## Budget Caps
 
-These limits protect your account from runaway trading:
+These limits cap how much you spend on AI API calls (not trade size):
 
-- **Daily USD cap** — the maximum dollar amount AI Trader can put into new trades per day
-- **Monthly USD cap** — the maximum for the entire month
+- **Daily USD cap** — the maximum AI analysis cost per day
+- **Monthly USD cap** — the maximum AI analysis cost for the entire month
+
+All AI costs are tracked, including Tier 2 calls that reject candidates. The dashboard shows today's and this month's AI spend in real time.
 
 > [!TIP]
 > Set these conservatively at first. You can always increase them later once you see how the AI performs.

@@ -116,11 +116,24 @@ const PROFILE_CONFIGS: Record<AiTraderProfile, ProfileConfig> = {
   },
 }
 
+// ─── Filter Diagnostics ─────────────────────────────────────────────────────
+
+export interface Tier1FilterStats {
+  lowVolatility: number
+  noReasons: number
+  lowConfluence: number
+  spreadTooWide: number
+  rrTooLow: number
+  htfPenalized: number
+  secondaryRsiPenalized: number
+  passed: number
+}
+
 // ─── Tier 1 Analysis ─────────────────────────────────────────────────────────
 
 /**
  * Run Tier 1 (free, local) technical analysis on candle data for an instrument.
- * Returns an array of potential signals ranked by confluence score.
+ * Returns an array of potential signals ranked by confluence score, plus filter diagnostics.
  */
 export function analyzeTier1(
   instrument: string,
@@ -129,6 +142,7 @@ export function analyzeTier1(
   htfCandles: ZoneCandle[],
   profile: AiTraderProfile,
   enabledTechniques: Record<AiTraderTechnique, boolean>,
+  filterStats?: Tier1FilterStats,
 ): Tier1Signal[] {
   if (primaryCandles.length < 30) return []
 
@@ -155,7 +169,10 @@ export function analyzeTier1(
   const sessionScoreVal = getSessionScore(instrument, session.session)
 
   // ─── Regime gate: reject low-volatility markets ──────────────────
-  if (regime.regime === "low_volatility") return []
+  if (regime.regime === "low_volatility") {
+    if (filterStats) filterStats.lowVolatility++
+    return []
+  }
 
   // ─── Multi-timeframe analysis ────────────────────────────────────
   const secCandles = secondaryCandles.map(toCandle)
@@ -343,19 +360,28 @@ export function analyzeTier1(
   for (const direction of ["long", "short"] as const) {
     const reasons = direction === "long" ? longReasons : shortReasons
     const techs = direction === "long" ? longTechs : shortTechs
-    if (reasons.length < 2) continue
+    if (reasons.length < 1) {
+      if (filterStats) filterStats.noReasons++
+      continue
+    }
 
-    // ─── HTF trend filter: skip if higher timeframe disagrees ──────
+    // ─── Confidence penalty: HTF trend disagrees (soft gate) ─────
+    let htfPenalty = 0
     if (htfTrendBullish !== null) {
-      if (direction === "long" && !htfTrendBullish) continue
-      if (direction === "short" && htfTrendBullish) continue
+      if (direction === "long" && !htfTrendBullish) htfPenalty = 15
+      if (direction === "short" && htfTrendBullish) htfPenalty = 15
     }
+    if (htfPenalty > 0 && filterStats) filterStats.htfPenalized++
 
-    // ─── Secondary TF filter: skip if already overextended ─────────
+    // ─── Confidence penalty: secondary TF overextended (soft gate) ─
+    let secondaryRsiPenalty = 0
     if (secondaryRsi !== null) {
-      if (direction === "long" && secondaryRsi > 65) continue
-      if (direction === "short" && secondaryRsi < 35) continue
+      if (direction === "long" && secondaryRsi > 70) secondaryRsiPenalty = 15
+      else if (direction === "long" && secondaryRsi > 60) secondaryRsiPenalty = 8
+      if (direction === "short" && secondaryRsi < 30) secondaryRsiPenalty = 15
+      else if (direction === "short" && secondaryRsi < 40) secondaryRsiPenalty = 8
     }
+    if (secondaryRsiPenalty > 0 && filterStats) filterStats.secondaryRsiPenalized++
 
     const confluenceInput: ConfluenceInput = {
       smcBias: direction === "long" ? (smcBias ?? null) : smcBias !== null ? 100 - smcBias : null,
@@ -375,7 +401,12 @@ export function analyzeTier1(
     }
 
     const result = computeConfluenceScore(confluenceInput, direction)
-    if (result.score < 30) continue
+    // Apply penalties as score reduction instead of hard filtering
+    const adjustedScore = Math.max(0, result.score - htfPenalty - secondaryRsiPenalty)
+    if (adjustedScore < 25) {
+      if (filterStats) filterStats.lowConfluence++
+      continue
+    }
 
     const atrVal = atr ?? pipSize * 20
     // Widen SL in volatile regimes to avoid noise-triggered stops
@@ -396,20 +427,28 @@ export function analyzeTier1(
 
     // ─── Spread-aware R:R: reject if spread eats too much risk ─────
     const spreadPips = getTypicalSpread(instrument)
-    if (spreadPips > riskPips * 0.2) continue // Spread > 20% of risk
+    if (spreadPips > riskPips * 0.3) {
+      if (filterStats) filterStats.spreadTooWide++
+      continue // Spread > 30% of risk
+    }
     const effectiveRisk = riskPips + spreadPips
     const effectiveReward = rewardPips - spreadPips
     const rr = effectiveRisk > 0 ? effectiveReward / effectiveRisk : 0
-    if (rr < profileConfig.minRR) continue
+    if (rr < profileConfig.minRR) {
+      if (filterStats) filterStats.rrTooLow++
+      continue
+    }
 
     const sorted = [...techs].sort((a, b) => b.str - a.str)
     const primaryTechnique = sorted[0]?.tech ?? "smc_structure"
+
+    if (filterStats) filterStats.passed++
 
     signals.push({
       instrument,
       direction,
       profile,
-      confidence: result.score,
+      confidence: adjustedScore,
       entryPrice,
       suggestedSL: sl,
       suggestedTP: tp,

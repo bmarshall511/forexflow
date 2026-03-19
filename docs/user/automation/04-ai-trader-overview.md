@@ -30,6 +30,8 @@ The AI Trader uses a three-step process to go from "maybe" to "yes" or "no." Eac
 
 The first step runs entirely on your computer with no AI costs. It performs fast technical analysis — checking price patterns, trends, and indicators across all your selected pairs. Most pairs are eliminated here. Only the ones showing real potential move to the next tier.
 
+Tier 1 uses a **soft filter** approach: when higher timeframe trend or secondary momentum disagrees with a signal, it reduces the confidence score rather than eliminating it entirely. This allows strong setups to pass even in mixed conditions, while weak ones are still filtered out. The scan log shows a diagnostic breakdown of why signals were filtered (low volatility, low confluence, spread too wide, etc.) so you can understand what the market looks like.
+
 > Think of this like a metal detector on a beach. It beeps on anything that _might_ be treasure, but most of it is bottle caps.
 
 ### Tier 2: Quick AI Filter (Cheap)
@@ -84,6 +86,7 @@ Like all automation in FXFlow, the AI Trader has safety limits:
 - **Daily loss limit** — stops trading if total losses exceed your threshold
 - **Currency pair whitelist** — only scans pairs you have approved
 - **Monthly AI budget** — caps how much money is spent on AI analysis
+- **Consecutive loss cooldown** — after 2+ consecutive AI Trader losses, scanning pauses for 30 minutes to prevent loss-chasing. This cooldown only counts losses from AI Trader trades — losses from Trade Finder, TV Alerts, or manual trades do not trigger it.
 
 ## Getting Started
 

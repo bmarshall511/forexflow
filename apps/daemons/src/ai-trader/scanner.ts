@@ -36,7 +36,12 @@ import { DataAggregator } from "./data-aggregator.js"
 import { ExecutionGate } from "./execution-gate.js"
 import { PerformanceTracker } from "./performance-tracker.js"
 import { TradeManager } from "./trade-manager.js"
-import { analyzeTier1, getProfileConfig, type Tier1Signal } from "./strategy-engine.js"
+import {
+  analyzeTier1,
+  getProfileConfig,
+  type Tier1Signal,
+  type Tier1FilterStats,
+} from "./strategy-engine.js"
 import { buildTier2Prompt, buildTier3Prompt, type Tier3Context } from "./prompt-builder.js"
 
 const MAX_SCAN_LOG_ENTRIES = 100
@@ -297,9 +302,13 @@ export class AiTraderScanner {
   }
 
   async onTradeClosed(tradeId: string, realizedPL: number): Promise<void> {
+    // Check BEFORE tradeManager processes (which deletes from managed set)
+    const isAi = this.isAiTrade(tradeId)
     await this.tradeManager.onTradeClosed(tradeId, realizedPL)
 
-    // Track consecutive losses for cool-down
+    // Only track consecutive losses for AI Trader trades (not Trade Finder, TV Alerts, etc.)
+    if (!isAi) return
+
     if (realizedPL < 0) {
       this.consecutiveLosses++
       if (this.consecutiveLosses >= 2) {
@@ -307,7 +316,7 @@ export class AiTraderScanner {
         this.cooldownUntil = Date.now() + COOLDOWN_MS
         this.addLogEntry(
           "scan_skip",
-          `Cooldown activated: ${this.consecutiveLosses} consecutive losses — pausing for 30 minutes`,
+          `Cooldown activated: ${this.consecutiveLosses} consecutive AI Trader losses — pausing for 30 minutes`,
         )
       }
     } else if (realizedPL > 0) {
@@ -501,6 +510,16 @@ export class AiTraderScanner {
       )
 
       const allSignals: Tier1Signal[] = []
+      const filterStats: Tier1FilterStats = {
+        lowVolatility: 0,
+        noReasons: 0,
+        lowConfluence: 0,
+        spreadTooWide: 0,
+        rrTooLow: 0,
+        htfPenalized: 0,
+        secondaryRsiPenalized: 0,
+        passed: 0,
+      }
 
       // Get current session for profile filtering
       const { getCurrentSession } = await import("@fxflow/shared")
@@ -549,6 +568,7 @@ export class AiTraderScanner {
               htfCandles,
               profile,
               config.enabledTechniques as Record<AiTraderTechnique, boolean>,
+              filterStats,
             )
 
             if (signals.length > 0) {
@@ -596,10 +616,24 @@ export class AiTraderScanner {
         await sleep(200)
       }
 
+      // Build filter diagnostic summary
+      const filterParts: string[] = []
+      if (filterStats.lowVolatility > 0) filterParts.push(`${filterStats.lowVolatility} low-vol`)
+      if (filterStats.noReasons > 0) filterParts.push(`${filterStats.noReasons} no-signal`)
+      if (filterStats.lowConfluence > 0)
+        filterParts.push(`${filterStats.lowConfluence} low-confluence`)
+      if (filterStats.spreadTooWide > 0) filterParts.push(`${filterStats.spreadTooWide} spread`)
+      if (filterStats.rrTooLow > 0) filterParts.push(`${filterStats.rrTooLow} low-R:R`)
+      if (filterStats.htfPenalized > 0)
+        filterParts.push(`${filterStats.htfPenalized} HTF-penalized`)
+      if (filterStats.secondaryRsiPenalized > 0)
+        filterParts.push(`${filterStats.secondaryRsiPenalized} RSI-penalized`)
+      const filterSummary = filterParts.length > 0 ? ` [filters: ${filterParts.join(", ")}]` : ""
+
       this.addLogEntry(
         "pair_scanned",
-        `Scanned ${pairs.length} pairs, found ${allSignals.length} Tier 1 signals`,
-        undefined,
+        `Scanned ${pairs.length} pairs, found ${allSignals.length} Tier 1 signals${filterSummary}`,
+        filterParts.length > 0 ? `Filter breakdown: ${filterParts.join(", ")}` : undefined,
         {
           pairsScanned: pairs.length,
           candidatesFound: allSignals.length,
@@ -779,6 +813,42 @@ export class AiTraderScanner {
 
     this.costTracker.invalidateCache()
 
+    // Helper to persist tier2 cost on any exit path
+    const recordTier2Only = async (status: "rejected" | "detected") => {
+      const opp = await createOpportunity({
+        instrument: signal.instrument,
+        direction: signal.direction,
+        profile: signal.profile,
+        confidence: signal.confidence,
+        scores: {
+          technical: signal.confidence,
+          fundamental: 0,
+          sentiment: 0,
+          session: 0,
+          historical: 0,
+          confluence: signal.confidence,
+        },
+        entryPrice: signal.entryPrice,
+        stopLoss: signal.suggestedSL,
+        takeProfit: signal.suggestedTP,
+        riskPips: signal.riskPips,
+        rewardPips: signal.rewardPips,
+        riskRewardRatio: signal.riskRewardRatio,
+        positionSize: 0,
+        regime: castRegime(signal.technicalSnapshot.regime),
+        session: castSession(signal.technicalSnapshot.session),
+        primaryTechnique: signal.primaryTechnique,
+        technicalSnapshot: signal.technicalSnapshot,
+      })
+      await updateOpportunityStatus(opp.id, status, {
+        tier2Response: tier2Text,
+        tier2Model,
+        tier2InputTokens,
+        tier2OutputTokens,
+        tier2Cost,
+      })
+    }
+
     let tier2Result: { pass: boolean; confidence: number; reason: string }
     try {
       tier2Result = extractJSON(tier2Text)
@@ -794,6 +864,7 @@ export class AiTraderScanner {
         error: `Could not parse response: ${tier2Text.slice(0, 150)}`,
         tier: 1,
       })
+      await recordTier2Only("rejected")
       return "tier2_fail"
     }
 
@@ -811,6 +882,7 @@ export class AiTraderScanner {
           tier: 2,
         },
       )
+      await recordTier2Only("rejected")
       return "tier2_fail"
     }
 
@@ -856,7 +928,7 @@ export class AiTraderScanner {
           tier: 2,
         },
       )
-      await createOpportunity({
+      const gateOpp = await createOpportunity({
         instrument: signal.instrument,
         direction: signal.direction,
         profile: signal.profile,
@@ -881,6 +953,14 @@ export class AiTraderScanner {
         primaryTechnique: signal.primaryTechnique,
         entryRationale: preTier3.reason ?? undefined,
         technicalSnapshot: signal.technicalSnapshot,
+      })
+      // Record tier2 cost on gate-blocked opportunities
+      await updateOpportunityStatus(gateOpp.id, "rejected", {
+        tier2Response: tier2Text,
+        tier2Model,
+        tier2InputTokens,
+        tier2OutputTokens,
+        tier2Cost,
       })
       return "gate_blocked"
     }

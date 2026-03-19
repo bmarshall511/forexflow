@@ -86,6 +86,10 @@ src/
 ## AI Trader
 
 - **Deterministic position sizing**: position size is calculated in code, NOT by the LLM. Uses `getRiskPercent()` from settings with formula `units = floor(riskAmount / (riskPips * pipSize))`, minimum 1 unit enforced.
+- **Cooldown scoping**: consecutive loss cooldown only counts AI Trader trades (checked via `isAiTrade()` BEFORE `tradeManager.onTradeClosed` deletes from managed set). Trade Finder, TV Alert, and manual trade losses do not trigger cooldown.
+- **Soft Tier 1 filters**: HTF trend disagreement and secondary RSI overextension apply confidence penalties (−8 to −15) instead of hard-gating signals. This lets strong setups through in mixed conditions.
+- **Full cost tracking**: ALL Tier 2 API costs are recorded to the DB (via opportunity records with status `"rejected"`), even when Tier 2 rejects the candidate or gates block pre-Tier-3. This ensures budget tracking and dashboard cost displays are accurate.
+- **Filter diagnostics**: Tier 1 scan results include a breakdown of why signals were filtered (low-vol, no-signal, low-confluence, spread, R:R, HTF-penalized, RSI-penalized) logged to the scan log for observability.
 
 ## Market Hours
 
