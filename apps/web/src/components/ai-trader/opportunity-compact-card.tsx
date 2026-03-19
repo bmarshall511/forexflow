@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp } from "lucide-react"
 import type { AiTraderOpportunityData } from "@fxflow/types"
 import { ConfidenceBar } from "./confidence-bar"
 import { ScoreBreakdown } from "./score-breakdown"
+import { OpportunityDecisionDetail } from "./opportunity-decision-detail"
 
 interface Props {
   opportunity: AiTraderOpportunityData
@@ -116,10 +117,6 @@ export function OpportunityCompactCard({ opportunity: opp }: Props) {
       {/* Expanded details */}
       {expanded && (
         <div className="space-y-3 border-t px-3 pb-3 pt-2">
-          {opp.entryRationale && (
-            <p className="text-muted-foreground text-xs leading-relaxed">{opp.entryRationale}</p>
-          )}
-
           <ConfidenceBar confidence={opp.confidence} />
 
           <div className="grid grid-cols-4 gap-2 text-center">
@@ -148,6 +145,8 @@ export function OpportunityCompactCard({ opportunity: opp }: Props) {
           </div>
 
           {opp.scores && <ScoreBreakdown scores={opp.scores} />}
+
+          <OpportunityDecisionDetail opportunity={opp} />
         </div>
       )}
     </div>
