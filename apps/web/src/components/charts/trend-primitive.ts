@@ -150,6 +150,18 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       )
     }
 
+    // ─── Trend Summary Badge ──────────────────────────────────
+    // When MTF swing points are outside the LTF chart's loaded time range,
+    // show a compact summary badge so the user still sees trend context.
+    if (opacityScale >= 1.0) {
+      const hasVisiblePoints = data.swingPoints.some(
+        (sw) => timeScale.timeToCoordinate(sw.time as unknown as Time) != null,
+      )
+      if (!hasVisiblePoints) {
+        this._drawTrendBadge(ctx, data, trendColor, isDark)
+      }
+    }
+
     ctx.restore()
   }
 
@@ -165,15 +177,20 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
   ): void {
     const opacity = visuals.boxOpacity * opacityScale
 
+    const chartWidth = ctx.canvas.width / (window.devicePixelRatio || 1)
+
     for (const seg of data.segments) {
-      const fromX = timeScale.timeToCoordinate(seg.from.time as unknown as Time)
-      const toX = timeScale.timeToCoordinate(seg.to.time as unknown as Time)
+      // Clamp segment edges to chart boundaries when times are outside loaded range
+      const rawFromX = timeScale.timeToCoordinate(seg.from.time as unknown as Time) as number | null
+      const rawToX = timeScale.timeToCoordinate(seg.to.time as unknown as Time) as number | null
       const topPrice = Math.max(seg.from.price, seg.to.price)
       const bottomPrice = Math.min(seg.from.price, seg.to.price)
       const topY = series.priceToCoordinate(topPrice) as number | null
       const bottomY = series.priceToCoordinate(bottomPrice) as number | null
 
-      if (fromX == null || toX == null || topY == null || bottomY == null) continue
+      if (topY == null || bottomY == null) continue
+      const fromX = rawFromX ?? 0
+      const toX = rawToX ?? chartWidth
 
       // Color based on segment direction and trend
       const isWithTrend =
@@ -202,6 +219,8 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     trendColor: string,
     opacityScale: number,
   ): void {
+    const chartWidth = ctx.canvas.width / (window.devicePixelRatio || 1)
+
     ctx.strokeStyle = hexToRgba(trendColor, 0.8 * opacityScale)
     ctx.lineWidth = 2
     ctx.setLineDash([])
@@ -210,10 +229,15 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     let started = false
 
     for (const sw of data.swingPoints) {
-      const x = timeScale.timeToCoordinate(sw.time as unknown as Time)
+      // Clamp x to chart edges when the swing point time is outside the loaded candle range.
+      // This happens when MTF (e.g., Daily) swing points are plotted on an LTF (e.g., H1) chart
+      // that only loads ~8 days of data while the trend spans months.
+      const rawX = timeScale.timeToCoordinate(sw.time as unknown as Time)
       const y = series.priceToCoordinate(sw.price) as number | null
+      if (y == null) continue
 
-      if (x == null || y == null) continue
+      // If time is outside the loaded range, clamp to left edge
+      const x: number = rawX ?? 0
 
       if (!started) {
         ctx.moveTo(x, y)
@@ -241,6 +265,8 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       const x = timeScale.timeToCoordinate(sw.time as unknown as Time)
       const y = series.priceToCoordinate(sw.price) as number | null
 
+      // Only draw markers for swing points with valid time coordinates on the chart
+      // (don't clamp to edge like lines — stacking markers at x=0 would be cluttered)
       if (x == null || y == null) continue
 
       // Filled circle
@@ -311,6 +337,56 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       ctx.fillStyle = hexToRgba(pillColor, 0.9 * opacityScale)
       ctx.fillText(label, x, y + offsetY)
     }
+  }
+
+  /**
+   * Draw a compact trend summary badge in the top-left of the chart area.
+   * Shown when MTF swing points are entirely outside the LTF chart's loaded data range
+   * (e.g., Daily trend on an H1 chart that only loads 8 days of data).
+   */
+  private _drawTrendBadge(
+    ctx: CanvasRenderingContext2D,
+    data: TrendData,
+    trendColor: string,
+    isDark: boolean,
+  ): void {
+    const dir = data.direction === "up" ? "▲ Up" : data.direction === "down" ? "▼ Down" : "◆ Range"
+    const status =
+      data.status === "confirmed"
+        ? "Confirmed"
+        : data.status === "forming"
+          ? "Forming"
+          : "Terminated"
+    const label = `MTF Trend: ${dir} · ${status}`
+
+    ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
+    const metrics = ctx.measureText(label)
+    const pad = 5
+    const w = metrics.width + pad * 2
+    const h = 16
+    const x = 8
+    const y = 8
+
+    // Background
+    ctx.fillStyle = isDark ? "rgba(0, 0, 0, 0.75)" : "rgba(255, 255, 255, 0.85)"
+    ctx.beginPath()
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(x, y, w, h, 3)
+    } else {
+      ctx.rect(x, y, w, h)
+    }
+    ctx.fill()
+
+    // Border
+    ctx.strokeStyle = hexToRgba(trendColor, 0.5)
+    ctx.lineWidth = 0.5
+    ctx.stroke()
+
+    // Text
+    ctx.fillStyle = trendColor
+    ctx.textAlign = "left"
+    ctx.textBaseline = "middle"
+    ctx.fillText(label, x + pad, y + h / 2)
   }
 
   private _drawControllingSwing(
