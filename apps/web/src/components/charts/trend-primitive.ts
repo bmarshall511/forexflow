@@ -177,21 +177,16 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
   ): void {
     const opacity = visuals.boxOpacity * opacityScale
 
-    const chartWidth = ctx.canvas.width / (window.devicePixelRatio || 1)
-
     for (const seg of data.segments) {
-      const rawFromX = timeScale.timeToCoordinate(seg.from.time as unknown as Time) as number | null
-      const rawToX = timeScale.timeToCoordinate(seg.to.time as unknown as Time) as number | null
+      const fromX = timeScale.timeToCoordinate(seg.from.time as unknown as Time)
+      const toX = timeScale.timeToCoordinate(seg.to.time as unknown as Time)
       const topPrice = Math.max(seg.from.price, seg.to.price)
       const bottomPrice = Math.min(seg.from.price, seg.to.price)
       const topY = series.priceToCoordinate(topPrice) as number | null
       const bottomY = series.priceToCoordinate(bottomPrice) as number | null
 
-      if (topY == null || bottomY == null) continue
-      // Skip segments entirely outside the loaded range; clamp partial segments
-      if (rawFromX == null && rawToX == null) continue
-      const fromX = rawFromX ?? 0
-      const toX = rawToX ?? chartWidth
+      // Both endpoints must be within the loaded candle range
+      if (fromX == null || toX == null || topY == null || bottomY == null) continue
 
       // Color based on segment direction and trend
       const isWithTrend =
