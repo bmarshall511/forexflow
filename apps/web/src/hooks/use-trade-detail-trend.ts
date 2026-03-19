@@ -2,16 +2,21 @@
 
 import { useState, useEffect, useRef } from "react"
 import type { ZoneCandle, TrendData } from "@fxflow/types"
-import { detectTrend, getDefaultSwingStrength } from "@fxflow/shared"
+import {
+  detectTrend,
+  DEFAULT_TREND_DETECTION_CONFIG,
+  getDefaultSwingStrength,
+} from "@fxflow/shared"
 import { fetchCandles } from "@/components/charts/chart-utils"
 
 /**
- * Lightweight trend detection for the trade detail drawer chart.
+ * Trend detection for the trade detail drawer chart.
+ *
+ * Uses the same detectTrend algorithm and DEFAULT_TREND_DETECTION_CONFIG as the
+ * charts page, ensuring identical trend structure rendering.
  *
  * Computes trend on the chart's active timeframe (not the MTF from the setup snapshot)
  * so swing points align with the loaded candle data and render correctly.
- *
- * This is simpler than useTrends (no settings/persistence) — just fetch + detect.
  */
 export function useTradeDetailTrend(
   instrument: string | null,
@@ -23,7 +28,7 @@ export function useTradeDetailTrend(
   const computeIdRef = useRef(0)
 
   useEffect(() => {
-    if (!enabled || !instrument || !currentPrice) {
+    if (!enabled || !instrument) {
       setTrendData(null)
       return
     }
@@ -31,23 +36,21 @@ export function useTradeDetailTrend(
     const id = ++computeIdRef.current
     let cancelled = false
 
-    fetchCandles(instrument, timeframe, 300).then((candles) => {
+    // Use the same candle count as the default trend config (500)
+    const count = DEFAULT_TREND_DETECTION_CONFIG.lookbackCandles
+    fetchCandles(instrument, timeframe, count).then((candles) => {
       if (cancelled || id !== computeIdRef.current) return
       if (!candles || candles.length < 10) return
 
       const price = currentPrice ?? candles[candles.length - 1]?.close ?? 0
-      const result = detectTrend(
-        candles as ZoneCandle[],
-        instrument,
-        timeframe,
-        {
-          swingStrength: getDefaultSwingStrength(timeframe),
-          minSegmentAtr: 0.5,
-          maxSwingPoints: 20,
-          lookbackCandles: 300,
-        },
-        price,
-      )
+
+      // Use exact same config as the charts page with adaptive swing strength
+      const config = {
+        ...DEFAULT_TREND_DETECTION_CONFIG,
+        swingStrength: getDefaultSwingStrength(timeframe),
+      }
+
+      const result = detectTrend(candles as ZoneCandle[], instrument, timeframe, config, price)
       if (id === computeIdRef.current) {
         setTrendData(result)
       }
