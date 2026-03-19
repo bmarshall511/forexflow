@@ -173,5 +173,8 @@ export function applyPresetToConfig(preset: SmartFlowPreset): Partial<SmartFlowC
     sessionAwareManagement: defaults.sessionAwareManagement,
     weekendCloseEnabled: defaults.weekendCloseEnabled,
     newsProtectionEnabled: defaults.newsProtectionEnabled,
+    // AI always enabled by default
+    aiMode: "auto_selective" as const,
+    aiMonitorIntervalHours: 1,
   }
 }

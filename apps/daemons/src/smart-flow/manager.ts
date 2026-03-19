@@ -200,6 +200,9 @@ export class SmartFlowManager {
       }
     }
 
+    // Migrate existing configs: ensure AI is enabled (was defaulting to "off")
+    await this.migrateAiDefaults()
+
     this.startMonitoringUpdates()
 
     // Auto-place trades for active configs that have no associated trade yet.
@@ -459,7 +462,7 @@ export class SmartFlowManager {
    * an associated active trade. Called on startup after OANDA connects, and
    * can be called again when configs are activated.
    */
-  private async autoPlaceActiveConfigs(): Promise<void> {
+  private async autoPlaceActiveConfigs(silent = false): Promise<void> {
     if (!this.tradeSyncer) return
 
     try {
@@ -472,20 +475,24 @@ export class SmartFlowManager {
 
       for (const config of activeConfigs) {
         if (configsWithTrades.has(config.id)) {
-          emitActivity(
-            "monitoring_update",
-            `${config.instrument.replace("_", "/")} — trade is active, managing with ${formatPreset(config.preset)} strategy`,
-            { instrument: config.instrument, configId: config.id },
-          )
+          if (!silent) {
+            emitActivity(
+              "monitoring_update",
+              `${config.instrument.replace("_", "/")} — trade is active, managing with ${formatPreset(config.preset)} strategy`,
+              { instrument: config.instrument, configId: config.id },
+            )
+          }
           continue
         }
 
-        // Active config with no trade — log intent and attempt placement
-        emitActivity(
-          "entry_watching",
-          `${config.instrument.replace("_", "/")} — checking market conditions to place your trade`,
-          { instrument: config.instrument, configId: config.id },
-        )
+        // Active config with no trade — attempt placement
+        if (!silent) {
+          emitActivity(
+            "entry_watching",
+            `${config.instrument.replace("_", "/")} — checking market conditions to place your trade`,
+            { instrument: config.instrument, configId: config.id },
+          )
+        }
 
         if (config.entryMode === "smart_entry") {
           const result = await this.createSmartEntry(config.id)
@@ -495,7 +502,7 @@ export class SmartFlowManager {
               `${config.instrument.replace("_", "/")} — watching for entry price${config.entryPrice != null ? ` at ${config.entryPrice}` : ""}`,
               { instrument: config.instrument, configId: config.id, severity: "success" },
             )
-          } else {
+          } else if (!silent) {
             emitActivity(
               "entry_blocked",
               `${config.instrument.replace("_", "/")} — couldn't set up smart entry: ${result.error}`,
@@ -510,7 +517,7 @@ export class SmartFlowManager {
               `${config.instrument.replace("_", "/")} — trade placed! SmartFlow is now managing it`,
               { instrument: config.instrument, configId: config.id, severity: "success" },
             )
-          } else {
+          } else if (!silent) {
             emitActivity(
               "entry_blocked",
               `${config.instrument.replace("_", "/")} — couldn't place trade: ${result.error}`,
@@ -693,9 +700,13 @@ export class SmartFlowManager {
     this.monitoringInterval = setInterval(
       () => {
         void this.emitMonitoringSummary()
+        // Retry placing trades for active configs that were previously blocked
+        // (e.g., instrument freed up after another source's trade closed)
+        // Silent mode: only log successful placements, not repeated blocks
+        void this.autoPlaceActiveConfigs(true)
       },
-      5 * 60 * 1000,
-    ) // every 5 minutes
+      2 * 60 * 1000,
+    ) // every 2 minutes
   }
 
   private async emitMonitoringSummary(): Promise<void> {
@@ -726,6 +737,42 @@ export class SmartFlowManager {
 
   private unlock(instrument: string): void {
     this.spm?.releaseLock(instrument, "smart_flow")
+  }
+
+  /** One-time migration: enable AI on configs that still have aiMode="off" from old defaults. */
+  private async migrateAiDefaults(): Promise<void> {
+    try {
+      const configs = await getSmartFlowConfigs()
+      const allTogglesEnabled = JSON.stringify({
+        moveSL: true,
+        moveTP: true,
+        breakeven: true,
+        partialClose: true,
+        closeProfit: true,
+        preemptiveSafetyClose: true,
+        cancelEntry: true,
+        adjustTrail: true,
+      })
+
+      let migrated = 0
+      for (const c of configs) {
+        if (c.aiMode === "off") {
+          const { updateSmartFlowConfig } = await import("@fxflow/db")
+          await updateSmartFlowConfig(c.id, {
+            aiMode: "auto_selective",
+            aiMonitorIntervalHours: 1,
+            aiActionToggles: JSON.parse(allTogglesEnabled),
+          })
+          migrated++
+        }
+      }
+
+      if (migrated > 0) {
+        console.log(`[smart-flow] Migrated ${migrated} configs: AI mode → auto_selective`)
+      }
+    } catch (err) {
+      console.error("[smart-flow] AI defaults migration failed:", (err as Error).message)
+    }
   }
 
   private emitUpdate(trade: SmartFlowTradeData, action: string, detail: string): void {

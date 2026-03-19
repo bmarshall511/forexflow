@@ -662,10 +662,10 @@ model SmartFlowConfig {
   recoverySizeMultiplier   Float    @default(0.5) // each add = initial * this
   recoveryTpAtrMultiple    Float    @default(0.3) // TP from average entry
   // AI Assist
-  aiMode                   String   @default("off") // "off" | "suggest" | "auto_selective" | "full_auto"
-  aiMonitorIntervalHours   Int      @default(4)
+  aiMode                   String   @default("auto_selective") // "off" | "suggest" | "auto_selective" | "full_auto"
+  aiMonitorIntervalHours   Int      @default(1)
   aiModel                  String?
-  aiActionTogglesJson      String   @default("{}") // JSON: SmartFlowAiActionToggles
+  aiActionTogglesJson      String   @default("{\"moveSL\":true,\"moveTP\":true,\"breakeven\":true,\"partialClose\":true,\"closeProfit\":true,\"preemptiveSafetyClose\":true,\"cancelEntry\":true,\"adjustTrail\":true}") // JSON: SmartFlowAiActionToggles
   aiConfidenceThresholdsJson String @default("{}") // JSON: SmartFlowAiConfidenceThresholds
   aiMaxActionsPerDay       Int      @default(10)
   aiCooldownAfterManualMins Int     @default(120)

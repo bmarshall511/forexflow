@@ -78,16 +78,16 @@ export type UpdateSmartFlowConfigInput = Partial<CreateSmartFlowConfigInput>
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Default AI action toggles when JSON parsing fails. */
+/** Default AI action toggles — all enabled by default. */
 const DEFAULT_AI_ACTION_TOGGLES: SmartFlowAiActionToggles = {
-  moveSL: false,
-  moveTP: false,
-  breakeven: false,
-  partialClose: false,
-  closeProfit: false,
-  preemptiveSafetyClose: false,
-  cancelEntry: false,
-  adjustTrail: false,
+  moveSL: true,
+  moveTP: true,
+  breakeven: true,
+  partialClose: true,
+  closeProfit: true,
+  preemptiveSafetyClose: true,
+  cancelEntry: true,
+  adjustTrail: true,
 }
 
 /** Default AI confidence thresholds when JSON parsing fails. */
