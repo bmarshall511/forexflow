@@ -49,6 +49,8 @@ interface TradeEditorPanelProps {
   curveData?: CurveData | null
   /** Trend overlay data */
   trendData?: TrendData | null
+  /** Higher-timeframe trend data */
+  higherTfTrendData?: TrendData | null
   /** Trend visual settings */
   trendVisuals?: TrendVisualSettings
 }
@@ -66,6 +68,7 @@ export function TradeEditorPanel({
   zoneCurrentPrice,
   curveData,
   trendData,
+  higherTfTrendData,
   trendVisuals,
 }: TradeEditorPanelProps) {
   const { modifyTrade, modifyPendingOrder } = useTradeActions()
@@ -115,6 +118,7 @@ export function TradeEditorPanel({
         zoneCurrentPrice={zoneCurrentPrice}
         curveData={curveData}
         trendData={trendData}
+        higherTfTrendData={higherTfTrendData}
         trendVisuals={trendVisuals}
         height={260}
       />

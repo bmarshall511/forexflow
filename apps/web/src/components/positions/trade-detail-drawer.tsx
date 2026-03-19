@@ -211,7 +211,10 @@ export function TradeDetailDrawer({
     [],
   )
 
-  const setupTrendData = overlayVis.showTrend ? (tfSetup?.trendData ?? null) : null
+  // The setup's trend was computed on the MTF timeframe (e.g., Daily for "weekly" set).
+  // Pass it as higherTfTrendData since the chart displays LTF candles (e.g., H1).
+  // This renders at 40% opacity behind primary content, matching the charts page pattern.
+  const setupHigherTfTrendData = overlayVis.showTrend ? (tfSetup?.trendData ?? null) : null
   const setupCurveData = overlayVis.showCurve ? (tfSetup?.curveData ?? null) : null
   const setupZonePrice = trade
     ? trade._type === "open" && trade.currentPrice != null
@@ -358,7 +361,7 @@ export function TradeDetailDrawer({
                   zones={setupZones}
                   zoneCurrentPrice={setupZonePrice}
                   curveData={setupCurveData}
-                  trendData={setupTrendData}
+                  higherTfTrendData={setupHigherTfTrendData}
                   trendVisuals={setupTrendVisuals}
                 />
               ) : (
@@ -377,7 +380,7 @@ export function TradeDetailDrawer({
                   zones={setupZones}
                   zoneCurrentPrice={setupZonePrice}
                   curveData={setupCurveData}
-                  trendData={setupTrendData}
+                  higherTfTrendData={setupHigherTfTrendData}
                   trendVisuals={setupTrendVisuals}
                   height={260}
                 />

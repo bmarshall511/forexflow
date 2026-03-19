@@ -109,6 +109,11 @@ export function useChartOverlays({
     if (!trendPrimRef.current) return
     if (trendData && trendVisuals) {
       trendPrimRef.current.setTrend(trendData, trendVisuals, isDark)
+    } else if (trendVisuals) {
+      // No primary trend data — clear primary but preserve visuals for HTF rendering.
+      // setTrend(null, visuals, isDark) clears primary data while keeping visuals intact
+      // so that higherTfTrendData renders with the correct settings (e.g., showBoxes).
+      trendPrimRef.current.setTrend(null, trendVisuals, isDark)
     } else {
       trendPrimRef.current.clearTrend()
     }
