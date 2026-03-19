@@ -201,7 +201,7 @@ export function TradeDetailDrawer({
 
   const setupTrendVisuals = useMemo(
     (): TrendVisualSettings => ({
-      showBoxes: false,
+      showBoxes: true,
       showLines: true,
       showMarkers: true,
       showLabels: true,
