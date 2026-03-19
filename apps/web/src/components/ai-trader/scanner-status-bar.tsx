@@ -140,24 +140,15 @@ export function ScannerStatusBar({ status, progress }: ScannerStatusBarProps) {
         </div>
       )}
 
-      {/* Stats row (when idle) */}
-      {!isScanning && isEnabled && (
-        <div className="flex gap-4 text-xs">
-          <div>
-            <span className="text-muted-foreground">Open Trades</span>
-            <p className="font-mono font-semibold">{status?.openAiTradeCount ?? 0}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Today&apos;s Cost</span>
-            <p className="font-mono font-semibold">${(status?.todayBudgetUsed ?? 0).toFixed(2)}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Monthly Cost</span>
-            <p className="font-mono font-semibold">
-              ${(status?.monthlyBudgetUsed ?? 0).toFixed(2)}
-            </p>
-          </div>
-        </div>
+      {/* Last scan summary (when idle, no error) */}
+      {!isScanning && isEnabled && !hasError && status?.lastScanAt && (
+        <p className="text-muted-foreground text-xs">
+          Scanner is monitoring{" "}
+          {status.candidateCount > 0
+            ? `${status.candidateCount} opportunity${status.candidateCount !== 1 ? "es" : ""}`
+            : "the market"}{" "}
+          — next scan {status.nextScanAt ? formatCountdown(status.nextScanAt) : "soon"}.
+        </p>
       )}
     </div>
   )
