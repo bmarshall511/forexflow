@@ -189,7 +189,8 @@ export function TradeDetailDrawer({
 
   const scrollToTime = useMemo(() => {
     if (!trade) return undefined
-    if (trade._type === "open") return Math.floor(new Date(trade.openedAt).getTime() / 1000)
+    // Open/pending trades: show latest candles (current price + trend) — don't scroll to entry
+    // Closed trades: scroll to entry to show the full trade lifecycle
     if (trade._type === "closed") return Math.floor(new Date(trade.openedAt).getTime() / 1000)
     return undefined
   }, [trade])
