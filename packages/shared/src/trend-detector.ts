@@ -97,6 +97,36 @@ export function detectTrend(
   // Step 5: Build segments between consecutive swings
   const segments = buildSegments(swings, instrument)
 
+  // Step 5b: Add trailing segment from the last swing point to current price.
+  // This ensures the current leg of price action (e.g., the move from the last HH down to
+  // where price is now) has a visible box, especially important when the trend terminates.
+  if (swings.length >= 2) {
+    const lastSwing = swings[swings.length - 1]!
+    const lastCandle = candles[n - 1]!
+    const trailingDir: TrendDirection = currentPrice > lastSwing.price ? "up" : "down"
+    // Only add if price has moved meaningfully (> 0.2 ATR) from the last swing
+    const trailingDistance = Math.abs(currentPrice - lastSwing.price)
+    if (currentAtr > 0 && trailingDistance > currentAtr * 0.2) {
+      const nowPoint: SwingPoint = {
+        id: uid(),
+        type: trailingDir === "up" ? "high" : "low",
+        price: currentPrice,
+        time: lastCandle.time,
+        label: "H", // placeholder — not rendered as a labeled swing
+        candleIndex: n - 1,
+      }
+      segments.push({
+        id: uid(),
+        from: lastSwing,
+        to: nowPoint,
+        direction: trailingDir,
+        rangePips: priceToPips(instrument, trailingDistance),
+        candleCount: Math.abs(n - 1 - lastSwing.candleIndex),
+        isBreakout: false,
+      })
+    }
+  }
+
   // Step 6: Identify trend direction and status (right-to-left scan)
   // Use 25% of ATR as termination buffer to prevent noise wicks from triggering false terminations
   const terminationBuffer = currentAtr * 0.25
