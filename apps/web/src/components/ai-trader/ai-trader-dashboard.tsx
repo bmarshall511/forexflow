@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { DataTile } from "@/components/ui/data-tile"
@@ -51,6 +51,17 @@ export function AiTraderDashboard() {
   const isScanning =
     status?.scanning || (progress && !["complete", "skipped", "error"].includes(progress.phase))
   const isPaused = status?.enabled === false && !isScanning
+
+  // Clear actionInFlight once scanner state catches up via WS
+  const prevScanningRef = useRef(false)
+  if (isScanning && actionInFlight) {
+    setActionInFlight(false)
+  }
+  // Also clear if scan completes while actionInFlight is still set (e.g. scan was very fast)
+  if (prevScanningRef.current && !isScanning && actionInFlight) {
+    setActionInFlight(false)
+  }
+  prevScanningRef.current = !!isScanning
   const scannerLabel = !status?.enabled
     ? isPaused
       ? "Paused"
@@ -61,14 +72,14 @@ export function AiTraderDashboard() {
 
   const onScanNow = async () => {
     setActionInFlight(true)
+    setTab("activity")
     try {
       await triggerScan()
-      toast.info("Scan triggered")
     } catch {
       toast.error("Failed to trigger scan")
-    } finally {
       setActionInFlight(false)
     }
+    // actionInFlight stays true — cleared when isScanning becomes true via WS
   }
 
   const onPause = async () => {

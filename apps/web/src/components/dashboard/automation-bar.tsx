@@ -16,6 +16,8 @@ interface SourceStats {
   unrealizedPL: number
   closedTodayCount: number
   closedTodayPL: number
+  wins: number
+  losses: number
 }
 
 const EMPTY_STATS: SourceStats = {
@@ -23,6 +25,8 @@ const EMPTY_STATS: SourceStats = {
   unrealizedPL: 0,
   closedTodayCount: 0,
   closedTodayPL: 0,
+  wins: 0,
+  losses: 0,
 }
 
 function useSourceStats() {
@@ -52,6 +56,8 @@ function useSourceStats() {
         const s = get(t.source)
         s.closedTodayCount++
         s.closedTodayPL += t.realizedPL
+        if (t.realizedPL > 0) s.wins++
+        else if (t.realizedPL < 0) s.losses++
       }
     }
 
@@ -153,6 +159,13 @@ function ModuleSegment({
               >
                 {formatPnL(stats.closedTodayPL, currency).formatted}
               </span>
+              {(stats.wins > 0 || stats.losses > 0) && (
+                <span className="text-muted-foreground ml-1">
+                  <span className="text-status-connected">{stats.wins}W</span>
+                  {" / "}
+                  <span className="text-status-disconnected">{stats.losses}L</span>
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -170,6 +183,8 @@ function mergeStats(...sources: (SourceStats | undefined)[]): SourceStats | null
     unrealizedPL: 0,
     closedTodayCount: 0,
     closedTodayPL: 0,
+    wins: 0,
+    losses: 0,
   }
   for (const s of sources) {
     if (!s) continue
@@ -178,6 +193,8 @@ function mergeStats(...sources: (SourceStats | undefined)[]): SourceStats | null
     merged.unrealizedPL += s.unrealizedPL
     merged.closedTodayCount += s.closedTodayCount
     merged.closedTodayPL += s.closedTodayPL
+    merged.wins += s.wins
+    merged.losses += s.losses
   }
   return any ? merged : null
 }
