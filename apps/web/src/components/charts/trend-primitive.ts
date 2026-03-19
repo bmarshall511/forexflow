@@ -180,7 +180,6 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     const chartWidth = ctx.canvas.width / (window.devicePixelRatio || 1)
 
     for (const seg of data.segments) {
-      // Clamp segment edges to chart boundaries when times are outside loaded range
       const rawFromX = timeScale.timeToCoordinate(seg.from.time as unknown as Time) as number | null
       const rawToX = timeScale.timeToCoordinate(seg.to.time as unknown as Time) as number | null
       const topPrice = Math.max(seg.from.price, seg.to.price)
@@ -189,6 +188,8 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
       const bottomY = series.priceToCoordinate(bottomPrice) as number | null
 
       if (topY == null || bottomY == null) continue
+      // Skip segments entirely outside the loaded range; clamp partial segments
+      if (rawFromX == null && rawToX == null) continue
       const fromX = rawFromX ?? 0
       const toX = rawToX ?? chartWidth
 
@@ -227,15 +228,11 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     let started = false
 
     for (const sw of data.swingPoints) {
-      // Clamp x to chart edges when the swing point time is outside the loaded candle range.
-      // This happens when MTF (e.g., Daily) swing points are plotted on an LTF (e.g., H1) chart
-      // that only loads ~8 days of data while the trend spans months.
-      const rawX = timeScale.timeToCoordinate(sw.time as unknown as Time)
+      const x = timeScale.timeToCoordinate(sw.time as unknown as Time)
       const y = series.priceToCoordinate(sw.price) as number | null
-      if (y == null) continue
 
-      // If time is outside the loaded range, clamp to left edge
-      const x: number = rawX ?? 0
+      // Skip swing points outside the loaded candle range
+      if (x == null || y == null) continue
 
       if (!started) {
         ctx.moveTo(x, y)
