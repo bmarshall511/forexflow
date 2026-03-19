@@ -59,7 +59,26 @@ import {
   Scissors,
   PlayCircle,
   Ban,
+  AlertTriangle,
 } from "lucide-react"
+
+/** Map OANDA close reason codes to plain English */
+const CLOSE_REASON_LABELS: Record<string, string> = {
+  STOP_LOSS_ORDER: "Stop Loss Hit",
+  TAKE_PROFIT_ORDER: "Take Profit Hit",
+  TRAILING_STOP_LOSS_ORDER: "Trailing Stop Hit",
+  MARGIN_CLOSEOUT: "Margin Closeout",
+  MARKET_ORDER: "Manually Closed",
+  LINKED_TRADE_CLOSED: "Linked Trade Closed",
+  ORDER_CANCEL: "Order Cancelled",
+  REVERSAL: "Position Reversed",
+  UNKNOWN: "Unknown",
+}
+
+function formatCloseReason(reason?: string | null): string {
+  if (!reason) return "—"
+  return CLOSE_REASON_LABELS[reason] ?? reason.replace(/_/g, " ")
+}
 
 /** Map cancelledBy values to user-friendly descriptions */
 const CANCEL_DESCRIPTIONS: Record<string, string> = {
@@ -99,6 +118,54 @@ function CancellationCallout({ closeContext }: { closeContext?: CloseContext | n
             })}
           </p>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** Plain English explanations for trade close reasons */
+const CLOSE_DESCRIPTIONS: Record<string, string> = {
+  STOP_LOSS_ORDER:
+    "Your stop loss was hit — the market moved against your position and reached the price you set as your maximum acceptable loss. The broker automatically closed the trade to protect you from further losses.",
+  TAKE_PROFIT_ORDER:
+    "Your take profit was hit — the market moved in your favour and reached the target price you set. The broker automatically closed the trade to lock in your gains.",
+  TRAILING_STOP_LOSS_ORDER:
+    "Your trailing stop was hit — as the trade moved in your favour the stop loss followed, but the market reversed and triggered the trailing stop. Your profits were protected up to that point.",
+  MARGIN_CLOSEOUT:
+    "Your broker closed this trade because your account no longer had enough margin (funds) to keep it open. This usually happens when losses on open trades consume most of your available balance.",
+  MARKET_ORDER:
+    "This trade was closed manually — either by you or by an automated rule (like an AI condition). A market order was sent to close the position at the current price.",
+  LINKED_TRADE_CLOSED:
+    "This trade was closed because a related trade was closed. Some brokers link opposing positions, and closing one automatically closes the other.",
+  REVERSAL:
+    "Your position was reversed — instead of just closing, a new trade in the opposite direction was opened at the same time.",
+  UNKNOWN:
+    "The exact reason this trade closed couldn't be determined. It may have been closed directly on the broker platform or during a connection interruption.",
+}
+
+function CloseReasonCallout({ closeReason }: { closeReason?: string | null }) {
+  if (!closeReason) return null
+  const description = CLOSE_DESCRIPTIONS[closeReason]
+  if (!description) return null
+
+  const isLoss = closeReason === "STOP_LOSS_ORDER" || closeReason === "MARGIN_CLOSEOUT"
+
+  return (
+    <div
+      className={cn(
+        "flex gap-3 rounded-lg border px-3.5 py-3",
+        isLoss ? "border-red-500/20 bg-red-500/5" : "border-border/50 bg-muted/30",
+      )}
+    >
+      <AlertTriangle
+        className={cn(
+          "mt-0.5 size-4 shrink-0",
+          isLoss ? "text-red-500/70" : "text-muted-foreground",
+        )}
+      />
+      <div className="min-w-0 space-y-1">
+        <p className="text-xs font-medium">Why did this trade close?</p>
+        <p className="text-muted-foreground text-xs leading-relaxed">{description}</p>
       </div>
     </div>
   )
@@ -345,9 +412,12 @@ export function TradeDetailDrawer({
               closeContext={trade._type === "closed" ? trade.closeContext : undefined}
             />
 
-            {/* Cancellation explanation callout */}
+            {/* Close/cancellation explanation callout */}
             {trade._type === "closed" && trade.outcome === "cancelled" && (
               <CancellationCallout closeContext={trade.closeContext} />
+            )}
+            {trade._type === "closed" && trade.outcome !== "cancelled" && (
+              <CloseReasonCallout closeReason={trade.closeReason} />
             )}
 
             {/* Chart with price overlays */}
@@ -634,7 +704,7 @@ export function TradeDetailDrawer({
                     {trade.outcome !== "cancelled" && (
                       <MetricTile
                         label="Close Reason"
-                        value={trade.closeReason?.replace(/_/g, " ") ?? "—"}
+                        value={formatCloseReason(trade.closeReason)}
                       />
                     )}
                   </>

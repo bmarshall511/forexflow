@@ -102,6 +102,54 @@ function parseCancelDetail(detail: string): { source: string; reason: string | n
   }
 }
 
+/** Map raw closedBy values to human-readable labels */
+const CLOSED_BY_LABELS: Record<string, string> = {
+  system: "Broker (Automatic)",
+  user: "You (Manual)",
+  ai_condition: "AI Condition",
+  trade_finder: "Trade Finder",
+}
+
+/** Map OANDA close reason codes in event detail to friendly text */
+const CLOSE_REASON_EVENT_LABELS: Record<string, string> = {
+  STOP_LOSS_ORDER: "Stop loss was hit",
+  TAKE_PROFIT_ORDER: "Take profit was hit",
+  TRAILING_STOP_LOSS_ORDER: "Trailing stop was hit",
+  MARGIN_CLOSEOUT: "Margin closeout",
+  MARKET_ORDER: "Closed at market price",
+}
+
+function parseCloseDetail(
+  detail: string,
+): { closedBy: string; reason: string | null; pl: string | null; exitPrice: string | null } | null {
+  try {
+    const obj = JSON.parse(detail)
+    if (!obj.closedBy && !obj.realizedPL && !obj.reason) return null
+
+    const closedBy = CLOSED_BY_LABELS[obj.closedBy] ?? obj.closedBy ?? "Unknown"
+
+    // Extract a friendly reason from the raw reason string
+    let reason: string | null = null
+    if (typeof obj.reason === "string") {
+      // Try to extract OANDA close reason from the reason string
+      for (const [code, label] of Object.entries(CLOSE_REASON_EVENT_LABELS)) {
+        if (obj.reason.includes(code)) {
+          reason = label
+          break
+        }
+      }
+      if (!reason) reason = obj.reason
+    }
+
+    const pl = obj.realizedPL != null ? String(obj.realizedPL) : null
+    const exitPrice = obj.exitPrice != null ? String(obj.exitPrice) : null
+
+    return { closedBy, reason, pl, exitPrice }
+  } catch {
+    return null
+  }
+}
+
 function parseGenericDetail(detail: string): string {
   try {
     const obj = JSON.parse(detail)
@@ -201,7 +249,10 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
         const sltpDetail = isSltpEvent ? parseSltpDetail(event.detail) : null
         const isCancelEvent = event.eventType === "ORDER_CANCELLED"
         const cancelDetail = isCancelEvent ? parseCancelDetail(event.detail) : null
-        const genericText = !sltpDetail && !cancelDetail ? parseGenericDetail(event.detail) : null
+        const isCloseEvent = event.eventType === "TRADE_CLOSED"
+        const closeDetail = isCloseEvent ? parseCloseDetail(event.detail) : null
+        const genericText =
+          !sltpDetail && !cancelDetail && !closeDetail ? parseGenericDetail(event.detail) : null
 
         return (
           <div key={event.id} className="flex gap-3">
@@ -243,6 +294,43 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
                     <span className="text-foreground font-medium">{cancelDetail.source}</span>
                   </span>
                   {cancelDetail.reason && <span> · Reason: {cancelDetail.reason}</span>}
+                </div>
+              )}
+
+              {/* Close detail */}
+              {closeDetail && (
+                <div className="text-muted-foreground mt-0.5 space-y-0.5 text-xs leading-relaxed">
+                  <div>
+                    Closed By:{" "}
+                    <span className="text-foreground font-medium">{closeDetail.closedBy}</span>
+                    {closeDetail.reason && <span> · {closeDetail.reason}</span>}
+                  </div>
+                  {(closeDetail.pl || closeDetail.exitPrice) && (
+                    <div>
+                      {closeDetail.exitPrice && (
+                        <span>
+                          Exit Price:{" "}
+                          <span className="text-foreground font-medium">
+                            {closeDetail.exitPrice}
+                          </span>
+                        </span>
+                      )}
+                      {closeDetail.pl && (
+                        <span>
+                          {closeDetail.exitPrice ? " · " : ""}Realized P&L:{" "}
+                          <span
+                            className={cn(
+                              "font-medium",
+                              parseFloat(closeDetail.pl) >= 0 ? "text-emerald-500" : "text-red-500",
+                            )}
+                          >
+                            {parseFloat(closeDetail.pl) >= 0 ? "+" : ""}
+                            {parseFloat(closeDetail.pl).toFixed(2)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

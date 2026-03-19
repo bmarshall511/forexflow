@@ -383,6 +383,14 @@ export class TradeFinderScanner {
         zone.type === "demand" ? zone.distalLine - slBuffer : zone.distalLine + slBuffer
       const riskPips = Math.abs(entryPrice - stopLoss) / pipSize
 
+      // Minimum risk guard: reject zones where SL is too tight relative to ATR.
+      // A risk < 50% of ATR will almost certainly get stopped out by normal market noise.
+      const atrPips = atr / pipSize
+      const minRiskPips = Math.max(atrPips * 0.5, 5) // At least 50% of ATR or 5 pips
+      if (riskPips < minRiskPips) {
+        continue
+      }
+
       // Find TP: opposing fresh zone (meeting min R:R) or min-R:R fallback
       const opposingType = zone.type === "demand" ? "supply" : "demand"
       const freshOpposing = ltfResult.zones
