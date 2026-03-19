@@ -394,6 +394,18 @@ export async function findSetupByResultSourceId(
   return row ? toSetupData(row) : null
 }
 
+/** Find a "placed" setup by instrument and direction (for fill detection when order ID ≠ trade ID) */
+export async function findPlacedSetupByInstrumentDirection(
+  instrument: string,
+  direction: string,
+): Promise<TradeFinderSetupData | null> {
+  const row = await db.tradeFinderSetup.findFirst({
+    where: { instrument, direction, status: "placed" },
+    orderBy: { placedAt: "desc" },
+  })
+  return row ? toSetupData(row) : null
+}
+
 /** Count auto-placed setups placed today (UTC day) for daily cap enforcement */
 export async function countTodayAutoPlaced(): Promise<number> {
   const startOfDay = new Date()

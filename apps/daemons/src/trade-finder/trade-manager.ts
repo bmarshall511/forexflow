@@ -20,6 +20,7 @@ import type {
 import {
   getTradeFinderConfig,
   findSetupByResultSourceId,
+  findPlacedSetupByInstrumentDirection,
   updateSetupManagement,
   getFilledSetups,
 } from "@fxflow/db"
@@ -101,13 +102,32 @@ export class TradeFinderTradeManager {
   }
 
   /** Called when a Trade Finder order fills */
-  async onOrderFilled(sourceTradeId: string): Promise<void> {
-    const setup = await findSetupByResultSourceId(sourceTradeId)
-    if (!setup || setup.status !== "filled") return
+  async onOrderFilled(dbTradeId: string, oandaSourceTradeId: string): Promise<void> {
+    // Primary: match by OANDA trade ID
+    let setup = await findSetupByResultSourceId(oandaSourceTradeId)
 
-    this.managedTrades.set(sourceTradeId, {
+    // Fallback: when LIMIT order fills, resultSourceId may still hold the old order ID.
+    // Look up the DB trade to get instrument+direction and find matching setup.
+    if (!setup) {
+      try {
+        const { db: prisma } = await import("@fxflow/db")
+        const trade = await prisma.trade.findUnique({ where: { id: dbTradeId } })
+        if (trade) {
+          // Check recently-filled setups matching this instrument+direction
+          setup = await findPlacedSetupByInstrumentDirection(trade.instrument, trade.direction)
+          // Also check filled setups (scanner may have already transitioned it)
+          if (!setup) setup = await findSetupByResultSourceId(oandaSourceTradeId)
+        }
+      } catch {
+        /* best-effort fallback */
+      }
+    }
+
+    if (!setup || (setup.status !== "filled" && setup.status !== "placed")) return
+
+    this.managedTrades.set(oandaSourceTradeId, {
       setup,
-      sourceTradeId,
+      sourceTradeId: oandaSourceTradeId,
       filledAt: Date.now(),
       lastModifiedAt: 0,
     })

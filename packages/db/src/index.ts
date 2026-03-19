@@ -245,6 +245,7 @@ export {
   getPendingAutoPlacedSetups,
   getAutoPlacedTotalRiskPips,
   findSetupByResultSourceId,
+  findPlacedSetupByInstrumentDirection,
   getPlacedAutoSetups,
   clearActiveSetups,
   clearSetupHistory,

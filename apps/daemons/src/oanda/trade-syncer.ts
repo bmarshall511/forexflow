@@ -59,7 +59,7 @@ export class OandaTradeSyncer {
 
   /** Lifecycle callbacks — set by daemon wiring for AutoAnalyzer integration */
   onPendingCreated: ((tradeId: string) => void) | null = null
-  onOrderFilled: ((tradeId: string) => void) | null = null
+  onOrderFilled: ((tradeId: string, sourceTradeId: string) => void) | null = null
   onTradeClosed: ((tradeId: string) => void) | null = null
 
   /** Called before a trade is removed from PositionManager, to persist final MFE/MAE. */
@@ -1382,7 +1382,7 @@ export class OandaTradeSyncer {
 
       // Collect lifecycle events to fire after all instruments are processed
       const newPendingCallbacks: string[] = []
-      const newFilledCallbacks: string[] = []
+      const newFilledCallbacks: { dbId: string; sourceTradeId: string }[] = []
 
       const instrumentPromises = [...allInstruments].map((instrument) =>
         this.withInstrumentMutex(instrument, async () => {
@@ -1487,7 +1487,7 @@ export class OandaTradeSyncer {
               if (wasKnownPending) {
                 this.knownPendingSourceIds.delete(trade.sourceTradeId)
               }
-              newFilledCallbacks.push(dbRecord.id)
+              newFilledCallbacks.push({ dbId: dbRecord.id, sourceTradeId: trade.sourceTradeId })
             } else {
               this.knownOpenSourceIds.add(trade.sourceTradeId)
             }
@@ -1508,8 +1508,8 @@ export class OandaTradeSyncer {
       for (const dbId of newPendingCallbacks) {
         this.onPendingCreated?.(dbId)
       }
-      for (const dbId of newFilledCallbacks) {
-        this.onOrderFilled?.(dbId)
+      for (const { dbId, sourceTradeId } of newFilledCallbacks) {
+        this.onOrderFilled?.(dbId, sourceTradeId)
       }
 
       // Mark any DB "open" trades that are no longer in OANDA as closed.

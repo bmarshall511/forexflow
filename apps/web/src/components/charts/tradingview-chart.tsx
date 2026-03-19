@@ -23,6 +23,7 @@ import type {
 } from "@fxflow/types"
 import { useDynamicCandles } from "@/hooks/use-dynamic-candles"
 import { useRealtimeCandles } from "@/hooks/use-realtime-candles"
+import { useChartOverlays } from "@/hooks/use-chart-overlays"
 import { getChartOptions, getCandlestickOptions, fetchCandles } from "./chart-utils"
 import { scrollToEntry } from "./chart-markers"
 import { TradeLevelPrimitive } from "./trade-level-primitive"
@@ -110,6 +111,7 @@ function TradingViewChartInner({
   const { resolvedTheme } = useTheme()
   const [error, setError] = useState<string | null>(null)
   const [granularity, setGranularity] = useState(defaultTimeframe ?? "H1")
+  const [chartGeneration, setChartGeneration] = useState(0)
 
   // Sync granularity when defaultTimeframe arrives from async API
   useEffect(() => {
@@ -251,6 +253,9 @@ function TradingViewChartInner({
     const observer = new ResizeObserver(handleResize)
     observer.observe(container)
 
+    // Increment chart generation so overlay hook re-applies data to new primitives
+    setChartGeneration((g) => g + 1)
+
     return () => {
       disposed = true
       unsubDynamic()
@@ -309,55 +314,24 @@ function TradingViewChartInner({
     }
   }, [markers])
 
-  // ─── Trade level indicators (lines on candles via primitive) ──────────
-  useEffect(() => {
-    if (tradeLevelPrimRef.current) {
-      tradeLevelPrimRef.current.setLevels(tradeLevels ?? [])
-    }
-  }, [tradeLevels])
-
-  // ─── Zone overlay: sync zones into the primitive ─────────────────────
-  const lastZonePriceRef = useRef<number | null>(null)
-  useEffect(() => {
-    if (!zonePrimRef.current) return
-    const price = zoneCurrentPrice ?? lastZonePriceRef.current
-    if (zones && zones.length > 0 && price != null) {
-      lastZonePriceRef.current = price
-      zonePrimRef.current.setZones(zones, price, isDark, decimals)
-    } else if (!zones || zones.length === 0) {
-      zonePrimRef.current.clearAll()
-    }
-  }, [zones, zoneCurrentPrice, isDark, decimals])
-
-  useEffect(() => {
-    if (!zonePrimRef.current) return
-    zonePrimRef.current.setHigherTfZones(higherTfZones ?? [])
-  }, [higherTfZones])
-
-  // ─── Curve overlay: sync curve data into the primitive ──────────────────
-  useEffect(() => {
-    if (!curvePrimRef.current) return
-    if (curveData) {
-      curvePrimRef.current.setCurve(curveData, isDark)
-    } else {
-      curvePrimRef.current.clearCurve()
-    }
-  }, [curveData, isDark])
-
-  // ─── Trend overlay: sync trend data into the primitive ─────────────────
-  useEffect(() => {
-    if (!trendPrimRef.current) return
-    if (trendData && trendVisuals) {
-      trendPrimRef.current.setTrend(trendData, trendVisuals, isDark)
-    } else {
-      trendPrimRef.current.clearTrend()
-    }
-  }, [trendData, trendVisuals, isDark])
-
-  useEffect(() => {
-    if (!trendPrimRef.current) return
-    trendPrimRef.current.setHigherTfTrend(higherTfTrendData ?? null)
-  }, [higherTfTrendData])
+  // ─── Shared overlay sync (zones, curve, trend, trade levels) ──────────
+  useChartOverlays({
+    zonePrimRef,
+    curvePrimRef,
+    trendPrimRef,
+    tradeLevelPrimRef,
+    chartGeneration,
+    zones,
+    higherTfZones,
+    zoneCurrentPrice,
+    curveData,
+    trendData,
+    higherTfTrendData,
+    trendVisuals,
+    tradeLevels,
+    isDark,
+    decimals,
+  })
 
   // ─── Zone click detection ──────────────────────────────────────────────
   const onZoneClickRef = useRef(onZoneClick)

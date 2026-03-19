@@ -40,6 +40,7 @@ import {
   countTodayAutoPlaced,
   getAutoPlacedTotalRiskPips,
   findSetupByResultSourceId,
+  findPlacedSetupByInstrumentDirection,
   getPlacedAutoSetups,
   updateSetupConfirmation,
   updateSetupSkipReason,
@@ -100,6 +101,11 @@ export interface GetOpenTradeIdsFn {
   (): Set<string>
 }
 
+/** Callback for getting open trade positions (for instrument+direction matching during fill detection) */
+export interface GetOpenPositionsFn {
+  (): Array<{ sourceTradeId: string; instrument: string; direction: string }>
+}
+
 const MAX_AUTO_TRADE_EVENTS = 50
 
 export class TradeFinderScanner {
@@ -121,6 +127,7 @@ export class TradeFinderScanner {
   private hasExistingPositionFn: HasExistingPositionFn | null = null
   private getPendingOrderIdsFn: GetPendingOrderIdsFn | null = null
   private getOpenTradeIdsFn: GetOpenTradeIdsFn | null = null
+  private getOpenPositionsFn: GetOpenPositionsFn | null = null
 
   // Notification emitter (set externally)
   private notificationEmitter: NotificationEmitter | null = null
@@ -148,12 +155,14 @@ export class TradeFinderScanner {
     hasExistingPosition: HasExistingPositionFn,
     getPendingOrderIds: GetPendingOrderIdsFn,
     getOpenTradeIds: GetOpenTradeIdsFn,
+    getOpenPositions?: GetOpenPositionsFn,
   ): void {
     this.placeOrderFn = placeOrder
     this.cancelOrderFn = cancelOrder
     this.hasExistingPositionFn = hasExistingPosition
     this.getPendingOrderIdsFn = getPendingOrderIds
     this.getOpenTradeIdsFn = getOpenTradeIds
+    this.getOpenPositionsFn = getOpenPositions ?? null
   }
 
   async start(): Promise<void> {
@@ -1120,7 +1129,13 @@ export class TradeFinderScanner {
     }
   }
 
-  /** Fallback: check "placed" auto-trade setups against live OANDA state to detect fills / external cancellations */
+  /**
+   * Fallback: check "placed" auto-trade setups against live OANDA state to detect fills / external cancellations.
+   *
+   * When a LIMIT order fills on OANDA, the resulting trade gets a different ID than the original order.
+   * This method accounts for the ID mismatch by also checking if an open trade exists on the same
+   * instrument+direction before assuming external cancellation.
+   */
   private async checkPlacedSetups(): Promise<void> {
     if (!this.getPendingOrderIdsFn || !this.getOpenTradeIdsFn) return
 
@@ -1129,6 +1144,7 @@ export class TradeFinderScanner {
 
     const pendingIds = this.getPendingOrderIdsFn()
     const openIds = this.getOpenTradeIdsFn()
+
     let slotOpened = false
 
     for (const setup of placedSetups) {
@@ -1137,14 +1153,33 @@ export class TradeFinderScanner {
       // Still pending on OANDA — nothing to do
       if (pendingIds.has(sourceId)) continue
 
-      // Filled — order is now an open trade
+      // Filled — order ID matches an open trade ID directly (e.g., MARKET orders)
       if (openIds.has(sourceId)) {
         await this.transitionToFilled(setup)
         slotOpened = true
         continue
       }
 
-      // Not in pending AND not in open — externally cancelled or filled & closed
+      // Order ID not in pending or open. This could be:
+      // (a) LIMIT order filled → new trade ID assigned (ID mismatch)
+      // (b) Order externally cancelled
+      //
+      // Check if there's an open trade on the same instrument. If there IS a position,
+      // the order likely filled (ID changed). If no position, it was truly cancelled.
+      const hasPosition = this.hasExistingPositionFn?.(setup.instrument) ?? false
+      if (hasPosition) {
+        // Order likely filled with a new trade ID — find the matching open trade's source ID
+        const matchingTradeId = this.findOpenTradeIdForInstrument(setup.instrument, setup.direction)
+        const newSourceId = matchingTradeId ?? sourceId
+        await this.transitionToFilled(setup, newSourceId)
+        slotOpened = true
+        console.log(
+          `[trade-finder] Fill detected via instrument match: ${setup.instrument} (order ${sourceId} → trade ${newSourceId})`,
+        )
+        continue
+      }
+
+      // No position on this instrument — genuinely cancelled externally
       await updateSetupStatus(setup.id, "invalidated")
       slotOpened = true
       const now = new Date().toISOString()
@@ -1179,9 +1214,30 @@ export class TradeFinderScanner {
     }
   }
 
-  /** Transition a setup from "placed" to "filled" */
-  private async transitionToFilled(setup: TradeFinderSetupData): Promise<void> {
-    await updateSetupStatus(setup.id, "filled")
+  /** Find the OANDA source trade ID for an open trade matching the given instrument and direction */
+  private findOpenTradeIdForInstrument(instrument: string, direction: string): string | null {
+    if (!this.getOpenTradeIdsFn) return null
+    // We need to iterate over open positions to find the matching one.
+    // The getOpenTradeIdsFn returns a Set<string> of IDs, but we need instrument+direction.
+    // Use the getOpenPositionsFn if available, otherwise return null.
+    if (!this.getOpenPositionsFn) return null
+    const positions = this.getOpenPositionsFn()
+    const match = positions.find((t) => t.instrument === instrument && t.direction === direction)
+    return match?.sourceTradeId ?? null
+  }
+
+  /** Transition a setup from "placed" to "filled" and update resultSourceId if needed */
+  private async transitionToFilled(
+    setup: TradeFinderSetupData,
+    newSourceId?: string,
+  ): Promise<void> {
+    const extra = newSourceId ? { resultSourceId: newSourceId } : undefined
+    await updateSetupStatus(setup.id, "filled", extra)
+    this.transitionToFilledBroadcast(setup, newSourceId ?? setup.resultSourceId!)
+  }
+
+  /** Broadcast fill events (called after status is already updated) */
+  private transitionToFilledBroadcast(setup: TradeFinderSetupData, sourceId: string): void {
     const now = new Date().toISOString()
     this.broadcast({
       type: "trade_finder_auto_trade_filled",
@@ -1190,7 +1246,7 @@ export class TradeFinderScanner {
         setupId: setup.id,
         instrument: setup.instrument,
         direction: setup.direction,
-        sourceId: setup.resultSourceId!,
+        sourceId,
         score: setup.scores.total,
       },
     })
@@ -1200,11 +1256,11 @@ export class TradeFinderScanner {
       instrument: setup.instrument,
       direction: setup.direction,
       score: setup.scores.total,
-      sourceId: setup.resultSourceId!,
+      sourceId,
       timestamp: now,
     })
     console.log(
-      `[trade-finder] AUTO-FILLED: ${setup.instrument} ${setup.direction} (order ${setup.resultSourceId})`,
+      `[trade-finder] AUTO-FILLED: ${setup.instrument} ${setup.direction} (trade ${sourceId})`,
     )
     const pair = setup.instrument.replace("_", "/")
     const dir = setup.direction === "long" ? "Long" : "Short"
@@ -1260,12 +1316,33 @@ export class TradeFinderScanner {
 
   // ─── Event-driven fill detection (called from daemon index.ts) ────────────
 
-  /** Called when tradeSyncer.onOrderFilled fires — check if it's one of our setups */
-  async onOrderFilled(sourceTradeId: string): Promise<void> {
+  /**
+   * Called when tradeSyncer.onOrderFilled fires — check if it's one of our setups.
+   *
+   * @param dbTradeId - The DB record ID (uuid) of the newly filled trade
+   * @param oandaSourceTradeId - The OANDA source trade ID (may differ from the order ID
+   *   stored in resultSourceId when a LIMIT order fills and OANDA assigns a new trade ID)
+   */
+  async onOrderFilled(dbTradeId: string, oandaSourceTradeId: string): Promise<void> {
     try {
-      const setup = await findSetupByResultSourceId(sourceTradeId)
+      // Primary: try matching by the OANDA trade ID (works for MARKET orders where trade ID = stored ID)
+      let setup = await findSetupByResultSourceId(oandaSourceTradeId)
+
+      // Fallback: when a LIMIT order fills, OANDA assigns a new trade ID that differs from the
+      // order ID we stored. Look up the DB trade to get instrument+direction, then find a matching
+      // "placed" setup.
+      if (!setup) {
+        const { db: prisma } = await import("@fxflow/db")
+        const trade = await prisma.trade.findUnique({ where: { id: dbTradeId } })
+        if (trade) {
+          setup = await findPlacedSetupByInstrumentDirection(trade.instrument, trade.direction)
+        }
+      }
+
       if (setup && setup.status === "placed") {
-        await this.transitionToFilled(setup)
+        // Update resultSourceId to the actual OANDA trade ID so the web app can look it up later
+        await updateSetupStatus(setup.id, "filled", { resultSourceId: oandaSourceTradeId })
+        await this.transitionToFilledBroadcast(setup, oandaSourceTradeId)
         // Slot opened — try to place the next queued setup
         void this.tryPlaceNextQueued()
       }

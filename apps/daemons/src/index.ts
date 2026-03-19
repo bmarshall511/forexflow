@@ -252,17 +252,17 @@ async function main() {
   tradeSyncer.onPendingCreated = (tradeId) => {
     void autoAnalyzer.onPendingCreated(tradeId)
   }
-  tradeSyncer.onOrderFilled = (tradeId) => {
+  tradeSyncer.onOrderFilled = (tradeId, sourceTradeId) => {
     conditionMonitor.invalidateTradeCache(tradeId)
     void autoAnalyzer.onOrderFilled(tradeId)
     // Check if this fill corresponds to a Trade Finder auto-placed setup
-    void tradeFinderScanner.onOrderFilled(tradeId)
+    void tradeFinderScanner.onOrderFilled(tradeId, sourceTradeId)
     // Start managing the filled Trade Finder trade
-    void tradeFinderTradeManager.onOrderFilled(tradeId)
+    void tradeFinderTradeManager.onOrderFilled(tradeId, sourceTradeId)
     // Check if this fill corresponds to an AI Trader opportunity
     void aiTraderScanner.onOrderFilled(tradeId)
     // Check if this fill corresponds to a SmartFlow trade
-    void smartFlowManager.onOrderFilled(tradeId, "")
+    void smartFlowManager.onOrderFilled(tradeId, sourceTradeId)
   }
   tradeSyncer.onTradeClosing = (sourceTradeId) =>
     positionPriceTracker.persistMfeMaeForTrade(sourceTradeId)
@@ -343,6 +343,13 @@ async function main() {
       for (const t of positionManager.getPositions().open) ids.add(t.sourceTradeId)
       return ids
     },
+    // getOpenPositions — open trade details for instrument+direction matching during fill detection
+    () =>
+      positionManager.getPositions().open.map((t) => ({
+        sourceTradeId: t.sourceTradeId,
+        instrument: t.instrument,
+        direction: t.direction,
+      })),
   )
 
   await tradeFinderScanner.start()
