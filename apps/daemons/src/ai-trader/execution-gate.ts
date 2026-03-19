@@ -131,16 +131,12 @@ export class ExecutionGate {
   }
 
   /**
-   * Check if the TV Alerts kill switch is engaged (shared kill switch).
+   * Check if the global kill switch is engaged.
+   * The AI Trader has its own `enabled` flag — TV Alerts state does not affect it.
+   * This method is kept for future use (e.g., a global "halt all automation" switch).
    */
   async isKillSwitchEngaged(): Promise<boolean> {
-    try {
-      const { getTVAlertsConfig } = await import("@fxflow/db")
-      const tvConfig = await getTVAlertsConfig()
-      return !tvConfig.enabled // If TV alerts disabled, kill switch is ON
-    } catch {
-      return false // If we can't read config, don't block
-    }
+    return false
   }
 
   /**
@@ -197,11 +193,6 @@ export class ExecutionGate {
     regime?: string | null,
     tier1Confidence?: number,
   ): Promise<GateResult> {
-    // Kill switch
-    if (await this.isKillSwitchEngaged()) {
-      return { allowed: false, reason: "Kill switch is engaged" }
-    }
-
     // Regime gate (before spending on Tier 3)
     if (regime !== undefined && tier1Confidence !== undefined) {
       const regimeResult = this.regimeCheck(regime, tier1Confidence)

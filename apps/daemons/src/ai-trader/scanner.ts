@@ -455,14 +455,6 @@ export class AiTraderScanner {
         return
       }
 
-      if (await this.executionGate.isKillSwitchEngaged()) {
-        console.log("[ai-trader] Scan skipped: kill switch engaged")
-        this.updateProgress("skipped", "Kill switch is on (TV Alerts disabled)")
-        this.addLogEntry("scan_skip", "Kill switch engaged")
-        this.scheduleScan(config.scanIntervalMinutes * 60_000)
-        return
-      }
-
       // ─── Check credentials ──────────────────────────────────
       this.updateProgress("checking_config", "Verifying OANDA credentials...")
       const creds = this.stateManager.getCredentials()
