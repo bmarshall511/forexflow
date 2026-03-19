@@ -219,8 +219,6 @@ class TrendPaneRenderer implements IPrimitivePaneRenderer {
     trendColor: string,
     opacityScale: number,
   ): void {
-    const chartWidth = ctx.canvas.width / (window.devicePixelRatio || 1)
-
     ctx.strokeStyle = hexToRgba(trendColor, 0.8 * opacityScale)
     ctx.lineWidth = 2
     ctx.setLineDash([])
