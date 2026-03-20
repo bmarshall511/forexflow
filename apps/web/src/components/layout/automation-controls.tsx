@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useState } from "react"
 import { Radio, Zap, Bot, Loader2, ChevronDown, Workflow, Sparkles } from "lucide-react"
+import type { PlacementSource } from "@fxflow/types"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useKillSwitch } from "@/hooks/use-kill-switch"
@@ -9,6 +10,7 @@ import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
 import { useAiTraderConfig } from "@/hooks/use-ai-trader-config"
 import { useSmartFlow } from "@/hooks/use-smart-flow"
 import { useAiSettings } from "@/hooks/use-ai-settings"
+import { useSourcePriority } from "@/hooks/use-source-priority"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -23,6 +25,8 @@ interface ToggleRowProps {
   onToggle: () => void
   color: string
   dotColor: string
+  /** Trade priority position (1-based). Shown as a small badge when set. */
+  priority?: number
 }
 
 function ToggleRow({
@@ -34,6 +38,7 @@ function ToggleRow({
   onToggle,
   color,
   dotColor,
+  priority,
 }: ToggleRowProps) {
   return (
     <button
@@ -69,6 +74,11 @@ function ToggleRow({
           >
             {enabled ? "On" : "Off"}
           </span>
+          {priority != null && (
+            <span className="text-muted-foreground/60 text-[9px] font-medium tabular-nums">
+              #{priority}
+            </span>
+          )}
         </div>
         <p className="text-muted-foreground text-[11px] leading-tight">{description}</p>
       </div>
@@ -89,6 +99,9 @@ function StatusDot({ active, color }: { active: boolean; color: string }) {
   )
 }
 
+/** Default priority order when source priority config is unavailable */
+const DEFAULT_PRIORITY: PlacementSource[] = ["trade_finder", "ai_trader", "smart_flow", "tv_alerts"]
+
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export function AutomationControls() {
@@ -101,6 +114,8 @@ export function AutomationControls() {
     savePreferences: aiAnalysisSave,
     refetch: aiAnalysisRefetch,
   } = useAiSettings()
+  const { config: priorityConfig } = useSourcePriority()
+  const priorityOrder = priorityConfig?.priorityOrder ?? DEFAULT_PRIORITY
 
   const [tfToggling, setTfToggling] = useState(false)
   const [aiToggling, setAiToggling] = useState(false)
@@ -207,13 +222,19 @@ export function AutomationControls() {
           )}
           aria-label={`Automation controls: ${activeCount} of 5 active`}
         >
-          {/* Status dots */}
+          {/* Status dots — ordered by trade priority */}
           <div className="flex items-center gap-1">
-            <StatusDot active={tvActive} color="bg-green-500" />
-            <StatusDot active={tfActive} color="bg-teal-500" />
-            <StatusDot active={aiActive} color="bg-violet-500" />
+            {priorityOrder.map((source) => {
+              const dotConfig: Record<PlacementSource, { active: boolean; color: string }> = {
+                tv_alerts: { active: tvActive, color: "bg-green-500" },
+                trade_finder: { active: tfActive, color: "bg-teal-500" },
+                ai_trader: { active: aiActive, color: "bg-violet-500" },
+                smart_flow: { active: sfActive, color: "bg-amber-500" },
+              }
+              const d = dotConfig[source]
+              return d ? <StatusDot key={source} active={d.active} color={d.color} /> : null
+            })}
             <StatusDot active={aaActive} color="bg-blue-500" />
-            <StatusDot active={sfActive} color="bg-amber-500" />
           </div>
           <span className="@5xl/header:inline hidden whitespace-nowrap">Automation</span>
           <ChevronDown className="size-3 opacity-50" />
@@ -225,30 +246,75 @@ export function AutomationControls() {
           <p className="text-muted-foreground text-[10px]">{activeCount} of 5 systems active</p>
         </div>
         <div className="space-y-0.5">
-          {tvEnabled !== null && (
-            <ToggleRow
-              icon={<Radio className="size-4" />}
-              label="TV Alerts"
-              description="TradingView webhook signals"
-              enabled={tvActive}
-              toggling={tvToggling}
-              onToggle={handleTvToggle}
-              color="text-green-500"
-              dotColor="bg-green-500"
-            />
-          )}
-          {tfConfig && (
-            <ToggleRow
-              icon={<Zap className="size-4" />}
-              label="Auto-Trade"
-              description="Trade Finder auto-placement"
-              enabled={tfActive}
-              toggling={tfToggling}
-              onToggle={handleTfToggle}
-              color="text-teal-500"
-              dotColor="bg-teal-500"
-            />
-          )}
+          {/* Placement sources — ordered by configured trade priority */}
+          {priorityOrder.map((source, idx) => {
+            const priority = idx + 1
+            switch (source) {
+              case "tv_alerts":
+                return tvEnabled !== null ? (
+                  <ToggleRow
+                    key="tv_alerts"
+                    icon={<Radio className="size-4" />}
+                    label="TV Alerts"
+                    description="TradingView webhook signals"
+                    enabled={tvActive}
+                    toggling={tvToggling}
+                    onToggle={handleTvToggle}
+                    color="text-green-500"
+                    dotColor="bg-green-500"
+                    priority={priority}
+                  />
+                ) : null
+              case "trade_finder":
+                return tfConfig ? (
+                  <ToggleRow
+                    key="trade_finder"
+                    icon={<Zap className="size-4" />}
+                    label="Auto-Trade"
+                    description="Trade Finder auto-placement"
+                    enabled={tfActive}
+                    toggling={tfToggling}
+                    onToggle={handleTfToggle}
+                    color="text-teal-500"
+                    dotColor="bg-teal-500"
+                    priority={priority}
+                  />
+                ) : null
+              case "ai_trader":
+                return aiConfig ? (
+                  <ToggleRow
+                    key="ai_trader"
+                    icon={<Bot className="size-4" />}
+                    label="AI Trader"
+                    description="Autonomous trade discovery"
+                    enabled={aiActive}
+                    toggling={aiToggling}
+                    onToggle={handleAiToggle}
+                    color="text-violet-500"
+                    dotColor="bg-violet-500"
+                    priority={priority}
+                  />
+                ) : null
+              case "smart_flow":
+                return sfSettings ? (
+                  <ToggleRow
+                    key="smart_flow"
+                    icon={<Workflow className="size-4" />}
+                    label="SmartFlow"
+                    description="Intelligent trade management"
+                    enabled={sfActive}
+                    toggling={sfToggling}
+                    onToggle={handleSfToggle}
+                    color="text-amber-500"
+                    dotColor="bg-amber-500"
+                    priority={priority}
+                  />
+                ) : null
+              default:
+                return null
+            }
+          })}
+          {/* AI Analysis — not a placement source, always shown last */}
           {aiAnalysisSettings && (
             <ToggleRow
               icon={<Sparkles className="size-4" />}
@@ -259,30 +325,6 @@ export function AutomationControls() {
               onToggle={handleAaToggle}
               color="text-blue-500"
               dotColor="bg-blue-500"
-            />
-          )}
-          {aiConfig && (
-            <ToggleRow
-              icon={<Bot className="size-4" />}
-              label="AI Trader"
-              description="Autonomous trade discovery"
-              enabled={aiActive}
-              toggling={aiToggling}
-              onToggle={handleAiToggle}
-              color="text-violet-500"
-              dotColor="bg-violet-500"
-            />
-          )}
-          {sfSettings && (
-            <ToggleRow
-              icon={<Workflow className="size-4" />}
-              label="SmartFlow"
-              description="Intelligent trade management"
-              enabled={sfActive}
-              toggling={sfToggling}
-              onToggle={handleSfToggle}
-              color="text-amber-500"
-              dotColor="bg-amber-500"
             />
           )}
         </div>
