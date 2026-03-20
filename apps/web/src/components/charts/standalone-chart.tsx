@@ -207,10 +207,14 @@ function StandaloneChartInner({
 
     const handleResize = () => {
       if (container && !disposed) {
-        chart.applyOptions({
-          width: container.clientWidth,
-          height: container.clientHeight,
-        })
+        try {
+          chart.applyOptions({
+            width: container.clientWidth,
+            height: container.clientHeight,
+          })
+        } catch {
+          // Chart disposed during resize — safe to ignore
+        }
       }
     }
     const observer = new ResizeObserver(handleResize)
@@ -221,7 +225,16 @@ function StandaloneChartInner({
       if (delayTimer) clearTimeout(delayTimer)
       unsubDynamic()
       observer.disconnect()
-      chart.remove()
+      // Defer chart.remove() to next frame so pending paint callbacks
+      // in lightweight-charts complete before the chart is disposed.
+      // This prevents "Object is disposed" errors from queued rAF paints.
+      requestAnimationFrame(() => {
+        try {
+          chart.remove()
+        } catch {
+          // Chart already disposed — safe to ignore
+        }
+      })
       chartRef.current = null
       seriesRef.current = null
       lastCandleRef.current = null // reset hook's ref on chart dispose
