@@ -76,7 +76,7 @@ export function TFSettingsPairs({ config, onUpdate, saving, autoTradeEnabledPair
             ` ${autoTradeEnabledPairCount} with auto-trade.`}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         {FOREX_PAIR_GROUPS.map((group) => (
           <PairGroup
             key={group.label}
@@ -110,10 +110,10 @@ function PairGroup({ label, groupPairs, config, enabledCount, getPairConfig, onT
 }) {
   return (
     <div>
-      <h3 className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wider">
+      <h3 className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
         {label}
       </h3>
-      <div className="space-y-0.5">
+      <div className="space-y-1">
         {groupPairs.map((fp) => {
           const pc = getPairConfig(fp.value)
           const isEnabled = pc?.enabled ?? false
@@ -125,7 +125,7 @@ function PairGroup({ label, groupPairs, config, enabledCount, getPairConfig, onT
             <div
               key={fp.value}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
+                "flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors",
                 isEnabled ? "bg-accent/50" : "hover:bg-muted/50",
               )}
             >
