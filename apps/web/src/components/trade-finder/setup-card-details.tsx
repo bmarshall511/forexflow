@@ -47,14 +47,15 @@ export function SetupCardDetails({
   const riskDollars = computeDollarAmount(setup.positionSize, setup.riskPips, setup.instrument)
   const rewardDollars = computeDollarAmount(setup.positionSize, setup.rewardPips, setup.instrument)
 
-  // Chart overlay toggles
+  // Chart state
   const [showOrder, setShowOrder] = useState(true)
   const [showZone, setShowZone] = useState(true)
   const [showTrend, setShowTrend] = useState(true)
   const [showCurve, setShowCurve] = useState(true)
+  const [chartTfKey, setChartTfKey] = useState<"ltf" | "mtf" | "htf">("ltf")
 
   const tfSet = TIMEFRAME_SET_MAP[setup.timeframeSet]
-  const chartTimeframe = tfSet?.ltf ?? "M15"
+  const chartTimeframe = tfSet?.[chartTfKey] ?? tfSet?.ltf ?? "M15"
 
   const orderOverlay = showOrder ? {
     direction: setup.direction,
@@ -210,7 +211,30 @@ export function SetupCardDetails({
           <LineChart className="size-3.5" />
           {showChart ? "Hide Chart" : "Show Chart"}
         </Button>
-        <span className="text-muted-foreground text-[10px]">{chartTimeframe} timeframe</span>
+        {showChart && tfSet && (
+          <div className="flex items-center gap-0.5 rounded-md border p-0.5">
+            {(["ltf", "mtf", "htf"] as const).map((key) => {
+              const tf = tfSet[key]
+              const label = key === "ltf" ? "Entry" : key === "mtf" ? "Trend" : "Big Picture"
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setChartTfKey(key)}
+                  className={cn(
+                    "rounded px-2 py-0.5 text-[10px] font-medium transition-colors",
+                    chartTfKey === key
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  title={`${label} timeframe (${tf})`}
+                >
+                  {tf}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {showChart && (
