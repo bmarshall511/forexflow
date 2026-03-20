@@ -24,7 +24,7 @@ export function TFSettingsSafety({ circuitBreaker, onReset }: Props) {
           Automatic protection against losing streaks. Always active.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-6">
         {!circuitBreaker ? (
           <p className="text-muted-foreground text-sm">
             Connect to daemon to see safety status

@@ -19,7 +19,7 @@ export function TFSettingsEntry({ config, onUpdate, saving }: TFSettingsProps) {
         </div>
         <CardDescription>Control how and when trades are placed.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-6">
         {/* Entry confirmation */}
         <div className="flex items-center justify-between">
           <div>

@@ -35,7 +35,7 @@ export function TFSettingsAutoTrade({
           Let the system place trades for you when it finds good setups.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-6">
         {/* Master toggle */}
         <div className="flex items-center justify-between">
           <div>
