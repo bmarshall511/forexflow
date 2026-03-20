@@ -178,59 +178,56 @@ export function TradeFinderDashboard() {
         }
       >
         {/* Status tiles */}
-        <div
-          className={cn(
-            "grid grid-cols-2 gap-3 sm:grid-cols-4",
-            config?.autoTradeEnabled && capUtilization && "lg:grid-cols-6",
-          )}
-        >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <StatusTile
             label="Scanner"
-            value={config?.enabled ? "Active" : "Off"}
-            variant={config?.enabled ? "positive" : "muted"}
+            value={config?.enabled ? "Running" : "Off"}
+            subtitle={
+              scanStatus?.isScanning
+                ? `Checking ${scanStatus.currentPair?.replace("_", "/") ?? ""} (${scanStatus.pairsScanned}/${scanStatus.totalPairs})`
+                : scanStatus?.lastScanAt
+                  ? `Last scan ${formatRelativeTime(scanStatus.lastScanAt)}`
+                  : undefined
+            }
+            variant={scanStatus?.isScanning ? "warning" : config?.enabled ? "positive" : "muted"}
           />
           <StatusTile
-            label="Active Setups"
+            label="Trade Ideas"
             value={String(totalActiveSetups)}
-            subtitle={approachingCount > 0 ? `${approachingCount} approaching` : undefined}
-            variant={approachingCount > 0 ? "warning" : "default"}
+            subtitle={
+              approachingCount > 0
+                ? `${approachingCount} close to entry`
+                : totalActiveSetups > 0
+                  ? "Watching the market"
+                  : "None right now"
+            }
+            variant={approachingCount > 0 ? "warning" : totalActiveSetups > 0 ? "default" : "muted"}
           />
           <StatusTile
             label="Auto-Trade"
-            value={config?.autoTradeEnabled ? `On (≥${config.autoTradeMinScore})` : "Off"}
-            variant={config?.autoTradeEnabled ? "accent" : "muted"}
-          />
-          <StatusTile
-            label="Last Scan"
-            value={scanStatus?.lastScanAt ? formatRelativeTime(scanStatus.lastScanAt) : "Never"}
+            value={config?.autoTradeEnabled ? "Active" : "Off"}
             subtitle={
-              scanStatus?.isScanning
-                ? `${scanStatus.pairsScanned}/${scanStatus.totalPairs} pairs`
-                : undefined
+              config?.autoTradeEnabled
+                ? capUtilization
+                  ? `${capUtilization.concurrent.used} of ${capUtilization.concurrent.max} slots used · ${capUtilization.risk.usedPercent.toFixed(1)}% risk`
+                  : `Minimum score: ${config.autoTradeMinScore}`
+                : "Enable in settings"
             }
-            variant={scanStatus?.isScanning ? "warning" : "default"}
+            variant={
+              config?.autoTradeEnabled
+                ? capUtilization && capUtilization.concurrent.used >= capUtilization.concurrent.max
+                  ? "warning"
+                  : "accent"
+                : "muted"
+            }
           />
-          {config?.autoTradeEnabled && capUtilization && (
-            <>
-              <StatusTile
-                label="Concurrent"
-                value={`${capUtilization.concurrent.used}/${capUtilization.concurrent.max}`}
-                variant={
-                  capUtilization.concurrent.used >= capUtilization.concurrent.max
-                    ? "warning"
-                    : "default"
-                }
-              />
-              <StatusTile
-                label="Risk"
-                value={`${capUtilization.risk.usedPercent.toFixed(1)}%/${capUtilization.risk.maxPercent}%`}
-                variant={
-                  capUtilization.risk.usedPercent >= capUtilization.risk.maxPercent
-                    ? "warning"
-                    : "default"
-                }
-              />
-            </>
+          {scanStatus?.error && (
+            <StatusTile
+              label="Error"
+              value="Scan failed"
+              subtitle={scanStatus.error}
+              variant="warning"
+            />
           )}
         </div>
       </PageHeader>
@@ -529,7 +526,7 @@ function StatusTile({
         {label}
       </span>
       <p className={cn("font-mono text-sm font-semibold tabular-nums", valueColor)}>{value}</p>
-      {subtitle && <p className="text-muted-foreground truncate text-[10px]">{subtitle}</p>}
+      {subtitle && <p className="text-muted-foreground text-[10px] leading-snug">{subtitle}</p>}
     </div>
   )
 }

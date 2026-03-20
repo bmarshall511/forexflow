@@ -60,6 +60,7 @@ function isCappedReason(reason: string): boolean {
 export function getAutoTradeStatus(
   setup: TradeFinderSetupData,
   config: AutoTradeConfig,
+  liveDistancePips?: number,
 ): AutoTradeStatus {
   if (!config.autoTradeEnabled) return null
   if (setup.status === "placed" || setup.status === "filled") return null
@@ -93,7 +94,7 @@ export function getAutoTradeStatus(
   const dir = setup.direction === "long" ? "go up" : "go down"
 
   if (setup.status === "active") {
-    const dist = setup.distanceToEntryPips.toFixed(0)
+    const dist = (liveDistancePips ?? setup.distanceToEntryPips).toFixed(0)
     return {
       type: "eligible",
       reason: `${pair} needs to move ${dist} more pips before this trade can be placed. The system will watch and wait.`,

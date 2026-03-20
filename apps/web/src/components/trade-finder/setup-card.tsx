@@ -2,7 +2,7 @@
 
 import type { TradeFinderSetupData } from "@fxflow/types"
 import { TIMEFRAME_SET_MAP } from "@fxflow/types"
-import { formatInstrument } from "@fxflow/shared"
+import { formatInstrument, getPipSize } from "@fxflow/shared"
 import { Progress } from "@/components/ui/progress"
 import { Zap, AlertCircle } from "lucide-react"
 import { usePositions } from "@/hooks/use-positions"
@@ -45,10 +45,17 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
   const { pricesByInstrument } = usePositions()
   const lastTick = pricesByInstrument.get(setup.instrument) ?? null
 
+  // Live distance from current price to entry (updates every tick)
+  const pipSize = getPipSize(setup.instrument)
+  const livePrice = lastTick?.bid ?? null
+  const liveDistancePips = livePrice
+    ? Math.abs(livePrice - setup.entryPrice) / pipSize
+    : setup.distanceToEntryPips
+
   const riskDollars = computeDollarAmount(setup.positionSize, setup.riskPips, setup.instrument)
   const rewardDollars = computeDollarAmount(setup.positionSize, setup.rewardPips, setup.instrument)
 
-  const autoTradeStatus = autoTradeConfig ? getAutoTradeStatus(setup, autoTradeConfig) : null
+  const autoTradeStatus = autoTradeConfig ? getAutoTradeStatus(setup, autoTradeConfig, liveDistancePips) : null
 
   const statusLabel = (() => {
     if (setup.autoPlaced && setup.status === "filled") return "Auto Filled"
@@ -163,15 +170,20 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
         </div>
       </div>
 
-      {/* Distance */}
-      <div className="px-4 pt-2">
+      {/* Distance + live price */}
+      <div className="flex items-center justify-between px-4 pt-2">
         <p className="text-muted-foreground text-xs">
-          {setup.distanceToEntryPips < 1
+          {liveDistancePips < 1
             ? "At the entry zone"
-            : setup.distanceToEntryPips < 10
-              ? `${setup.distanceToEntryPips.toFixed(1)} pips from entry`
-              : `${setup.distanceToEntryPips.toFixed(0)} pips from entry`}
+            : liveDistancePips < 10
+              ? `${liveDistancePips.toFixed(1)} pips from entry`
+              : `${liveDistancePips.toFixed(0)} pips from entry`}
         </p>
+        {livePrice && (
+          <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+            {livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5)}
+          </span>
+        )}
       </div>
 
       {/* Auto-trade status context */}
