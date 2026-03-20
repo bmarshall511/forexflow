@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Clock, Crosshair, TrendingUp, type LucideIcon } from "lucide-react"
+import { Bot, Clock, Crosshair, TrendingUp, type LucideIcon } from "lucide-react"
 import { useDaemonStatus } from "./use-daemon-status"
 import { useDaemonConnection } from "./use-daemon-connection"
 import { usePositions } from "./use-positions"
@@ -20,7 +20,7 @@ export interface NavBadge {
 /** Returns a map of badge keys → array of badge items for sidebar nav. */
 export function useSidebarBadges(): Record<string, NavBadge[]> {
   const { tvAlertsStatus } = useDaemonStatus()
-  const { tradeFinderScanStatus } = useDaemonConnection()
+  const { tradeFinderScanStatus, lastAiTraderScanStatus } = useDaemonConnection()
   const { summary } = usePositions()
   const activeAnalyses = useActiveAiAnalyses()
 
@@ -38,6 +38,14 @@ export function useSidebarBadges(): Record<string, NavBadge[]> {
           icon: Crosshair,
         },
       ],
+      aiTrader: [
+        {
+          count: lastAiTraderScanStatus?.openAiTradeCount ?? 0,
+          label: "trades",
+          color: "text-indigo-500",
+          icon: Bot,
+        },
+      ],
       tvAlerts: [
         {
           count: tvAlertsStatus?.signalCountToday ?? 0,
@@ -53,6 +61,13 @@ export function useSidebarBadges(): Record<string, NavBadge[]> {
         },
       ],
     }),
-    [summary.openCount, summary.pendingCount, tradeFinderScanStatus?.activeSetups, tvAlertsStatus?.signalCountToday, activeAnalyses],
+    [
+      summary.openCount,
+      summary.pendingCount,
+      tradeFinderScanStatus?.activeSetups,
+      lastAiTraderScanStatus?.openAiTradeCount,
+      tvAlertsStatus?.signalCountToday,
+      activeAnalyses,
+    ],
   )
 }

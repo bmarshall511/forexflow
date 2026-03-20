@@ -18,6 +18,8 @@ import {
   ScrollText,
   Pause,
   Play,
+  AlertTriangle,
+  Shield,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useAiTrader } from "@/hooks/use-ai-trader"
@@ -50,7 +52,7 @@ export function AiTraderDashboard() {
 
   const isScanning =
     status?.scanning || (progress && !["complete", "skipped", "error"].includes(progress.phase))
-  const isPaused = status?.enabled === false && !isScanning
+  const isPaused = status?.paused === true || (status?.enabled === false && !isScanning)
 
   // Clear actionInFlight once scanner state catches up via WS
   const prevScanningRef = useRef(false)
@@ -158,24 +160,67 @@ export function AiTraderDashboard() {
       >
         <ScannerStatusBar status={status} progress={progress} />
 
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        {status?.error && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-500">
+            <AlertTriangle className="size-4 shrink-0" />
+            <span className="truncate">{status.error}</span>
+          </div>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <DataTile
-            label="Open EdgeFinder Trades"
-            value={String(status?.openAiTradeCount ?? 0)}
-            icon={<Zap className="size-3" />}
-            variant={status?.openAiTradeCount ? "accent" : "default"}
-          />
-          <DataTile
-            label="Today's AI Cost"
-            value={`$${(status?.todayBudgetUsed ?? 0).toFixed(4)}`}
-            subtitle={dailyBudgetUsd > 0 ? `of $${dailyBudgetUsd.toFixed(2)} budget` : undefined}
-            icon={<DollarSign className="size-3" />}
-          />
-          <DataTile
-            label="Monthly AI Cost"
-            value={`$${(status?.monthlyBudgetUsed ?? 0).toFixed(4)}`}
+            label="Scanner"
+            value={isScanning ? "Scanning" : isPaused ? "Paused" : status?.enabled ? "Idle" : "Off"}
             subtitle={
-              monthlyBudgetUsd > 0 ? `of $${monthlyBudgetUsd.toFixed(2)} budget` : undefined
+              isScanning && progress
+                ? progress.phase === "scanning_pairs" && progress.pairsTotal > 0
+                  ? `${progress.pairsScanned}/${progress.pairsTotal} pairs checked`
+                  : progress.phase === "analyzing_candidates"
+                    ? `AI analyzing ${progress.candidatesAnalyzed}/${progress.candidatesTotal}`
+                    : "Starting..."
+                : status?.lastScanAt
+                  ? `Last scan ${formatTimeAgo(status.lastScanAt)}`
+                  : undefined
+            }
+            icon={<Bot className="size-3" />}
+            variant={isScanning ? "accent" : status?.error ? "negative" : "default"}
+          />
+          <DataTile
+            label="Opportunities"
+            value={String(suggestedCount)}
+            subtitle={
+              suggestedCount > 0
+                ? `${suggestedCount} awaiting review`
+                : opportunities.length > 0
+                  ? `${opportunities.length} total history`
+                  : "None found yet"
+            }
+            icon={<Zap className="size-3" />}
+            variant={suggestedCount > 0 ? "accent" : "default"}
+          />
+          <DataTile
+            label="Mode"
+            value={
+              operatingMode === "full_auto"
+                ? "Full Auto"
+                : operatingMode === "semi_auto"
+                  ? "Semi-Auto"
+                  : "Manual"
+            }
+            subtitle={
+              operatingMode === "manual"
+                ? "You approve each trade"
+                : `Auto above ${confidenceThreshold}% confidence`
+            }
+            icon={<Shield className="size-3" />}
+          />
+          <DataTile
+            label="AI Budget"
+            value={`$${(status?.todayBudgetUsed ?? 0).toFixed(2)}`}
+            subtitle={
+              dailyBudgetUsd > 0
+                ? `of $${dailyBudgetUsd.toFixed(2)} daily · $${(status?.monthlyBudgetUsed ?? 0).toFixed(2)}/$${monthlyBudgetUsd.toFixed(2)} mo`
+                : undefined
             }
             icon={<DollarSign className="size-3" />}
           />
@@ -214,6 +259,15 @@ export function AiTraderDashboard() {
       </div>
     </div>
   )
+}
+
+function formatTimeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  if (diff < 60_000) return "just now"
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h ago`
 }
 
 // ─── Scan Control Buttons ──────────────────────────────────────────────────

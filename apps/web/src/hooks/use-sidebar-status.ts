@@ -15,10 +15,56 @@ export interface SidebarStatus {
 /** Returns a map of statusKey → SidebarStatus for nav items with dynamic status text. */
 export function useSidebarStatus(): Record<string, SidebarStatus> {
   const { tradeFinderScanStatus, tradeFinderSetupCounts } = useTradeFinderNavData()
+  const { lastAiTraderScanStatus, lastAiTraderScanProgress } = useDaemonConnection()
 
   return useMemo(() => {
     const result: Record<string, SidebarStatus> = {}
 
+    // ─── EdgeFinder status ────────────────────────────────────────────
+    if (lastAiTraderScanStatus) {
+      const { scanning, enabled, paused, error, openAiTradeCount, lastScanAt, nextScanAt } =
+        lastAiTraderScanStatus
+      let line1: string
+      let line2: string | undefined
+      let variant: SidebarStatus["variant"] = "default"
+
+      if (error) {
+        line1 = "Something went wrong"
+        variant = "error"
+      } else if (!enabled) {
+        line1 = "Disabled in settings"
+        variant = "default"
+      } else if (paused) {
+        line1 = "Paused"
+        variant = "warning"
+      } else if (scanning && lastAiTraderScanProgress) {
+        const { phase, pairsScanned, pairsTotal } = lastAiTraderScanProgress
+        if (phase === "scanning_pairs" && pairsTotal > 0) {
+          line1 = `Scanning ${pairsScanned}/${pairsTotal} pairs`
+        } else if (phase === "analyzing_candidates") {
+          line1 = "AI analyzing candidates..."
+        } else {
+          line1 = "Scanning..."
+        }
+        variant = "active"
+      } else if (nextScanAt) {
+        line1 = `Scans again in ${formatCountdown(nextScanAt)}`
+      } else if (lastScanAt) {
+        line1 = `Scanned ${formatTimeAgo(lastScanAt)}`
+      } else {
+        line1 = "Connecting..."
+      }
+
+      if (openAiTradeCount > 0) {
+        line2 = `${openAiTradeCount} trade${openAiTradeCount !== 1 ? "s" : ""} open`
+      } else if (enabled && !error) {
+        line2 = "No open trades"
+      }
+
+      result.aiTrader = { line1, line2, variant }
+    }
+
+    // ─── Trade Finder status ──────────────────────────────────────────
     if (tradeFinderScanStatus) {
       const { isScanning, pairsScanned, totalPairs, lastScanAt, nextScanAt, error, currentPair } =
         tradeFinderScanStatus
@@ -47,9 +93,10 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
       const { active, approaching } = tradeFinderSetupCounts
       const total = active + approaching
       if (total > 0) {
-        line2 = approaching > 0
-          ? `${total} found, ${approaching} close to entry`
-          : `${total} trade idea${total !== 1 ? "s" : ""} found`
+        line2 =
+          approaching > 0
+            ? `${total} found, ${approaching} close to entry`
+            : `${total} trade idea${total !== 1 ? "s" : ""} found`
       } else if (!isScanning && !error) {
         line2 = "No trade ideas right now"
       }
@@ -58,7 +105,12 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
     }
 
     return result
-  }, [tradeFinderScanStatus, tradeFinderSetupCounts])
+  }, [
+    tradeFinderScanStatus,
+    tradeFinderSetupCounts,
+    lastAiTraderScanStatus,
+    lastAiTraderScanProgress,
+  ])
 }
 
 /** Gathers Trade Finder data needed for the sidebar nav status. */

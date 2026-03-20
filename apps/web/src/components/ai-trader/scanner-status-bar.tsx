@@ -118,7 +118,7 @@ export function ScannerStatusBar({ status, progress }: ScannerStatusBarProps) {
           {!isScanning && status?.nextScanAt && (
             <div className="flex items-center gap-1">
               <Clock className="size-3" />
-              <span>Next: {formatCountdown(status.nextScanAt)}</span>
+              <span>Scans again {formatCountdown(status.nextScanAt)}</span>
             </div>
           )}
         </div>

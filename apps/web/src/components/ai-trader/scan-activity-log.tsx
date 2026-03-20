@@ -54,19 +54,51 @@ function getEntryStyle(entry: AiTraderScanLogEntry): EntryStyle {
   const conf = m?.confidence != null ? `${m.confidence}%` : ""
   const dir = m?.direction ? String(m.direction).toUpperCase() : ""
 
+  // Build a rich inline summary from filter diagnostics (pair_scanned entries)
+  const filterSummary = (() => {
+    if (entry.type !== "pair_scanned" || !m) return ""
+    const passed = m.filterPassed ?? m.candidatesFound ?? 0
+    const parts: string[] = []
+    if (m.filterLowVol) parts.push(`${m.filterLowVol} low volatility`)
+    if (m.filterNoSignal) parts.push(`${m.filterNoSignal} no signal`)
+    if (m.filterLowConfluence) parts.push(`${m.filterLowConfluence} low confluence`)
+    if (m.filterSpread) parts.push(`${m.filterSpread} spread too wide`)
+    if (m.filterRR) parts.push(`${m.filterRR} low R:R`)
+    if (m.filterHTF) parts.push(`${m.filterHTF} HTF disagreement`)
+    if (m.filterRSI) parts.push(`${m.filterRSI} RSI overextended`)
+    const filtersText = parts.length > 0 ? ` · Filtered: ${parts.join(", ")}` : ""
+    return ` · ${passed} passed${filtersText}`
+  })()
+
+  // Build scan_complete pipeline funnel summary
+  const funnelSummary = (() => {
+    if (entry.type !== "scan_complete" || !m) return ""
+    const parts: string[] = []
+    if (m.candidatesFound != null) parts.push(`${m.candidatesFound} signals`)
+    if (m.candidatesAnalyzed != null) parts.push(`${m.candidatesAnalyzed} sent to AI`)
+    if (m.tier2Passed != null) parts.push(`${m.tier2Passed} passed Tier 2`)
+    if (m.tier3Passed != null) parts.push(`${m.tier3Passed} passed Tier 3`)
+    if (m.tradesPlaced != null) parts.push(`${m.tradesPlaced} placed`)
+    return parts.length > 0 ? ` — ${parts.join(" → ")}` : ""
+  })()
+
+  const profile = m?.profile ? ` (${String(m.profile)})` : ""
+  const reason = m?.reason || entry.detail
+  const rr = m?.riskRewardRatio != null ? ` · ${Number(m.riskRewardRatio).toFixed(1)}:1 R:R` : ""
+
   const labels: Record<string, string> = {
     scan_start: "Starting market scan...",
-    scan_complete: `Scan finished — ${m?.pairsScanned ?? "?"} pairs checked`,
-    scan_skip: `Scan skipped — ${entry.message || "conditions not met"}`,
-    scan_error: `Scan error — ${entry.message || "something went wrong"}`,
-    pair_scanned: `Checked ${pair || "pairs"}`,
-    candidate_found: `Found potential signal on ${pair}`,
-    tier2_pass: `${pair} passed initial screening (${conf})`,
-    tier2_fail: `${pair} didn't pass screening — weak setup`,
-    tier3_pass: `${pair} approved — ${conf} confident ${dir}`,
-    tier3_fail: `${pair} rejected by deep analysis`,
-    trade_placed: `Placed LIMIT ${dir} on ${pair}${m?.entryPrice ? ` at ${m.entryPrice}` : ""}`,
-    trade_rejected: `${pair} trade failed — ${entry.message || "execution error"}`,
+    scan_complete: `Scan finished — ${m?.pairsScanned ?? "?"} pairs checked${funnelSummary}`,
+    scan_skip: entry.message || "Scan skipped — conditions not met",
+    scan_error: entry.message || "Scan error — something went wrong",
+    pair_scanned: `Scanned ${m?.pairsScanned ?? "?"} pairs, found ${m?.candidatesFound ?? 0} Tier 1 signals${filterSummary}`,
+    candidate_found: `${pair}${profile}: ${conf} confident ${dir}${rr}`,
+    tier2_pass: `${pair} passed quick screening — ${conf} confident ${dir}`,
+    tier2_fail: `${pair} rejected by quick screening${reason ? ` — ${reason}` : ""}`,
+    tier3_pass: `${pair} approved by deep analysis — ${conf} confident ${dir}${rr}`,
+    tier3_fail: `${pair} rejected by deep analysis${reason ? ` — ${reason}` : ""}`,
+    trade_placed: `Placed ${dir} on ${pair}${m?.entryPrice ? ` @ ${m.entryPrice}` : ""}${rr}`,
+    trade_rejected: `${pair} placement failed${reason ? ` — ${reason}` : ""}`,
     gate_blocked: `${pair} blocked — ${m?.reason || entry.message || "risk check failed"}`,
   }
 
