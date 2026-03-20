@@ -92,13 +92,13 @@ export function checkCurrencyExposure(
   if (baseCount >= maxPerCurrency) {
     return {
       allowed: false,
-      reason: `${base} exposure limit reached (${baseCount}/${maxPerCurrency})`,
+      reason: `Already have ${baseCount} trades using ${base} (max ${maxPerCurrency})`,
     }
   }
   if (quoteCount >= maxPerCurrency) {
     return {
       allowed: false,
-      reason: `${quote} exposure limit reached (${quoteCount}/${maxPerCurrency})`,
+      reason: `Already have ${quoteCount} trades using ${quote} (max ${maxPerCurrency})`,
     }
   }
 

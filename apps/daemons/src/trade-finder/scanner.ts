@@ -131,6 +131,7 @@ export class TradeFinderScanner {
   private totalPairs = 0
   private activeSetupCount = 0
   private lastError: string | null = null
+  private currentPair: string | null = null
 
   // Auto-trade dependencies (set externally after construction)
   private placeOrderFn: AutoTradePlaceOrderFn | null = null
@@ -282,6 +283,8 @@ export class TradeFinderScanner {
       const balance = snapshot.accountOverview?.summary.balance ?? 0
 
       for (const pair of enabledPairs) {
+        this.currentPair = pair.instrument
+        this.broadcastScanStatus()
         try {
           await this.scanPair(pair, config, apiUrl, creds.token, riskPercent, balance)
         } catch (err) {
@@ -294,6 +297,7 @@ export class TradeFinderScanner {
           await sleep(500)
         }
       }
+      this.currentPair = null
 
       // Check existing setups for invalidation
       await this.validateExistingSetups(config, apiUrl, creds.token)
@@ -600,7 +604,7 @@ export class TradeFinderScanner {
     if (setup.scores.total < config.autoTradeMinScore) {
       await this.skipAutoTrade(
         setup,
-        `Score ${setup.scores.total} below auto-trade threshold ${config.autoTradeMinScore}`,
+        `Quality too low — scored ${setup.scores.total}, needs at least ${config.autoTradeMinScore}`,
       )
       return
     }
@@ -610,7 +614,7 @@ export class TradeFinderScanner {
     if (trendScore < 1 && setup.scores.total < 13) {
       await this.skipAutoTrade(
         setup,
-        `Trend score ${trendScore} — counter-trend or no trend detected`,
+        `Market isn't trending in the right direction for this trade`,
       )
       return
     }
@@ -620,14 +624,14 @@ export class TradeFinderScanner {
     if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
       await this.skipAutoTrade(
         setup,
-        `R:R ${setup.rrRatio} below minimum ${config.autoTradeMinRR}:1`,
+        `Profit target too small — ${setup.rrRatio} but needs at least ${config.autoTradeMinRR}:1`,
       )
       return
     }
 
     // 6. Same-instrument guard — skip if existing open trade or pending order
     if (this.hasExistingPositionFn && this.hasExistingPositionFn(setup.instrument)) {
-      await this.skipAutoTrade(setup, `Existing position on ${setup.instrument}`)
+      await this.skipAutoTrade(setup, `Already have a trade on ${setup.instrument.replace("_", "/")}`)
       return
     }
 
@@ -646,7 +650,7 @@ export class TradeFinderScanner {
     if (pendingCount >= config.autoTradeMaxConcurrent) {
       await this.skipAutoTrade(
         setup,
-        `Max concurrent auto-trades reached (${pendingCount}/${config.autoTradeMaxConcurrent})`,
+        `Already have ${pendingCount} trades open (max ${config.autoTradeMaxConcurrent}) — waiting for a slot`,
       )
       return
     }
@@ -657,7 +661,7 @@ export class TradeFinderScanner {
       if (todayCount >= config.autoTradeMaxDaily) {
         await this.skipAutoTrade(
           setup,
-          `Daily auto-trade limit reached (${todayCount}/${config.autoTradeMaxDaily})`,
+          `Already placed ${todayCount} trades today (max ${config.autoTradeMaxDaily}) — done for today`,
         )
         return
       }
@@ -680,7 +684,7 @@ export class TradeFinderScanner {
       if (totalRiskPercent > config.autoTradeMaxRiskPercent) {
         await this.skipAutoTrade(
           setup,
-          `Total risk ${totalRiskPercent.toFixed(1)}% exceeds cap ${config.autoTradeMaxRiskPercent}%`,
+          `Too much money at risk (${totalRiskPercent.toFixed(1)}% of balance, max ${config.autoTradeMaxRiskPercent}%)`,
         )
         return
       }
@@ -695,7 +699,7 @@ export class TradeFinderScanner {
         if (spreadPips / setup.riskPips > 0.15) {
           await this.skipAutoTrade(
             setup,
-            `Spread ${spreadPips.toFixed(1)} pips = ${((spreadPips / setup.riskPips) * 100).toFixed(0)}% of SL — too wide`,
+            `Trading costs too high right now (${((spreadPips / setup.riskPips) * 100).toFixed(0)}% of risk) — will try again later`,
           )
           return
         }
@@ -732,7 +736,7 @@ export class TradeFinderScanner {
           )
         : setup.positionSize
     if (freshPositionSize <= 0) {
-      await this.skipAutoTrade(setup, "Position size is 0 after recalculation with current balance")
+      await this.skipAutoTrade(setup, "Account balance too low to place this trade")
       return
     }
 
@@ -1628,6 +1632,7 @@ export class TradeFinderScanner {
       totalPairs: this.totalPairs,
       activeSetups: this.activeSetupCount,
       error: this.lastError,
+      currentPair: this.currentPair,
     }
   }
 

@@ -2499,6 +2499,8 @@ export interface TradeFinderScanStatus {
   totalPairs: number
   activeSetups: number
   error: string | null
+  /** The instrument currently being scanned (null when not scanning) */
+  currentPair: string | null
 }
 
 /** Trade Finder settings API response */

@@ -1,12 +1,12 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { useDaemonConnection } from "./use-daemon-connection"
 
 export interface SidebarStatus {
-  /** Primary status line, e.g. "Scanning 5/20..." or "Next scan in 2m" */
+  /** Primary status line */
   line1: string
-  /** Secondary line, e.g. "3 setups · 1 approaching" */
+  /** Secondary line */
   line2?: string
   /** Visual variant for coloring */
   variant: "default" | "active" | "warning" | "error"
@@ -20,17 +20,21 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
     const result: Record<string, SidebarStatus> = {}
 
     if (tradeFinderScanStatus) {
-      const { isScanning, pairsScanned, totalPairs, lastScanAt, nextScanAt, error } =
+      const { isScanning, pairsScanned, totalPairs, lastScanAt, nextScanAt, error, currentPair } =
         tradeFinderScanStatus
 
       let line1: string
+      let line2: string | undefined
       let variant: SidebarStatus["variant"] = "default"
 
       if (error) {
         line1 = "Something went wrong"
         variant = "error"
       } else if (isScanning) {
-        line1 = `Checking ${pairsScanned} of ${totalPairs} pairs...`
+        const pairLabel = currentPair ? currentPair.replace("_", "/") : ""
+        line1 = pairLabel
+          ? `Checking ${pairLabel} (${pairsScanned}/${totalPairs})`
+          : `Checking ${pairsScanned} of ${totalPairs} pairs...`
         variant = "active"
       } else if (nextScanAt) {
         line1 = `Scans again in ${formatCountdown(nextScanAt)}`
@@ -42,11 +46,12 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
 
       const { active, approaching } = tradeFinderSetupCounts
       const total = active + approaching
-      let line2: string | undefined
       if (total > 0) {
-        const parts = [`${total} trade idea${total !== 1 ? "s" : ""} found`]
-        if (approaching > 0) parts.push(`${approaching} close to entry`)
-        line2 = parts.join(" · ")
+        line2 = approaching > 0
+          ? `${total} found, ${approaching} close to entry`
+          : `${total} trade idea${total !== 1 ? "s" : ""} found`
+      } else if (!isScanning && !error) {
+        line2 = "No trade ideas right now"
       }
 
       result.tradeFinder = { line1, line2, variant }
@@ -60,15 +65,15 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
 function useTradeFinderNavData() {
   const { tradeFinderScanStatus } = useDaemonConnection()
   const [setupCounts, setSetupCounts] = useState({ active: 0, approaching: 0 })
+  const mountedRef = useRef(true)
 
-  // Fetch setup counts on mount and periodically
   useEffect(() => {
-    let mounted = true
+    mountedRef.current = true
     const fetchCounts = async () => {
       try {
         const res = await fetch("/api/trade-finder/setups")
         const json = await res.json()
-        if (!mounted || !json.ok) return
+        if (!mountedRef.current || !json.ok) return
         const setups = json.data as Array<{ status: string }>
         setSetupCounts({
           active: setups.filter((s) => s.status === "active").length,
@@ -79,9 +84,9 @@ function useTradeFinderNavData() {
       }
     }
     void fetchCounts()
-    const interval = setInterval(fetchCounts, 30_000) // Refresh every 30s
+    const interval = setInterval(fetchCounts, 30_000)
     return () => {
-      mounted = false
+      mountedRef.current = false
       clearInterval(interval)
     }
   }, [])
@@ -94,20 +99,25 @@ function useTradeFinderNavData() {
 
 function formatCountdown(isoDate: string): string {
   const diff = new Date(isoDate).getTime() - Date.now()
-  if (diff <= 0) return "now"
+  if (diff <= 0) return "a moment"
   const secs = Math.floor(diff / 1000)
-  if (secs < 60) return `${secs}s`
+  if (secs < 60) return `${secs} seconds`
   const mins = Math.floor(secs / 60)
-  if (mins < 60) return `${mins}m`
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`
+  if (mins === 1) return "1 minute"
+  if (mins < 60) return `${mins} minutes`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h ${mins % 60}m`
 }
 
 function formatTimeAgo(isoDate: string): string {
   const diff = Date.now() - new Date(isoDate).getTime()
   if (diff < 0) return "just now"
   const secs = Math.floor(diff / 1000)
-  if (secs < 60) return `${secs}s ago`
+  if (secs < 60) return "just now"
   const mins = Math.floor(secs / 60)
-  if (mins < 60) return `${mins}m ago`
-  return `${Math.floor(mins / 60)}h ago`
+  if (mins === 1) return "1 minute ago"
+  if (mins < 60) return `${mins} minutes ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs === 1) return "1 hour ago"
+  return `${hrs} hours ago`
 }

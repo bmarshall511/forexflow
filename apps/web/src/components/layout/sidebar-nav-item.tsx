@@ -16,6 +16,13 @@ const STATUS_COLORS: Record<SidebarStatus["variant"], string> = {
   error: "text-red-400",
 }
 
+const STATUS_DOT: Record<SidebarStatus["variant"], string> = {
+  default: "bg-sidebar-foreground/30",
+  active: "bg-blue-400 animate-pulse",
+  warning: "bg-amber-400",
+  error: "bg-red-400",
+}
+
 interface SidebarNavItemProps {
   item: NavItem
   badges?: NavBadge[]
@@ -36,13 +43,13 @@ export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
     <Link
       href={item.href}
       className={cn(
-        "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        "group flex items-start gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-sidebar-ring focus-visible:outline-none focus-visible:ring-2",
         isActive
           ? "bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-sidebar-foreground/70",
-        !isOpen && "justify-center px-0",
+        !isOpen && "items-center justify-center px-0",
       )}
       aria-current={isActive ? "page" : undefined}
       aria-label={
@@ -52,7 +59,7 @@ export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
       }
     >
       {/* Icon with collapsed-state count badge */}
-      <span className="relative shrink-0">
+      <span className="relative mt-0.5 shrink-0">
         <Icon className="size-5" />
         {!isOpen && hasBadges && (
           <span
@@ -68,34 +75,39 @@ export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
       {isOpen && (
         <>
           <div className="min-w-0 flex-1">
-            <span className="block truncate">{item.label}</span>
-            {/* Dynamic status lines */}
+            <div className="flex items-center justify-between">
+              <span className="truncate">{item.label}</span>
+              {hasBadges && !status && (
+                <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                  {visibleBadges.map((badge) => {
+                    const BadgeIcon = badge.icon
+                    return (
+                      <span
+                        key={badge.label}
+                        className={cn("flex items-center gap-0.5 tabular-nums", badge.color)}
+                        title={`${badge.count} ${badge.label}`}
+                      >
+                        {BadgeIcon && <BadgeIcon className="size-3" />}
+                        <span className="text-[11px] font-semibold leading-none">{badge.count}</span>
+                      </span>
+                    )
+                  })}
+                </span>
+              )}
+            </div>
+            {/* Dynamic status lines — no truncation, text wraps naturally */}
             {status && (
-              <div className={cn("mt-0.5 space-y-0", STATUS_COLORS[status.variant])}>
-                <p className="truncate text-[10px] leading-tight">{status.line1}</p>
+              <div className={cn("mt-1 space-y-0.5", STATUS_COLORS[status.variant])}>
+                <p className="flex items-center gap-1.5 text-[10px] leading-snug">
+                  <span className={cn("inline-block size-1.5 shrink-0 rounded-full", STATUS_DOT[status.variant])} />
+                  {status.line1}
+                </p>
                 {status.line2 && (
-                  <p className="truncate text-[10px] leading-tight opacity-75">{status.line2}</p>
+                  <p className="text-[10px] leading-snug opacity-70 pl-[13px]">{status.line2}</p>
                 )}
               </div>
             )}
           </div>
-          {hasBadges && !status && (
-            <span className="ml-auto flex shrink-0 items-center gap-1.5">
-              {visibleBadges.map((badge) => {
-                const BadgeIcon = badge.icon
-                return (
-                  <span
-                    key={badge.label}
-                    className={cn("flex items-center gap-0.5 tabular-nums", badge.color)}
-                    title={`${badge.count} ${badge.label}`}
-                  >
-                    {BadgeIcon && <BadgeIcon className="size-3" />}
-                    <span className="text-[11px] font-semibold leading-none">{badge.count}</span>
-                  </span>
-                )
-              })}
-            </span>
-          )}
         </>
       )}
     </Link>
@@ -105,12 +117,15 @@ export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>{link}</TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8} className="space-y-1">
+        <TooltipContent side="right" sideOffset={8} className="space-y-1.5">
           <p className="font-medium">{item.label}</p>
           {status && (
-            <div className={cn("space-y-0.5 text-xs", STATUS_COLORS[status.variant])}>
-              <p>{status.line1}</p>
-              {status.line2 && <p className="opacity-75">{status.line2}</p>}
+            <div className={cn("space-y-0.5", STATUS_COLORS[status.variant])}>
+              <p className="flex items-center gap-1.5 text-xs">
+                <span className={cn("inline-block size-1.5 shrink-0 rounded-full", STATUS_DOT[status.variant])} />
+                {status.line1}
+              </p>
+              {status.line2 && <p className="text-xs opacity-70 pl-[13px]">{status.line2}</p>}
             </div>
           )}
           {hasBadges && (

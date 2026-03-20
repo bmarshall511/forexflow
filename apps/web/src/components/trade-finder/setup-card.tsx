@@ -85,13 +85,13 @@ function getAutoTradeStatus(
   if (setup.scores.total < config.autoTradeMinScore) {
     return {
       type: "blocked",
-      reason: `Score ${setup.scores.total} below threshold ${config.autoTradeMinScore}`,
+      reason: `Quality too low — scored ${setup.scores.total}, needs at least ${config.autoTradeMinScore}`,
     }
   }
 
   const rrNum = parseFloat(setup.rrRatio)
   if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
-    return { type: "blocked", reason: `R:R ${setup.rrRatio} below min ${config.autoTradeMinRR}:1` }
+    return { type: "blocked", reason: `Profit target too small — needs at least ${config.autoTradeMinRR}:1` }
   }
 
   if (setup.lastSkipReason) {
@@ -102,7 +102,7 @@ function getAutoTradeStatus(
   }
 
   if (setup.queuePosition != null) {
-    return { type: "queued", position: setup.queuePosition, reason: "Waiting for cap slot" }
+    return { type: "queued", position: setup.queuePosition, reason: "In line — waiting for a trade slot to open up" }
   }
 
   return { type: "eligible" }
