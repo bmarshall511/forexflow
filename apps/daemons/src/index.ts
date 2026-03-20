@@ -11,6 +11,7 @@ import {
   setTVAlertsState,
   setConditionMonitor,
   setTradeFinderScanner,
+  setPriceTracker,
   setDigestGenerator,
   setAiTraderScanner,
   setAlertMonitor,
@@ -141,6 +142,8 @@ async function main() {
     broadcast,
     config.priceThrottleMs,
   )
+
+  setPriceTracker(positionPriceTracker)
 
   // 10b. Chart price tracker (pricing stream for chart page instruments)
   const chartPriceTracker = new ChartPriceTracker(stateManager, broadcast, config.priceThrottleMs)

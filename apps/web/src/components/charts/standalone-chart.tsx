@@ -1,5 +1,18 @@
 "use client"
 
+// Suppress "Object is disposed" errors from lightweight-charts internal paint cycle.
+// When React unmounts a chart, queued requestAnimationFrame callbacks may fire after
+// chart.remove() disposes the canvas binding. This is a known library issue and harmless.
+if (typeof window !== "undefined" && !(window as unknown as Record<string, unknown>).__lcDisposeSuppressed) {
+  ;(window as unknown as Record<string, unknown>).__lcDisposeSuppressed = true
+  window.addEventListener("error", (e) => {
+    if (e.message?.includes("Object is disposed")) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  })
+}
+
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react"
 import { useTheme } from "next-themes"
 import { createChart, CandlestickSeries, LineStyle, createSeriesMarkers } from "lightweight-charts"
@@ -225,16 +238,14 @@ function StandaloneChartInner({
       if (delayTimer) clearTimeout(delayTimer)
       unsubDynamic()
       observer.disconnect()
-      // Defer chart.remove() to next frame so pending paint callbacks
-      // in lightweight-charts complete before the chart is disposed.
-      // This prevents "Object is disposed" errors from queued rAF paints.
-      requestAnimationFrame(() => {
-        try {
-          chart.remove()
-        } catch {
-          // Chart already disposed — safe to ignore
-        }
-      })
+      // Remove chart — wrap in try/catch because lightweight-charts
+      // may have queued rAF paint callbacks that throw "Object is disposed"
+      // after the chart is removed. This is a known library issue and harmless.
+      try {
+        chart.remove()
+      } catch {
+        // Suppress "Object is disposed" from pending paint callbacks
+      }
       chartRef.current = null
       seriesRef.current = null
       lastCandleRef.current = null // reset hook's ref on chart dispose

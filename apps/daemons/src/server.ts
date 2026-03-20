@@ -37,6 +37,12 @@ export function setTradeFinderScanner(scanner: TradeFinderScanner): void {
   _tradeFinderScanner = scanner
 }
 
+import type { PositionPriceTracker } from "./positions/position-price-tracker.js"
+let _priceTracker: PositionPriceTracker | null = null
+export function setPriceTracker(tracker: PositionPriceTracker): void {
+  _priceTracker = tracker
+}
+
 import type { DigestGenerator } from "./ai/digest-generator.js"
 let _digestGenerator: DigestGenerator | null = null
 export function setDigestGenerator(generator: DigestGenerator): void {
@@ -671,6 +677,27 @@ export async function startServer(port: number, deps: ServerDeps) {
         .getCapUtilization()
         .then((caps) => sendJson(res, 200, { ok: true, data: caps }))
         .catch((err) => sendJson(res, 500, { ok: false, error: String(err) }))
+      return
+    }
+
+    // Price endpoints — latest known prices for any instrument
+    if (req.method === "GET" && req.url?.startsWith("/price/")) {
+      const instrument = req.url.slice(7) // "/price/EUR_USD" → "EUR_USD"
+      if (!_priceTracker) {
+        sendJson(res, 503, { ok: false, error: "Price tracker not initialized" })
+        return
+      }
+      const tick = _priceTracker.getLatestPrice(instrument)
+      sendJson(res, 200, { ok: true, data: tick })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/prices") {
+      if (!_priceTracker) {
+        sendJson(res, 503, { ok: false, error: "Price tracker not initialized" })
+        return
+      }
+      sendJson(res, 200, { ok: true, data: _priceTracker.getAllLatestPrices() })
       return
     }
 

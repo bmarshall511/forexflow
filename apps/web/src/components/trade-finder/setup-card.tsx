@@ -5,7 +5,7 @@ import { TIMEFRAME_SET_MAP } from "@fxflow/types"
 import { formatInstrument, getPipSize } from "@fxflow/shared"
 import { Progress } from "@/components/ui/progress"
 import { Zap, AlertCircle } from "lucide-react"
-import { useDaemonConnection } from "@/hooks/use-daemon-connection"
+import { useLivePrice } from "@/hooks/use-live-price"
 import { cn } from "@/lib/utils"
 import { StandaloneChart } from "@/components/charts/standalone-chart"
 import { Button } from "@/components/ui/button"
@@ -42,16 +42,9 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
   const scoreIndicator =
     scorePct >= 75 ? "bg-green-500" : scorePct >= 58 ? "bg-amber-500" : "bg-orange-500"
 
-  // Get live prices from both position and chart streams for maximum coverage
-  const { positionsPrices, chartPrices } = useDaemonConnection()
-  const lastTick =
-    positionsPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
-    chartPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
-    null
-
-  // Live distance from current price to entry (updates every tick)
+  // Live price — combines WS streams with REST polling for full coverage
+  const { bid: livePrice } = useLivePrice(setup.instrument)
   const pipSize = getPipSize(setup.instrument)
-  const livePrice = lastTick?.bid ?? null
   const liveDistancePips = livePrice
     ? Math.abs(livePrice - setup.entryPrice) / pipSize
     : setup.distanceToEntryPips
@@ -65,6 +58,20 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
     if (setup.autoPlaced && setup.status === "filled") return "Auto Filled"
     if (setup.autoPlaced && setup.status === "placed") return "Auto Pending"
     return STATUS_STYLES[setup.status]?.label ?? setup.status
+  })()
+
+  // Explain WHY a setup was invalidated/expired
+  const outcomeReason = (() => {
+    if (setup.status === "invalidated") {
+      if (setup.lastSkipReason) return setup.lastSkipReason
+      if (setup.confirmationCandlesWaited > 0) {
+        return `Waited ${setup.confirmationCandlesWaited} candles for a bounce but none appeared — the setup timed out`
+      }
+      const dir = setup.direction === "long" ? "below" : "above"
+      return `Price moved ${dir} the zone — the trade idea is no longer safe`
+    }
+    if (setup.status === "expired") return "This setup was too old and was removed"
+    return null
   })()
 
   const statusIcon = setup.autoPlaced && (setup.status === "placed" || setup.status === "filled")
@@ -131,16 +138,27 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
         </span>
       </div>
 
-      {/* Mini chart */}
-      <div className="pointer-events-none px-4 pt-3">
+      {/* Mini chart with timeframe label */}
+      <div className="pointer-events-none relative px-4 pt-3">
         <div className="bg-background h-[120px] overflow-hidden rounded-lg border">
+          <span className="absolute right-5 top-4 z-10 rounded bg-black/50 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+            {chartTimeframe}
+          </span>
           <StandaloneChart
             key={`mini-${setup.instrument}-${chartTimeframe}`}
             instrument={setup.instrument}
             timeframe={chartTimeframe}
-            lastTick={lastTick}
+            lastTick={null}
             zones={[setup.zone]}
-            currentPrice={lastTick?.bid ?? setup.entryPrice}
+            orderOverlay={{
+              direction: setup.direction,
+              orderType: "LIMIT" as const,
+              entryPrice: setup.entryPrice,
+              stopLoss: setup.stopLoss,
+              takeProfit: setup.takeProfit,
+              onDraftChange: () => {},
+            }}
+            currentPrice={livePrice ?? setup.entryPrice}
             loadDelay={100}
           />
         </div>
@@ -190,8 +208,16 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
         )}
       </div>
 
-      {/* Auto-trade status context */}
-      {autoTradeStatus?.reason && (
+      {/* Status context: why it's waiting, blocked, invalidated, etc. */}
+      {outcomeReason && (
+        <div className="flex items-start gap-1.5 px-4 pt-2">
+          <AlertCircle className="mt-0.5 size-3 shrink-0 text-red-400" />
+          <span className="line-clamp-2 text-[11px] leading-snug text-red-400">
+            {outcomeReason}
+          </span>
+        </div>
+      )}
+      {!outcomeReason && autoTradeStatus?.reason && (
         <div className="flex items-start gap-1.5 px-4 pt-2">
           <AlertCircle
             className={cn(

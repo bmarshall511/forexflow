@@ -26,7 +26,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet"
 import { PlaceOrderDialog } from "./place-order-dialog"
-import { useDaemonConnection } from "@/hooks/use-daemon-connection"
+import { useLivePrice } from "@/hooks/use-live-price"
 import { cn } from "@/lib/utils"
 import {
   TF_LABELS,
@@ -117,15 +117,8 @@ function SetupDetailContent({
   const scoreColor =
     scorePct >= 75 ? "text-green-500" : scorePct >= 58 ? "text-amber-500" : "text-orange-500"
 
-  const { positionsPrices, chartPrices } = useDaemonConnection()
-  const lastTick =
-    positionsPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
-    chartPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
-    null
-
-  // Live distance
+  const { bid: livePrice } = useLivePrice(setup.instrument)
   const pipSize = getPipSize(setup.instrument)
-  const livePrice = lastTick?.bid ?? null
   const liveDistancePips = livePrice
     ? Math.abs(livePrice - setup.entryPrice) / pipSize
     : setup.distanceToEntryPips
@@ -443,10 +436,10 @@ function SetupDetailContent({
               key={`${setup.instrument}-${chartTimeframe}`}
               instrument={setup.instrument}
               timeframe={chartTimeframe}
-              lastTick={lastTick}
+              lastTick={null}
               orderOverlay={orderOverlay}
               zones={showZone ? [setup.zone] : []}
-              currentPrice={lastTick?.bid ?? setup.entryPrice}
+              currentPrice={livePrice ?? setup.entryPrice}
               curveData={showCurve ? setup.curveData : null}
               trendData={showTrend ? setup.trendData : null}
               trendVisuals={showTrend && setup.trendData ? DEFAULT_TREND_VISUALS : undefined}

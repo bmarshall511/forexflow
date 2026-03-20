@@ -13,6 +13,8 @@ export class PositionPriceTracker {
   private abortController: AbortController | null = null
   private currentInstruments: string[] = []
   private pendingPrices = new Map<string, PositionPriceTick>()
+  /** Accumulated latest prices for all instruments ever seen — never cleared */
+  private latestPrices = new Map<string, PositionPriceTick>()
   private throttleTimer: ReturnType<typeof setInterval> | null = null
   private mfePersistTimer: ReturnType<typeof setInterval> | null = null
   private reconnectAttempt = 0
@@ -205,7 +207,18 @@ export class PositionPriceTracker {
 
       // Buffer for throttled broadcast
       this.pendingPrices.set(msg.instrument, tick)
+      this.latestPrices.set(msg.instrument, tick)
     }
+  }
+
+  /** Get the latest known price for an instrument (may be slightly stale). */
+  getLatestPrice(instrument: string): PositionPriceTick | null {
+    return this.latestPrices.get(instrument) ?? null
+  }
+
+  /** Get all latest known prices. */
+  getAllLatestPrices(): PositionPriceTick[] {
+    return Array.from(this.latestPrices.values())
   }
 
   // ─── Throttled broadcast ──────────────────────────────────────────────────
