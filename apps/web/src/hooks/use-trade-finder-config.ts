@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type { TradeFinderConfigData } from "@fxflow/types"
+import type { TradeFinderConfigData, TradeFinderCircuitBreakerState } from "@fxflow/types"
+
+const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
 
 export function useTradeFinderConfig() {
   const [config, setConfig] = useState<TradeFinderConfigData | null>(null)
+  const [circuitBreaker, setCircuitBreaker] = useState<TradeFinderCircuitBreakerState | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchConfig = useCallback(async () => {
@@ -19,9 +22,20 @@ export function useTradeFinderConfig() {
     }
   }, [])
 
+  const fetchCircuitBreaker = useCallback(async () => {
+    try {
+      const res = await fetch(`${DAEMON_URL}/trade-finder/circuit-breaker`)
+      const json = await res.json()
+      if (json.ok) setCircuitBreaker(json.data)
+    } catch {
+      // Non-critical — daemon may not be running
+    }
+  }, [])
+
   useEffect(() => {
     void fetchConfig()
-  }, [fetchConfig])
+    void fetchCircuitBreaker()
+  }, [fetchConfig, fetchCircuitBreaker])
 
   // Listen for cross-instance config changes (e.g. header toggle → settings page)
   useEffect(() => {
@@ -42,5 +56,10 @@ export function useTradeFinderConfig() {
     window.dispatchEvent(new Event("trade-finder-config-changed"))
   }, [])
 
-  return { config, isLoading, update, refresh: fetchConfig }
+  const resetCircuitBreaker = useCallback(async () => {
+    await fetch(`${DAEMON_URL}/actions/trade-finder/reset-circuit-breaker`, { method: "POST" })
+    await fetchCircuitBreaker()
+  }, [fetchCircuitBreaker])
+
+  return { config, circuitBreaker, isLoading, update, refresh: fetchConfig, resetCircuitBreaker }
 }
