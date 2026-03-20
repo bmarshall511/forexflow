@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import type { TradeFinderSetupData, PositionPriceTick } from "@fxflow/types"
 import { TIMEFRAME_SET_MAP } from "@fxflow/types"
 import { formatRelativeTime } from "@fxflow/shared"
@@ -37,17 +38,23 @@ export function SetupCardDetails({
   const riskDollars = computeDollarAmount(setup.positionSize, setup.riskPips, setup.instrument)
   const rewardDollars = computeDollarAmount(setup.positionSize, setup.rewardPips, setup.instrument)
 
+  // Chart overlay toggles
+  const [showOrder, setShowOrder] = useState(true)
+  const [showZone, setShowZone] = useState(true)
+  const [showTrend, setShowTrend] = useState(true)
+  const [showCurve, setShowCurve] = useState(true)
+
   const tfSet = TIMEFRAME_SET_MAP[setup.timeframeSet]
   const chartTimeframe = tfSet?.ltf ?? "M15"
 
-  const orderOverlay = {
+  const orderOverlay = showOrder ? {
     direction: setup.direction,
     orderType: "LIMIT" as const,
     entryPrice: setup.entryPrice,
     stopLoss: setup.stopLoss,
     takeProfit: setup.takeProfit,
     onDraftChange: () => {},
-  }
+  } : null
 
   return (
     <div className="border-border/40 space-y-4 border-t px-4 pb-4 pt-4">
@@ -183,7 +190,7 @@ export function SetupCardDetails({
         </div>
       )}
 
-      {/* Chart toggle */}
+      {/* Chart */}
       <div className="flex items-center justify-between">
         <Button
           variant={showChart ? "secondary" : "outline"}
@@ -198,30 +205,66 @@ export function SetupCardDetails({
       </div>
 
       {showChart && (
-        <div className="bg-background h-[280px] overflow-hidden rounded-md border">
-          <StandaloneChart
-            instrument={setup.instrument}
-            timeframe={chartTimeframe}
-            lastTick={lastTick}
-            orderOverlay={orderOverlay}
-            zones={[setup.zone]}
-            currentPrice={lastTick?.bid ?? null}
-            curveData={setup.curveData}
-            trendData={setup.trendData}
-          />
-        </div>
+        <>
+          {/* Chart overlay toggles */}
+          <div className="flex flex-wrap gap-1.5">
+            <OverlayToggle label="Entry/SL/TP" on={showOrder} onToggle={() => setShowOrder(!showOrder)} color="blue" />
+            <OverlayToggle label="Zone" on={showZone} onToggle={() => setShowZone(!showZone)} color="purple" />
+            {setup.trendData && (
+              <OverlayToggle label="Trend" on={showTrend} onToggle={() => setShowTrend(!showTrend)} color="teal" />
+            )}
+            {setup.curveData && (
+              <OverlayToggle label="Big Picture" on={showCurve} onToggle={() => setShowCurve(!showCurve)} color="amber" />
+            )}
+          </div>
+          <div className="bg-background h-[280px] overflow-hidden rounded-md border">
+            <StandaloneChart
+              instrument={setup.instrument}
+              timeframe={chartTimeframe}
+              lastTick={lastTick}
+              orderOverlay={orderOverlay}
+              zones={showZone ? [setup.zone] : []}
+              currentPrice={lastTick?.bid ?? null}
+              curveData={showCurve ? setup.curveData : null}
+              trendData={showTrend ? setup.trendData : null}
+            />
+          </div>
+        </>
       )}
 
-      {/* Score Breakdown */}
+      {/* Score Breakdown — what makes this trade good or bad */}
       <Collapsible>
         <CollapsibleTrigger className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors">
           <ChevronDown className="size-3" />
-          <span>Score Breakdown</span>
+          <span>Why this score? (tap to see breakdown)</span>
         </CollapsibleTrigger>
-        <CollapsibleContent className="pt-2">
+        <CollapsibleContent className="pt-3">
           <SetupScoreBreakdown scores={setup.scores} />
         </CollapsibleContent>
       </Collapsible>
     </div>
+  )
+}
+
+const OVERLAY_COLORS: Record<string, { on: string; off: string }> = {
+  blue: { on: "border-blue-500/30 bg-blue-500/10 text-blue-500", off: "border-border text-muted-foreground" },
+  purple: { on: "border-purple-500/30 bg-purple-500/10 text-purple-500", off: "border-border text-muted-foreground" },
+  teal: { on: "border-teal-500/30 bg-teal-500/10 text-teal-500", off: "border-border text-muted-foreground" },
+  amber: { on: "border-amber-500/30 bg-amber-500/10 text-amber-500", off: "border-border text-muted-foreground" },
+}
+
+function OverlayToggle({ label, on, onToggle, color }: { label: string; on: boolean; onToggle: () => void; color: string }) {
+  const colors = OVERLAY_COLORS[color] ?? OVERLAY_COLORS.blue!
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={cn(
+        "rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors",
+        on ? colors.on : colors.off,
+      )}
+    >
+      {label}
+    </button>
   )
 }
