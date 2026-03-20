@@ -359,29 +359,13 @@ export function analyzeTier1(
   for (const direction of ["long", "short"] as const) {
     const reasons = direction === "long" ? longReasons : shortReasons
     const techs = direction === "long" ? longTechs : shortTechs
-    if (reasons.length < 2) {
+    // At least 1 reason required — the AI needs SOMETHING directional to evaluate
+    if (reasons.length < 1) {
       if (filterStats) filterStats.noReasons++
       continue
     }
 
-    // ─── Confidence penalty: HTF trend disagrees (soft gate) ─────
-    let htfPenalty = 0
-    if (htfTrendBullish !== null) {
-      if (direction === "long" && !htfTrendBullish) htfPenalty = 8
-      if (direction === "short" && htfTrendBullish) htfPenalty = 8
-    }
-    if (htfPenalty > 0 && filterStats) filterStats.htfPenalized++
-
-    // ─── Confidence penalty: secondary TF overextended (soft gate) ─
-    let secondaryRsiPenalty = 0
-    if (secondaryRsi !== null) {
-      if (direction === "long" && secondaryRsi > 70) secondaryRsiPenalty = 15
-      else if (direction === "long" && secondaryRsi > 60) secondaryRsiPenalty = 8
-      if (direction === "short" && secondaryRsi < 30) secondaryRsiPenalty = 15
-      else if (direction === "short" && secondaryRsi < 40) secondaryRsiPenalty = 8
-    }
-    if (secondaryRsiPenalty > 0 && filterStats) filterStats.secondaryRsiPenalized++
-
+    // ─── Compute confluence score as context for the AI (informational, not gating)
     const confluenceInput: ConfluenceInput = {
       smcBias: direction === "long" ? (smcBias ?? null) : smcBias !== null ? 100 - smcBias : null,
       fvgPresent: direction === "long" ? fvgBull : fvgBear,
@@ -400,15 +384,28 @@ export function analyzeTier1(
     }
 
     const result = computeConfluenceScore(confluenceInput, direction)
-    // Apply penalties as score reduction instead of hard filtering
+
+    // Apply soft penalties to the score — these inform the AI's context, not hard-gate
+    let htfPenalty = 0
+    if (htfTrendBullish !== null) {
+      if (direction === "long" && !htfTrendBullish) htfPenalty = 8
+      if (direction === "short" && htfTrendBullish) htfPenalty = 8
+    }
+    if (htfPenalty > 0 && filterStats) filterStats.htfPenalized++
+
+    let secondaryRsiPenalty = 0
+    if (secondaryRsi !== null) {
+      if (direction === "long" && secondaryRsi > 70) secondaryRsiPenalty = 10
+      else if (direction === "long" && secondaryRsi > 60) secondaryRsiPenalty = 5
+      if (direction === "short" && secondaryRsi < 30) secondaryRsiPenalty = 10
+      else if (direction === "short" && secondaryRsi < 40) secondaryRsiPenalty = 5
+    }
+    if (secondaryRsiPenalty > 0 && filterStats) filterStats.secondaryRsiPenalized++
+
     const adjustedScore = Math.max(
       0,
       result.score - htfPenalty - secondaryRsiPenalty - lowVolPenalty,
     )
-    if (adjustedScore < 15) {
-      if (filterStats) filterStats.lowConfluence++
-      continue
-    }
 
     const atrVal = atr ?? pipSize * 20
     // Widen SL in volatile regimes to avoid noise-triggered stops
