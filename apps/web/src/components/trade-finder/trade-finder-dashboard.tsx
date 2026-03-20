@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import type { TradeFinderSetupData } from "@fxflow/types"
 import { useTradeFinder } from "@/hooks/use-trade-finder"
 import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
@@ -58,7 +58,6 @@ export function TradeFinderDashboard() {
 
   const { config, update: updateConfig } = useTradeFinderConfig()
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [tab, setTab] = useState<Tab>("active")
   const [, setPlacingId] = useState<string | null>(null)
   const [togglingAutoTrade, setTogglingAutoTrade] = useState(false)
@@ -73,19 +72,30 @@ export function TradeFinderDashboard() {
     if (match) setSelectedSetup(match)
   }, [setupIdFromUrl, isLoading, setups, history])
 
-  // Update URL when setup is selected/deselected
-  const selectSetup = useCallback(
-    (setup: TradeFinderSetupData) => {
-      setSelectedSetup(setup)
-      router.replace(`/trade-finder?setup=${setup.id}`, { scroll: false })
-    },
-    [router],
-  )
+  // Handle browser back button: close sheet when URL changes
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      if (!params.has("setup")) setSelectedSetup(null)
+    }
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
+
+  // Update URL when setup is selected/deselected (pushState for back button support)
+  const selectSetup = useCallback((setup: TradeFinderSetupData) => {
+    setSelectedSetup(setup)
+    const url = new URL(window.location.href)
+    url.searchParams.set("setup", setup.id)
+    window.history.pushState({}, "", url.toString())
+  }, [])
 
   const deselectSetup = useCallback(() => {
     setSelectedSetup(null)
-    router.replace("/trade-finder", { scroll: false })
-  }, [router])
+    const url = new URL(window.location.href)
+    url.searchParams.delete("setup")
+    window.history.replaceState({}, "", url.toString())
+  }, [])
 
   const handlePlace = async (setupId: string, orderType: "MARKET" | "LIMIT") => {
     setPlacingId(setupId)
