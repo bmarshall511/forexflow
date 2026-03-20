@@ -105,13 +105,37 @@ function getAutoTradeStatus(
     return { type: "queued", position: setup.queuePosition, reason: "In line — waiting for a trade slot to open up" }
   }
 
-  // Eligible but explain what it's waiting for
+  // Eligible — explain specifically what it's waiting for
+  const pair = setup.instrument.replace("_", "/")
+  const dir = setup.direction === "long" ? "go up" : "go down"
+
   if (setup.status === "active") {
-    return { type: "eligible", reason: "Waiting for price to get closer to the entry zone" }
+    const dist = setup.distanceToEntryPips.toFixed(0)
+    return {
+      type: "eligible",
+      reason: `${pair} needs to move ${dist} more pips before this trade can be placed. The system will watch and wait.`,
+    }
   }
+
   if (setup.status === "approaching") {
-    return { type: "eligible", reason: "Price is near the zone — waiting for a bounce signal to enter" }
+    if (setup.confirmationPattern) {
+      return {
+        type: "eligible",
+        reason: `Price is at the zone and showed a "${setup.confirmationPattern.replace(/_/g, " ")}" pattern — placing the trade now.`,
+      }
+    }
+    if (setup.confirmationCandlesWaited > 0) {
+      return {
+        type: "eligible",
+        reason: `Price reached the zone but hasn't shown signs of turning around yet. Watched for ${setup.confirmationCandlesWaited} candle${setup.confirmationCandlesWaited !== 1 ? "s" : ""} so far — needs a clear reversal sign (like a strong candle in the opposite direction) before entering.`,
+      }
+    }
+    return {
+      type: "eligible",
+      reason: `Price is very close to the entry zone. The system is watching for a clear sign that ${pair} will ${dir} before placing the trade — this prevents entering if price is just passing through.`,
+    }
   }
+
   return { type: "eligible" }
 }
 
