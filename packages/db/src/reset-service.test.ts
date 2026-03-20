@@ -24,6 +24,7 @@ const mockTVAlertsConfig = vi.hoisted(() => ({ deleteMany: vi.fn(), findFirst: v
 const mockAiSettings = vi.hoisted(() => ({ deleteMany: vi.fn() }))
 const mockTradeFinderConfig = vi.hoisted(() => ({ deleteMany: vi.fn(), findFirst: vi.fn() }))
 const mockAiTraderConfig = vi.hoisted(() => ({ deleteMany: vi.fn(), findFirst: vi.fn() }))
+const mockSmartFlowSettings = vi.hoisted(() => ({ deleteMany: vi.fn(), findFirst: vi.fn() }))
 const mockZoneSettings = vi.hoisted(() => ({ deleteMany: vi.fn() }))
 const mockTrendSettings = vi.hoisted(() => ({ deleteMany: vi.fn() }))
 const mock$transaction = vi.hoisted(() => vi.fn())
@@ -55,6 +56,7 @@ vi.mock("./client", () => ({
     aiSettings: mockAiSettings,
     tradeFinderConfig: mockTradeFinderConfig,
     aiTraderConfig: mockAiTraderConfig,
+    smartFlowSettings: mockSmartFlowSettings,
     zoneSettings: mockZoneSettings,
     trendSettings: mockTrendSettings,
     $transaction: mock$transaction,
@@ -152,6 +154,7 @@ describe("reset-service", () => {
       mockTVAlertsConfig.findFirst.mockResolvedValue({ enabled: true })
       mockTradeFinderConfig.findFirst.mockResolvedValue({ autoTradeEnabled: false })
       mockAiTraderConfig.findFirst.mockResolvedValue({ enabled: true })
+      mockSmartFlowSettings.findFirst.mockResolvedValue({ enabled: false })
 
       const status = await getResetPreflightStatus()
 
@@ -163,6 +166,7 @@ describe("reset-service", () => {
         tvAlertsEnabled: true,
         autoTradeEnabled: false,
         aiTraderEnabled: true,
+        smartFlowEnabled: false,
       })
       expect(status.moduleCounts).toBeDefined()
     })

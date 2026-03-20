@@ -57,7 +57,8 @@ export function PreflightChecks({
   const isTvEnabled = tvEnabled ?? mergedAuto.tvAlertsEnabled
   const isTfEnabled = tfConfig?.autoTradeEnabled ?? mergedAuto.autoTradeEnabled
   const isAiEnabled = aiConfig?.enabled ?? mergedAuto.aiTraderEnabled
-  const hasAutomationEnabled = isTvEnabled || isTfEnabled || isAiEnabled
+  const isSfEnabled = mergedAuto.smartFlowEnabled
+  const hasAutomationEnabled = isTvEnabled || isTfEnabled || isAiEnabled || isSfEnabled
 
   const allClear =
     !hasOpenTrades &&
@@ -136,6 +137,29 @@ export function PreflightChecks({
     setActionLoading("ai_trader")
     try {
       await aiSave({ enabled: false })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleDisableSmartFlow() {
+    setActionLoading("smart_flow")
+    try {
+      const res = await fetch("/api/smart-flow/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: false }),
+      })
+      if (res.ok) {
+        setOverrides((prev) => ({
+          ...prev,
+          automation: { ...mergedAuto, smartFlowEnabled: false },
+        }))
+      } else {
+        toast.error("Failed to disable SmartFlow")
+      }
+    } catch {
+      toast.error("Failed to reach server")
     } finally {
       setActionLoading(null)
     }
@@ -220,6 +244,14 @@ export function PreflightChecks({
       passed: !isAiEnabled,
       action: isAiEnabled ? handleDisableAiTrader : undefined,
       loading: actionLoading === "ai_trader",
+    },
+    {
+      key: "smart_flow",
+      label: "SmartFlow",
+      enabled: isSfEnabled,
+      passed: !isSfEnabled,
+      action: isSfEnabled ? handleDisableSmartFlow : undefined,
+      loading: actionLoading === "smart_flow",
     },
   ]
 

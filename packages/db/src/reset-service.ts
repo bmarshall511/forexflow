@@ -22,6 +22,7 @@ export interface AutomationStatus {
   tvAlertsEnabled: boolean
   autoTradeEnabled: boolean
   aiTraderEnabled: boolean
+  smartFlowEnabled: boolean
 }
 
 export interface PreflightStatus {
@@ -134,6 +135,7 @@ export async function getResetPreflightStatus(): Promise<PreflightStatus> {
     tvConfig,
     tfConfig,
     aiConfig,
+    sfConfig,
     moduleCounts,
   ] = await Promise.all([
     db.trade.count({ where: { status: "open" } }),
@@ -143,6 +145,7 @@ export async function getResetPreflightStatus(): Promise<PreflightStatus> {
     db.tVAlertsConfig.findFirst().then((c) => c?.enabled ?? false),
     db.tradeFinderConfig.findFirst().then((c) => c?.autoTradeEnabled ?? false),
     db.aiTraderConfig.findFirst().then((c) => c?.enabled ?? false),
+    db.smartFlowSettings.findFirst().then((c) => c?.enabled ?? false),
     getModuleDataCounts(),
   ])
   return {
@@ -154,6 +157,7 @@ export async function getResetPreflightStatus(): Promise<PreflightStatus> {
       tvAlertsEnabled: tvConfig,
       autoTradeEnabled: tfConfig,
       aiTraderEnabled: aiConfig,
+      smartFlowEnabled: sfConfig,
     },
     moduleCounts,
   }
