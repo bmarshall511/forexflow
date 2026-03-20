@@ -70,5 +70,12 @@ export function useSmartFlow(): UseSmartFlowReturn {
     void fetchData()
   }, [fetchData])
 
+  // Listen for cross-component updates (e.g., reset preflight disabling SmartFlow)
+  useEffect(() => {
+    const handler = () => void fetchData()
+    window.addEventListener("smart-flow-updated", handler)
+    return () => window.removeEventListener("smart-flow-updated", handler)
+  }, [fetchData])
+
   return { settings, configs, activeTrades, closedTrades, status, isLoading, refetch: fetchData }
 }

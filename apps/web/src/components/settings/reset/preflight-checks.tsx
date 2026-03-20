@@ -155,6 +155,8 @@ export function PreflightChecks({
           ...prev,
           automation: { ...mergedAuto, smartFlowEnabled: false },
         }))
+        // Notify other components (e.g., header automation controls) to refetch
+        window.dispatchEvent(new Event("smart-flow-updated"))
       } else {
         toast.error("Failed to disable SmartFlow")
       }
