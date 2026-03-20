@@ -2682,6 +2682,8 @@ export interface AiTraderManagementAction {
 export interface AiTraderScanStatus {
   scanning: boolean
   enabled: boolean
+  /** Scanner is temporarily paused (via dashboard button), distinct from disabled in settings */
+  paused?: boolean
   lastScanAt: string | null
   nextScanAt: string | null
   candidateCount: number

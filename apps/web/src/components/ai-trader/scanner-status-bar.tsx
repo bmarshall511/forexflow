@@ -52,10 +52,18 @@ export function ScannerStatusBar({ status, progress }: ScannerStatusBarProps) {
   let stateColor: string
   let icon: React.ReactNode
 
-  if (!isEnabled) {
+  if (!status) {
+    stateLabel = "Connecting..."
+    stateColor = "text-muted-foreground"
+    icon = <Bot className="text-muted-foreground size-4 animate-pulse" />
+  } else if (!isEnabled) {
     stateLabel = "Scanner Off"
     stateColor = "text-muted-foreground"
     icon = <Bot className="text-muted-foreground size-4" />
+  } else if (status.paused) {
+    stateLabel = "Paused"
+    stateColor = "text-amber-500"
+    icon = <Bot className="size-4 text-amber-500" />
   } else if (hasError) {
     stateLabel = "Error"
     stateColor = "text-red-500"
