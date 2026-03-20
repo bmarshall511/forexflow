@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
+import type { TradeFinderSetupData } from "@fxflow/types"
 import { useTradeFinder } from "@/hooks/use-trade-finder"
 import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
 import { Button } from "@/components/ui/button"
@@ -29,6 +31,7 @@ import {
   BarChart3,
 } from "lucide-react"
 import { SetupCard } from "./setup-card"
+import { SetupDetailSheet } from "./setup-card-details"
 import { AutoTradeLog } from "./auto-trade-log"
 import { PerformanceOverview } from "./performance-overview"
 import { toast } from "sonner"
@@ -54,9 +57,35 @@ export function TradeFinderDashboard() {
   } = useTradeFinder()
 
   const { config, update: updateConfig } = useTradeFinderConfig()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>("active")
   const [, setPlacingId] = useState<string | null>(null)
   const [togglingAutoTrade, setTogglingAutoTrade] = useState(false)
+  const [selectedSetup, setSelectedSetup] = useState<TradeFinderSetupData | null>(null)
+
+  // URL deep-link: open setup sheet if ?setup=<id> is in URL
+  const setupIdFromUrl = searchParams.get("setup")
+  useEffect(() => {
+    if (!setupIdFromUrl || isLoading) return
+    const allSetups = [...setups, ...history]
+    const match = allSetups.find((s) => s.id === setupIdFromUrl)
+    if (match) setSelectedSetup(match)
+  }, [setupIdFromUrl, isLoading, setups, history])
+
+  // Update URL when setup is selected/deselected
+  const selectSetup = useCallback(
+    (setup: TradeFinderSetupData) => {
+      setSelectedSetup(setup)
+      router.replace(`/trade-finder?setup=${setup.id}`, { scroll: false })
+    },
+    [router],
+  )
+
+  const deselectSetup = useCallback(() => {
+    setSelectedSetup(null)
+    router.replace("/trade-finder", { scroll: false })
+  }, [router])
 
   const handlePlace = async (setupId: string, orderType: "MARKET" | "LIMIT") => {
     setPlacingId(setupId)
@@ -305,51 +334,31 @@ export function TradeFinderDashboard() {
                   </AlertDialog>
                 </div>
 
-                {/* Approaching setups first */}
-                {approachingCount > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="size-2 animate-pulse rounded-full bg-amber-500" />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-amber-500">
-                        Approaching ({approachingCount})
-                      </span>
-                    </div>
-                    {setups
-                      .filter((s) => s.status === "approaching")
-                      .map((setup) => (
-                        <SetupCard
-                          key={setup.id}
-                          setup={setup}
-                          onPlace={handlePlace}
-                          autoTradeConfig={autoTradeConfig}
-                        />
-                      ))}
-                  </div>
-                )}
-
-                {/* Active setups */}
-                {activeCount > 0 && (
-                  <div className="space-y-3">
-                    {approachingCount > 0 && (
-                      <div className="flex items-center gap-2 pt-2">
-                        <div className="size-2 rounded-full bg-blue-500" />
-                        <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                          Watching ({activeCount})
-                        </span>
-                      </div>
-                    )}
-                    {setups
-                      .filter((s) => s.status === "active")
-                      .map((setup) => (
-                        <SetupCard
-                          key={setup.id}
-                          setup={setup}
-                          onPlace={handlePlace}
-                          autoTradeConfig={autoTradeConfig}
-                        />
-                      ))}
-                  </div>
-                )}
+                {/* Card grid */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {setups
+                    .filter((s) => s.status === "approaching")
+                    .map((setup) => (
+                      <SetupCard
+                        key={setup.id}
+                        setup={setup}
+                        onSelect={selectSetup}
+                        onPlace={handlePlace}
+                        autoTradeConfig={autoTradeConfig}
+                      />
+                    ))}
+                  {setups
+                    .filter((s) => s.status === "active")
+                    .map((setup) => (
+                      <SetupCard
+                        key={setup.id}
+                        setup={setup}
+                        onSelect={selectSetup}
+                        onPlace={handlePlace}
+                        autoTradeConfig={autoTradeConfig}
+                      />
+                    ))}
+                </div>
               </>
             )}
           </>
@@ -402,9 +411,14 @@ export function TradeFinderDashboard() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {history.map((setup) => (
-                    <SetupCard key={setup.id} setup={setup} autoTradeConfig={autoTradeConfig} />
+                    <SetupCard
+                      key={setup.id}
+                      setup={setup}
+                      onSelect={selectSetup}
+                      autoTradeConfig={autoTradeConfig}
+                    />
                   ))}
                 </div>
               </>
@@ -467,6 +481,17 @@ export function TradeFinderDashboard() {
           </div>
         )}
       </div>
+
+      {/* ─── Shared Detail Sheet ─── */}
+      <SetupDetailSheet
+        setup={selectedSetup}
+        open={!!selectedSetup}
+        onOpenChange={(open) => {
+          if (!open) deselectSetup()
+        }}
+        onPlace={handlePlace}
+        autoTradeConfig={autoTradeConfig}
+      />
     </div>
   )
 }
