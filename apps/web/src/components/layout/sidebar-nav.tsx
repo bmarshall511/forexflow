@@ -3,6 +3,7 @@
 import { NAV_GROUPS } from "@/lib/constants"
 import { useSidebar } from "@/hooks/use-sidebar"
 import { useSidebarBadges } from "@/hooks/use-sidebar-badges"
+import { useSidebarStatus } from "@/hooks/use-sidebar-status"
 import { SidebarNavItem } from "./sidebar-nav-item"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils"
 export function SidebarNav() {
   const { isOpen } = useSidebar()
   const badges = useSidebarBadges()
+  const statuses = useSidebarStatus()
 
   return (
     <nav
@@ -32,6 +34,7 @@ export function SidebarNav() {
                 key={item.href}
                 item={item}
                 badges={item.badgeKey ? badges[item.badgeKey] : undefined}
+                status={item.statusKey ? statuses[item.statusKey] : undefined}
               />
             ))}
           </div>

@@ -7,13 +7,22 @@ import { useSidebar } from "@/hooks/use-sidebar"
 import { cn } from "@/lib/utils"
 import type { NavItem } from "@/lib/constants"
 import type { NavBadge } from "@/hooks/use-sidebar-badges"
+import type { SidebarStatus } from "@/hooks/use-sidebar-status"
+
+const STATUS_COLORS: Record<SidebarStatus["variant"], string> = {
+  default: "text-sidebar-foreground/50",
+  active: "text-blue-400",
+  warning: "text-amber-400",
+  error: "text-red-400",
+}
 
 interface SidebarNavItemProps {
   item: NavItem
   badges?: NavBadge[]
+  status?: SidebarStatus
 }
 
-export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
+export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
   const pathname = usePathname()
   const { isOpen } = useSidebar()
   const isActive = pathname === item.href
@@ -55,11 +64,22 @@ export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
         )}
       </span>
 
-      {/* Expanded: label + badge indicators */}
+      {/* Expanded: label + status lines + badge indicators */}
       {isOpen && (
         <>
-          <span className="flex-1 truncate">{item.label}</span>
-          {hasBadges && (
+          <div className="min-w-0 flex-1">
+            <span className="block truncate">{item.label}</span>
+            {/* Dynamic status lines */}
+            {status && (
+              <div className={cn("mt-0.5 space-y-0", STATUS_COLORS[status.variant])}>
+                <p className="truncate text-[10px] leading-tight">{status.line1}</p>
+                {status.line2 && (
+                  <p className="truncate text-[10px] leading-tight opacity-75">{status.line2}</p>
+                )}
+              </div>
+            )}
+          </div>
+          {hasBadges && !status && (
             <span className="ml-auto flex shrink-0 items-center gap-1.5">
               {visibleBadges.map((badge) => {
                 const BadgeIcon = badge.icon
@@ -87,6 +107,12 @@ export function SidebarNavItem({ item, badges }: SidebarNavItemProps) {
         <TooltipTrigger asChild>{link}</TooltipTrigger>
         <TooltipContent side="right" sideOffset={8} className="space-y-1">
           <p className="font-medium">{item.label}</p>
+          {status && (
+            <div className={cn("space-y-0.5 text-xs", STATUS_COLORS[status.variant])}>
+              <p>{status.line1}</p>
+              {status.line2 && <p className="opacity-75">{status.line2}</p>}
+            </div>
+          )}
           {hasBadges && (
             <div className="flex flex-col gap-0.5">
               {visibleBadges.map((badge) => {

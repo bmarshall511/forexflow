@@ -30,6 +30,8 @@ export interface NavItem {
   href: string
   icon: LucideIcon
   badgeKey?: string
+  /** Key for dynamic status text below the label (from useSidebarStatus) */
+  statusKey?: string
 }
 
 export interface NavGroup {
@@ -51,7 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Automation",
     items: [
-      { label: "Trade Finder", href: "/trade-finder", icon: Search, badgeKey: "tradeFinder" },
+      { label: "Trade Finder", href: "/trade-finder", icon: Search, badgeKey: "tradeFinder", statusKey: "tradeFinder" },
       { label: "TradingView Alerts", href: "/tv-alerts", icon: Radio, badgeKey: "tvAlerts" },
       { label: "AI Analysis", href: "/ai-analysis", icon: Sparkles, badgeKey: "aiAnalysis" },
       { label: "AI Trader", href: "/ai-trader", icon: Bot, badgeKey: "aiTrader" },
