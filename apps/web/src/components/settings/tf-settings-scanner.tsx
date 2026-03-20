@@ -31,7 +31,12 @@ export function TFSettingsScanner({ config, onUpdate, saving }: TFSettingsProps)
       <CardContent className="space-y-6">
         {/* Scanner toggle */}
         <div className="flex items-center justify-between">
-          <Label>Scanner</Label>
+          <div>
+            <Label>Scanner</Label>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Turn the scanner on or off
+            </p>
+          </div>
           <ToggleSwitch
             checked={config.enabled}
             onChange={(v) => void onUpdate({ enabled: v })}
@@ -91,6 +96,8 @@ export function TFSettingsScanner({ config, onUpdate, saving }: TFSettingsProps)
             aria-label="Maximum enabled pairs"
           />
         </div>
+
+        <Separator />
 
         {/* Risk per trade (read-only) */}
         <div className="flex items-center justify-between">

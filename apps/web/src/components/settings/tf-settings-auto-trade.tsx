@@ -43,7 +43,7 @@ export function TFSettingsAutoTrade({
             <p className="text-muted-foreground mt-0.5 text-xs">
               {config.autoTradeEnabled
                 ? `Active on ${autoTradeEnabledPairCount} pair(s)`
-                : "Disabled -- setups are shown but not placed"}
+                : "Disabled — setups are shown but not placed"}
             </p>
           </div>
           <ToggleSwitch
@@ -56,79 +56,16 @@ export function TFSettingsAutoTrade({
         {config.autoTradeEnabled && (
           <>
             {/* Warning */}
-            <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               <span>
                 This places real trades with real money. Make sure you understand the risks.
               </span>
             </div>
 
-            <div className="relative my-4">
-              <Separator />
-              <span className="bg-card text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 px-2 text-[10px] uppercase tracking-wider">
-                Quality &amp; Targets
-              </span>
-            </div>
+            <Separator />
 
-            <NumberRow
-              label="Minimum quality score"
-              desc="Only auto-trade the best setups"
-              value={config.autoTradeMinScore}
-              min={1} max={18} step={0.5}
-              onCommit={(v) => void onUpdate({ autoTradeMinScore: v })}
-            />
-            <NumberRow
-              label="Minimum profit target"
-              desc="e.g. 2 means aim for $2 profit for every $1 risked"
-              value={config.autoTradeMinRR}
-              min={0.5} max={10} step={0.5}
-              onCommit={(v) => void onUpdate({ autoTradeMinRR: v })}
-            />
-
-            <div className="relative my-4">
-              <Separator />
-              <span className="bg-card text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 px-2 text-[10px] uppercase tracking-wider">
-                Safety Limits
-              </span>
-            </div>
-
-            <NumberRow
-              label="Trades at once"
-              desc="Maximum trades open at the same time"
-              value={config.autoTradeMaxConcurrent}
-              min={1} max={20} step={1} integer
-              onCommit={(v) => void onUpdate({ autoTradeMaxConcurrent: v })}
-            />
-            <NumberRow
-              label="Trades per day"
-              desc="Maximum new trades placed each day (0 = no limit)"
-              value={config.autoTradeMaxDaily}
-              min={0} max={50} step={1} integer
-              onCommit={(v) => void onUpdate({ autoTradeMaxDaily: v })}
-            />
-            <NumberRow
-              label="Max money at risk"
-              desc="Pause trading if this much of your balance is at risk"
-              value={config.autoTradeMaxRiskPercent}
-              min={0.5} max={50} step={0.5}
-              suffix="%"
-              onCommit={(v) => void onUpdate({ autoTradeMaxRiskPercent: v })}
-            />
-
-            {/* Cancel on invalidation */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Cancel when setup breaks</Label>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  Automatically cancel orders if the trade idea is no longer valid
-                </p>
-              </div>
-              <ToggleSwitch
-                checked={config.autoTradeCancelOnInvalidation}
-                onChange={(v) => void onUpdate({ autoTradeCancelOnInvalidation: v })}
-                disabled={saving}
-              />
-            </div>
+            <AutoTradeFields config={config} onUpdate={onUpdate} saving={saving} />
 
             <Separator />
 
@@ -143,7 +80,7 @@ export function TFSettingsAutoTrade({
               >
                 {cancellingAuto ? "Cancelling..." : "Cancel All Auto-Placed Orders"}
               </Button>
-              <p className="text-muted-foreground mt-1 text-[10px]">
+              <p className="text-muted-foreground mt-1.5 text-[10px]">
                 Cancels all currently pending auto-placed orders
               </p>
             </div>
@@ -154,31 +91,141 @@ export function TFSettingsAutoTrade({
   )
 }
 
-/* Inline helper to keep the main component under 150 LOC */
-function NumberRow({ label, desc, value, min, max, step, integer, suffix, onCommit }: {
-  label: string; desc: string; value: number
-  min: number; max: number; step: number; integer?: boolean; suffix?: string
-  onCommit: (v: number) => void
-}) {
+/** Extracted to keep the parent under 150 LOC */
+function AutoTradeFields({ config, onUpdate, saving }: TFSettingsProps) {
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <Label>{label}</Label>
-        <p className="text-muted-foreground mt-0.5 text-xs">{desc}</p>
-      </div>
-      <div className="flex items-center gap-1">
+    <div className="space-y-6">
+      {/* Min quality score */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>Minimum quality score</Label>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Only auto-trade the best setups
+          </p>
+        </div>
         <input
           type="number"
-          min={min} max={max} step={step}
-          defaultValue={value}
+          min={1} max={18} step={0.5}
+          defaultValue={config.autoTradeMinScore}
           onBlur={(e) => {
-            const num = integer ? parseInt(e.target.value) : parseFloat(e.target.value)
-            if (!isNaN(num) && num >= min && num <= max) onCommit(num)
+            const n = parseFloat(e.target.value)
+            if (!isNaN(n) && n >= 1 && n <= 18) void onUpdate({ autoTradeMinScore: n })
           }}
           className={INPUT_CLASS}
-          aria-label={label}
+          aria-label="Minimum quality score"
         />
-        {suffix && <span className="text-muted-foreground text-xs">{suffix}</span>}
+      </div>
+
+      <Separator />
+
+      {/* Min profit target */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>Minimum profit target</Label>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            e.g. 2 means aim for $2 profit for every $1 risked
+          </p>
+        </div>
+        <input
+          type="number"
+          min={0.5} max={10} step={0.5}
+          defaultValue={config.autoTradeMinRR}
+          onBlur={(e) => {
+            const n = parseFloat(e.target.value)
+            if (!isNaN(n) && n >= 0.5 && n <= 10) void onUpdate({ autoTradeMinRR: n })
+          }}
+          className={INPUT_CLASS}
+          aria-label="Minimum profit target"
+        />
+      </div>
+
+      <Separator />
+
+      {/* Trades at once */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>Trades at once</Label>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Maximum trades open at the same time
+          </p>
+        </div>
+        <input
+          type="number"
+          min={1} max={20} step={1}
+          defaultValue={config.autoTradeMaxConcurrent}
+          onBlur={(e) => {
+            const n = parseInt(e.target.value)
+            if (!isNaN(n) && n >= 1 && n <= 20) void onUpdate({ autoTradeMaxConcurrent: n })
+          }}
+          className={INPUT_CLASS}
+          aria-label="Trades at once"
+        />
+      </div>
+
+      <Separator />
+
+      {/* Trades per day */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>Trades per day</Label>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Maximum new trades placed each day (0 = no limit)
+          </p>
+        </div>
+        <input
+          type="number"
+          min={0} max={50} step={1}
+          defaultValue={config.autoTradeMaxDaily}
+          onBlur={(e) => {
+            const n = parseInt(e.target.value)
+            if (!isNaN(n) && n >= 0 && n <= 50) void onUpdate({ autoTradeMaxDaily: n })
+          }}
+          className={INPUT_CLASS}
+          aria-label="Trades per day"
+        />
+      </div>
+
+      <Separator />
+
+      {/* Max money at risk */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>Max money at risk</Label>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Pause trading if this much of your balance is at risk
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min={0.5} max={50} step={0.5}
+            defaultValue={config.autoTradeMaxRiskPercent}
+            onBlur={(e) => {
+              const n = parseFloat(e.target.value)
+              if (!isNaN(n) && n >= 0.5 && n <= 50) void onUpdate({ autoTradeMaxRiskPercent: n })
+            }}
+            className={INPUT_CLASS}
+            aria-label="Max money at risk"
+          />
+          <span className="text-muted-foreground text-xs">%</span>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Cancel on invalidation */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>Cancel when setup breaks</Label>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Automatically cancel orders if the trade idea is no longer valid
+          </p>
+        </div>
+        <ToggleSwitch
+          checked={config.autoTradeCancelOnInvalidation}
+          onChange={(v) => void onUpdate({ autoTradeCancelOnInvalidation: v })}
+          disabled={saving}
+        />
       </div>
     </div>
   )
