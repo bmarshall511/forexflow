@@ -35,7 +35,7 @@ export function TFSettingsAutoTrade({
           Let the system place trades for you when it finds good setups.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* Master toggle */}
         <div className="flex items-center justify-between">
           <div>
@@ -63,7 +63,7 @@ export function TFSettingsAutoTrade({
               </span>
             </div>
 
-            <div className="relative my-2">
+            <div className="relative my-4">
               <Separator />
               <span className="bg-card text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 px-2 text-[10px] uppercase tracking-wider">
                 Quality &amp; Targets
@@ -85,7 +85,7 @@ export function TFSettingsAutoTrade({
               onCommit={(v) => void onUpdate({ autoTradeMinRR: v })}
             />
 
-            <div className="relative my-2">
+            <div className="relative my-4">
               <Separator />
               <span className="bg-card text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 px-2 text-[10px] uppercase tracking-wider">
                 Safety Limits

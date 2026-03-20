@@ -28,7 +28,7 @@ export function TFSettingsScanner({ config, onUpdate, saving }: TFSettingsProps)
           The scanner watches the market and finds potential trades for you.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* Scanner toggle */}
         <div className="flex items-center justify-between">
           <Label>Scanner</Label>

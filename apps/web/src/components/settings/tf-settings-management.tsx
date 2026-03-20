@@ -22,7 +22,7 @@ export function TFSettingsManagement({ config, onUpdate, saving }: TFSettingsPro
           Manage open trades to protect profits and cut losses.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* Breakeven */}
         <div className="flex items-center justify-between">
           <div>
