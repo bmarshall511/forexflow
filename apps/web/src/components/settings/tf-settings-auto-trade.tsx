@@ -63,11 +63,12 @@ export function TFSettingsAutoTrade({
               </span>
             </div>
 
-            <Separator className="my-1">
-              <span className="text-muted-foreground px-2 text-[10px] uppercase tracking-wider">
+            <div className="relative my-2">
+              <Separator />
+              <span className="bg-card text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 px-2 text-[10px] uppercase tracking-wider">
                 Quality &amp; Targets
               </span>
-            </Separator>
+            </div>
 
             <NumberRow
               label="Minimum quality score"
@@ -84,11 +85,12 @@ export function TFSettingsAutoTrade({
               onCommit={(v) => void onUpdate({ autoTradeMinRR: v })}
             />
 
-            <Separator className="my-1">
-              <span className="text-muted-foreground px-2 text-[10px] uppercase tracking-wider">
+            <div className="relative my-2">
+              <Separator />
+              <span className="bg-card text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 px-2 text-[10px] uppercase tracking-wider">
                 Safety Limits
               </span>
-            </Separator>
+            </div>
 
             <NumberRow
               label="Trades at once"
