@@ -25,8 +25,6 @@ interface ToggleRowProps {
   onToggle: () => void
   color: string
   dotColor: string
-  /** Trade priority position (1-based). Shown as a small badge when set. */
-  priority?: number
 }
 
 function ToggleRow({
@@ -38,7 +36,6 @@ function ToggleRow({
   onToggle,
   color,
   dotColor,
-  priority,
 }: ToggleRowProps) {
   return (
     <button
@@ -74,11 +71,6 @@ function ToggleRow({
           >
             {enabled ? "On" : "Off"}
           </span>
-          {priority != null && (
-            <span className="text-muted-foreground/60 text-[9px] font-medium tabular-nums">
-              #{priority}
-            </span>
-          )}
         </div>
         <p className="text-muted-foreground text-[11px] leading-tight">{description}</p>
       </div>
@@ -245,10 +237,13 @@ export function AutomationControls() {
           <p className="text-foreground text-xs font-semibold">Automation Controls</p>
           <p className="text-muted-foreground text-[10px]">{activeCount} of 5 systems active</p>
         </div>
+
+        {/* ── Trade Placement group ── */}
         <div className="space-y-0.5">
-          {/* Placement sources — ordered by configured trade priority */}
-          {priorityOrder.map((source, idx) => {
-            const priority = idx + 1
+          <p className="text-muted-foreground/70 px-3 pb-0.5 text-[9px] font-semibold uppercase tracking-widest">
+            Trade Placement (by priority)
+          </p>
+          {priorityOrder.map((source) => {
             switch (source) {
               case "tv_alerts":
                 return tvEnabled !== null ? (
@@ -262,7 +257,6 @@ export function AutomationControls() {
                     onToggle={handleTvToggle}
                     color="text-green-500"
                     dotColor="bg-green-500"
-                    priority={priority}
                   />
                 ) : null
               case "trade_finder":
@@ -277,7 +271,6 @@ export function AutomationControls() {
                     onToggle={handleTfToggle}
                     color="text-teal-500"
                     dotColor="bg-teal-500"
-                    priority={priority}
                   />
                 ) : null
               case "ai_trader":
@@ -292,7 +285,6 @@ export function AutomationControls() {
                     onToggle={handleAiToggle}
                     color="text-violet-500"
                     dotColor="bg-violet-500"
-                    priority={priority}
                   />
                 ) : null
               case "smart_flow":
@@ -307,14 +299,19 @@ export function AutomationControls() {
                     onToggle={handleSfToggle}
                     color="text-amber-500"
                     dotColor="bg-amber-500"
-                    priority={priority}
                   />
                 ) : null
               default:
                 return null
             }
           })}
-          {/* AI Analysis — not a placement source, always shown last */}
+        </div>
+
+        {/* ── Analysis group ── */}
+        <div className="mt-2 space-y-0.5">
+          <p className="text-muted-foreground/70 px-3 pb-0.5 text-[9px] font-semibold uppercase tracking-widest">
+            Analysis
+          </p>
           {aiAnalysisSettings && (
             <ToggleRow
               icon={<Sparkles className="size-4" />}
@@ -328,6 +325,7 @@ export function AutomationControls() {
             />
           )}
         </div>
+
         <div className="border-border mt-2 border-t px-3 pt-2">
           <p className="text-muted-foreground text-[10px]">
             <kbd className="bg-muted rounded px-1 py-0.5 font-mono text-[9px]">Ctrl+Shift+K</kbd>{" "}
