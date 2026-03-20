@@ -63,34 +63,37 @@ export function SetupCardDetails({
           {setup.breakevenMoved && (
             <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
               <CheckCircle2 className="size-3.5" />
-              <span>Breakeven locked</span>
+              <span>Safety net moved — you can&apos;t lose money on this trade</span>
             </div>
           )}
           {setup.partialTaken && (
             <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
               <CheckCircle2 className="size-3.5" />
-              <span>Partial taken</span>
+              <span>Some profit locked in — part of the trade was closed</span>
             </div>
           )}
           {autoTradeStatus?.type === "eligible" && (
-            <div className="flex items-center gap-1.5 text-xs text-teal-600 dark:text-teal-400">
-              <Zap className="size-3.5" />
-              <span>Eligible for auto-trade</span>
+            <div className="flex items-start gap-1.5 text-xs text-teal-600 dark:text-teal-400">
+              <Zap className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                Ready for auto-trade
+                {autoTradeStatus.reason ? ` — ${autoTradeStatus.reason.charAt(0).toLowerCase()}${autoTradeStatus.reason.slice(1)}` : ""}
+              </span>
             </div>
           )}
           {autoTradeStatus?.type === "queued" && (
-            <div className="flex items-center gap-1.5 text-xs text-blue-500">
-              <Clock className="size-3.5" />
+            <div className="flex items-start gap-1.5 text-xs text-blue-500">
+              <Clock className="mt-0.5 size-3.5 shrink-0" />
               <span>
-                Queued{autoTradeStatus.position != null ? ` #${autoTradeStatus.position}` : ""}:{" "}
+                {autoTradeStatus.position != null ? `#${autoTradeStatus.position} in line — ` : ""}
                 {autoTradeStatus.reason}
               </span>
             </div>
           )}
           {autoTradeStatus?.type === "blocked" && (
-            <div className="flex items-center gap-1.5 text-xs text-amber-500">
-              <AlertCircle className="size-3.5" />
-              <span>Blocked: {autoTradeStatus.reason}</span>
+            <div className="flex items-start gap-1.5 text-xs text-amber-500">
+              <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+              <span>Can&apos;t auto-trade: {autoTradeStatus.reason.charAt(0).toLowerCase()}{autoTradeStatus.reason.slice(1)}</span>
             </div>
           )}
         </div>

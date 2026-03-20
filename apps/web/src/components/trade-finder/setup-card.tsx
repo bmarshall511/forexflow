@@ -29,11 +29,11 @@ export const STATUS_STYLES: Record<string, { className: string; label: string }>
   active: { className: "bg-blue-500/10 text-blue-500 border-blue-500/20", label: "Watching" },
   approaching: {
     className: "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse",
-    label: "Approaching",
+    label: "Getting close",
   },
-  placed: { className: "bg-teal-500/10 text-teal-500 border-teal-500/20", label: "Pending" },
-  filled: { className: "bg-green-500/10 text-green-500 border-green-500/20", label: "Filled" },
-  invalidated: { className: "bg-red-500/10 text-red-500 border-red-500/20", label: "Invalidated" },
+  placed: { className: "bg-teal-500/10 text-teal-500 border-teal-500/20", label: "Order placed" },
+  filled: { className: "bg-green-500/10 text-green-500 border-green-500/20", label: "Trade open" },
+  invalidated: { className: "bg-red-500/10 text-red-500 border-red-500/20", label: "No longer valid" },
   expired: { className: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20", label: "Expired" },
 }
 
@@ -61,7 +61,7 @@ export function computeDollarAmount(
 // ─── Auto-trade status logic ───
 
 export type AutoTradeStatus =
-  | { type: "eligible" }
+  | { type: "eligible"; reason?: string }
   | { type: "queued"; position: number | null; reason: string }
   | { type: "blocked"; reason: string }
   | null
@@ -105,6 +105,13 @@ function getAutoTradeStatus(
     return { type: "queued", position: setup.queuePosition, reason: "In line — waiting for a trade slot to open up" }
   }
 
+  // Eligible but explain what it's waiting for
+  if (setup.status === "active") {
+    return { type: "eligible", reason: "Waiting for price to get closer to the entry zone" }
+  }
+  if (setup.status === "approaching") {
+    return { type: "eligible", reason: "Price is near the zone — waiting for a bounce signal to enter" }
+  }
   return { type: "eligible" }
 }
 
@@ -193,25 +200,35 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
                 {statusBadge}
               </div>
 
-              {/* Row 2: R:R / Risk / Reward / Distance */}
-              <div className="mt-1 flex items-center gap-3 text-[11px]">
-                <span className="text-muted-foreground">R:R {setup.rrRatio}</span>
-                <span className="text-muted-foreground">
-                  Risk{" "}
-                  <span className="font-medium text-red-500">{fmtDollar(riskDollars)}</span>
-                  {" "}→ Reward{" "}
-                  <span className="font-medium text-green-500">{fmtDollar(rewardDollars)}</span>
+              {/* Row 2: Key metrics */}
+              <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
+                <span>
+                  Risking <span className="font-medium text-red-500">{fmtDollar(riskDollars)}</span>
+                  {" "}to make <span className="font-medium text-green-500">{fmtDollar(rewardDollars)}</span>
+                  {" "}<span className="opacity-60">({setup.rrRatio})</span>
                 </span>
-                <span className="text-muted-foreground">
-                  {setup.distanceToEntryPips.toFixed(0)}p away
+                <span>
+                  {setup.distanceToEntryPips < 1
+                    ? "At the entry zone"
+                    : setup.distanceToEntryPips < 10
+                      ? `${setup.distanceToEntryPips.toFixed(1)} pips from entry`
+                      : `${setup.distanceToEntryPips.toFixed(0)} pips from entry`}
                 </span>
               </div>
 
-              {/* Skip reason as subtle line below row 2 */}
-              {(autoTradeStatus?.type === "queued" || autoTradeStatus?.type === "blocked") && (
-                <div className="mt-0.5 flex items-center gap-1">
-                  <AlertCircle className="size-3 shrink-0 text-amber-500/70" />
-                  <span className="truncate text-[10px] text-amber-500/70">
+              {/* Status context line — why it's waiting, what's blocking it */}
+              {autoTradeStatus && autoTradeStatus.reason && (
+                <div className="mt-1 flex items-start gap-1.5">
+                  <AlertCircle className={cn(
+                    "mt-0.5 size-3 shrink-0",
+                    autoTradeStatus.type === "eligible" ? "text-blue-400" :
+                    autoTradeStatus.type === "blocked" ? "text-amber-500" : "text-blue-400",
+                  )} />
+                  <span className={cn(
+                    "text-[10px] leading-snug",
+                    autoTradeStatus.type === "eligible" ? "text-blue-400" :
+                    autoTradeStatus.type === "blocked" ? "text-amber-500" : "text-blue-400",
+                  )}>
                     {autoTradeStatus.reason}
                   </span>
                 </div>
