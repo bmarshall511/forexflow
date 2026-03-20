@@ -106,6 +106,7 @@ export function ResetWizard() {
             ai_analysis: 0,
             ai_trader: 0,
             trade_finder: 0,
+            smart_flow: 0,
             technical_data: 0,
             notifications: 0,
             chart_state: 0,

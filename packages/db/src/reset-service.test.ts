@@ -14,6 +14,14 @@ const mockAiTraderOpportunity = vi.hoisted(() => ({ count: vi.fn(), deleteMany: 
 const mockAiTraderMarketData = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
 const mockAiTraderStrategyPerformance = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
 const mockTradeFinderSetup = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
+const mockTradeFinderPerformance = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
+const mockSmartFlowTrade = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
+const mockSmartFlowTimeEstimate = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
+const mockSmartFlowActivityLog = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
+const mockSmartFlowConfig = vi.hoisted(() => ({ deleteMany: vi.fn() }))
+const mockPriceAlert = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
+const mockSourcePriorityLog = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
+const mockSourcePriorityConfig = vi.hoisted(() => ({ deleteMany: vi.fn() }))
 const mockSupplyDemandZone = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
 const mockDetectedTrend = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
 const mockCurveSnapshot = vi.hoisted(() => ({ count: vi.fn(), deleteMany: vi.fn() }))
@@ -46,6 +54,14 @@ vi.mock("./client", () => ({
     aiTraderMarketData: mockAiTraderMarketData,
     aiTraderStrategyPerformance: mockAiTraderStrategyPerformance,
     tradeFinderSetup: mockTradeFinderSetup,
+    tradeFinderPerformance: mockTradeFinderPerformance,
+    smartFlowTrade: mockSmartFlowTrade,
+    smartFlowTimeEstimate: mockSmartFlowTimeEstimate,
+    smartFlowActivityLog: mockSmartFlowActivityLog,
+    smartFlowConfig: mockSmartFlowConfig,
+    priceAlert: mockPriceAlert,
+    sourcePriorityLog: mockSourcePriorityLog,
+    sourcePriorityConfig: mockSourcePriorityConfig,
     supplyDemandZone: mockSupplyDemandZone,
     detectedTrend: mockDetectedTrend,
     curveSnapshot: mockCurveSnapshot,
@@ -99,6 +115,14 @@ describe("reset-service", () => {
       mockAiTraderStrategyPerformance.count.mockResolvedValue(2)
       // trade_finder
       mockTradeFinderSetup.count.mockResolvedValue(12)
+      mockTradeFinderPerformance.count.mockResolvedValue(6)
+      // smart_flow
+      mockSmartFlowTrade.count.mockResolvedValue(4)
+      mockSmartFlowTimeEstimate.count.mockResolvedValue(3)
+      mockSmartFlowActivityLog.count.mockResolvedValue(8)
+      // trading_history extras
+      mockPriceAlert.count.mockResolvedValue(2)
+      mockSourcePriorityLog.count.mockResolvedValue(5)
       // technical_data
       mockSupplyDemandZone.count.mockResolvedValue(30)
       mockDetectedTrend.count.mockResolvedValue(10)
@@ -110,11 +134,12 @@ describe("reset-service", () => {
 
       const counts = await getModuleDataCounts()
 
-      expect(counts.trading_history).toBe(25) // 10+5+3+7
+      expect(counts.trading_history).toBe(32) // 10+5+3+7+2+5
       expect(counts.tv_alerts).toBe(35) // 20+15
       expect(counts.ai_analysis).toBe(10) // 4+2+1+3
       expect(counts.ai_trader).toBe(16) // 8+6+2
-      expect(counts.trade_finder).toBe(12)
+      expect(counts.trade_finder).toBe(18) // 12+6
+      expect(counts.smart_flow).toBe(15) // 4+3+8
       expect(counts.technical_data).toBe(45) // 30+10+5
       expect(counts.notifications).toBe(50)
       expect(counts.chart_state).toBe(2)
@@ -146,6 +171,12 @@ describe("reset-service", () => {
       mockAiTraderMarketData.count.mockResolvedValue(0)
       mockAiTraderStrategyPerformance.count.mockResolvedValue(0)
       mockTradeFinderSetup.count.mockResolvedValue(0)
+      mockTradeFinderPerformance.count.mockResolvedValue(0)
+      mockSmartFlowTrade.count.mockResolvedValue(0)
+      mockSmartFlowTimeEstimate.count.mockResolvedValue(0)
+      mockSmartFlowActivityLog.count.mockResolvedValue(0)
+      mockPriceAlert.count.mockResolvedValue(0)
+      mockSourcePriorityLog.count.mockResolvedValue(0)
       mockSupplyDemandZone.count.mockResolvedValue(0)
       mockDetectedTrend.count.mockResolvedValue(0)
       mockCurveSnapshot.count.mockResolvedValue(0)
@@ -211,11 +242,18 @@ describe("reset-service", () => {
       expect(result.deleted).toBe(16)
     })
 
-    it("resets trade_finder directly", async () => {
-      mockTradeFinderSetup.deleteMany.mockResolvedValue({ count: 12 })
+    it("resets trade_finder via transaction", async () => {
+      mock$transaction.mockResolvedValue([{ count: 12 }, { count: 6 }])
 
       const result = await resetModule("trade_finder")
-      expect(result.deleted).toBe(12)
+      expect(result.deleted).toBe(18)
+    })
+
+    it("resets smart_flow via transaction", async () => {
+      mock$transaction.mockResolvedValue([{ count: 4 }, { count: 3 }, { count: 8 }])
+
+      const result = await resetModule("smart_flow")
+      expect(result.deleted).toBe(15)
     })
 
     it("resets technical_data via transaction", async () => {
@@ -242,7 +280,7 @@ describe("reset-service", () => {
 
   describe("resetTradingData", () => {
     it("resets all modules and reports success", async () => {
-      // Each module reset call
+      // Each module reset call (9 modules total)
       mock$transaction
         .mockResolvedValueOnce([
           { count: 1 },
@@ -252,19 +290,22 @@ describe("reset-service", () => {
           { count: 1 },
           { count: 1 },
           { count: 1 },
-        ]) // trading_history
+          { count: 1 },
+          { count: 1 },
+        ]) // trading_history (9 tables)
         .mockResolvedValueOnce([{ count: 1 }, { count: 1 }]) // tv_alerts
         .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }, { count: 1 }]) // ai_analysis
         .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // ai_trader
-      mockTradeFinderSetup.deleteMany.mockResolvedValue({ count: 1 }) // trade_finder
-      mock$transaction.mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // technical_data
+        .mockResolvedValueOnce([{ count: 1 }, { count: 1 }]) // trade_finder (2 tables)
+        .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // smart_flow (3 tables)
+        .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // technical_data
       mockNotification.deleteMany.mockResolvedValue({ count: 1 }) // notifications
       mockChartLayout.deleteMany.mockResolvedValue({ count: 1 }) // chart_state
 
       const result = await resetTradingData()
 
       expect(result.success).toBe(true)
-      expect(result.modulesReset).toHaveLength(8)
+      expect(result.modulesReset).toHaveLength(9)
       expect(result.errors).toHaveLength(0)
       expect(result.recordsDeleted).toBeGreaterThan(0)
     })
@@ -276,8 +317,9 @@ describe("reset-service", () => {
         .mockResolvedValueOnce([{ count: 1 }, { count: 1 }]) // tv_alerts
         .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }, { count: 1 }]) // ai_analysis
         .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // ai_trader
-      mockTradeFinderSetup.deleteMany.mockResolvedValue({ count: 1 })
-      mock$transaction.mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // technical_data
+        .mockResolvedValueOnce([{ count: 1 }, { count: 1 }]) // trade_finder
+        .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // smart_flow
+        .mockResolvedValueOnce([{ count: 1 }, { count: 1 }, { count: 1 }]) // technical_data
       mockNotification.deleteMany.mockResolvedValue({ count: 1 })
       mockChartLayout.deleteMany.mockResolvedValue({ count: 1 })
 
@@ -286,13 +328,13 @@ describe("reset-service", () => {
       expect(result.success).toBe(false)
       expect(result.errors).toHaveLength(1)
       expect(result.errors[0]).toContain("trading_history")
-      expect(result.modulesReset).toHaveLength(7)
+      expect(result.modulesReset).toHaveLength(8)
     })
   })
 
   describe("resetFactory", () => {
     it("resets all data and config tables", async () => {
-      // Data modules
+      // Data modules (9 modules)
       mock$transaction
         .mockResolvedValueOnce([
           { count: 0 },
@@ -302,16 +344,19 @@ describe("reset-service", () => {
           { count: 0 },
           { count: 0 },
           { count: 0 },
-        ])
-        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }])
-        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }])
-        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }, { count: 0 }])
-      mockTradeFinderSetup.deleteMany.mockResolvedValue({ count: 0 })
-      mock$transaction.mockResolvedValueOnce([{ count: 0 }, { count: 0 }, { count: 0 }])
+          { count: 0 },
+          { count: 0 },
+        ]) // trading_history
+        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }]) // tv_alerts
+        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }]) // ai_analysis
+        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }, { count: 0 }]) // ai_trader
+        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }]) // trade_finder
+        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }, { count: 0 }]) // smart_flow
+        .mockResolvedValueOnce([{ count: 0 }, { count: 0 }, { count: 0 }]) // technical_data
       mockNotification.deleteMany.mockResolvedValue({ count: 0 })
       mockChartLayout.deleteMany.mockResolvedValue({ count: 0 })
 
-      // Config tables
+      // Config tables (10 tables)
       mockSettings.deleteMany.mockResolvedValue({ count: 1 })
       mockTVAlertsConfig.deleteMany.mockResolvedValue({ count: 1 })
       mockAiSettings.deleteMany.mockResolvedValue({ count: 1 })
@@ -319,14 +364,19 @@ describe("reset-service", () => {
       mockAiTraderConfig.deleteMany.mockResolvedValue({ count: 1 })
       mockZoneSettings.deleteMany.mockResolvedValue({ count: 1 })
       mockTrendSettings.deleteMany.mockResolvedValue({ count: 1 })
+      mockSmartFlowSettings.deleteMany.mockResolvedValue({ count: 1 })
+      mockSmartFlowConfig.deleteMany.mockResolvedValue({ count: 1 })
+      mockSourcePriorityConfig.deleteMany.mockResolvedValue({ count: 1 })
 
       const result = await resetFactory()
 
       expect(result.success).toBe(true)
-      expect(result.modulesReset).toHaveLength(8)
-      expect(result.recordsDeleted).toBe(7) // 7 config tables
+      expect(result.modulesReset).toHaveLength(9)
+      expect(result.recordsDeleted).toBe(10) // 10 config tables
       expect(mockSettings.deleteMany).toHaveBeenCalledOnce()
       expect(mockAiTraderConfig.deleteMany).toHaveBeenCalledOnce()
+      expect(mockSmartFlowSettings.deleteMany).toHaveBeenCalledOnce()
+      expect(mockSourcePriorityConfig.deleteMany).toHaveBeenCalledOnce()
     })
   })
 

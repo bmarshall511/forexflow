@@ -11,6 +11,7 @@ const MODULE_LABELS: Record<ResetModule, string> = {
   ai_analysis: "AI Analysis",
   ai_trader: "AI Trader",
   trade_finder: "Trade Finder",
+  smart_flow: "SmartFlow",
   technical_data: "Technical Data",
   notifications: "Notifications",
   chart_state: "Chart State",

@@ -14,6 +14,7 @@ export type ResetModule =
   | "ai_analysis"
   | "ai_trader"
   | "trade_finder"
+  | "smart_flow"
   | "technical_data"
   | "notifications"
   | "chart_state"
@@ -47,6 +48,7 @@ const ALL_DATA_MODULES: ResetModule[] = [
   "ai_analysis",
   "ai_trader",
   "trade_finder",
+  "smart_flow",
   "technical_data",
   "notifications",
   "chart_state",
@@ -55,13 +57,15 @@ const ALL_DATA_MODULES: ResetModule[] = [
 // ─── Module count helpers ───────────────────────────────────────────────────
 
 async function countTradingHistory(): Promise<number> {
-  const [trades, events, tags, tradeTags] = await Promise.all([
+  const [trades, events, tags, tradeTags, alerts, priorityLogs] = await Promise.all([
     db.trade.count(),
     db.tradeEvent.count(),
     db.tag.count(),
     db.tradeTag.count(),
+    db.priceAlert.count(),
+    db.sourcePriorityLog.count(),
   ])
-  return trades + events + tags + tradeTags
+  return trades + events + tags + tradeTags + alerts + priorityLogs
 }
 
 async function countTvAlerts(): Promise<number> {
@@ -92,7 +96,20 @@ async function countAiTrader(): Promise<number> {
 }
 
 async function countTradeFinderModule(): Promise<number> {
-  return db.tradeFinderSetup.count()
+  const [setups, perf] = await Promise.all([
+    db.tradeFinderSetup.count(),
+    db.tradeFinderPerformance.count(),
+  ])
+  return setups + perf
+}
+
+async function countSmartFlowModule(): Promise<number> {
+  const [trades, timeEstimates, activityLogs] = await Promise.all([
+    db.smartFlowTrade.count(),
+    db.smartFlowTimeEstimate.count(),
+    db.smartFlowActivityLog.count(),
+  ])
+  return trades + timeEstimates + activityLogs
 }
 
 async function countTechnicalData(): Promise<number> {
@@ -110,6 +127,7 @@ const MODULE_COUNTERS: Record<ResetModule, () => Promise<number>> = {
   ai_analysis: countAiAnalysis,
   ai_trader: countAiTrader,
   trade_finder: countTradeFinderModule,
+  smart_flow: countSmartFlowModule,
   technical_data: countTechnicalData,
   notifications: () => db.notification.count(),
   chart_state: () => db.chartLayout.count(),
@@ -170,7 +188,8 @@ export async function resetModule(module: ResetModule): Promise<{ deleted: numbe
   switch (module) {
     case "trading_history": {
       // Children first: TradeTag, TradeEvent, then AiAnalysis (cascades TradeCondition),
-      // AiRecommendationOutcome, then Trade, then Tag
+      // AiRecommendationOutcome, then Trade, then Tag.
+      // Also: PriceAlert (user-created alerts) and SourcePriorityLog (audit trail).
       const results = await db.$transaction([
         db.tradeTag.deleteMany(),
         db.tradeEvent.deleteMany(),
@@ -179,6 +198,8 @@ export async function resetModule(module: ResetModule): Promise<{ deleted: numbe
         db.aiAnalysis.deleteMany(),
         db.trade.deleteMany(),
         db.tag.deleteMany(),
+        db.priceAlert.deleteMany(),
+        db.sourcePriorityLog.deleteMany(),
       ])
       deleted = results.reduce((sum, r) => sum + r.count, 0)
       break
@@ -211,8 +232,20 @@ export async function resetModule(module: ResetModule): Promise<{ deleted: numbe
       break
     }
     case "trade_finder": {
-      const result = await db.tradeFinderSetup.deleteMany()
-      deleted = result.count
+      const results = await db.$transaction([
+        db.tradeFinderSetup.deleteMany(),
+        db.tradeFinderPerformance.deleteMany(),
+      ])
+      deleted = results.reduce((sum, r) => sum + r.count, 0)
+      break
+    }
+    case "smart_flow": {
+      const results = await db.$transaction([
+        db.smartFlowActivityLog.deleteMany(),
+        db.smartFlowTimeEstimate.deleteMany(),
+        db.smartFlowTrade.deleteMany(),
+      ])
+      deleted = results.reduce((sum, r) => sum + r.count, 0)
       break
     }
     case "technical_data": {
@@ -273,6 +306,9 @@ export async function resetFactory(): Promise<ResetResult> {
     { name: "AiTraderConfig", fn: () => db.aiTraderConfig.deleteMany() },
     { name: "ZoneSettings", fn: () => db.zoneSettings.deleteMany() },
     { name: "TrendSettings", fn: () => db.trendSettings.deleteMany() },
+    { name: "SmartFlowSettings", fn: () => db.smartFlowSettings.deleteMany() },
+    { name: "SmartFlowConfig", fn: () => db.smartFlowConfig.deleteMany() },
+    { name: "SourcePriorityConfig", fn: () => db.sourcePriorityConfig.deleteMany() },
   ]
 
   for (const { name, fn } of configDeletes) {

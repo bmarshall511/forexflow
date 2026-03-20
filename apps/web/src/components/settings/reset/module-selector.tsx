@@ -25,7 +25,16 @@ const MODULES: ModuleInfo[] = [
     label: "AI Trader",
     description: "Opportunities, market data, and strategy performance",
   },
-  { id: "trade_finder", label: "Trade Finder", description: "Setups and scanner history" },
+  {
+    id: "trade_finder",
+    label: "Trade Finder",
+    description: "Setups, scanner history, and performance stats",
+  },
+  {
+    id: "smart_flow",
+    label: "SmartFlow",
+    description: "Trades, activity logs, and time estimates",
+  },
   {
     id: "technical_data",
     label: "Technical Data",
