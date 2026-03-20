@@ -48,7 +48,7 @@ export function ServicesStatusCard({ daemon, snapshot }: ServicesStatusCardProps
           }
         />
         <DetailRow label="Trade Finder" value={<ServiceStatus enabled={tfEnabled} />} />
-        <DetailRow label="AI Trader" value={<ServiceStatus enabled={aiTraderEnabled} />} />
+        <DetailRow label="EdgeFinder" value={<ServiceStatus enabled={aiTraderEnabled} />} />
         <DetailRow
           label="AI Analysis"
           value={

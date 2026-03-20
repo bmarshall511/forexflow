@@ -17,7 +17,7 @@ export function PerformanceEquityCurve({ data }: Props) {
   }
 
   return (
-    <section aria-label="AI Trader equity curve">
+    <section aria-label="EdgeFinder equity curve">
       <h3 className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
         Cumulative P&L
       </h3>

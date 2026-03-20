@@ -152,9 +152,9 @@ export function AutomationControls() {
     setAiToggling(true)
     try {
       await aiSave({ enabled: !aiConfig.enabled })
-      toast.success(aiConfig.enabled ? "AI Trader disabled" : "AI Trader enabled")
+      toast.success(aiConfig.enabled ? "EdgeFinder disabled" : "EdgeFinder enabled")
     } catch {
-      toast.error("Failed to toggle AI Trader")
+      toast.error("Failed to toggle EdgeFinder")
     } finally {
       setAiToggling(false)
     }
@@ -278,7 +278,7 @@ export function AutomationControls() {
                   <ToggleRow
                     key="ai_trader"
                     icon={<Bot className="size-4" />}
-                    label="AI Trader"
+                    label="EdgeFinder"
                     description="Autonomous trade discovery"
                     enabled={aiActive}
                     toggling={aiToggling}

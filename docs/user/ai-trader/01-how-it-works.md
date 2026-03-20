@@ -1,13 +1,13 @@
 ---
-title: "How the AI Trader Works"
+title: "How the EdgeFinder Works"
 description: "Understand the 3-tier pipeline that finds and executes trades automatically"
 category: "ai-trader"
 order: 1
 ---
 
-# How the AI Trader Works
+# How the EdgeFinder Works
 
-The AI Trader is like having a team of three experts working together to find good trades for you. Each expert has a different job, and a trade must pass ALL three before any real money is involved.
+The EdgeFinder is like having a team of three experts working together to find good trades for you. Each expert has a different job, and a trade must pass ALL three before any real money is involved.
 
 This system is called the **3-tier pipeline**. Let's walk through each tier.
 
@@ -85,13 +85,13 @@ Here's what a typical scan costs:
 That's about 3.5 cents for a complete scan of 28 currency pairs.
 
 > [!NOTE]
-> Actual costs vary depending on how much data is sent to the AI. These are typical estimates. You can monitor exact spending on the AI Trader dashboard.
+> Actual costs vary depending on how much data is sent to the AI. These are typical estimates. You can monitor exact spending on the EdgeFinder dashboard.
 
 ---
 
 ## How Often Does It Scan?
 
-The AI Trader scans on a schedule that you control. The default is **every 30 minutes**, but you can change it.
+The EdgeFinder scans on a schedule that you control. The default is **every 30 minutes**, but you can change it.
 
 - **Every 15 minutes** — more frequent, catches opportunities faster, costs more
 - **Every 30 minutes** — good balance (default)
@@ -112,7 +112,7 @@ When Tier 3 says "yes, take this trade," and the confidence score meets your thr
 4. **AI manages the trade** — the system monitors and adjusts the trade as it develops
 5. **You get a notification** — a message appears telling you a new AI trade was placed
 
-The trade shows up with an **"AI Trade"** badge so you always know which trades the AI placed versus ones you placed yourself.
+The trade shows up with an **"EdgeFinder"** badge so you always know which trades the AI placed versus ones you placed yourself.
 
 > [!WARNING]
-> The AI Trader places real trades with real money on your OANDA account. Always start with a practice (demo) account until you're comfortable with how it works.
+> The EdgeFinder places real trades with real money on your OANDA account. Always start with a practice (demo) account until you're comfortable with how it works.

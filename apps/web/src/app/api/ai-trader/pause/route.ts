@@ -15,7 +15,7 @@ export async function POST() {
   } catch (error) {
     console.error("[POST /api/ai-trader/pause]", error)
     return NextResponse.json<ApiResponse<null>>(
-      { ok: false, error: "Failed to pause AI Trader scanner" },
+      { ok: false, error: "Failed to pause EdgeFinder scanner" },
       { status: 502 },
     )
   }

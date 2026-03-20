@@ -19,7 +19,7 @@ export async function POST() {
   } catch (error) {
     console.error("[POST /api/ai-trader/scan]", error)
     return NextResponse.json<ApiResponse<{ triggered: boolean }>>(
-      { ok: false, error: "Failed to trigger AI Trader scan" },
+      { ok: false, error: "Failed to trigger EdgeFinder scan" },
       { status: 502 },
     )
   }

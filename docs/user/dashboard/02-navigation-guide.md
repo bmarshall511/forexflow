@@ -30,7 +30,7 @@ These pages control features that can trade or alert you automatically:
 - **Trade Finder** — A scanner that finds trading opportunities for you
 - **TV Alerts** — Receives and processes signals from TradingView
 - **AI Analysis** — Ask AI to analyze your trades and give you insights
-- **AI Trader** — A fully automated AI trading system
+- **EdgeFinder** — A fully automated AI trading system
 - **Alerts** — Custom price alerts you've set up
 
 ### System

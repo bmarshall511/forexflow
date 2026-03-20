@@ -241,7 +241,7 @@ export function PreflightChecks({
     },
     {
       key: "ai_trader",
-      label: "AI Trader",
+      label: "EdgeFinder",
       enabled: isAiEnabled,
       passed: !isAiEnabled,
       action: isAiEnabled ? handleDisableAiTrader : undefined,

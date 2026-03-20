@@ -46,7 +46,7 @@ These shortcuts are shown inside the Command Palette and navigate you to a page 
 | **G S**  | Settings    |
 
 > [!NOTE]
-> You can also find **Trade Finder**, **TradingView Alerts**, **AI Analysis**, and **AI Trader** in the Command Palette by typing their names.
+> You can also find **Trade Finder**, **TradingView Alerts**, **AI Analysis**, and **EdgeFinder** in the Command Palette by typing their names.
 
 ## Quick Settings (from Command Palette)
 

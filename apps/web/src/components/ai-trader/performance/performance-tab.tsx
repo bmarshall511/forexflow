@@ -56,7 +56,7 @@ export function PerformanceTab() {
     <div className="space-y-6">
       {/* Period Selector */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">AI Trader Performance</h2>
+        <h2 className="text-sm font-medium">EdgeFinder Performance</h2>
         <div className="bg-muted flex rounded-lg p-0.5" role="radiogroup" aria-label="Time period">
           {PERIODS.map((p) => (
             <button

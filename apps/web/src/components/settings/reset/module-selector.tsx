@@ -22,7 +22,7 @@ const MODULES: ModuleInfo[] = [
   },
   {
     id: "ai_trader",
-    label: "AI Trader",
+    label: "EdgeFinder",
     description: "Opportunities, market data, and strategy performance",
   },
   {

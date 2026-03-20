@@ -38,7 +38,7 @@ Here's a quick look at FXFlow's main features:
 | **TradingView Alerts** | Receive trading signals from TradingView and act on them automatically      |
 | **Trade Finder**       | Scans the market for trading opportunities so you don't have to             |
 | **AI Analysis**        | Ask AI to analyze any trade and explain what's happening in plain language  |
-| **AI Trader**          | Let AI find, evaluate, and even place trades for you (with your permission) |
+| **EdgeFinder**         | Let AI find, evaluate, and even place trades for you (with your permission) |
 
 ## How Does It Work?
 
@@ -46,7 +46,7 @@ Here's the simple version:
 
 1. **You connect FXFlow to OANDA** — OANDA is a forex broker (like a bank, but for trading currencies). FXFlow needs this connection to see your trades and place new ones.
 2. **FXFlow syncs everything** — Every couple of minutes, FXFlow checks OANDA for any changes: new trades, closed trades, updated prices. It keeps your dashboard perfectly up to date.
-3. **You trade your way** — Place trades manually, use TradingView signals, let Trade Finder suggest opportunities, or hand the wheel to the AI Trader. You choose how much control you want.
+3. **You trade your way** — Place trades manually, use TradingView signals, let Trade Finder suggest opportunities, or hand the wheel to EdgeFinder. You choose how much control you want.
 
 > [!NOTE]
 > FXFlow does NOT hold your money. Your funds stay with OANDA at all times. FXFlow is just the tool you use to manage and view everything — like how a TV remote controls your TV but doesn't store the shows.

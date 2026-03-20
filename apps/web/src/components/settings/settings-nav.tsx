@@ -30,7 +30,7 @@ const SETTINGS_NAV: SettingsNavItem[] = [
   { label: "Trade Finder", href: "/settings/trade-finder", icon: Search },
   { label: "TradingView Alerts", href: "/settings/tv-alerts", icon: Radio },
   { label: "AI Analysis", href: "/settings/ai", icon: Sparkles },
-  { label: "AI Trader", href: "/settings/ai-trader", icon: Bot },
+  { label: "EdgeFinder", href: "/settings/ai-trader", icon: Bot },
   { label: "SmartFlow", href: "/settings/smart-flow", icon: Zap },
   { label: "Trade Priority", href: "/settings/trade-priority", icon: ArrowUpDown },
   { label: "Security", href: "/settings/security", icon: Shield },

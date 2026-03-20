@@ -27,7 +27,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["G", "P"], label: "Go to Positions" },
       { keys: ["G", "C"], label: "Go to Charts" },
       { keys: ["G", "A"], label: "Go to AI Analysis" },
-      { keys: ["G", "R"], label: "Go to AI Trader" },
+      { keys: ["G", "R"], label: "Go to EdgeFinder" },
       { keys: ["G", "L"], label: "Go to Alerts" },
       { keys: ["G", "S"], label: "Go to Settings" },
     ],

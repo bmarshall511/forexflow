@@ -46,7 +46,7 @@ This section lets you jump to any page in FXFlow. Type a page name and it shows 
 - Trade Finder
 - TV Alerts
 - AI Analysis
-- AI Trader
+- EdgeFinder
 - Settings
 - ...and more
 

@@ -13,7 +13,7 @@ import type { PlacementSource } from "@fxflow/types"
 const SOURCE_LABELS: Record<PlacementSource, string> = {
   trade_finder: "Trade Finder",
   tv_alerts: "TradingView Alerts",
-  ai_trader: "AI Trader",
+  ai_trader: "EdgeFinder",
   smart_flow: "SmartFlow",
 }
 

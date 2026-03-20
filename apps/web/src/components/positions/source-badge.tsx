@@ -30,11 +30,11 @@ const SOURCE_CONFIG: Record<TradeSource, { label: string; className: string }> =
     className: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
   },
   ai_trader: {
-    label: "AI Trade (Auto)",
+    label: "EdgeFinder",
     className: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
   },
   ai_trader_manual: {
-    label: "AI Trade (Manual)",
+    label: "EdgeFinder (Manual)",
     className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
   },
   smart_flow: {

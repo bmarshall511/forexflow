@@ -49,7 +49,7 @@ export function PipelineExplainer() {
         className="flex w-full items-center justify-between text-left"
       >
         <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-          How AI Trader Works
+          How EdgeFinder Works
         </p>
         {collapsed ? (
           <ChevronDown className="text-muted-foreground size-3.5" />

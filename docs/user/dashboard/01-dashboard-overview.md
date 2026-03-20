@@ -40,7 +40,7 @@ FXFlow can trade automatically for you using different systems. The **Automation
 
 - **Trade Finder** — A scanner that looks for trading opportunities based on your rules
 - **TV Alerts** — Receives signals from TradingView (another trading tool) and acts on them
-- **AI Trader** — An artificial intelligence system that finds and places trades for you
+- **EdgeFinder** — An artificial intelligence system that finds and places trades for you
 
 Each one shows a small colored dot: green means it's running, gray means it's turned off.
 
@@ -51,7 +51,7 @@ Each one shows a small colored dot: green means it's running, gray means it's tu
 
 This section breaks down your profits and losses by _how_ each trade was created. For example, you can see whether your manual trades are doing better than your automated ones.
 
-Sources include things like "FXFlow" (trades you placed yourself), "TradingView Alert" (automated signals), "Trade Finder" (the scanner), and "AI Trade" (placed by the AI system).
+Sources include things like "FXFlow" (trades you placed yourself), "TradingView Alert" (automated signals), "Trade Finder" (the scanner), and "EdgeFinder" (placed by the AI system).
 
 This helps you figure out which methods are actually making you money.
 
@@ -64,7 +64,7 @@ The **Market Calendar** shows upcoming economic events that can affect currency 
 
 ## AI Insights
 
-If you use any of FXFlow's AI features (like AI Analysis or AI Trader), this card shows how much you've used them. AI features cost a small amount per use (called "tokens"), and this section tracks:
+If you use any of FXFlow's AI features (like AI Analysis or EdgeFinder), this card shows how much you've used them. AI features cost a small amount per use (called "tokens"), and this section tracks:
 
 - How many tokens you've used
 - The estimated cost

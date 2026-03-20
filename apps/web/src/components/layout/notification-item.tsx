@@ -70,7 +70,7 @@ function DeepLink({ notification }: { notification: NotificationData }) {
         href="/ai-trader"
         className="mt-1 inline-flex text-[10px] text-violet-500 hover:underline"
       >
-        View AI Trader →
+        View EdgeFinder →
       </Link>
     )
   }

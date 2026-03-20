@@ -69,7 +69,7 @@ Every trade has a small colored badge showing _how_ it was created. This helps y
 | **FXFlow**            | Amber   | You placed this trade manually inside FXFlow                     |
 | **TradingView Alert** | Emerald | An automated signal from TradingView placed this trade           |
 | **Trade Finder**      | Purple  | The Trade Finder scanner found and placed this trade             |
-| **AI Trade**          | Indigo  | The AI Trader system decided to place this trade                 |
+| **EdgeFinder**        | Indigo  | The EdgeFinder system decided to place this trade                |
 | **OANDA**             | Blue    | Placed directly on the OANDA broker platform, not through FXFlow |
 
 > [!NOTE]

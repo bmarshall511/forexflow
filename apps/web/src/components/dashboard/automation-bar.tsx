@@ -331,7 +331,7 @@ export function AutomationBar() {
       />
       <ModuleSegment
         icon={Bot}
-        name="AI Trader"
+        name="EdgeFinder"
         status={aiStatus}
         line1={aiLine1}
         stats={aiStats}

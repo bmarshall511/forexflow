@@ -186,7 +186,7 @@ export function useActivityFeed(): UseActivityFeedReturn {
     addEvent({
       id: `ait-${lastAiTraderOpportunity.id ?? Date.now()}`,
       type: "ai_opportunity",
-      title: `AI opportunity: ${pair}`,
+      title: `EdgeFinder opportunity: ${pair}`,
       detail: `${dir} ${conf}%`.trim(),
       timestamp: new Date().toISOString(),
       intent: "warning",

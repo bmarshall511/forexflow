@@ -7,7 +7,7 @@ order: 3
 
 # Analysis Techniques
 
-The AI Trader uses 14 different techniques to analyze the market. Think of each technique as a different tool in a toolbox. A carpenter wouldn't build a house with just a hammer — they need saws, drills, levels, and more. The same idea applies here.
+The EdgeFinder uses 14 different techniques to analyze the market. Think of each technique as a different tool in a toolbox. A carpenter wouldn't build a house with just a hammer — they need saws, drills, levels, and more. The same idea applies here.
 
 These techniques are split into three groups.
 
@@ -149,7 +149,7 @@ No single technique is reliable on its own. A rubber band CAN stay stretched for
 Four different techniques, using completely different math, all saying the same thing: "buy." That's powerful.
 
 > [!TIP]
-> You can enable or disable individual techniques in **Settings > AI Trader**. But more techniques means more data points for the AI, which generally leads to better decisions. It's usually best to leave them all on.
+> You can enable or disable individual techniques in **Settings > EdgeFinder**. But more techniques means more data points for the AI, which generally leads to better decisions. It's usually best to leave them all on.
 
 > [!NOTE]
 > You don't need to memorize any of this. The AI handles all 14 techniques automatically. This page is here so you can understand WHY the AI made a particular decision when you review its analysis.

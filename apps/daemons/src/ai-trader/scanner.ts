@@ -292,9 +292,14 @@ export class AiTraderScanner {
     const dailyCost = await this.costTracker.getDailyCost()
     const monthlyCost = await this.costTracker.getMonthlyCost()
 
+    // Report enabled based on config alone — paused is a separate transient state.
+    // The UI should show "enabled but paused" differently from "disabled in settings".
+    const configEnabled = config?.enabled ?? false
+
     return {
       scanning: this.scanning,
-      enabled: (config?.enabled ?? false) && !this.paused,
+      enabled: configEnabled,
+      paused: this.paused,
       lastScanAt: this.lastScanAt,
       nextScanAt: this.nextScanAt,
       candidateCount: 0,
@@ -366,7 +371,7 @@ export class AiTraderScanner {
         this.cooldownUntil = Date.now() + COOLDOWN_MS
         this.addLogEntry(
           "scan_skip",
-          `Cooldown activated: ${this.consecutiveLosses} consecutive AI Trader losses — pausing for 30 minutes`,
+          `Cooldown activated: ${this.consecutiveLosses} consecutive EdgeFinder losses — pausing for 30 minutes`,
         )
       }
 
@@ -379,7 +384,7 @@ export class AiTraderScanner {
         this.dailyPausedUntil = midnight.getTime()
         this.addLogEntry(
           "scan_skip",
-          `Daily circuit breaker: ${this.dailyLosses} AI Trader losses today — paused until midnight UTC`,
+          `Daily circuit breaker: ${this.dailyLosses} EdgeFinder losses today — paused until midnight UTC`,
         )
       }
 
@@ -1367,7 +1372,7 @@ export class AiTraderScanner {
     })
 
     await this.notificationEmitter?.emitAiTrader(
-      "AI Trade Opportunity",
+      "EdgeFinder Opportunity",
       `${pairLabel} ${signal.direction.toUpperCase()} — Confidence: ${tier3Result.confidence}%`,
     )
 
@@ -1393,7 +1398,7 @@ export class AiTraderScanner {
         stopLoss: opp.stopLoss,
         takeProfit: opp.takeProfit,
         placedVia: "ai_trader",
-        notes: `AI Trade | Profile: ${opp.profile} | Confidence: ${opp.confidence}% | ${opp.entryRationale?.slice(0, 100) ?? ""}`,
+        notes: `EdgeFinder Trade | Profile: ${opp.profile} | Confidence: ${opp.confidence}% | ${opp.entryRationale?.slice(0, 100) ?? ""}`,
       })
 
       await updateOpportunityStatus(opp.id, "placed", {
@@ -1449,7 +1454,7 @@ export class AiTraderScanner {
       )
 
       await this.notificationEmitter?.emitAiTrader(
-        "AI Trade Placed",
+        "EdgeFinder Trade Placed",
         `${pairLabel} ${opp.direction.toUpperCase()} — ${opp.positionSize} units @ ${opp.entryPrice}`,
       )
     } catch (err) {

@@ -18,7 +18,7 @@ export async function GET() {
   } catch (error) {
     console.error("[GET /api/ai-trader/config]", error)
     return NextResponse.json<ApiResponse<AiTraderConfigData>>(
-      { ok: false, error: "Failed to read AI Trader config" },
+      { ok: false, error: "Failed to read EdgeFinder config" },
       { status: 500 },
     )
   }
@@ -54,7 +54,7 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error("[PUT /api/ai-trader/config]", error)
     return NextResponse.json<ApiResponse<AiTraderConfigData>>(
-      { ok: false, error: "Failed to update AI Trader config" },
+      { ok: false, error: "Failed to update EdgeFinder config" },
       { status: 500 },
     )
   }

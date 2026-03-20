@@ -49,12 +49,12 @@ When the Trade Finder scanner acts on an opportunity:
 - **Order Placed** — Trade Finder found a setup and placed a pending order for you
 - **Order Filled** — A pending order from Trade Finder has been filled (the trade is now live)
 
-### AI Trader
+### EdgeFinder
 
-When the AI Trader system takes action:
+When the EdgeFinder system takes action:
 
-- **Trade Placed** — The AI Trader decided to place a trade
-- **Trade Managed** — The AI Trader adjusted an existing trade (like moving a stop loss)
+- **Trade Placed** — The EdgeFinder decided to place a trade
+- **Trade Managed** — The EdgeFinder adjusted an existing trade (like moving a stop loss)
 
 ### Conditions
 

@@ -220,7 +220,7 @@ export function AiTraderSettingsPage() {
       const json = (await res.json()) as { ok: boolean; data: AiTraderConfig }
       if (json.ok) setConfig(json.data)
     } catch {
-      toast.error("Failed to load AI Trader config")
+      toast.error("Failed to load EdgeFinder config")
     } finally {
       setIsLoading(false)
       hasFetchedOnce.current = true
@@ -296,7 +296,7 @@ export function AiTraderSettingsPage() {
   }
 
   if (!config) {
-    return <p className="text-muted-foreground text-sm">Failed to load AI Trader settings.</p>
+    return <p className="text-muted-foreground text-sm">Failed to load EdgeFinder settings.</p>
   }
 
   return (
@@ -311,13 +311,13 @@ export function AiTraderSettingsPage() {
             <Bot className="text-primary size-4" />
             General Settings
           </CardTitle>
-          <CardDescription>Core AI Trader configuration and operating mode.</CardDescription>
+          <CardDescription>Core EdgeFinder configuration and operating mode.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm">Enabled</p>
-              <p className="text-muted-foreground text-xs">Master toggle for the AI Trader</p>
+              <p className="text-muted-foreground text-xs">Master toggle for EdgeFinder</p>
             </div>
             <Toggle
               checked={config.enabled}

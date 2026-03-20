@@ -855,7 +855,7 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "GET" && req.url === "/ai-trader/status") {
       if (!_aiTraderScanner) {
-        sendJson(res, 503, { ok: false, error: "AI Trader not initialized" })
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not initialized" })
         return
       }
       _aiTraderScanner
@@ -871,7 +871,7 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "POST" && req.url === "/actions/ai-trader/scan") {
       if (!_aiTraderScanner) {
-        sendJson(res, 503, { ok: false, error: "AI Trader not initialized" })
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not initialized" })
         return
       }
       _aiTraderScanner
@@ -887,7 +887,7 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "POST" && req.url === "/actions/ai-trader/pause") {
       if (!_aiTraderScanner) {
-        sendJson(res, 503, { ok: false, error: "AI Trader not initialized" })
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not initialized" })
         return
       }
       _aiTraderScanner.pause()
@@ -897,7 +897,7 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "POST" && req.url === "/actions/ai-trader/resume") {
       if (!_aiTraderScanner) {
-        sendJson(res, 503, { ok: false, error: "AI Trader not initialized" })
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not initialized" })
         return
       }
       _aiTraderScanner.resume()
@@ -907,7 +907,7 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "GET" && req.url === "/ai-trader/scan-log") {
       if (!_aiTraderScanner) {
-        sendJson(res, 503, { ok: false, error: "AI Trader not initialized" })
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not initialized" })
         return
       }
       sendJson(res, 200, { ok: true, data: _aiTraderScanner.getScanLog() })
@@ -916,7 +916,7 @@ export async function startServer(port: number, deps: ServerDeps) {
 
     if (req.method === "GET" && req.url === "/ai-trader/scan-progress") {
       if (!_aiTraderScanner) {
-        sendJson(res, 503, { ok: false, error: "AI Trader not initialized" })
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not initialized" })
         return
       }
       sendJson(res, 200, { ok: true, data: _aiTraderScanner.getScanProgress() })
@@ -926,7 +926,7 @@ export async function startServer(port: number, deps: ServerDeps) {
     if (req.method === "POST" && req.url?.startsWith("/actions/ai-trader/approve/")) {
       const opportunityId = req.url.replace("/actions/ai-trader/approve/", "")
       if (!_aiTraderScanner || !tradeSyncer) {
-        sendJson(res, 503, { ok: false, error: "AI Trader not available" })
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not available" })
         return
       }
       import("@fxflow/db")
@@ -955,7 +955,7 @@ export async function startServer(port: number, deps: ServerDeps) {
             stopLoss: opp.stopLoss,
             takeProfit: opp.takeProfit,
             placedVia: "ai_trader_manual",
-            notes: `AI Trade (manual approve) | ${opp.profile} | Confidence: ${opp.confidence}%`,
+            notes: `EdgeFinder Trade (manual approve) | ${opp.profile} | Confidence: ${opp.confidence}%`,
           })
           await updateOpportunityStatus(opportunityId, "placed", {
             resultSourceId: result.sourceId,

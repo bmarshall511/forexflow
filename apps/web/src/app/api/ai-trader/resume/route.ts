@@ -15,7 +15,7 @@ export async function POST() {
   } catch (error) {
     console.error("[POST /api/ai-trader/resume]", error)
     return NextResponse.json<ApiResponse<null>>(
-      { ok: false, error: "Failed to resume AI Trader scanner" },
+      { ok: false, error: "Failed to resume EdgeFinder scanner" },
       { status: 502 },
     )
   }

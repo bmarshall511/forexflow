@@ -16,11 +16,11 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 ## A
 
-**ADX (Average Directional Index)** — A number from 0 to 100 that tells you how _strong_ a trend is, not which direction it goes. A reading above 25 usually means there is a solid trend. In FXFlow, ADX is one of the techniques the AI Trader uses when scanning for trade ideas.
+**ADX (Average Directional Index)** — A number from 0 to 100 that tells you how _strong_ a trend is, not which direction it goes. A reading above 25 usually means there is a solid trend. In FXFlow, ADX is one of the techniques the EdgeFinder uses when scanning for trade ideas.
 
 **Ask** — The price you pay when you _buy_ a currency pair. It is always slightly higher than the Bid price. You can see Ask prices on the Positions page and in Charts.
 
-**ATR (Average True Range)** — A measure of how much a currency pair typically moves in a given time period. A high ATR means the price is bouncing around a lot. FXFlow's AI Trader and Trade Finder use ATR to decide where to place stop losses and take profits.
+**ATR (Average True Range)** — A measure of how much a currency pair typically moves in a given time period. A high ATR means the price is bouncing around a lot. FXFlow's EdgeFinder and Trade Finder use ATR to decide where to place stop losses and take profits.
 
 ## B
 
@@ -28,9 +28,9 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 **Bid** — The price you receive when you _sell_ a currency pair. It is always slightly lower than the Ask price.
 
-**Bollinger Bands** — Two lines drawn above and below a moving average on a chart. When the price touches or crosses these lines, it might be about to reverse. FXFlow's AI Trader can use Bollinger Bands as one of its analysis techniques.
+**Bollinger Bands** — Two lines drawn above and below a moving average on a chart. When the price touches or crosses these lines, it might be about to reverse. FXFlow's EdgeFinder can use Bollinger Bands as one of its analysis techniques.
 
-**BOS (Break of Structure)** — When the price breaks past a recent high or low, it signals the trend might continue. This is a Smart Money Concepts term. The AI Trader watches for BOS during its analysis.
+**BOS (Break of Structure)** — When the price breaks past a recent high or low, it signals the trend might continue. This is a Smart Money Concepts term. The EdgeFinder watches for BOS during its analysis.
 
 **Breakeven** — Moving your stop loss to the exact price where you entered the trade, so that if the market reverses you lose nothing (and gain nothing). In FXFlow, you can move a trade to breakeven from the Positions page.
 
@@ -40,9 +40,9 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 **Candlestick** — A small bar on a chart that shows four prices for a time period: where the price opened, the highest point, the lowest point, and where it closed. Green (or hollow) candles mean the price went up; red (or filled) candles mean it went down. Visible on the Charts page.
 
-**CHoCH (Change of Character)** — When the price breaks a key level in the _opposite_ direction of the current trend, hinting that the trend may be reversing. Another Smart Money Concepts term used by the AI Trader.
+**CHoCH (Change of Character)** — When the price breaks a key level in the _opposite_ direction of the current trend, hinting that the trend may be reversing. Another Smart Money Concepts term used by the EdgeFinder.
 
-**Confluence** — When multiple signals or techniques all agree on the same trade direction at the same time. More confluence usually means a higher-confidence trade. FXFlow's AI Trader looks for confluence across its analysis techniques.
+**Confluence** — When multiple signals or techniques all agree on the same trade direction at the same time. More confluence usually means a higher-confidence trade. FXFlow's EdgeFinder looks for confluence across its analysis techniques.
 
 **Correlation** — How closely two currency pairs move together. If EUR/USD goes up and GBP/USD usually goes up too, they are positively correlated. Knowing this helps you avoid accidentally doubling your risk.
 
@@ -52,15 +52,15 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 **Daemon** — A background program that does the heavy lifting in FXFlow: syncing trades with OANDA, processing signals, and running AI analysis. You will see a green or red dot in the header showing whether the daemon is connected.
 
-**Demand Zone** — A price area where buyers stepped in strongly in the past, so the price might bounce upward again if it returns there. The opposite of a Supply Zone. Used by the AI Trader's Smart Money analysis.
+**Demand Zone** — A price area where buyers stepped in strongly in the past, so the price might bounce upward again if it returns there. The opposite of a Supply Zone. Used by the EdgeFinder's Smart Money analysis.
 
-**Divergence** — When the price makes a new high (or low) but an indicator like RSI does not. This mismatch can warn that a trend is running out of steam. FXFlow's AI Trader checks for divergence automatically.
+**Divergence** — When the price makes a new high (or low) but an indicator like RSI does not. This mismatch can warn that a trend is running out of steam. FXFlow's EdgeFinder checks for divergence automatically.
 
 **Drawdown** — How far your account has fallen from its highest point. If your account peaked at $10,000 and is now $9,200, your drawdown is $800 (or 8%). Shown in Analytics.
 
 ## E
 
-**EMA (Exponential Moving Average)** — A smoothed line on the chart that follows the price, giving more importance to recent prices. Traders use EMAs to spot trends. The AI Trader uses EMA crossovers as one of its techniques.
+**EMA (Exponential Moving Average)** — A smoothed line on the chart that follows the price, giving more importance to recent prices. Traders use EMAs to spot trends. The EdgeFinder uses EMA crossovers as one of its techniques.
 
 **Equity** — Your account balance _plus or minus_ the profit or loss of all open trades. Equity changes in real time as prices move. Shown on the Dashboard.
 
@@ -68,9 +68,9 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 ## F
 
-**Fair Value Gap (FVG)** — A gap left behind when the price moves so fast that it skips over a range. The market often comes back to "fill" these gaps later, creating trade opportunities. The AI Trader scans for FVGs.
+**Fair Value Gap (FVG)** — A gap left behind when the price moves so fast that it skips over a range. The market often comes back to "fill" these gaps later, creating trade opportunities. The EdgeFinder scans for FVGs.
 
-**Fibonacci** — A sequence of numbers used to draw levels on a chart (like 38.2%, 50%, 61.8%). Traders expect the price to pause or reverse at these levels. FXFlow's AI Trader uses Fibonacci retracements, especially the OTE zone.
+**Fibonacci** — A sequence of numbers used to draw levels on a chart (like 38.2%, 50%, 61.8%). Traders expect the price to pause or reverse at these levels. FXFlow's EdgeFinder uses Fibonacci retracements, especially the OTE zone.
 
 **Forex** — Short for "foreign exchange." It is the global marketplace where currencies are traded against each other, 24 hours a day, five days a week. FXFlow is built for forex trading.
 
@@ -80,7 +80,7 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 ## K
 
-**Kill Zone** — Specific hours of the trading day when the biggest price moves tend to happen (for example, the London open or the New York open). The AI Trader can focus its scanning on kill zones for higher-quality setups.
+**Kill Zone** — Specific hours of the trading day when the biggest price moves tend to happen (for example, the London open or the New York open). The EdgeFinder can focus its scanning on kill zones for higher-quality setups.
 
 ## L
 
@@ -91,7 +91,7 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 **Limit Order** — An order that waits at a specific price and only executes if the market reaches that price. For example, "Buy EUR/USD if it drops to 1.0800." Shown on the Pending Orders tab of the Positions page.
 
-**Liquidity Sweep** — When the price briefly spikes past a key level (grabbing stop losses from other traders) and then reverses sharply. Smart Money traders look for these sweeps as entry signals. The AI Trader includes liquidity sweep detection.
+**Liquidity Sweep** — When the price briefly spikes past a key level (grabbing stop losses from other traders) and then reverses sharply. Smart Money traders look for these sweeps as entry signals. The EdgeFinder includes liquidity sweep detection.
 
 **Long** — Buying a currency pair because you expect its price to go up. The opposite of Short.
 
@@ -99,7 +99,7 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 ## M
 
-**MACD (Moving Average Convergence Divergence)** — An indicator that shows the relationship between two moving averages. When the MACD line crosses above the signal line, it can be a buy signal (and vice versa). Used by the AI Trader.
+**MACD (Moving Average Convergence Divergence)** — An indicator that shows the relationship between two moving averages. When the MACD line crosses above the signal line, it can be a buy signal (and vice versa). Used by the EdgeFinder.
 
 **MAE (Maximum Adverse Excursion)** — The worst point a trade reached while it was open (the biggest unrealized loss). Useful for reviewing whether your stop loss was placed well. Shown in trade details.
 
@@ -116,9 +116,9 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 > [!NOTE]
 > FXFlow syncs with OANDA every 2 minutes and also listens for instant updates. If something looks out of date, you can force a sync from the Positions page.
 
-**OB (Order Block)** — A candle (or small group of candles) where institutional traders placed large orders. When the price returns to that area, it may react strongly. Part of Smart Money Concepts, used by the AI Trader.
+**OB (Order Block)** — A candle (or small group of candles) where institutional traders placed large orders. When the price returns to that area, it may react strongly. Part of Smart Money Concepts, used by the EdgeFinder.
 
-**OTE (Optimal Trade Entry)** — A zone between the 61.8% and 78.6% Fibonacci retracement levels. Smart Money traders consider this the ideal area to enter a trade during a pullback. The AI Trader looks for OTE setups.
+**OTE (Optimal Trade Entry)** — A zone between the 61.8% and 78.6% Fibonacci retracement levels. Smart Money traders consider this the ideal area to enter a trade during a pullback. The EdgeFinder looks for OTE setups.
 
 ## P
 
@@ -144,7 +144,7 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 **Rollover** — A small fee (or credit) applied to positions held overnight, based on the interest rate difference between the two currencies. Also called swap. Shown in trade details.
 
-**RSI (Relative Strength Index)** — A number from 0 to 100 that measures whether a currency pair has been bought too much (above 70 = "overbought") or sold too much (below 30 = "oversold"). One of the AI Trader's analysis techniques.
+**RSI (Relative Strength Index)** — A number from 0 to 100 that measures whether a currency pair has been bought too much (above 70 = "overbought") or sold too much (below 30 = "oversold"). One of the EdgeFinder's analysis techniques.
 
 ## S
 
@@ -154,7 +154,7 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 **Slippage** — The difference between the price you expected and the price you actually got when your order was filled. It happens during fast-moving markets. FXFlow logs slippage so you can review it later.
 
-**Smart Money Concepts (SMC)** — A trading approach that tries to follow what large institutional traders ("smart money") are doing. Includes ideas like Order Blocks, Fair Value Gaps, BOS, CHoCH, and Liquidity Sweeps. FXFlow's AI Trader has a full SMC analysis suite.
+**Smart Money Concepts (SMC)** — A trading approach that tries to follow what large institutional traders ("smart money") are doing. Includes ideas like Order Blocks, Fair Value Gaps, BOS, CHoCH, and Liquidity Sweeps. FXFlow's EdgeFinder has a full SMC analysis suite.
 
 **Spread** — The difference between the Bid and Ask price. It is essentially the cost of entering a trade. Tighter spreads mean lower costs. Spreads are visible on the Charts page and in trade details.
 
@@ -163,7 +163,7 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 > [!WARNING]
 > Never trade without a stop loss. A single bad trade without one can cause serious damage to your account.
 
-**Supply Zone** — A price area where sellers stepped in strongly in the past, so the price might fall if it returns there. The opposite of a Demand Zone. Used by the AI Trader.
+**Supply Zone** — A price area where sellers stepped in strongly in the past, so the price might fall if it returns there. The opposite of a Demand Zone. Used by the EdgeFinder.
 
 **Support** — A price level where the market has struggled to go lower in the past. Think of it as a floor. If the price breaks through support, it often keeps falling.
 
@@ -190,6 +190,6 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 **Webhook** — A URL that receives automatic messages from another service. FXFlow uses webhooks to receive alerts from TradingView. When TradingView sends a signal, the webhook catches it and passes it to FXFlow's daemon for processing.
 
-**Williams %R** — An indicator similar to RSI that ranges from 0 to -100. Readings above -20 suggest overbought conditions; below -80 suggest oversold. One of the techniques available to the AI Trader.
+**Williams %R** — An indicator similar to RSI that ranges from 0 to -100. Readings above -20 suggest overbought conditions; below -80 suggest oversold. One of the techniques available to the EdgeFinder.
 
 **Win Rate** — The percentage of your trades that ended in profit. A 60% win rate means 6 out of every 10 trades were winners. Shown in Analytics. A high win rate does not guarantee profitability unless your average winner is larger than your average loser.

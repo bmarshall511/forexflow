@@ -16,7 +16,7 @@ const TABLE_LABELS: { key: keyof Omit<StorageStats, "total">; label: string }[] 
   { key: "analyses", label: "AI Analyses" },
   { key: "conditions", label: "Trade Conditions" },
   { key: "setups", label: "Trade Finder Setups" },
-  { key: "opportunities", label: "AI Trader Opportunities" },
+  { key: "opportunities", label: "EdgeFinder Opportunities" },
   { key: "notifications", label: "Notifications" },
   { key: "zones", label: "S/D Zones" },
 ]

@@ -133,7 +133,7 @@ export function AiTraderDashboard() {
   return (
     <div className="min-h-screen">
       <PageHeader
-        title="AI Trader"
+        title="EdgeFinder"
         subtitle="AI-powered trade discovery and execution"
         icon={Bot}
         bordered
@@ -160,7 +160,7 @@ export function AiTraderDashboard() {
 
         <div className="mt-4 grid grid-cols-3 gap-3">
           <DataTile
-            label="Open AI Trades"
+            label="Open EdgeFinder Trades"
             value={String(status?.openAiTradeCount ?? 0)}
             icon={<Zap className="size-3" />}
             variant={status?.openAiTradeCount ? "accent" : "default"}
@@ -182,7 +182,7 @@ export function AiTraderDashboard() {
         </div>
       </PageHeader>
 
-      <TabNav label="AI trader sections">
+      <TabNav label="EdgeFinder sections">
         <TabNavButton
           active={tab === "opportunities"}
           onClick={() => setTab("opportunities")}

@@ -60,7 +60,7 @@ All four checks must pass (green ticks) before the reset buttons become availabl
 - TradingView webhook configuration
 - AI settings and API keys
 - Trade Finder preferences
-- AI Trader configuration
+- EdgeFinder configuration
 - Security settings (PIN, session duration)
 - Deployment mode settings
 
@@ -82,7 +82,7 @@ All four checks must pass (green ticks) before the reset buttons become availabl
 - All settings and API keys
 - All AI analyses and trade conditions
 - All Trade Finder setups
-- All AI Trader configuration
+- All EdgeFinder configuration
 - Everything
 
 **When to use it:**

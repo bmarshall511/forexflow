@@ -29,7 +29,7 @@ export function useAiTraderConfig(): UseAiTraderConfigReturn {
       .then((json: { ok: boolean; data?: AiTraderConfigData; error?: string }) => {
         if (cancelled) return
         if (!json.ok || !json.data) {
-          setError(json.error ?? "Failed to load AI Trader config")
+          setError(json.error ?? "Failed to load EdgeFinder config")
           setConfig(null)
           return
         }
@@ -64,7 +64,7 @@ export function useAiTraderConfig(): UseAiTraderConfigReturn {
       body: JSON.stringify(data),
     })
     const json = (await res.json()) as { ok: boolean; data?: AiTraderConfigData; error?: string }
-    if (!json.ok) throw new Error(json.error ?? "Failed to save AI Trader config")
+    if (!json.ok) throw new Error(json.error ?? "Failed to save EdgeFinder config")
     if (json.data) setConfig(json.data)
     window.dispatchEvent(new Event("ai-trader-config-changed"))
   }, [])

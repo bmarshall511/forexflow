@@ -25,7 +25,7 @@ export class ExecutionGate {
    */
   async canScan(config: AiTraderConfigData): Promise<GateResult> {
     if (!config.enabled) {
-      return { allowed: false, reason: "AI Trader is disabled" }
+      return { allowed: false, reason: "EdgeFinder is disabled" }
     }
 
     if (!isMarketExpectedOpen(new Date())) {

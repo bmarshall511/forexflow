@@ -58,7 +58,7 @@ export function AiTraderCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bot className="text-primary size-4" />
-          AI Trader
+          EdgeFinder
         </CardTitle>
         <CardAction>
           <Link
@@ -66,7 +66,7 @@ export function AiTraderCard() {
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowUpRight className="size-4" />
-            <span className="sr-only">Go to AI Trader</span>
+            <span className="sr-only">Go to EdgeFinder</span>
           </Link>
         </CardAction>
       </CardHeader>
@@ -82,7 +82,7 @@ export function AiTraderCard() {
             <Skeleton className="h-20" />
           </div>
         ) : !status ? (
-          <p className="text-muted-foreground text-sm">Unable to load AI Trader status.</p>
+          <p className="text-muted-foreground text-sm">Unable to load EdgeFinder status.</p>
         ) : (
           <>
             {/* Status indicator */}
@@ -105,7 +105,7 @@ export function AiTraderCard() {
                 className="text-muted-foreground hover:text-foreground ml-auto transition-colors"
               >
                 <Settings2 className="size-3.5" />
-                <span className="sr-only">AI Trader Settings</span>
+                <span className="sr-only">EdgeFinder Settings</span>
               </Link>
             </div>
 

@@ -15,7 +15,7 @@ const features = [
   },
   {
     icon: Bot,
-    name: "AI Trader",
+    name: "EdgeFinder",
     description:
       "Autonomous trading with a 3-tier AI pipeline: local technical analysis, Haiku filtering, and Sonnet decision-making.",
   },

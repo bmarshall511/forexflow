@@ -7,7 +7,7 @@ order: 4
 
 # Operating Modes
 
-The AI Trader has three operating modes that control **how much freedom** the AI has to place trades. Think of it like the self-driving levels in a car — from full human control to full autopilot.
+The EdgeFinder has three operating modes that control **how much freedom** the AI has to place trades. Think of it like the self-driving levels in a car — from full human control to full autopilot.
 
 ---
 
@@ -109,7 +109,7 @@ The confidence score reflects how many analysis techniques agree AND how strong 
 
 ## Switching Modes
 
-You can change your operating mode at any time in **Settings > AI Trader**. The change takes effect immediately:
+You can change your operating mode at any time in **Settings > EdgeFinder**. The change takes effect immediately:
 
 - Switching to a stricter mode (e.g., Full Auto to Manual) is always safe — no new trades will be auto-placed
 - Switching to a more permissive mode (e.g., Manual to Full Auto) means the AI can immediately start placing trades on the next scan

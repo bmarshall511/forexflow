@@ -7,7 +7,7 @@ order: 2
 
 # Strategy Profiles
 
-A strategy profile tells the AI Trader **how** to trade. Think of it like choosing a sport — each one has different rules, different speeds, and different skills. You pick the style that fits your life.
+A strategy profile tells the EdgeFinder **how** to trade. Think of it like choosing a sport — each one has different rules, different speeds, and different skills. You pick the style that fits your life.
 
 FXFlow has 4 strategy profiles. You can enable one or several at the same time.
 
@@ -115,4 +115,4 @@ The AI will look for opportunities that match ANY of your active profiles. Each 
 
 ## Changing Profiles
 
-You can enable or disable profiles at any time from **Settings > AI Trader**. Changes take effect on the next scan cycle. Any trades already open will continue to be managed — changing profiles only affects future scans.
+You can enable or disable profiles at any time from **Settings > EdgeFinder**. Changes take effect on the next scan cycle. Any trades already open will continue to be managed — changing profiles only affects future scans.

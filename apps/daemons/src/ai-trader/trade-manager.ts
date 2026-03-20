@@ -188,7 +188,7 @@ export class TradeManager {
       // Notification
       const prefix = realizedPL >= 0 ? "+" : ""
       await this.notificationEmitter?.emitAiTrader(
-        `AI Trade Closed (${outcome.toUpperCase()})`,
+        `EdgeFinder Trade Closed (${outcome.toUpperCase()})`,
         `${opp.instrument.replace("_", "/")} ${opp.direction} — ${prefix}$${realizedPL.toFixed(2)}`,
         outcome === "win" ? "info" : "warning",
       )

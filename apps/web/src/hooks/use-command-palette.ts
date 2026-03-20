@@ -89,7 +89,7 @@ export function useCommandPalette() {
       },
       {
         id: "nav-ai-trader",
-        label: "AI Trader",
+        label: "EdgeFinder",
         section: "navigate",
         icon: Bot,
         keywords: ["autonomous", "auto"],

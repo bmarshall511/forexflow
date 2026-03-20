@@ -65,7 +65,7 @@ Every trade in FXFlow is tagged with _how_ it was placed:
 
 - **Manual** — you placed it yourself through FXFlow
 - **TradingView Alert** — an automated alert from TradingView triggered it
-- **AI Trade** — the AI Trader system found and placed it
+- **EdgeFinder** — the EdgeFinder system found and placed it
 - **Trade Finder** — the scanner spotted a setup and auto-traded it
 
 This tab shows profit/loss for each source, so you can see whether your manual trades beat the automated ones (or vice versa).

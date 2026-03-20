@@ -7,7 +7,7 @@ order: 6
 
 # Trade Management
 
-Finding a good trade is only half the job. What happens AFTER the trade is placed matters just as much. The AI Trader doesn't just open trades and walk away — it actively monitors and manages every position to protect your money and lock in profits.
+Finding a good trade is only half the job. What happens AFTER the trade is placed matters just as much. The EdgeFinder doesn't just open trades and walk away — it actively monitors and manages every position to protect your money and lock in profits.
 
 Here are the tools it uses.
 

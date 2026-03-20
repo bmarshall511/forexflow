@@ -7,7 +7,7 @@ order: 5
 
 # Budget and Risk Controls
 
-The AI Trader has several built-in controls to make sure it doesn't spend too much on AI API calls or open too many trades at once. Think of these as guardrails on a highway — they keep everything on track even if something unexpected happens.
+The EdgeFinder has several built-in controls to make sure it doesn't spend too much on AI API calls or open too many trades at once. Think of these as guardrails on a highway — they keep everything on track even if something unexpected happens.
 
 ---
 
@@ -17,7 +17,7 @@ The AI Trader has several built-in controls to make sure it doesn't spend too mu
 
 **The analogy:** Like a daily spending limit on a debit card. If your limit is $5, you can buy things all day — but once you've spent $5, the card stops working until tomorrow.
 
-**How to set it:** Go to **Settings > AI Trader > Budget** and enter a dollar amount.
+**How to set it:** Go to **Settings > EdgeFinder > Budget** and enter a dollar amount.
 
 **Example:** If your daily cap is $3.00 and each full scan costs about $0.035, you can run roughly 85 scans before hitting the limit. At one scan every 30 minutes, that's over 42 hours of scanning — more than a full day. So $3/day is plenty for most people.
 
@@ -63,7 +63,7 @@ The AI Trader has several built-in controls to make sure it doesn't spend too mu
 
 ## Where to See Your Current Spend
 
-The **AI Trader dashboard** shows your budget usage in real time:
+The **EdgeFinder dashboard** shows your budget usage in real time:
 
 - **Today's spend** — how much you've used of your daily cap
 - **Month's spend** — how much you've used of your monthly cap
@@ -133,6 +133,6 @@ You can optionally add API keys for two external data services that give the AI 
 - **Why it helps:** Gives the AI additional market indicators and cross-market data
 
 > [!TIP]
-> Both of these are optional. The AI Trader works perfectly well without them. They just provide bonus data that can help the AI make even better-informed decisions.
+> Both of these are optional. The EdgeFinder works perfectly well without them. They just provide bonus data that can help the AI make even better-informed decisions.
 
-To add API keys, go to **Settings > AI Trader > API Keys**. Keys are encrypted and stored securely on your local machine.
+To add API keys, go to **Settings > EdgeFinder > API Keys**. Keys are encrypted and stored securely on your local machine.

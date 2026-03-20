@@ -1,30 +1,30 @@
 ---
-title: "AI Trader Overview"
+title: "EdgeFinder Overview"
 description: "A fully autonomous trading system that finds, analyzes, and optionally executes trades using AI."
 category: "automation"
 order: 4
 ---
 
-# AI Trader Overview
+# EdgeFinder Overview
 
-The AI Trader is the most advanced automation feature in FXFlow. It is a system that can **find trading opportunities, analyze them with artificial intelligence, and place trades** — all without you lifting a finger.
+The EdgeFinder is the most advanced automation feature in FXFlow. It is a system that can **find trading opportunities, analyze them with artificial intelligence, and place trades** — all without you lifting a finger.
 
-Think of it as the difference between a calculator and a robot. The other tools in FXFlow are calculators — they help you do things faster. The AI Trader is a robot that can do the whole job on its own (if you let it).
+Think of it as the difference between a calculator and a robot. The other tools in FXFlow are calculators — they help you do things faster. The EdgeFinder is a robot that can do the whole job on its own (if you let it).
 
 ## What It Does (High Level)
 
-The AI Trader follows a repeating cycle:
+The EdgeFinder follows a repeating cycle:
 
 1. **Scans** your selected currency pairs looking for potential trades
 2. **Filters** the candidates using AI to remove the weak ones
 3. **Decides** whether to trade, including exact entry, stop loss, and take profit
 4. **Executes** the trade on OANDA (if you have given it permission)
 
-This cycle runs continuously while the AI Trader is enabled, checking the markets at regular intervals.
+This cycle runs continuously while the EdgeFinder is enabled, checking the markets at regular intervals.
 
 ## The 3-Tier Pipeline
 
-The AI Trader uses a three-step process to go from "maybe" to "yes" or "no." Each step gets more thorough (and more expensive):
+The EdgeFinder uses a three-step process to go from "maybe" to "yes" or "no." Each step gets more thorough (and more expensive):
 
 ### Tier 1: Local Scan (Free)
 
@@ -51,46 +51,46 @@ The remaining candidates get a full, detailed AI analysis. This uses a more powe
 
 ## Operating Modes
 
-You control how much autonomy the AI Trader has:
+You control how much autonomy the EdgeFinder has:
 
 ### Manual Mode
 
-The AI Trader scans and analyzes, but **never places trades**. It shows you the opportunities it finds and you decide whether to act on them. This is the safest way to start.
+The EdgeFinder scans and analyzes, but **never places trades**. It shows you the opportunities it finds and you decide whether to act on them. This is the safest way to start.
 
 ### Semi-Auto Mode
 
-The AI Trader can place trades on its own, but **only when confidence is high**. You set a confidence threshold (e.g., 80%), and trades below that threshold are shown to you for manual approval.
+The EdgeFinder can place trades on its own, but **only when confidence is high**. You set a confidence threshold (e.g., 80%), and trades below that threshold are shown to you for manual approval.
 
 ### Full Auto Mode
 
-The AI Trader handles everything. It finds, analyzes, and executes trades based on its own judgment within the risk limits you configure.
+The EdgeFinder handles everything. It finds, analyzes, and executes trades based on its own judgment within the risk limits you configure.
 
 > [!WARNING]
 > Full Auto mode on a live account means real money is being traded without your approval on each trade. Only use this after extensive testing in Manual mode. Make sure your risk controls (max trades per day, max risk per trade, daily loss limit) are properly configured.
 
 ## What You See on the Dashboard
 
-The AI Trader dashboard shows you:
+The EdgeFinder dashboard shows you:
 
 - **Scanner status** — whether it is currently scanning, and what pair/phase it is on
-- **Activity log** — a timeline of everything the AI Trader has done (scanned, rejected, executed)
+- **Activity log** — a timeline of everything the EdgeFinder has done (scanned, rejected, executed)
 - **Opportunities** — current trade candidates with their scores and AI analysis summaries
-- **Performance** — how the AI Trader's trades have performed over time
+- **Performance** — how the EdgeFinder's trades have performed over time
 
 ## Risk Controls
 
-Like all automation in FXFlow, the AI Trader has safety limits:
+Like all automation in FXFlow, the EdgeFinder has safety limits:
 
 - **Max trades per day** — prevents overtrading
 - **Max risk per trade** — caps how much of your account any single trade can risk
 - **Daily loss limit** — stops trading if total losses exceed your threshold
 - **Currency pair whitelist** — only scans pairs you have approved
 - **Monthly AI budget** — caps how much money is spent on AI analysis
-- **Consecutive loss cooldown** — after 2+ consecutive AI Trader losses, scanning pauses for 30 minutes to prevent loss-chasing. This cooldown only counts losses from AI Trader trades — losses from Trade Finder, TV Alerts, or manual trades do not trigger it.
+- **Consecutive loss cooldown** — after 2+ consecutive EdgeFinder losses, scanning pauses for 30 minutes to prevent loss-chasing. This cooldown only counts losses from EdgeFinder trades — losses from Trade Finder, TV Alerts, or manual trades do not trigger it.
 
 ## Getting Started
 
-1. Go to **AI Trader** in the sidebar
+1. Go to **EdgeFinder** in the sidebar
 2. Configure your currency pair whitelist
 3. Set risk controls (max trades, risk %, daily loss limit)
 4. Start in **Manual mode**
@@ -98,6 +98,6 @@ Like all automation in FXFlow, the AI Trader has safety limits:
 6. If the quality looks good, consider Semi-Auto with a high confidence threshold
 
 > [!TIP]
-> The AI Trader is most effective when you let it scan many pairs (10+) but set strict risk controls. It finds the needles in the haystack while you focus on other things.
+> The EdgeFinder is most effective when you let it scan many pairs (10+) but set strict risk controls. It finds the needles in the haystack while you focus on other things.
 
-For a detailed breakdown of the AI Trader's strategies, technical analysis techniques, and configuration options, see the **AI Trader Deep Dive** section.
+For a detailed breakdown of the EdgeFinder's strategies, technical analysis techniques, and configuration options, see the **EdgeFinder Deep Dive** section.

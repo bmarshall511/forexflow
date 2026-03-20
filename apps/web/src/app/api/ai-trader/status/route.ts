@@ -17,7 +17,7 @@ export async function GET() {
   } catch (error) {
     console.error("[GET /api/ai-trader/status]", error)
     return NextResponse.json<ApiResponse<AiTraderScanStatus>>(
-      { ok: false, error: "Failed to fetch AI Trader status" },
+      { ok: false, error: "Failed to fetch EdgeFinder status" },
       { status: 502 },
     )
   }
