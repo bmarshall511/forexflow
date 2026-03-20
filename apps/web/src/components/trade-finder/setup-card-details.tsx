@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { TradeFinderSetupData, PositionPriceTick } from "@fxflow/types"
+import type { TradeFinderSetupData, PositionPriceTick, TrendVisualSettings } from "@fxflow/types"
 import { TIMEFRAME_SET_MAP } from "@fxflow/types"
 import { formatRelativeTime } from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,15 @@ import { SetupScoreBreakdown } from "./setup-score-breakdown"
 import { StandaloneChart } from "@/components/charts/standalone-chart"
 import { cn } from "@/lib/utils"
 import { TF_LABELS, fmtDollar, computeDollarAmount } from "./setup-card"
+
+const DEFAULT_TREND_VISUALS: TrendVisualSettings = {
+  showBoxes: true,
+  showLines: true,
+  showMarkers: true,
+  showLabels: true,
+  showControllingSwing: true,
+  boxOpacity: 0.15,
+}
 
 interface SetupCardDetailsProps {
   setup: TradeFinderSetupData
@@ -224,9 +233,10 @@ export function SetupCardDetails({
               lastTick={lastTick}
               orderOverlay={orderOverlay}
               zones={showZone ? [setup.zone] : []}
-              currentPrice={lastTick?.bid ?? null}
+              currentPrice={lastTick?.bid ?? setup.entryPrice}
               curveData={showCurve ? setup.curveData : null}
               trendData={showTrend ? setup.trendData : null}
+              trendVisuals={showTrend && setup.trendData ? DEFAULT_TREND_VISUALS : undefined}
             />
           </div>
         </>
