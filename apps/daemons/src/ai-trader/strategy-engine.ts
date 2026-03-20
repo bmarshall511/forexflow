@@ -168,11 +168,10 @@ export function analyzeTier1(
   const killZoneActive = isKillZone()
   const sessionScoreVal = getSessionScore(instrument, session.session)
 
-  // ─── Regime gate: reject low-volatility markets ──────────────────
-  if (regime.regime === "low_volatility") {
-    if (filterStats) filterStats.lowVolatility++
-    return []
-  }
+  // ─── Regime check: low-volatility is penalized, not hard-gated ──
+  // BB squeeze periods can precede breakouts — let the AI decide
+  const lowVolPenalty = regime.regime === "low_volatility" ? 10 : 0
+  if (lowVolPenalty > 0 && filterStats) filterStats.lowVolatility++
 
   // ─── Multi-timeframe analysis ────────────────────────────────────
   const secCandles = secondaryCandles.map(toCandle)
@@ -402,7 +401,10 @@ export function analyzeTier1(
 
     const result = computeConfluenceScore(confluenceInput, direction)
     // Apply penalties as score reduction instead of hard filtering
-    const adjustedScore = Math.max(0, result.score - htfPenalty - secondaryRsiPenalty)
+    const adjustedScore = Math.max(
+      0,
+      result.score - htfPenalty - secondaryRsiPenalty - lowVolPenalty,
+    )
     if (adjustedScore < 15) {
       if (filterStats) filterStats.lowConfluence++
       continue
