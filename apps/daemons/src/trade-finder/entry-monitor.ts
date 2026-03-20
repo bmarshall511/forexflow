@@ -14,7 +14,7 @@
 
 import type { ZoneData } from "@fxflow/types"
 
-interface ConfirmationCandle {
+export interface ConfirmationCandle {
   open: number
   high: number
   low: number
@@ -72,6 +72,14 @@ export function detectConfirmationPattern(
     const insideBar = detectInsideBarBreakout(mother, prev, last, direction)
     if (insideBar) {
       return { confirmed: true, pattern: "inside_bar_breakout", refinedEntry: last.close }
+    }
+  }
+
+  // 4. Break of Structure (need 5+ candles for swing detection)
+  if (recentCandles.length >= 5) {
+    const bos = detectBreakOfStructure(recentCandles, direction)
+    if (bos) {
+      return { confirmed: true, pattern: "break_of_structure", refinedEntry: last.close }
     }
   }
 
@@ -147,4 +155,74 @@ function detectInsideBarBreakout(
     // Breakout below inside bar low with bearish close
     return breakout.close < inside.low && breakout.close < breakout.open
   }
+}
+
+/** Break of Structure: recent candle broke a swing point in the setup direction */
+function detectBreakOfStructure(
+  candles: ConfirmationCandle[],
+  direction: "long" | "short",
+): boolean {
+  if (candles.length < 5) return false
+
+  // Find recent swing highs/lows (simple 2-bar pivot)
+  const swingHighs: number[] = []
+  const swingLows: number[] = []
+  for (let i = 1; i < candles.length - 1; i++) {
+    if (candles[i]!.high > candles[i - 1]!.high && candles[i]!.high > candles[i + 1]!.high) {
+      swingHighs.push(candles[i]!.high)
+    }
+    if (candles[i]!.low < candles[i - 1]!.low && candles[i]!.low < candles[i + 1]!.low) {
+      swingLows.push(candles[i]!.low)
+    }
+  }
+
+  const last = candles[candles.length - 1]!
+
+  if (direction === "long" && swingHighs.length > 0) {
+    // BOS for longs: last candle closes above the most recent swing high
+    const recentSwingHigh = swingHighs[swingHighs.length - 1]!
+    return last.close > recentSwingHigh && last.close > last.open
+  }
+
+  if (direction === "short" && swingLows.length > 0) {
+    // BOS for shorts: last candle closes below the most recent swing low
+    const recentSwingLow = swingLows[swingLows.length - 1]!
+    return last.close < recentSwingLow && last.close < last.open
+  }
+
+  return false
+}
+
+/**
+ * Check if price is arriving at the zone with dangerous momentum.
+ * Fast arrivals (3+ large-body candles in the same direction) indicate
+ * displacement that will likely slice through the zone.
+ */
+export function checkArrivalSpeed(
+  recentCandles: ConfirmationCandle[],
+  direction: "long" | "short",
+  atr: number,
+): { safe: boolean; reason: string } {
+  if (recentCandles.length < 3 || atr <= 0) return { safe: true, reason: "" }
+
+  const last3 = recentCandles.slice(-3)
+  const avgBody = last3.reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / 3
+
+  // Check if all 3 candles are moving TOWARD the zone (opposing direction)
+  const allBearish = last3.every((c) => c.close < c.open)
+  const allBullish = last3.every((c) => c.close > c.open)
+
+  // For longs (demand zone): danger if price is falling fast toward zone (all bearish)
+  // For shorts (supply zone): danger if price is rising fast toward zone (all bullish)
+  const momentumTowardZone =
+    (direction === "long" && allBearish) || (direction === "short" && allBullish)
+
+  if (momentumTowardZone && avgBody > atr * 0.8) {
+    return {
+      safe: false,
+      reason: "Momentum arrival — 3 large-body candles approaching zone",
+    }
+  }
+
+  return { safe: true, reason: "" }
 }

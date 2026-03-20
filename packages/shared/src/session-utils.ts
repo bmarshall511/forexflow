@@ -132,6 +132,78 @@ export function getSessionBestPairs(session: ForexSession): string[] {
  * @param session - The forex session to evaluate against.
  * @returns Score from 10 (off-session) to 90 (direct match).
  */
+/** Currencies that are active during the Asian session */
+const ASIAN_CURRENCIES = new Set(["AUD", "NZD", "JPY"])
+
+/**
+ * Check whether auto-trading is allowed for an instrument at the current time.
+ * Enforces session kill zone requirements and day-of-week filters.
+ *
+ * Rules:
+ * - Only trade during kill zones (London Open, NY Open, London/NY overlap)
+ * - Asian kill zone only allowed for AUD/NZD/JPY pairs
+ * - Monday: block before London Open (07:00 UTC / 02:00 ET)
+ * - Friday: block after 12:00 ET (market thins out ahead of weekend)
+ *
+ * @param instrument - OANDA instrument name (e.g., "EUR_USD")
+ * @param date - Date to check (defaults to now)
+ * @returns Whether auto-trading is allowed and the reason if not
+ */
+export function isAutoTradeSession(
+  instrument: string,
+  date?: Date,
+): { allowed: boolean; reason: string } {
+  const d = date ?? new Date()
+  const et = toET(d)
+  const hourET = et.hour + et.minute / 60
+  const dayOfWeek = et.day // 0=Sun, 1=Mon, ... 5=Fri, 6=Sat
+
+  // Day-of-week filters
+  if (dayOfWeek === 1 && hourET < 2) {
+    return { allowed: false, reason: "Monday pre-London — market direction not established" }
+  }
+  if (dayOfWeek === 5 && hourET >= 12) {
+    return { allowed: false, reason: "Friday afternoon — thin liquidity ahead of weekend" }
+  }
+
+  const sessionInfo = getCurrentSession(d)
+
+  // Must be in a kill zone
+  if (!sessionInfo.isKillZone) {
+    return { allowed: false, reason: `Outside kill zone (${sessionInfo.session})` }
+  }
+
+  // Asian kill zone: only for AUD/NZD/JPY pairs
+  if (sessionInfo.session === "asian") {
+    const [base, quote] = instrument.split("_")
+    const hasAsianCurrency =
+      (base && ASIAN_CURRENCIES.has(base)) || (quote && ASIAN_CURRENCIES.has(quote))
+    if (!hasAsianCurrency) {
+      return {
+        allowed: false,
+        reason: `Asian session — ${instrument.replace("_", "/")} not active during this session`,
+      }
+    }
+  }
+
+  return { allowed: true, reason: "" }
+}
+
+/**
+ * Get the optimal trading sessions for a given instrument.
+ *
+ * @param instrument - OANDA instrument name (e.g., "EUR_USD")
+ * @returns Array of sessions where this pair has high liquidity
+ */
+export function getPairOptimalSessions(instrument: string): ForexSession[] {
+  const sessions: ForexSession[] = []
+  for (const [session, pairs] of Object.entries(SESSION_PAIRS) as [ForexSession, string[]][]) {
+    if (session === "off_session") continue
+    if (pairs.includes(instrument)) sessions.push(session)
+  }
+  return sessions.length > 0 ? sessions : ["london_ny_overlap"]
+}
+
 export function getSessionScore(instrument: string, session: ForexSession): number {
   const pairs = SESSION_PAIRS[session]
   if (pairs.length === 0) return 10 // Off-session: minimal score

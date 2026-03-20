@@ -14,7 +14,7 @@ import type {
 export type SkipCategory = "capped" | "blocked"
 
 /** Cap-related keywords in skip reasons that indicate temporary (queue-able) blocks */
-const CAP_KEYWORDS = ["concurrent", "risk"]
+const CAP_KEYWORDS = ["concurrent", "risk", "session"]
 
 /**
  * Categorize a skip reason as "capped" (will auto-place when slot opens) or
@@ -67,4 +67,40 @@ export function computeQueuePositions(
     positions.set(eligible[i]!.id, i + 1)
   }
   return positions
+}
+
+/**
+ * Check currency exposure limits. Prevents over-concentration on a single currency.
+ * Splits instrument into base/quote and counts existing auto-trade exposure.
+ */
+export function checkCurrencyExposure(
+  instrument: string,
+  existingAutoTrades: Array<{ instrument: string }>,
+  maxPerCurrency: number = 2,
+): { allowed: boolean; reason: string } {
+  const [base, quote] = instrument.split("_")
+  if (!base || !quote) return { allowed: true, reason: "" }
+
+  let baseCount = 0
+  let quoteCount = 0
+  for (const trade of existingAutoTrades) {
+    const [tb, tq] = trade.instrument.split("_")
+    if (tb === base || tq === base) baseCount++
+    if (tb === quote || tq === quote) quoteCount++
+  }
+
+  if (baseCount >= maxPerCurrency) {
+    return {
+      allowed: false,
+      reason: `${base} exposure limit reached (${baseCount}/${maxPerCurrency})`,
+    }
+  }
+  if (quoteCount >= maxPerCurrency) {
+    return {
+      allowed: false,
+      reason: `${quote} exposure limit reached (${quoteCount}/${maxPerCurrency})`,
+    }
+  }
+
+  return { allowed: true, reason: "" }
 }

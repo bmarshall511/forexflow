@@ -125,6 +125,45 @@ export async function getEventsInRange(from: Date, to: Date): Promise<EconomicEv
   return rows.map(toEventData)
 }
 
+/**
+ * Check if a high-impact economic event is imminent for the currencies in a pair.
+ * Used by Trade Finder to avoid placing orders near volatile news releases.
+ *
+ * @param instrument - OANDA instrument (e.g., "EUR_USD")
+ * @param hoursAhead - How far ahead to look (default 2 hours)
+ * @returns Whether a high-impact event is imminent and details if so
+ */
+export async function hasImminentHighImpactEvent(
+  instrument: string,
+  hoursAhead = 2,
+): Promise<{ imminent: boolean; event?: string }> {
+  const [base, quote] = instrument.split("_")
+  if (!base || !quote) return { imminent: false }
+
+  const now = new Date()
+  const cutoff = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000)
+
+  const rows = await db.economicEvent.findMany({
+    where: {
+      timestamp: { gte: now, lte: cutoff },
+      impact: "high",
+      currency: { in: [base, quote] },
+    },
+    orderBy: { timestamp: "asc" },
+    take: 1,
+  })
+
+  if (rows.length > 0) {
+    const event = rows[0]!
+    return {
+      imminent: true,
+      event: `${event.currency} ${event.title} in ${Math.round((event.timestamp.getTime() - now.getTime()) / 60_000)}min`,
+    }
+  }
+
+  return { imminent: false }
+}
+
 // ─── Cleanup ────────────────────────────────────────────────────────────────
 
 /**

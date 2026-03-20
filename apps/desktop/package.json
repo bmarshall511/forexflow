@@ -5,7 +5,7 @@
   "author": "FXFlow",
   "private": true,
   "main": "dist/main/index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "electron:dev": "tsc && electron .",
     "electron:build": "rm -rf dist *.tsbuildinfo && tsc && tsc -p tsconfig.preload.json",
@@ -14,7 +14,7 @@
   "dependencies": {
     "@fxflow/shared": "workspace:*",
     "@fxflow/types": "workspace:*",
-    "electron-store": "^10",
+    "electron-store": "^8.2.0",
     "electron-updater": "^6"
   },
   "devDependencies": {

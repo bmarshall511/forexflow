@@ -63,6 +63,7 @@ function toSetupData(row: {
   placedAt: Date | null
   lastSkipReason: string | null
   confirmationPattern: string | null
+  confirmationCandlesWaited: number
   breakevenMoved: boolean
   partialTaken: boolean
   managementLog: string | null
@@ -99,6 +100,7 @@ function toSetupData(row: {
     placedAt: row.placedAt ? safeIso(row.placedAt) : null,
     lastSkipReason: row.lastSkipReason ?? null,
     confirmationPattern: row.confirmationPattern ?? null,
+    confirmationCandlesWaited: row.confirmationCandlesWaited,
     breakevenMoved: row.breakevenMoved,
     partialTaken: row.partialTaken,
     queuePosition: null, // Computed at runtime by the daemon scanner
@@ -277,6 +279,17 @@ export async function updateSetupConfirmation(
   await db.tradeFinderSetup.update({
     where: { id },
     data: { entryPrice, confirmationPattern, lastUpdatedAt: new Date() },
+  })
+}
+
+/** Increment the confirmation wait counter for a setup */
+export async function updateSetupConfirmationWait(
+  id: string,
+  candlesWaited: number,
+): Promise<void> {
+  await db.tradeFinderSetup.update({
+    where: { id },
+    data: { confirmationCandlesWaited: candlesWaited, lastUpdatedAt: new Date() },
   })
 }
 

@@ -6,6 +6,7 @@ import type {
   TradeFinderScoreBreakdown,
   TradeFinderAutoTradeEvent,
   TradeFinderCapUtilization,
+  TradeFinderCircuitBreakerState,
   TradeDirection,
   ZoneData,
   TrendData,
@@ -25,11 +26,14 @@ import {
   getPipSize,
   getCurrentSession,
   getSessionScore,
+  isAutoTradeSession,
   scoreKeyLevels,
   detectRegime,
 } from "@fxflow/shared"
 import {
   getTradeFinderConfig,
+  updateTradeFinderConfig,
+  hasImminentHighImpactEvent,
   getActiveSetups,
   createSetup,
   updateSetupStatus,
@@ -43,6 +47,7 @@ import {
   findPlacedSetupByInstrumentDirection,
   getPlacedAutoSetups,
   updateSetupConfirmation,
+  updateSetupConfirmationWait,
   updateSetupSkipReason,
   getSetup,
   type CreateSetupInput,
@@ -51,8 +56,9 @@ import type { StateManager } from "../state-manager.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
 import { getRestUrl } from "../oanda/api-client.js"
 import { CandleCache, fetchOandaCandles } from "./candle-cache.js"
-import { computeQueuePositions } from "./auto-trade-queue.js"
-import { detectConfirmationPattern } from "./entry-monitor.js"
+import { computeQueuePositions, checkCurrencyExposure } from "./auto-trade-queue.js"
+import { detectConfirmationPattern, checkArrivalSpeed } from "./entry-monitor.js"
+import { TradeFinderCircuitBreaker } from "./circuit-breaker.js"
 
 const CANDLE_COUNT_MAP: Record<string, number> = {
   M1: 500,
@@ -71,7 +77,7 @@ export interface AutoTradePlaceOrderFn {
   (request: {
     instrument: string
     direction: TradeDirection
-    orderType: "LIMIT"
+    orderType: "LIMIT" | "MARKET"
     units: number
     entryPrice: number
     stopLoss: number
@@ -79,6 +85,11 @@ export interface AutoTradePlaceOrderFn {
     timeframe: Timeframe | null
     placedVia: "trade_finder_auto"
   }): Promise<PlaceOrderResponseData>
+}
+
+/** Callback for getting current spread for an instrument */
+export interface GetCurrentSpreadFn {
+  (instrument: string): number | null
 }
 
 /** Callback for cancelling a pending order */
@@ -128,6 +139,10 @@ export class TradeFinderScanner {
   private getPendingOrderIdsFn: GetPendingOrderIdsFn | null = null
   private getOpenTradeIdsFn: GetOpenTradeIdsFn | null = null
   private getOpenPositionsFn: GetOpenPositionsFn | null = null
+  private getCurrentSpreadFn: GetCurrentSpreadFn | null = null
+
+  // Circuit breaker for drawdown protection
+  private circuitBreaker: TradeFinderCircuitBreaker
 
   // Notification emitter (set externally)
   private notificationEmitter: NotificationEmitter | null = null
@@ -141,6 +156,7 @@ export class TradeFinderScanner {
   constructor(stateManager: StateManager, broadcast: (msg: AnyDaemonMessage) => void) {
     this.stateManager = stateManager
     this.broadcast = broadcast
+    this.circuitBreaker = new TradeFinderCircuitBreaker(broadcast)
   }
 
   /** Set notification emitter for persisted auto-trade notifications */
@@ -156,6 +172,7 @@ export class TradeFinderScanner {
     getPendingOrderIds: GetPendingOrderIdsFn,
     getOpenTradeIds: GetOpenTradeIdsFn,
     getOpenPositions?: GetOpenPositionsFn,
+    getCurrentSpread?: GetCurrentSpreadFn,
   ): void {
     this.placeOrderFn = placeOrder
     this.cancelOrderFn = cancelOrder
@@ -163,9 +180,11 @@ export class TradeFinderScanner {
     this.getPendingOrderIdsFn = getPendingOrderIds
     this.getOpenTradeIdsFn = getOpenTradeIds
     this.getOpenPositionsFn = getOpenPositions ?? null
+    this.getCurrentSpreadFn = getCurrentSpread ?? null
   }
 
   async start(): Promise<void> {
+    await this.repairDangerousConfig()
     console.log("[trade-finder] Scanner started")
     // Initial scan after a short delay
     this.scheduleScan(5_000)
@@ -176,7 +195,47 @@ export class TradeFinderScanner {
       clearTimeout(this.timer)
       this.timer = null
     }
+    this.circuitBreaker.dispose()
     console.log("[trade-finder] Scanner stopped")
+  }
+
+  /** Get circuit breaker state for API/WS */
+  getCircuitBreakerState(): TradeFinderCircuitBreakerState {
+    return this.circuitBreaker.getState()
+  }
+
+  /** Called when a Trade Finder auto-trade closes */
+  onAutoTradeClose(outcome: "win" | "loss" | "breakeven", plPercent: number): void {
+    this.circuitBreaker.onTradeClose(outcome, plPercent)
+  }
+
+  /** Manually reset the circuit breaker */
+  resetCircuitBreaker(): void {
+    this.circuitBreaker.reset()
+  }
+
+  /** Repair dangerous config values on startup */
+  private async repairDangerousConfig(): Promise<void> {
+    const config = await getTradeFinderConfig()
+    const repairs: Partial<
+      Pick<
+        TradeFinderConfigData,
+        | "autoTradeMaxConcurrent"
+        | "autoTradeMaxDaily"
+        | "autoTradeMaxRiskPercent"
+        | "autoTradeMinScore"
+      >
+    > = {}
+
+    if (config.autoTradeMaxConcurrent > 5) repairs.autoTradeMaxConcurrent = 5
+    if (config.autoTradeMaxDaily > 10) repairs.autoTradeMaxDaily = 10
+    if (config.autoTradeMaxRiskPercent > 10) repairs.autoTradeMaxRiskPercent = 10
+    if (config.autoTradeMinScore < 9) repairs.autoTradeMinScore = 9
+
+    if (Object.keys(repairs).length > 0) {
+      await updateTradeFinderConfig(repairs)
+      console.log(`[trade-finder] SAFETY: Repaired dangerous config values:`, repairs)
+    }
   }
 
   private scheduleScan(delayMs: number): void {
@@ -287,10 +346,12 @@ export class TradeFinderScanner {
 
     const currentPrice = ltfCandles[ltfCandles.length - 1]!.close
 
-    // 2. HTF: Detect zones → build curve
+    // 2. HTF: Detect zones → build curve + store for confluence scoring
     let curveData: CurveData | null = null
+    let htfZones: ZoneData[] = []
     if (htfCandles.length > 0) {
       const htfResult = detectZones(htfCandles, instrument, htf, zoneConfig, currentPrice)
+      htfZones = htfResult.zones
       curveData = this.buildCurve(htfResult.zones, currentPrice)
     }
 
@@ -352,6 +413,9 @@ export class TradeFinderScanner {
       // Only consider active, untested zones
       if (zone.status !== "active" || zone.testCount > 0) continue
 
+      // Zone age decay: reject zones older than 30 LTF candles
+      if (zone.ageInCandles > 30) continue
+
       // Build direction from zone type
       const direction: TradeDirection = zone.type === "demand" ? "long" : "short"
 
@@ -366,7 +430,7 @@ export class TradeFinderScanner {
         trendData,
         curveData,
         commodityZones,
-        { instrument, ltfCandles, prevDailyCandle, prevWeeklyCandle },
+        { instrument, ltfCandles, prevDailyCandle, prevWeeklyCandle, htfZones, atr },
       )
       if (extendedScores.total < config.minScore) continue
 
@@ -378,7 +442,7 @@ export class TradeFinderScanner {
           : zone.proximalLine + entryBuffer // Shorts: enter slightly above proximal (ask side)
 
       // Compute SL/TP
-      const slBuffer = atr * 0.02 + spread
+      const slBuffer = atr * 0.15 + spread
       const stopLoss =
         zone.type === "demand" ? zone.distalLine - slBuffer : zone.distalLine + slBuffer
       const riskPips = Math.abs(entryPrice - stopLoss) / pipSize
@@ -386,7 +450,7 @@ export class TradeFinderScanner {
       // Minimum risk guard: reject zones where SL is too tight relative to ATR.
       // A risk < 50% of ATR will almost certainly get stopped out by normal market noise.
       const atrPips = atr / pipSize
-      const minRiskPips = Math.max(atrPips * 0.5, 5) // At least 50% of ATR or 5 pips
+      const minRiskPips = Math.max(atrPips * 0.75, 8) // At least 75% of ATR or 8 pips
       if (riskPips < minRiskPips) {
         continue
       }
@@ -400,11 +464,21 @@ export class TradeFinderScanner {
           return b.proximalLine - a.proximalLine
         })
 
-      // When auto-trade is enabled, require TP to meet the configured min R:R
+      // Dynamic R:R by market regime: ranging markets → tighter TP, trending → wider
+      let regimeMultiplier = 2 // default
+      if (ltfCandles.length >= 50) {
+        const regimeCandles = ltfCandles.map((c) => ({ ...c, volume: 0 }))
+        const regime = detectRegime(regimeCandles)
+        if (regime.regime === "ranging") regimeMultiplier = 2
+        else if (regime.regime === "trending") regimeMultiplier = 3
+        else regimeMultiplier = 2 // volatile/low-vol: default
+      }
+
+      // When auto-trade is enabled, require TP to meet the configured min R:R (regime-aware)
       const minRRMultiplier =
         config.autoTradeEnabled && pair.autoTradeEnabled !== false
-          ? Math.max(2, config.autoTradeMinRR)
-          : 2
+          ? Math.max(regimeMultiplier, config.autoTradeMinRR)
+          : regimeMultiplier
 
       let takeProfit: number | null = null
       for (const oz of freshOpposing) {
@@ -485,7 +559,10 @@ export class TradeFinderScanner {
       )
 
       // ── Auto-trade: attempt to place if eligible ──
-      if (config.autoTradeEnabled && pair.autoTradeEnabled !== false) {
+      // Auto-trade with confirmation: don't place immediately on detection.
+      // Setup stays "active" and will be evaluated in validateExistingSetups()
+      // after price approaches the zone and confirmation is detected.
+      if (config.autoTradeEnabled && pair.autoTradeEnabled !== false && !config.entryConfirmation) {
         await this.tryAutoPlace(setup, config, pair)
       }
     }
@@ -497,13 +574,29 @@ export class TradeFinderScanner {
     setup: TradeFinderSetupData,
     config: TradeFinderConfigData,
     _pair: TradeFinderPairConfig,
+    useMarketOrder = false,
   ): Promise<void> {
+    // 1. placeOrderFn check
     if (!this.placeOrderFn) {
       await this.skipAutoTrade(setup, "Trade syncer not available")
       return
     }
 
-    // 1. Score threshold check
+    // 2. Session gate — only trade during institutional kill zones
+    const sessionCheck = isAutoTradeSession(setup.instrument)
+    if (!sessionCheck.allowed) {
+      await this.skipAutoTrade(setup, `Session: ${sessionCheck.reason}`)
+      return
+    }
+
+    // 3. Circuit breaker check
+    const cbCheck = this.circuitBreaker.isAllowed()
+    if (!cbCheck.allowed) {
+      await this.skipAutoTrade(setup, `Circuit breaker: ${cbCheck.reason}`)
+      return
+    }
+
+    // 4. Score threshold check
     if (setup.scores.total < config.autoTradeMinScore) {
       await this.skipAutoTrade(
         setup,
@@ -512,7 +605,17 @@ export class TradeFinderScanner {
       return
     }
 
-    // 1b. Minimum R:R check (safety net — TP selection already targets min R:R)
+    // 4. Trend alignment guard — require trend alignment unless exceptional score
+    const trendScore = setup.scores.trend?.value ?? 0
+    if (trendScore < 1 && setup.scores.total < 13) {
+      await this.skipAutoTrade(
+        setup,
+        `Trend score ${trendScore} — counter-trend or no trend detected`,
+      )
+      return
+    }
+
+    // 5. Minimum R:R check (safety net — TP selection already targets min R:R)
     const rrNum = parseFloat(setup.rrRatio) // e.g. "2.1:1" → 2.1
     if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
       await this.skipAutoTrade(
@@ -522,13 +625,23 @@ export class TradeFinderScanner {
       return
     }
 
-    // 2. Same-instrument guard — skip if existing open trade or pending order
+    // 6. Same-instrument guard — skip if existing open trade or pending order
     if (this.hasExistingPositionFn && this.hasExistingPositionFn(setup.instrument)) {
       await this.skipAutoTrade(setup, `Existing position on ${setup.instrument}`)
       return
     }
 
-    // 3. Max concurrent check
+    // 7. Currency exposure guard
+    if (this.hasExistingPositionFn && this.getOpenPositionsFn) {
+      const openPositions = this.getOpenPositionsFn()
+      const exposureCheck = checkCurrencyExposure(setup.instrument, openPositions)
+      if (!exposureCheck.allowed) {
+        await this.skipAutoTrade(setup, exposureCheck.reason)
+        return
+      }
+    }
+
+    // 8. Max concurrent check
     const pendingCount = await countPendingAutoPlaced()
     if (pendingCount >= config.autoTradeMaxConcurrent) {
       await this.skipAutoTrade(
@@ -538,7 +651,7 @@ export class TradeFinderScanner {
       return
     }
 
-    // 3b. Daily cap check
+    // 9. Daily cap check
     if (config.autoTradeMaxDaily > 0) {
       const todayCount = await countTodayAutoPlaced()
       if (todayCount >= config.autoTradeMaxDaily) {
@@ -550,7 +663,7 @@ export class TradeFinderScanner {
       }
     }
 
-    // 4. Max total risk % check
+    // 10. Max total risk % check
     const snapshot = this.stateManager.getSnapshot()
     const balance = snapshot.accountOverview?.summary.balance ?? 0
     if (balance > 0) {
@@ -573,10 +686,36 @@ export class TradeFinderScanner {
       }
     }
 
+    // 11. Spread validation — reject if spread is too wide relative to SL
+    const pipSize = getPipSize(setup.instrument)
+    if (this.getCurrentSpreadFn) {
+      const currentSpread = this.getCurrentSpreadFn(setup.instrument)
+      if (currentSpread !== null) {
+        const spreadPips = currentSpread / pipSize
+        if (spreadPips / setup.riskPips > 0.15) {
+          await this.skipAutoTrade(
+            setup,
+            `Spread ${spreadPips.toFixed(1)} pips = ${((spreadPips / setup.riskPips) * 100).toFixed(0)}% of SL — too wide`,
+          )
+          return
+        }
+      }
+    }
+
+    // 12. News event filter — skip if high-impact event imminent for this pair's currencies
+    try {
+      const newsCheck = await hasImminentHighImpactEvent(setup.instrument, 2)
+      if (newsCheck.imminent) {
+        await this.skipAutoTrade(setup, `News: ${newsCheck.event}`)
+        return
+      }
+    } catch {
+      // Non-critical — don't block trade if calendar lookup fails
+    }
+
     // All checks passed — recalculate position size with fresh balance before placing
     const freshBalance = snapshot.accountOverview?.summary.balance ?? 0
     const riskPercent = config.riskPercent
-    const pipSize = getPipSize(setup.instrument)
     const freshPositionSize =
       freshBalance > 0 && setup.riskPips > 0
         ? this.calculatePositionSize(
@@ -600,11 +739,12 @@ export class TradeFinderScanner {
     try {
       const tfMap = TIMEFRAME_SET_MAP[setup.timeframeSet]
       const ltfTimeframe = (tfMap?.ltf ?? null) as Timeframe | null
+      const effectiveOrderType = useMarketOrder ? ("MARKET" as const) : ("LIMIT" as const)
 
       const orderRequest = {
         instrument: setup.instrument,
         direction: setup.direction,
-        orderType: "LIMIT" as const,
+        orderType: effectiveOrderType,
         units: freshPositionSize,
         entryPrice: setup.entryPrice,
         stopLoss: setup.stopLoss,
@@ -642,7 +782,7 @@ export class TradeFinderScanner {
           setupId: setup.id,
           instrument: setup.instrument,
           direction: setup.direction,
-          orderType: "LIMIT",
+          orderType: effectiveOrderType,
           entryPrice: setup.entryPrice,
           stopLoss: setup.stopLoss,
           takeProfit: setup.takeProfit,
@@ -672,13 +812,13 @@ export class TradeFinderScanner {
       })
 
       console.log(
-        `[trade-finder] AUTO-PLACED: ${setup.instrument} ${setup.direction} LIMIT @ ${setup.entryPrice} (score: ${setup.scores.total})`,
+        `[trade-finder] AUTO-PLACED: ${setup.instrument} ${setup.direction} ${effectiveOrderType} @ ${setup.entryPrice} (score: ${setup.scores.total})`,
       )
       const pair = setup.instrument.replace("_", "/")
       const dir = setup.direction === "long" ? "Long" : "Short"
       void this.notificationEmitter?.emitTradeFinder(
         "Auto-Trade Placed",
-        `${pair} ${dir} LIMIT @ ${setup.entryPrice.toFixed(5)} (score ${setup.scores.total}/16)`,
+        `${pair} ${dir} ${effectiveOrderType} @ ${setup.entryPrice.toFixed(5)} (score ${setup.scores.total}/16)`,
       )
     } catch (err) {
       const reason = `Placement failed: ${(err as Error).message}`
@@ -752,9 +892,23 @@ export class TradeFinderScanner {
       }[]
       prevDailyCandle: { open: number; high: number; low: number; close: number } | null
       prevWeeklyCandle: { open: number; high: number; low: number; close: number } | null
+      htfZones?: ZoneData[]
+      atr?: number
     },
   ): TradeFinderScoreBreakdown {
-    const { strength, time, freshness } = zone.scores
+    const { strength, time } = zone.scores
+
+    // Zone age decay: penalize freshness by 0.5 per 10 candles of age
+    const agePenalty = Math.floor(zone.ageInCandles / 10) * 0.5
+    const rawFreshness = zone.scores.freshness
+    const freshness =
+      agePenalty > 0
+        ? {
+            ...rawFreshness,
+            value: Math.max(0, rawFreshness.value - agePenalty),
+            explanation: `${rawFreshness.explanation} (age penalty: -${agePenalty.toFixed(1)})`,
+          }
+        : rawFreshness
 
     const trend = this.scoreTrend(zone.type as "demand" | "supply", trendData)
     const curve = this.scoreCurve(zone.type as "demand" | "supply", curveData)
@@ -817,6 +971,54 @@ export class TradeFinderScanner {
       }
     }
 
+    // HTF zone confluence scoring: LTF zone near/overlapping an HTF zone of same type
+    let htfConfluence = { value: 0, max: 2, label: "Poor", explanation: "No HTF zone data" }
+    if (context?.htfZones && context.htfZones.length > 0 && context.atr) {
+      const sameTypeHtfZones = context.htfZones.filter(
+        (z) => z.type === zone.type && z.status === "active",
+      )
+      const confluenceDistance = context.atr * 2 // 2x ATR proximity threshold
+      for (const htfZone of sameTypeHtfZones) {
+        // Check overlap: LTF zone proximal/distal within HTF zone range
+        const htfMin = Math.min(htfZone.proximalLine, htfZone.distalLine)
+        const htfMax = Math.max(htfZone.proximalLine, htfZone.distalLine)
+        const ltfMin = Math.min(zone.proximalLine, zone.distalLine)
+        const ltfMax = Math.max(zone.proximalLine, zone.distalLine)
+        const overlaps = ltfMin <= htfMax && ltfMax >= htfMin
+        if (overlaps) {
+          htfConfluence = {
+            value: 2,
+            max: 2,
+            label: "Best",
+            explanation: `LTF zone overlaps HTF ${htfZone.type} zone — stacked confluence`,
+          }
+          break
+        }
+        // Check proximity
+        const distance = Math.min(
+          Math.abs(zone.proximalLine - htfZone.proximalLine),
+          Math.abs(zone.proximalLine - htfZone.distalLine),
+        )
+        if (distance <= confluenceDistance) {
+          htfConfluence = {
+            value: 1,
+            max: 2,
+            label: "Good",
+            explanation: `LTF zone within 2x ATR of HTF ${htfZone.type} zone`,
+          }
+          break
+        }
+      }
+      if (htfConfluence.value === 0 && sameTypeHtfZones.length > 0) {
+        htfConfluence = {
+          value: 0,
+          max: 2,
+          label: "Poor",
+          explanation: "No nearby HTF zone of same type",
+        }
+      }
+    }
+
     const total =
       strength.value +
       time.value +
@@ -827,7 +1029,8 @@ export class TradeFinderScanner {
       commodityCorrelation.value +
       session.value +
       keyLevel.value +
-      volatilityRegime.value
+      volatilityRegime.value +
+      htfConfluence.value
 
     return {
       strength,
@@ -840,8 +1043,9 @@ export class TradeFinderScanner {
       session,
       keyLevel,
       volatilityRegime,
+      htfConfluence,
       total,
-      maxPossible: 16,
+      maxPossible: 18,
     }
   }
 
@@ -1020,6 +1224,9 @@ export class TradeFinderScanner {
       }
     }
 
+    // Apply circuit breaker sizing reduction when in drawdown
+    effectiveRiskPercent *= this.circuitBreaker.getSizingMultiplier()
+
     const riskAmount = balance * (effectiveRiskPercent / 100)
     const pipValue = pipSize * 100_000
     if (pipValue <= 0) return 0
@@ -1099,9 +1306,19 @@ export class TradeFinderScanner {
       if (config.autoTradeEnabled && !setup.autoPlaced && !setup.resultSourceId) {
         const pair = config.pairs.find((p) => p.instrument === setup.instrument)
         if (pair && pair.autoTradeEnabled !== false) {
-          // Entry confirmation: check for confirmation pattern before placing
           if (config.entryConfirmation && newStatus === "approaching") {
+            // Entry confirmation mode: check for confirmation pattern before placing MARKET order
             const recentCandles = candles.slice(-6)
+
+            // Check arrival speed — skip if momentum is too aggressive
+            const arrivalCheck = checkArrivalSpeed(recentCandles, setup.direction, atrVal)
+            if (!arrivalCheck.safe) {
+              console.log(
+                `[trade-finder] ${setup.instrument} arrival speed unsafe: ${arrivalCheck.reason}`,
+              )
+              continue
+            }
+
             const confirmation = detectConfirmationPattern(
               setup.zone,
               recentCandles,
@@ -1112,7 +1329,7 @@ export class TradeFinderScanner {
               confirmation.refinedEntry !== null &&
               confirmation.pattern
             ) {
-              // Refined entry — update setup entry price
+              // Confirmed — update setup and place MARKET order (fills at current price)
               const refinedSetup = {
                 ...setup,
                 entryPrice: confirmation.refinedEntry,
@@ -1124,12 +1341,36 @@ export class TradeFinderScanner {
                 confirmation.pattern,
               ).catch(() => {})
               console.log(
-                `[trade-finder] Entry confirmed: ${setup.instrument} ${confirmation.pattern} → entry ${confirmation.refinedEntry.toFixed(5)}`,
+                `[trade-finder] Entry confirmed: ${setup.instrument} ${confirmation.pattern} → MARKET entry ${confirmation.refinedEntry.toFixed(5)}`,
               )
-              await this.tryAutoPlace(refinedSetup as TradeFinderSetupData, config, pair)
+              await this.tryAutoPlace(
+                refinedSetup as TradeFinderSetupData,
+                config,
+                pair,
+                true, // useMarketOrder
+              )
+            } else {
+              // No confirmation yet — increment wait counter and check timeout
+              const waited = (setup.confirmationCandlesWaited ?? 0) + 1
+              await updateSetupConfirmationWait(setup.id, waited).catch(() => {})
+              if (waited >= config.confirmationTimeout) {
+                await updateSetupStatus(setup.id, "invalidated")
+                this.broadcast({
+                  type: "trade_finder_setup_removed",
+                  timestamp: new Date().toISOString(),
+                  data: {
+                    setupId: setup.id,
+                    instrument: setup.instrument,
+                    reason: `Confirmation timeout after ${waited} candles`,
+                  },
+                })
+                console.log(
+                  `[trade-finder] Confirmation timeout: ${setup.instrument} — ${waited} candles without confirmation`,
+                )
+              }
             }
-            // No confirmation yet — skip placement, will retry next scan cycle
-          } else {
+          } else if (!config.entryConfirmation) {
+            // No confirmation required — place LIMIT order as before
             await this.tryAutoPlace(setup, config, pair)
           }
         }

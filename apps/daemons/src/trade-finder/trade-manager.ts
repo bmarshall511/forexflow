@@ -187,21 +187,72 @@ export class TradeFinderTradeManager {
 
     const rrAchieved = setup.riskPips > 0 ? pnlPips / setup.riskPips : 0
 
-    // 1. Breakeven move
-    if (config.breakevenEnabled && !setup.breakevenMoved && rrAchieved >= 1.0) {
-      await this.moveToBreakeven(managed, trade, decimals)
-      return // One action per tick
+    // 1. Breakeven move — scale trigger by risk distance
+    //    Tight SL (< 15 pips): 1.5:1 R:R (more room to breathe)
+    //    Normal SL (15-30 pips): 1.0:1 R:R (standard)
+    //    Wide SL (30+ pips): 0.75:1 R:R (lock in faster)
+    if (config.breakevenEnabled && !setup.breakevenMoved) {
+      const beThreshold = setup.riskPips < 15 ? 1.5 : setup.riskPips > 30 ? 0.75 : 1.0
+      if (rrAchieved >= beThreshold) {
+        await this.moveToBreakeven(managed, trade, decimals)
+        return // One action per tick
+      }
     }
 
     // 2. Partial close
+    if (config.partialCloseEnabled && !setup.partialTaken && setup.breakevenMoved) {
+      // "thirds" strategy: close 33% at 1:1, "standard": close at configured R:R
+      const partialRR = config.partialExitStrategy === "thirds" ? 1.0 : config.partialCloseRR
+      const partialPct = config.partialExitStrategy === "thirds" ? 33 : config.partialClosePercent
+      if (rrAchieved >= partialRR) {
+        await this.takePartialProfit(
+          managed,
+          trade,
+          { ...config, partialClosePercent: partialPct },
+          decimals,
+        )
+        return
+      }
+    }
+
+    // 2b. Second partial for "thirds" strategy: close another 33% at 2:1, trail SL to 1:1
     if (
       config.partialCloseEnabled &&
-      !setup.partialTaken &&
-      setup.breakevenMoved &&
-      rrAchieved >= config.partialCloseRR
+      config.partialExitStrategy === "thirds" &&
+      setup.partialTaken &&
+      rrAchieved >= 2.0 &&
+      now - managed.lastModifiedAt > MODIFY_COOLDOWN_MS
     ) {
-      await this.takePartialProfit(managed, trade, config, decimals)
-      return
+      // Close another 33% of the ORIGINAL position (50% of remaining)
+      const unitsToClose = Math.floor(trade.currentUnits * 0.5)
+      if (unitsToClose > 0 && this.closeTradeFn) {
+        try {
+          await this.closeTradeFn(
+            managed.sourceTradeId,
+            unitsToClose,
+            "Trade Finder thirds: 2nd partial at 2:1 R:R",
+          )
+          // Move SL to 1:1 R:R level
+          const oneRLevel =
+            setup.direction === "long"
+              ? setup.entryPrice + setup.riskPips * pipSize
+              : setup.entryPrice - setup.riskPips * pipSize
+          const roundedSL = parseFloat(oneRLevel.toFixed(decimals))
+          if (this.modifyTradeFn) {
+            await this.modifyTradeFn(managed.sourceTradeId, roundedSL, undefined)
+          }
+          managed.lastModifiedAt = Date.now()
+          console.log(
+            `[trade-finder-mgr] THIRDS 2nd PARTIAL: ${setup.instrument} closed ${unitsToClose} units, SL → ${roundedSL.toFixed(decimals)} (1R)`,
+          )
+        } catch (err) {
+          console.error(
+            `[trade-finder-mgr] Thirds 2nd partial failed for ${setup.instrument}:`,
+            err,
+          )
+        }
+        return
+      }
     }
 
     // 3. Trailing stop (after partial or after 2:1 if partials disabled)
@@ -234,8 +285,8 @@ export class TradeFinderTradeManager {
 
     const { setup } = managed
     const pipSize = getPipSize(setup.instrument)
-    // Buffer: spread + small margin to prevent noise stop-outs
-    const buffer = pipSize * 3
+    // Buffer: estimated spread (2 pips) + 1 pip margin to cover costs
+    const buffer = pipSize * 3 + pipSize
     const newSL = setup.direction === "long" ? setup.entryPrice + buffer : setup.entryPrice - buffer
     const roundedSL = parseFloat(newSL.toFixed(decimals))
 

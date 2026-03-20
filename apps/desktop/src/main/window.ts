@@ -8,11 +8,10 @@
  */
 import { BrowserWindow, shell } from "electron"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
 import { store } from "./store.js"
 
-const WEB_APP_PORT = 3000
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+/** Must match WEB_SERVER_PORT in index.ts */
+const WEB_APP_PORT = 3456
 const PRELOAD_PATH = path.join(__dirname, "..", "preload", "index.js")
 
 /** Create the main BrowserWindow. */
@@ -45,6 +44,13 @@ export function createMainWindow(): BrowserWindow {
   // Show when ready to avoid white flash
   win.once("ready-to-show", () => {
     win.show()
+    // Auto-open DevTools for debugging blank screen
+    win.webContents.openDevTools({ mode: "detach" })
+  })
+
+  // Log navigation events
+  win.webContents.on("did-navigate", (_event, url, httpResponseCode) => {
+    console.log(`[window] Navigated to ${url} (HTTP ${httpResponseCode})`)
   })
 
   // Persist window bounds on move/resize

@@ -73,14 +73,29 @@ src/
 
 ## Trade Finder
 
-- `scanner.ts` — detects supply/demand zones, scores them, auto-places orders.
-- `auto-trade-queue.ts` — pure functions for queue position computation + skip reason categorization.
+- `scanner.ts` — detects supply/demand zones, scores them (11 dimensions, max 18), auto-places orders.
+- `entry-monitor.ts` — confirmation pattern detection (engulfing, pin bar, inside bar breakout, break of structure) + arrival speed filter.
+- `trade-manager.ts` — post-fill management (breakeven with risk-scaled triggers, partial exits with "standard" or "thirds" strategy, trailing stop, time exit).
+- `circuit-breaker.ts` — drawdown protection: 3 consecutive losses = 4hr pause, 5 daily losses = 24hr pause, 3% drawdown = 50% sizing, 5% drawdown = day pause.
+- `auto-trade-queue.ts` — queue position computation + skip reason categorization + currency exposure checks.
+- `adaptive-tuner.ts` — auto-tunes thresholds based on 30-day rolling performance.
 - Setup lifecycle: `active → approaching → placed → filled → invalidated/expired`.
+- **Entry confirmation flow**: When `entryConfirmation` is enabled, setups are NOT placed on detection. They wait for price to approach the zone, then require a confirmation pattern (engulfing/pin bar/inside bar/BOS) before placing a MARKET order. Timeout without confirmation → invalidation.
+- **Auto-trade guard order**: session gate → circuit breaker → score threshold → trend alignment → R:R check → same-instrument → currency exposure → concurrent cap → daily cap → risk % cap → spread validation → news filter.
+- **Session gating**: `isAutoTradeSession()` enforces institutional kill zones (London 07-10 UTC, NY 12-15 UTC). Asian session only for AUD/NZD/JPY pairs. Monday pre-London and Friday afternoon blocked.
+- **Arrival speed filter**: Rejects entries where 3+ large-body candles approach the zone with momentum (> 0.8x ATR average body). Prevents "knife catching" at zones.
+- **Correlation guard**: Max 2 concurrent auto-trades per base/quote currency via `checkCurrencyExposure()`.
+- **Spread validation**: Rejects if current spread > 15% of SL distance.
+- **News filter**: Skips auto-trade if high-impact economic event imminent (< 2 hours) for the pair's currencies.
+- **SL buffer**: `ATR × 0.15 + spread` (not 0.02). Minimum risk: `max(ATR × 0.75, 8 pips)`.
+- **Smart sizing**: Scales risk% down by score quality (81-100% = 1.0×, 63-80% = 0.75×, <63% = 0.5×). Circuit breaker further reduces by 0.5× when daily drawdown > 3%.
+- **Dynamic R:R**: Ranging markets (ADX < 20) use tighter TP (2:1), trending markets (ADX > 25) use wider TP (3:1+).
+- **Zone age decay**: Zones older than 30 candles are rejected. Freshness score penalized by -0.5 per 10 candles of age.
+- **HTF confluence scoring**: LTF zones overlapping HTF zones of same type score +2, nearby (within 2×ATR) score +1.
+- **Startup safety**: `repairDangerousConfig()` caps concurrent to 5, daily to 10, risk% to 10, minScore floor of 9.
 - Fill detection: dual path — event-driven via `tradeSyncer.onOrderFilled` + fallback via `checkPlacedSetups()`.
-- Risk cap counts BOTH pending AND filled auto-placed trades (`countPendingAutoPlaced()` + `getAutoPlacedTotalRiskPips()`), preventing cap bypass when orders fill.
 - Auto-trade events ring buffer (max 50) exposed via `GET /trade-finder/auto-trade-events`.
-- Skip reasons persisted to DB (`lastSkipReason` column) and broadcast via WS for accurate UI badges.
-- Queue system: eligible-but-capped setups are priority-ordered (score DESC, distance ASC). Reactive placement on slot open (fill/cancel/invalidation).
+- Circuit breaker state: `GET /trade-finder/circuit-breaker` + `POST /actions/trade-finder/reset-circuit-breaker`.
 - Cap utilization: `GET /trade-finder/caps` endpoint + `trade_finder_cap_utilization` WS message.
 
 ## AI Trader

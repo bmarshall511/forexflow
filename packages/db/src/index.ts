@@ -252,6 +252,7 @@ export {
   updateSetupManagement,
   getFilledSetups,
   updateSetupConfirmation,
+  updateSetupConfirmationWait,
   updateSetupSkipReason,
   type CreateSetupInput,
 } from "./trade-finder-service"
@@ -358,6 +359,7 @@ export {
   upsertEconomicEvents,
   getUpcomingEvents,
   getEventsInRange,
+  hasImminentHighImpactEvent,
   cleanupOldEvents,
   type EconomicEventInput,
 } from "./calendar-service"

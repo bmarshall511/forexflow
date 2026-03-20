@@ -674,6 +674,25 @@ export async function startServer(port: number, deps: ServerDeps) {
       return
     }
 
+    if (req.method === "GET" && req.url === "/trade-finder/circuit-breaker") {
+      if (!_tradeFinderScanner) {
+        sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })
+        return
+      }
+      sendJson(res, 200, { ok: true, data: _tradeFinderScanner.getCircuitBreakerState() })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/trade-finder/reset-circuit-breaker") {
+      if (!_tradeFinderScanner) {
+        sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })
+        return
+      }
+      _tradeFinderScanner.resetCircuitBreaker()
+      sendJson(res, 200, { ok: true })
+      return
+    }
+
     if (req.method === "POST" && req.url === "/actions/trade-finder/scan") {
       if (!_tradeFinderScanner) {
         sendJson(res, 503, { ok: false, error: "Trade Finder not initialized" })

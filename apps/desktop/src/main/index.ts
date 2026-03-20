@@ -13,7 +13,14 @@
  */
 import { app, BrowserWindow } from "electron"
 import path from "node:path"
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs"
+import {
+  appendFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs"
 import { fork, type ChildProcess } from "node:child_process"
 import { store } from "./store.js"
 import { createMainWindow } from "./window.js"
@@ -23,11 +30,38 @@ import { DaemonManager } from "./daemon-manager.js"
 import { setupAutoUpdater } from "./updater.js"
 import { registerIpcHandlers } from "./ipc-handlers.js"
 
+// File-based debug logging (stdout is swallowed in packaged macOS apps)
+const LOG_FILE = "/tmp/fxflow-debug.log"
+function log(msg: string): void {
+  const line = `[${new Date().toISOString()}] ${msg}\n`
+  console.log(msg)
+  try {
+    appendFileSync(LOG_FILE, line)
+  } catch {
+    // ignore
+  }
+}
+try {
+  writeFileSync(LOG_FILE, `[${new Date().toISOString()}] === FXFlow starting ===\n`)
+} catch {
+  // ignore
+}
+log(`isPackaged: ${app.isPackaged}`)
+log(`resourcesPath: ${process.resourcesPath}`)
+log(`appPath: ${app.getAppPath()}`)
+log(`userData: ${app.getPath("userData")}`)
+
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
+  log("Another instance is running — quitting")
   app.quit()
+} else {
+  log("Got single instance lock")
 }
+
+/** Port for the embedded web server — avoids conflict with dev server on 3000. */
+const WEB_SERVER_PORT = 3456
 
 let mainWindow: BrowserWindow | null = null
 let webServerProcess: ChildProcess | null = null
@@ -47,27 +81,26 @@ function startWebServer(env: Record<string, string>): void {
   const serverEntry = path.join(serverDir, "server.js")
 
   // Startup diagnostics — verify critical files exist
-  console.log(`[startup] isPackaged: ${app.isPackaged}`)
-  console.log(`[startup] serverDir: ${serverDir}`)
-  console.log(`[startup] server.js exists: ${existsSync(serverEntry)}`)
+  log(`[startup] serverDir: ${serverDir}`)
+  log(`[startup] server.js exists: ${existsSync(serverEntry)}`)
   const staticDir = path.join(serverDir, ".next", "static")
-  console.log(`[startup] .next/static exists: ${existsSync(staticDir)}`)
+  log(`[startup] .next/static exists: ${existsSync(staticDir)}`)
   if (existsSync(staticDir)) {
     try {
-      console.log(`[startup] .next/static contents: ${readdirSync(staticDir).join(", ")}`)
+      log(`[startup] .next/static contents: ${readdirSync(staticDir).join(", ")}`)
     } catch {
       /* ignore */
     }
   }
   const publicDir = path.join(serverDir, "public")
-  console.log(`[startup] public/ exists: ${existsSync(publicDir)}`)
+  log(`[startup] public/ exists: ${existsSync(publicDir)}`)
 
   webServerProcess = fork(serverEntry, [], {
     cwd: serverDir,
     env: {
       ...process.env,
       ...env,
-      PORT: "3000",
+      PORT: String(WEB_SERVER_PORT),
       NODE_ENV: "production",
       FXFLOW_ELECTRON: "1",
     } as Record<string, string>,
@@ -76,15 +109,15 @@ function startWebServer(env: Record<string, string>): void {
   })
 
   webServerProcess.stdout?.on("data", (data: Buffer) => {
-    console.log(`[web] ${data.toString().trim()}`)
+    log(`[web] ${data.toString().trim()}`)
   })
 
   webServerProcess.stderr?.on("data", (data: Buffer) => {
-    console.error(`[web] ${data.toString().trim()}`)
+    log(`[web:err] ${data.toString().trim()}`)
   })
 
   webServerProcess.on("exit", (code) => {
-    console.log(`[web] Server exited with code ${code}`)
+    log(`[web] Server exited with code ${code}`)
     webServerProcess = null
   })
 }
@@ -126,11 +159,14 @@ app.on("second-instance", () => {
 })
 
 app.whenReady().then(async () => {
+  log("[startup] app.whenReady fired")
   const mode = store.get("deploymentMode")
+  log(`[startup] deploymentMode: ${mode}`)
   const env = buildChildEnv()
 
   // Show splash screen immediately so user sees the app is loading
   const splash = createSplashWindow()
+  log("[startup] Splash window created")
 
   // Ensure data directory and database exist (local mode)
   if (mode === "local") {
@@ -146,9 +182,9 @@ app.whenReady().then(async () => {
         : path.join(app.getAppPath(), "assets", "template.db")
       if (existsSync(templatePath)) {
         copyFileSync(templatePath, dbPath)
-        console.log("[startup] Initialized database from template")
+        log("[startup] Initialized database from template")
       } else {
-        console.warn("[startup] No template database found — database may need manual migration")
+        log("[startup] WARNING: No template database found — database may need manual migration")
       }
     }
   }
@@ -167,7 +203,9 @@ app.whenReady().then(async () => {
   startWebServer(env)
 
   // Wait for web server to be ready
-  await waitForServer("http://localhost:3000", 30_000)
+  log(`[startup] Waiting for web server on localhost:${WEB_SERVER_PORT}...`)
+  await waitForServer(`http://localhost:${WEB_SERVER_PORT}`, 30_000)
+  log("[startup] Web server is ready, creating main window")
 
   // Create main window and close splash
   mainWindow = createMainWindow()
@@ -241,5 +279,5 @@ async function waitForServer(url: string, timeoutMs: number): Promise<void> {
     }
     await new Promise((r) => setTimeout(r, 500))
   }
-  console.warn(`[startup] Server at ${url} did not respond within ${timeoutMs}ms`)
+  log(`[startup] WARNING: Server at ${url} did not respond within ${timeoutMs}ms`)
 }

@@ -71,6 +71,8 @@ export async function getTradeFinderConfig(): Promise<TradeFinderConfigData> {
     trailingStopCandles: config.trailingStopCandles,
     timeExitEnabled: config.timeExitEnabled,
     timeExitCandles: config.timeExitCandles,
+    partialExitStrategy: (config.partialExitStrategy ?? "standard") as "standard" | "thirds",
+    shadowMode: config.shadowMode ?? false,
     updatedAt: safeIso(config.updatedAt),
   }
 }
@@ -100,6 +102,8 @@ type UpdatableConfigFields = Pick<
   | "trailingStopCandles"
   | "timeExitEnabled"
   | "timeExitCandles"
+  | "partialExitStrategy"
+  | "shadowMode"
 >
 
 /**
@@ -145,6 +149,9 @@ export async function updateTradeFinderConfig(
     updateData.trailingStopCandles = data.trailingStopCandles
   if (data.timeExitEnabled !== undefined) updateData.timeExitEnabled = data.timeExitEnabled
   if (data.timeExitCandles !== undefined) updateData.timeExitCandles = data.timeExitCandles
+  if (data.partialExitStrategy !== undefined)
+    updateData.partialExitStrategy = data.partialExitStrategy
+  if (data.shadowMode !== undefined) updateData.shadowMode = data.shadowMode
   if (data.pairs !== undefined) updateData.pairsJson = JSON.stringify(data.pairs)
 
   await db.tradeFinderConfig.update({

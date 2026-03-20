@@ -775,6 +775,7 @@ export type DaemonMessageType =
   | "trade_finder_auto_trade_cancelled"
   | "trade_finder_auto_trade_skipped"
   | "trade_finder_cap_utilization"
+  | "trade_finder_circuit_breaker"
   // Price Alerts
   | "price_alert_triggered"
   // AI Trader
@@ -956,12 +957,12 @@ export interface TradeFinderScanStatusMessage extends DaemonMessage<TradeFinderS
   type: "trade_finder_scan_status"
 }
 
-/** Broadcast when Trade Finder auto-trade places a limit order on OANDA. */
+/** Broadcast when Trade Finder auto-trade places an order on OANDA. */
 export interface TradeFinderAutoTradePlacedMessage extends DaemonMessage<{
   setupId: string
   instrument: string
   direction: TradeDirection
-  orderType: "LIMIT"
+  orderType: "LIMIT" | "MARKET"
   entryPrice: number
   stopLoss: number
   takeProfit: number
@@ -1007,6 +1008,11 @@ export interface TradeFinderAutoTradeSkippedMessage extends DaemonMessage<{
 /** Broadcast current auto-trade cap utilization to clients. */
 export interface TradeFinderCapUtilizationMessage extends DaemonMessage<TradeFinderCapUtilization> {
   type: "trade_finder_cap_utilization"
+}
+
+/** Broadcast circuit breaker state changes to clients. */
+export interface TradeFinderCircuitBreakerMessage extends DaemonMessage<TradeFinderCircuitBreakerState> {
+  type: "trade_finder_circuit_breaker"
 }
 
 /** Auto-trade activity event for the activity log */
@@ -1065,6 +1071,7 @@ export type AnyDaemonMessage =
   | TradeFinderAutoTradeCancelledMessage
   | TradeFinderAutoTradeSkippedMessage
   | TradeFinderCapUtilizationMessage
+  | TradeFinderCircuitBreakerMessage
   | AiTraderOpportunityFoundMessage
   | AiTraderOpportunityUpdatedMessage
   | AiTraderOpportunityRemovedMessage
@@ -2365,7 +2372,7 @@ export interface TradeFinderConfigData {
   smartSizing: boolean
   /** Wait for confirmation candle pattern before placing auto-trade */
   entryConfirmation: boolean
-  /** Max candles to wait for confirmation before falling back to proximal entry */
+  /** Max candles to wait for confirmation before invalidating setup */
   confirmationTimeout: number
   /** Move SL to breakeven at 1:1 R:R */
   breakevenEnabled: boolean
@@ -2383,6 +2390,10 @@ export interface TradeFinderConfigData {
   timeExitEnabled: boolean
   /** Max candles before time-based exit */
   timeExitCandles: number
+  /** Partial exit strategy: "standard" (50/50) or "thirds" (33/33/33) */
+  partialExitStrategy: "standard" | "thirds"
+  /** Shadow mode: run all logic but don't place real orders */
+  shadowMode: boolean
   updatedAt: string
 }
 
@@ -2401,6 +2412,8 @@ export interface TradeFinderScoreBreakdown {
   keyLevel: OddsEnhancerScore
   /** Volatility regime (0-1): is the market in a favorable regime for zone trading? */
   volatilityRegime: OddsEnhancerScore
+  /** HTF zone confluence (0-2): does an HTF zone of the same type overlap or sit nearby? */
+  htfConfluence?: OddsEnhancerScore
   total: number
   maxPossible: number
 }
@@ -2418,7 +2431,7 @@ export interface TradeFinderSetupData {
   scores: TradeFinderScoreBreakdown
   /** Entry price (zone proximal line) */
   entryPrice: number
-  /** Computed SL: distalLine ± (ATR × 0.02 + spread) */
+  /** Computed SL: distalLine ± (ATR × 0.15 + spread) */
   stopLoss: number
   /** Computed TP: opposing fresh zone proximal or 2:1 fallback */
   takeProfit: number
@@ -2450,6 +2463,8 @@ export interface TradeFinderSetupData {
   lastSkipReason: string | null
   /** Entry confirmation pattern detected (e.g. "engulfing", "pin_bar", null = no confirmation yet) */
   confirmationPattern: string | null
+  /** How many scan cycles spent waiting for entry confirmation (0 = not waiting) */
+  confirmationCandlesWaited: number
   /** Whether SL has been moved to breakeven */
   breakevenMoved: boolean
   /** Whether partial profit has been taken */
@@ -2462,6 +2477,17 @@ export interface TradeFinderSetupData {
 export interface TradeFinderCapUtilization {
   concurrent: { used: number; max: number }
   risk: { usedPercent: number; maxPercent: number }
+}
+
+/** Circuit breaker state for auto-trade drawdown protection */
+export interface TradeFinderCircuitBreakerState {
+  paused: boolean
+  pausedUntil: string | null
+  reason: string | null
+  consecutiveLosses: number
+  dailyLosses: number
+  dailyDrawdownPercent: number
+  reducedSizing: boolean
 }
 
 /** Scanner status broadcast to clients */
