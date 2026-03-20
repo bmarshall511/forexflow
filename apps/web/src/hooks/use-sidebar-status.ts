@@ -27,25 +27,25 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
       let variant: SidebarStatus["variant"] = "default"
 
       if (error) {
-        line1 = "Scan error"
+        line1 = "Something went wrong"
         variant = "error"
       } else if (isScanning) {
-        line1 = `Scanning ${pairsScanned}/${totalPairs}...`
+        line1 = `Checking ${pairsScanned} of ${totalPairs} pairs...`
         variant = "active"
       } else if (nextScanAt) {
-        line1 = `Next: ${formatCountdown(nextScanAt)}`
+        line1 = `Scans again in ${formatCountdown(nextScanAt)}`
       } else if (lastScanAt) {
-        line1 = `Last: ${formatTimeAgo(lastScanAt)}`
+        line1 = `Scanned ${formatTimeAgo(lastScanAt)}`
       } else {
-        line1 = "Idle"
+        line1 = "Not running"
       }
 
       const { active, approaching } = tradeFinderSetupCounts
       const total = active + approaching
       let line2: string | undefined
       if (total > 0) {
-        const parts = [`${total} setup${total !== 1 ? "s" : ""}`]
-        if (approaching > 0) parts.push(`${approaching} approaching`)
+        const parts = [`${total} trade idea${total !== 1 ? "s" : ""} found`]
+        if (approaching > 0) parts.push(`${approaching} close to entry`)
         line2 = parts.join(" · ")
       }
 
