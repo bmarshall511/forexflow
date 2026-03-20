@@ -2767,6 +2767,15 @@ export interface AiTraderScanLogEntry {
     reasons?: string[]
     /** Error message when Tier 2/3 processing fails */
     error?: string
+    /** Tier 1 filter diagnostics (pair_scanned entries) */
+    filterLowVol?: number
+    filterNoSignal?: number
+    filterLowConfluence?: number
+    filterSpread?: number
+    filterRR?: number
+    filterHTF?: number
+    filterRSI?: number
+    filterPassed?: number
   }
 }
 

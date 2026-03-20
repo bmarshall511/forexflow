@@ -100,11 +100,14 @@ src/
 
 ## AI Trader
 
-- **Deterministic position sizing**: position size is calculated in code, NOT by the LLM. Uses `getRiskPercent()` from settings with formula `units = floor(riskAmount / (riskPips * pipSize))`, minimum 1 unit enforced.
+- **Deterministic position sizing**: position size is calculated in code, NOT by the LLM. Uses `getRiskPercent()` from settings with formula `units = floor(riskAmount / (riskPips * pipValuePerUnit))`, minimum 1 unit enforced. Cross-pair conversion factor applied: for non-USD-quoted pairs, `pipValuePerUnit = pipSize / entryPrice`.
 - **Cooldown scoping**: consecutive loss cooldown only counts AI Trader trades (checked via `isAiTrade()` BEFORE `tradeManager.onTradeClosed` deletes from managed set). Trade Finder, TV Alert, and manual trade losses do not trigger cooldown.
-- **Soft Tier 1 filters**: HTF trend disagreement and secondary RSI overextension apply confidence penalties (−8 to −15) instead of hard-gating signals. This lets strong setups through in mixed conditions.
-- **Full cost tracking**: ALL Tier 2 API costs are recorded to the DB (via opportunity records with status `"rejected"`), even when Tier 2 rejects the candidate or gates block pre-Tier-3. This ensures budget tracking and dashboard cost displays are accurate.
-- **Filter diagnostics**: Tier 1 scan results include a breakdown of why signals were filtered (low-vol, no-signal, low-confluence, spread, R:R, HTF-penalized, RSI-penalized) logged to the scan log for observability.
+- **Daily circuit breaker**: 4+ daily AI Trader losses → pause until midnight UTC. 3%+ daily drawdown → pause until midnight UTC. Counters reset at midnight. Checked before each scan in `runScan()`.
+- **Soft Tier 1 filters**: HTF trend disagreement applies −8 confidence penalty (not hard gate). Secondary RSI overextension applies −8 to −15 penalty. Minimum 2 directional reasons required. Confluence minimum: 15 points (after penalties).
+- **Full cost tracking**: ALL Tier 2 API costs are recorded to the DB (via opportunity records with status `"rejected"`), even when Tier 2 rejects the candidate or gates block pre-Tier-3. Cost calculations use model-aware pricing from `AI_MODEL_OPTIONS`.
+- **Filter diagnostics**: Tier 1 scan results include a breakdown of why signals were filtered (low-vol, no-signal, low-confluence, spread, R:R, HTF-penalized, RSI-penalized) persisted in scan log metadata for observability.
+- **Startup safety**: `repairDangerousConfig()` caps concurrent to 5, fixes Tier 2 model to Haiku (not Sonnet/Opus), fixes Tier 3 model to Sonnet (not Opus), floors minimumConfidence at 40.
+- **Tier 3 adjustment validation**: LLM-adjusted entry/SL/TP are bounds-checked against ATR. Entry adjustments > 3x ATR from original are rejected. SL adjustments outside 0.3–5x ATR are rejected.
 
 ## Market Hours
 

@@ -13,8 +13,10 @@ import type {
   AiTraderTechnique,
   AnyDaemonMessage,
 } from "@fxflow/types"
+import { AI_MODEL_OPTIONS } from "@fxflow/types"
 import {
   getAiTraderConfig,
+  updateAiTraderConfig,
   getDecryptedClaudeKey,
   createOpportunity,
   updateOpportunityStatus,
@@ -142,6 +144,11 @@ export class AiTraderScanner {
   private consecutiveLosses = 0
   private cooldownUntil: number | null = null
 
+  // Daily loss circuit breaker
+  private dailyLosses = 0
+  private dailyDrawdownPercent = 0
+  private dailyPausedUntil: number | null = null
+
   // Scan progress tracking
   private scanProgress: AiTraderScanProgressData | null = null
   private scanLog: AiTraderScanLogEntry[] = []
@@ -188,11 +195,41 @@ export class AiTraderScanner {
   }
 
   async start(): Promise<void> {
+    await this.repairDangerousConfig()
     console.log("[ai-trader] Scanner started")
     await this.tradeManager.start()
     await expireOldOpportunities(4)
     await cleanupOldOpportunities(90)
     this.scheduleScan(10_000)
+  }
+
+  /** Repair dangerous config values on startup */
+  private async repairDangerousConfig(): Promise<void> {
+    const config = await getAiTraderConfig()
+    if (!config) return
+
+    const repairs: Record<string, unknown> = {}
+
+    // Cap maxConcurrentTrades to 5 (20 is dangerously high)
+    if (config.maxConcurrentTrades > 5) repairs.maxConcurrentTrades = 5
+
+    // Fix Tier 2 model: should be Haiku for cheap quick filter, not Sonnet/Opus
+    const haiku = "claude-haiku-4-5-20251001"
+    const tier2IsExpensive =
+      config.scanModel.includes("sonnet") || config.scanModel.includes("opus")
+    if (tier2IsExpensive) repairs.scanModel = haiku
+
+    // Fix Tier 3 model: should be Sonnet for deep analysis, not Opus (5x cost)
+    const sonnet = "claude-sonnet-4-6"
+    if (config.decisionModel.includes("opus")) repairs.decisionModel = sonnet
+
+    // Floor minimumConfidence at 40 (below that is too permissive)
+    if (config.minimumConfidence < 40) repairs.minimumConfidence = 40
+
+    if (Object.keys(repairs).length > 0) {
+      await updateAiTraderConfig(repairs as Parameters<typeof updateAiTraderConfig>[0])
+      console.log(`[ai-trader] SAFETY: Repaired dangerous config values:`, repairs)
+    }
   }
 
   stop(): void {
@@ -309,19 +346,74 @@ export class AiTraderScanner {
     // Only track consecutive losses for AI Trader trades (not Trade Finder, TV Alerts, etc.)
     if (!isAi) return
 
+    // Reset daily counters at midnight UTC
+    this.checkDailyReset()
+
     if (realizedPL < 0) {
       this.consecutiveLosses++
-      if (this.consecutiveLosses >= 2) {
-        const COOLDOWN_MS = 30 * 60_000 // 30 minutes
+      this.dailyLosses++
+
+      // Calculate drawdown % against account balance
+      const overview = this.stateManager.getAccountOverview()
+      const balance = overview?.summary.balance ?? 0
+      if (balance > 0) {
+        this.dailyDrawdownPercent += (Math.abs(realizedPL) / balance) * 100
+      }
+
+      // Consecutive loss cooldown: 2+ losses → 30 min pause
+      if (this.consecutiveLosses >= 2 && !this.cooldownUntil) {
+        const COOLDOWN_MS = 30 * 60_000
         this.cooldownUntil = Date.now() + COOLDOWN_MS
         this.addLogEntry(
           "scan_skip",
           `Cooldown activated: ${this.consecutiveLosses} consecutive AI Trader losses — pausing for 30 minutes`,
         )
       }
+
+      // Daily circuit breaker: 4+ daily losses → pause until midnight UTC
+      if (this.dailyLosses >= 4 && !this.dailyPausedUntil) {
+        const now = new Date()
+        const midnight = new Date(now)
+        midnight.setUTCDate(midnight.getUTCDate() + 1)
+        midnight.setUTCHours(0, 0, 0, 0)
+        this.dailyPausedUntil = midnight.getTime()
+        this.addLogEntry(
+          "scan_skip",
+          `Daily circuit breaker: ${this.dailyLosses} AI Trader losses today — paused until midnight UTC`,
+        )
+      }
+
+      // Daily drawdown > 3% → pause until midnight UTC
+      if (this.dailyDrawdownPercent > 3 && !this.dailyPausedUntil) {
+        const now = new Date()
+        const midnight = new Date(now)
+        midnight.setUTCDate(midnight.getUTCDate() + 1)
+        midnight.setUTCHours(0, 0, 0, 0)
+        this.dailyPausedUntil = midnight.getTime()
+        this.addLogEntry(
+          "scan_skip",
+          `Daily drawdown circuit breaker: ${this.dailyDrawdownPercent.toFixed(1)}% daily loss — paused until midnight UTC`,
+        )
+      }
     } else if (realizedPL > 0) {
       this.consecutiveLosses = 0
       this.cooldownUntil = null
+    }
+  }
+
+  /** Reset daily counters at midnight UTC */
+  private checkDailyReset(): void {
+    const now = new Date()
+    if (this.dailyPausedUntil && Date.now() >= this.dailyPausedUntil) {
+      this.dailyLosses = 0
+      this.dailyDrawdownPercent = 0
+      this.dailyPausedUntil = null
+      console.log("[ai-trader] Daily circuit breaker counters reset")
+    }
+    // Also reset at midnight UTC even without pause
+    if (now.getUTCHours() === 0 && now.getUTCMinutes() === 0 && this.dailyLosses > 0) {
+      this.dailyLosses = 0
+      this.dailyDrawdownPercent = 0
     }
   }
 
@@ -398,6 +490,15 @@ export class AiTraderScanner {
   private async runScan(): Promise<void> {
     if (this.scanning || this.paused) return
 
+    // Daily circuit breaker check
+    this.checkDailyReset()
+    if (this.dailyPausedUntil && Date.now() < this.dailyPausedUntil) {
+      const remaining = Math.ceil((this.dailyPausedUntil - Date.now()) / 60_000)
+      this.addLogEntry("scan_skip", `Daily circuit breaker active (${remaining} min until reset)`)
+      this.scheduleScan(60_000)
+      return
+    }
+
     // Cool-down check after consecutive losses
     if (this.cooldownUntil && Date.now() < this.cooldownUntil) {
       const remaining = Math.ceil((this.cooldownUntil - Date.now()) / 60_000)
@@ -405,7 +506,7 @@ export class AiTraderScanner {
         "scan_skip",
         `Cooling down after ${this.consecutiveLosses} consecutive losses (${remaining} min remaining)`,
       )
-      this.scheduleScan(60_000) // Re-check in 1 minute
+      this.scheduleScan(60_000)
       return
     }
     // Clear expired cooldown
@@ -630,6 +731,15 @@ export class AiTraderScanner {
           pairsScanned: pairs.length,
           candidatesFound: allSignals.length,
           tier: 1,
+          // Persist filter diagnostics so we can analyze why signals are being filtered
+          filterLowVol: filterStats.lowVolatility,
+          filterNoSignal: filterStats.noReasons,
+          filterLowConfluence: filterStats.lowConfluence,
+          filterSpread: filterStats.spreadTooWide,
+          filterRR: filterStats.rrTooLow,
+          filterHTF: filterStats.htfPenalized,
+          filterRSI: filterStats.secondaryRsiPenalized,
+          filterPassed: filterStats.passed,
         },
       )
       console.log(`[ai-trader] Tier 1 found ${allSignals.length} candidates`)
@@ -800,8 +910,7 @@ export class AiTraderScanner {
     const tier2InputTokens = tier2Response.usage.input_tokens
     const tier2OutputTokens = tier2Response.usage.output_tokens
     const tier2Model = config.scanModel || "claude-haiku-4-5-20251001"
-    // Haiku pricing: $0.80/M input, $4/M output
-    const tier2Cost = (tier2InputTokens * 0.8 + tier2OutputTokens * 4) / 1_000_000
+    const tier2Cost = getModelCost(tier2Model, tier2InputTokens, tier2OutputTokens)
 
     this.costTracker.invalidateCache()
 
@@ -994,7 +1103,7 @@ export class AiTraderScanner {
     const tier3Prompt = buildTier3Prompt(tier3Ctx)
 
     const tier3Response = await anthropic.messages.create({
-      model: config.decisionModel || "claude-sonnet-4-5-20241022",
+      model: config.decisionModel || "claude-sonnet-4-6",
       max_tokens: 1500,
       system: tier3Prompt.system,
       messages: [{ role: "user", content: tier3Prompt.user }],
@@ -1007,7 +1116,8 @@ export class AiTraderScanner {
 
     const tier3InputTokens = tier3Response.usage.input_tokens
     const tier3OutputTokens = tier3Response.usage.output_tokens
-    const tier3Cost = (tier3InputTokens * 3 + tier3OutputTokens * 15) / 1_000_000
+    const tier3Model = config.decisionModel || "claude-sonnet-4-6"
+    const tier3Cost = getModelCost(tier3Model, tier3InputTokens, tier3OutputTokens)
 
     this.costTracker.invalidateCache()
 
@@ -1047,10 +1157,36 @@ export class AiTraderScanner {
       return "tier3_fail"
     }
 
-    // ─── Create opportunity + update with tier data ────────────────────
-    const entryPrice = tier3Result.adjustedEntry ?? signal.entryPrice
-    const stopLoss = tier3Result.adjustedSL ?? signal.suggestedSL
-    const takeProfit = tier3Result.adjustedTP ?? signal.suggestedTP
+    // ─── Validate Tier 3 adjustments are within reasonable bounds ───────
+    const atr = signal.technicalSnapshot.atr ?? getPipSize(signal.instrument) * 20
+    const maxAdjustmentDistance = atr * 3 // Max 3x ATR from original levels
+
+    let entryPrice = tier3Result.adjustedEntry ?? signal.entryPrice
+    let stopLoss = tier3Result.adjustedSL ?? signal.suggestedSL
+    let takeProfit = tier3Result.adjustedTP ?? signal.suggestedTP
+
+    // Reject unreasonable Tier 3 adjustments and fall back to Tier 1 levels
+    if (tier3Result.adjustedEntry !== null) {
+      if (Math.abs(tier3Result.adjustedEntry - signal.entryPrice) > maxAdjustmentDistance) {
+        console.warn(`[ai-trader] Tier 3 adjusted entry too far from original — ignoring`)
+        entryPrice = signal.entryPrice
+      }
+    }
+    if (tier3Result.adjustedSL !== null) {
+      const slDistance = Math.abs(entryPrice - tier3Result.adjustedSL)
+      if (slDistance < atr * 0.3 || slDistance > atr * 5) {
+        console.warn(
+          `[ai-trader] Tier 3 adjusted SL unreasonable (${slDistance.toFixed(5)} vs ATR ${atr.toFixed(5)}) — ignoring`,
+        )
+        stopLoss = signal.suggestedSL
+      }
+    }
+    if (tier3Result.adjustedTP !== null) {
+      if (Math.abs(tier3Result.adjustedTP - entryPrice) > maxAdjustmentDistance * 3) {
+        console.warn(`[ai-trader] Tier 3 adjusted TP too far — ignoring`)
+        takeProfit = signal.suggestedTP
+      }
+    }
 
     // Recalculate R:R using final (potentially Tier 3-adjusted) levels
     const finalRiskPips = priceToPips(signal.instrument, Math.abs(entryPrice - stopLoss))
@@ -1084,12 +1220,21 @@ export class AiTraderScanner {
     }
 
     // Deterministic position sizing — calculated from account settings, never from LLM
+    // For non-USD-quoted pairs (e.g. EUR_GBP, GBP_CAD), the pip value in USD differs
+    // from the raw pipSize. We approximate by dividing pipSize by the entry price ratio,
+    // which converts quote-currency pip value to USD. For USD-quoted pairs this is ~1.
     const pipSize = getPipSize(signal.instrument)
     const riskPipsForSizing = Math.abs(entryPrice - stopLoss) / pipSize
     const riskAmount = accountBalance * (riskPercent / 100)
+    const [, quoteCcy] = signal.instrument.split("_")
+    const isUsdQuote = quoteCcy === "USD"
+    // pipValuePerUnit in account currency (USD assumed):
+    // USD-quoted: pipSize (1 pip of 1 unit = pipSize USD)
+    // Non-USD-quoted: pipSize / midPrice approximates the USD value per pip per unit
+    const pipValuePerUnit = isUsdQuote ? pipSize : pipSize / Math.max(entryPrice, 0.0001)
     const positionSize =
-      riskPipsForSizing > 0
-        ? Math.max(1, Math.floor(riskAmount / (riskPipsForSizing * pipSize)))
+      riskPipsForSizing > 0 && pipValuePerUnit > 0
+        ? Math.max(1, Math.floor(riskAmount / (riskPipsForSizing * pipValuePerUnit)))
         : 0
 
     if (positionSize <= 0) {
@@ -1128,7 +1273,7 @@ export class AiTraderScanner {
       tier2OutputTokens,
       tier2Cost,
       tier3Response: tier3Text,
-      tier3Model: config.decisionModel || "claude-sonnet-4-5-20241022",
+      tier3Model: config.decisionModel || "claude-sonnet-4-6",
       tier3InputTokens,
       tier3OutputTokens,
       tier3Cost,
@@ -1178,7 +1323,7 @@ export class AiTraderScanner {
         tier2OutputTokens,
         tier2Cost,
         tier3Response: tier3Text,
-        tier3Model: config.decisionModel || "claude-sonnet-4-5-20241022",
+        tier3Model: config.decisionModel || "claude-sonnet-4-6",
         tier3InputTokens,
         tier3OutputTokens,
         tier3Cost,
@@ -1208,7 +1353,7 @@ export class AiTraderScanner {
       status: "suggested",
       tier2Response: tier2Text,
       tier3Response: tier3Text,
-      tier3Model: config.decisionModel || "claude-sonnet-4-5-20241022",
+      tier3Model: config.decisionModel || "claude-sonnet-4-6",
       tier3InputTokens,
       tier3OutputTokens,
       tier3Cost,
@@ -1344,6 +1489,14 @@ export class AiTraderScanner {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** Look up per-model token pricing from AI_MODEL_OPTIONS. Falls back to Sonnet pricing if unknown. */
+function getModelCost(modelId: string, inputTokens: number, outputTokens: number): number {
+  const model = AI_MODEL_OPTIONS.find((m) => modelId.includes(m.id) || m.id.includes(modelId))
+  const inputCost = model?.inputCostPer1M ?? 3 // Sonnet fallback
+  const outputCost = model?.outputCostPer1M ?? 15
+  return (inputTokens * inputCost + outputTokens * outputCost) / 1_000_000
 }
 
 const VALID_REGIMES = new Set<AiTraderMarketRegime>([

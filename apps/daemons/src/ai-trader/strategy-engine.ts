@@ -360,7 +360,7 @@ export function analyzeTier1(
   for (const direction of ["long", "short"] as const) {
     const reasons = direction === "long" ? longReasons : shortReasons
     const techs = direction === "long" ? longTechs : shortTechs
-    if (reasons.length < 1) {
+    if (reasons.length < 2) {
       if (filterStats) filterStats.noReasons++
       continue
     }
@@ -368,8 +368,8 @@ export function analyzeTier1(
     // ─── Confidence penalty: HTF trend disagrees (soft gate) ─────
     let htfPenalty = 0
     if (htfTrendBullish !== null) {
-      if (direction === "long" && !htfTrendBullish) htfPenalty = 15
-      if (direction === "short" && htfTrendBullish) htfPenalty = 15
+      if (direction === "long" && !htfTrendBullish) htfPenalty = 8
+      if (direction === "short" && htfTrendBullish) htfPenalty = 8
     }
     if (htfPenalty > 0 && filterStats) filterStats.htfPenalized++
 
@@ -403,7 +403,7 @@ export function analyzeTier1(
     const result = computeConfluenceScore(confluenceInput, direction)
     // Apply penalties as score reduction instead of hard filtering
     const adjustedScore = Math.max(0, result.score - htfPenalty - secondaryRsiPenalty)
-    if (adjustedScore < 25) {
+    if (adjustedScore < 15) {
       if (filterStats) filterStats.lowConfluence++
       continue
     }
