@@ -252,6 +252,7 @@ export function SetupCardDetails({
           </div>
           <div className="bg-background h-[280px] overflow-hidden rounded-md border">
             <StandaloneChart
+              key={`${setup.instrument}-${chartTimeframe}`}
               instrument={setup.instrument}
               timeframe={chartTimeframe}
               lastTick={lastTick}
