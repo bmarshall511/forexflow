@@ -160,6 +160,7 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
             }}
             currentPrice={livePrice ?? setup.entryPrice}
             loadDelay={100}
+            visibleBars={50}
           />
         </div>
       </div>

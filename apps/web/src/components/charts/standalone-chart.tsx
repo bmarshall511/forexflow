@@ -82,6 +82,8 @@ interface StandaloneChartProps {
   onZoneClick?: (zone: ZoneData) => void
   /** Called when the loaded candle count changes (initial load + dynamic scroll) */
   onCandleCountChange?: (count: number) => void
+  /** Limit visible bars to the last N candles (null = fit all). Useful for mini charts. */
+  visibleBars?: number
   className?: string
 }
 
@@ -101,6 +103,7 @@ function StandaloneChartInner({
   trendVisuals,
   onZoneClick,
   onCandleCountChange,
+  visibleBars,
   className,
 }: StandaloneChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -204,7 +207,15 @@ function StandaloneChartInner({
             close: last.close,
           }
         }
-        chart.timeScale().fitContent()
+        if (visibleBars && candles.length > visibleBars) {
+          // Zoom to show only the last N bars (useful for mini charts)
+          chart.timeScale().setVisibleLogicalRange({
+            from: candles.length - visibleBars,
+            to: candles.length,
+          })
+        } else {
+          chart.timeScale().fitContent()
+        }
       })
     }
 

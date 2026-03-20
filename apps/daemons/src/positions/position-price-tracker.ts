@@ -68,6 +68,11 @@ export class PositionPriceTracker {
     this.evaluateInstruments()
   }
 
+  /** Trigger re-evaluation of subscribed instruments (public for async sources). */
+  evaluateInstrumentsPublic(): void {
+    this.evaluateInstruments()
+  }
+
   private evaluateInstruments(): void {
     const instrumentSet = new Set(this.positionManager.getActiveInstruments())
     for (const source of this.extraInstrumentSources) {

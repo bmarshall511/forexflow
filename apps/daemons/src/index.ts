@@ -315,6 +315,24 @@ async function main() {
   tradeFinderScanner.setNotificationEmitter(notificationEmitter)
   setTradeFinderScanner(tradeFinderScanner)
 
+  // Add Trade Finder instruments to price tracker so cards get live prices
+  {
+    let tfInstruments: string[] = []
+    const refreshTfInstruments = () => {
+      import("@fxflow/db")
+        .then((db) => db.getTradeFinderConfig())
+        .then((cfg) => {
+          tfInstruments = cfg.pairs.filter((p) => p.enabled).map((p) => p.instrument)
+          positionPriceTracker.evaluateInstrumentsPublic()
+        })
+        .catch(() => {})
+    }
+    positionPriceTracker.addInstrumentSource(() => tfInstruments)
+    refreshTfInstruments()
+    // Refresh every 5 minutes in case pairs change
+    setInterval(refreshTfInstruments, 5 * 60_000)
+  }
+
   // Wire auto-trade callbacks so the scanner can place/cancel orders
   tradeFinderScanner.setAutoTradeCallbacks(
     // placeOrder
