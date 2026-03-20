@@ -264,8 +264,8 @@ export function AutomationControls() {
                   <ToggleRow
                     key="trade_finder"
                     icon={<Zap className="size-4" />}
-                    label="Auto-Trade"
-                    description="Trade Finder auto-placement"
+                    label="Trade Finder"
+                    description="Automatically place trades when good setups are found"
                     enabled={tfActive}
                     toggling={tfToggling}
                     onToggle={handleTfToggle}

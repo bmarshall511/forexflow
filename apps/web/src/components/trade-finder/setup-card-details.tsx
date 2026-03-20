@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { TradeFinderSetupData, TrendVisualSettings } from "@fxflow/types"
 import { TIMEFRAME_SET_MAP } from "@fxflow/types"
-import { formatInstrument, formatRelativeTime } from "@fxflow/shared"
+import { formatInstrument, formatRelativeTime, getPipSize } from "@fxflow/shared"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   ChevronRight,
@@ -26,7 +26,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet"
 import { PlaceOrderDialog } from "./place-order-dialog"
-import { usePositions } from "@/hooks/use-positions"
+import { useDaemonConnection } from "@/hooks/use-daemon-connection"
 import { cn } from "@/lib/utils"
 import {
   TF_LABELS,
@@ -117,8 +117,18 @@ function SetupDetailContent({
   const scoreColor =
     scorePct >= 75 ? "text-green-500" : scorePct >= 58 ? "text-amber-500" : "text-orange-500"
 
-  const { pricesByInstrument } = usePositions()
-  const lastTick = pricesByInstrument.get(setup.instrument) ?? null
+  const { positionsPrices, chartPrices } = useDaemonConnection()
+  const lastTick =
+    positionsPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
+    chartPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
+    null
+
+  // Live distance
+  const pipSize = getPipSize(setup.instrument)
+  const livePrice = lastTick?.bid ?? null
+  const liveDistancePips = livePrice
+    ? Math.abs(livePrice - setup.entryPrice) / pipSize
+    : setup.distanceToEntryPips
 
   // Chart state
   const [showOrder, setShowOrder] = useState(true)
@@ -195,6 +205,20 @@ function SetupDetailContent({
                 {isLong ? "Buy" : "Sell"}
               </span>
               <span className="text-muted-foreground/40">&middot;</span>
+              {livePrice && (
+                <>
+                  <span className="font-mono tabular-nums">
+                    {livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5)}
+                  </span>
+                  <span className="text-muted-foreground/40">&middot;</span>
+                  <span className="text-muted-foreground">
+                    {liveDistancePips < 1
+                      ? "at entry"
+                      : `${liveDistancePips.toFixed(1)}p away`}
+                  </span>
+                  <span className="text-muted-foreground/40">&middot;</span>
+                </>
+              )}
               <span
                 className={cn(
                   setup.status === "approaching" && "text-amber-500",
@@ -306,7 +330,7 @@ function SetupDetailContent({
             <StatRow label="Size" value={`${setup.positionSize.toLocaleString()} units`} />
             <StatRow label="Risk:Reward" value={setup.rrRatio} />
             <StatRow label="Zone" value={setup.zone.formation.replace(/_/g, " ")} />
-            <StatRow label="Distance" value={`${setup.distanceToEntryPips.toFixed(1)} pips`} />
+            <StatRow label="Distance" value={`${liveDistancePips.toFixed(1)} pips`} />
             <StatRow label="Timeframe" value={TF_LABELS[setup.timeframeSet] ?? setup.timeframeSet} />
             {setup.placedAt && <StatRow label="Placed" value={formatRelativeTime(setup.placedAt)} />}
           </div>

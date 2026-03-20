@@ -5,7 +5,7 @@ import { TIMEFRAME_SET_MAP } from "@fxflow/types"
 import { formatInstrument, getPipSize } from "@fxflow/shared"
 import { Progress } from "@/components/ui/progress"
 import { Zap, AlertCircle } from "lucide-react"
-import { usePositions } from "@/hooks/use-positions"
+import { useDaemonConnection } from "@/hooks/use-daemon-connection"
 import { cn } from "@/lib/utils"
 import { StandaloneChart } from "@/components/charts/standalone-chart"
 import { Button } from "@/components/ui/button"
@@ -42,8 +42,12 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
   const scoreIndicator =
     scorePct >= 75 ? "bg-green-500" : scorePct >= 58 ? "bg-amber-500" : "bg-orange-500"
 
-  const { pricesByInstrument } = usePositions()
-  const lastTick = pricesByInstrument.get(setup.instrument) ?? null
+  // Get live prices from both position and chart streams for maximum coverage
+  const { positionsPrices, chartPrices } = useDaemonConnection()
+  const lastTick =
+    positionsPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
+    chartPrices?.prices?.find((p) => p.instrument === setup.instrument) ??
+    null
 
   // Live distance from current price to entry (updates every tick)
   const pipSize = getPipSize(setup.instrument)
