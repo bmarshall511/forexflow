@@ -1605,6 +1605,30 @@ export class OandaTradeSyncer {
       const trade = response.trade
       if (!trade) return null
 
+      // If the trade is still "OPEN" on OANDA but missing from the open trades list,
+      // it's in a transient state (e.g., SL just triggered but not fully settled).
+      // Retry after a short delay to let OANDA finalize the close.
+      if (trade.state === "OPEN") {
+        console.log(
+          `[trade-syncer] Trade ${sourceTradeId} still OPEN on detail lookup — retrying in 3s`,
+        )
+        await new Promise((r) => setTimeout(r, 3000))
+        const retryResponse = await oandaGet<OandaTradeDetailResponse>({
+          mode: creds.mode,
+          token: creds.token,
+          path: `/v3/accounts/${creds.accountId}/trades/${sourceTradeId}`,
+        })
+        const retryTrade = retryResponse.trade
+        if (!retryTrade || retryTrade.state === "OPEN") {
+          console.warn(
+            `[trade-syncer] Trade ${sourceTradeId} still OPEN after retry — skipping orphan close`,
+          )
+          return null
+        }
+        // Use the retry result
+        Object.assign(trade, retryTrade)
+      }
+
       // Only process if trade is actually closed on OANDA
       if (trade.state !== "CLOSED" && trade.state !== "CLOSE_WHEN_TRADEABLE") return null
 
