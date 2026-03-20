@@ -8,17 +8,22 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 })
 
-// Read version from monorepo root package.json
+// Read base version from monorepo root package.json
 const rootPkg = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../package.json"), "utf8"))
-const appVersion = rootPkg.version ?? "0.0.0"
+const baseVersion = rootPkg.version ?? "0.0.0"
 
-// Get git SHA at build time (short hash)
+// Get git SHA and commit count at build time for dynamic versioning
 let buildSha = "local"
+let commitCount = "0"
 try {
   buildSha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim()
+  commitCount = execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim()
 } catch {
   // Not a git repo or git not available — use fallback
 }
+
+// Dynamic version: base version + commit count (e.g. "0.1.0+342")
+const appVersion = buildSha === "local" ? baseVersion : `${baseVersion}+${commitCount}`
 
 const nextConfig: NextConfig = {
   output: "standalone",
