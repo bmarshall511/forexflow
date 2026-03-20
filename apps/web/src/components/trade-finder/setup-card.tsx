@@ -295,7 +295,6 @@ export function SetupCard({ setup, onPlace, autoTradeConfig }: SetupCardProps) {
             showChart={showChart}
             onToggleChart={() => setShowChart(!showChart)}
             lastTick={lastTick}
-            autoTradeStatus={autoTradeStatus}
           />
           <SetupCardActions setup={setup} onPlace={onPlace} />
         </CollapsibleContent>

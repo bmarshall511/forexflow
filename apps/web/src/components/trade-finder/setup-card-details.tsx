@@ -13,23 +13,18 @@ import {
   ShieldAlert,
   DollarSign,
   CheckCircle2,
-  Zap,
-  Clock,
-  AlertCircle,
 } from "lucide-react"
 import { PriceCard, StatRow } from "@/components/ui/price-card"
 import { SetupScoreBreakdown } from "./setup-score-breakdown"
 import { StandaloneChart } from "@/components/charts/standalone-chart"
 import { cn } from "@/lib/utils"
 import { TF_LABELS, fmtDollar, computeDollarAmount } from "./setup-card"
-import type { AutoTradeStatus } from "./setup-card"
 
 interface SetupCardDetailsProps {
   setup: TradeFinderSetupData
   showChart: boolean
   onToggleChart: () => void
   lastTick: PositionPriceTick | null
-  autoTradeStatus: AutoTradeStatus
 }
 
 export function SetupCardDetails({
@@ -37,7 +32,6 @@ export function SetupCardDetails({
   showChart,
   onToggleChart,
   lastTick,
-  autoTradeStatus,
 }: SetupCardDetailsProps) {
   const isLong = setup.direction === "long"
   const riskDollars = computeDollarAmount(setup.positionSize, setup.riskPips, setup.instrument)
@@ -57,8 +51,8 @@ export function SetupCardDetails({
 
   return (
     <div className="border-border/40 space-y-4 border-t px-4 pb-4 pt-4">
-      {/* Management status indicators (moved from collapsed badges) */}
-      {(setup.breakevenMoved || setup.partialTaken || autoTradeStatus) && (
+      {/* Management status (only show info NOT already visible in collapsed header) */}
+      {(setup.breakevenMoved || setup.partialTaken) && (
         <div className="space-y-1">
           {setup.breakevenMoved && (
             <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
@@ -70,30 +64,6 @@ export function SetupCardDetails({
             <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
               <CheckCircle2 className="size-3.5" />
               <span>Some profit locked in — part of the trade was closed</span>
-            </div>
-          )}
-          {autoTradeStatus?.type === "eligible" && (
-            <div className="flex items-start gap-1.5 text-xs text-teal-600 dark:text-teal-400">
-              <Zap className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                Ready for auto-trade
-                {autoTradeStatus.reason ? ` — ${autoTradeStatus.reason.charAt(0).toLowerCase()}${autoTradeStatus.reason.slice(1)}` : ""}
-              </span>
-            </div>
-          )}
-          {autoTradeStatus?.type === "queued" && (
-            <div className="flex items-start gap-1.5 text-xs text-blue-500">
-              <Clock className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                {autoTradeStatus.position != null ? `#${autoTradeStatus.position} in line — ` : ""}
-                {autoTradeStatus.reason}
-              </span>
-            </div>
-          )}
-          {autoTradeStatus?.type === "blocked" && (
-            <div className="flex items-start gap-1.5 text-xs text-amber-500">
-              <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-              <span>Can&apos;t auto-trade: {autoTradeStatus.reason.charAt(0).toLowerCase()}{autoTradeStatus.reason.slice(1)}</span>
             </div>
           )}
         </div>
