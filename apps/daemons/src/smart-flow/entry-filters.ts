@@ -1,10 +1,4 @@
-import {
-  isAutoTradeSession,
-  isKillZone,
-  getCurrentSession,
-  getPipSize,
-  getCorrelation,
-} from "@fxflow/shared"
+import { isAutoTradeSession } from "@fxflow/shared"
 import { hasImminentHighImpactEvent } from "@fxflow/db"
 import type {
   SmartFlowSettingsData,

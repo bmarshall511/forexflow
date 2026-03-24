@@ -7,7 +7,6 @@ import type { SmartFlowScanMode, SmartFlowOpportunityScores } from "@fxflow/type
 import {
   computeATR,
   computeRSI,
-  computeMACD,
   computeEMA,
   computeBollingerBands,
   computeADX,
@@ -123,7 +122,6 @@ export function analyzeTrendFollowing(
   if (primaryCandles.length < MIN_CANDLES || secondaryCandles.length < MIN_CANDLES) return null
 
   const pv = withVolume(primaryCandles)
-  const sv = withVolume(secondaryCandles)
   const price = primaryCandles[primaryCandles.length - 1]!.close
 
   // Detect trend on MTF (secondary) and HTF
@@ -215,7 +213,7 @@ export function analyzeTrendFollowing(
 export function analyzeMeanReversion(
   instrument: string,
   primaryCandles: ScanCandle[],
-  secondaryCandles: ScanCandle[],
+  _secondaryCandles: ScanCandle[],
   _htfCandles: ScanCandle[],
 ): ScanSignal | null {
   if (primaryCandles.length < MIN_CANDLES) return null
