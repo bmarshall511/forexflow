@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import type { ApiResponse } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 export async function POST(
   request: NextRequest,

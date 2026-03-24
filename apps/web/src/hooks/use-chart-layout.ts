@@ -2,11 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import type { ChartGridLayout, ChartPanelConfig, ChartLayoutData } from "@fxflow/types"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_REST_URL =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100")
-    : ""
+const DAEMON_REST_URL = getClientDaemonUrl()
 
 const LAYOUT_PANEL_COUNTS: Record<ChartGridLayout, number> = {
   single: 1,

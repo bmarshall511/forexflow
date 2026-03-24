@@ -8,11 +8,9 @@ import type {
   TradeFinderCapUtilization,
 } from "@fxflow/types"
 import { useDaemonConnection } from "./use-daemon-connection"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100")
-    : ""
+const DAEMON_URL = getClientDaemonUrl()
 
 export function useTradeFinder() {
   const [setups, setSetups] = useState<TradeFinderSetupData[]>([])

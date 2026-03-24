@@ -4,8 +4,9 @@ import { useState, useCallback } from "react"
 import { toast } from "sonner"
 import type { TradeActionResponse, PlaceOrderRequest, PlaceOrderResponseData } from "@fxflow/types"
 import { playSound } from "@/lib/sounds"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getClientDaemonUrl()
 
 export interface BulkActionResult {
   succeeded: number

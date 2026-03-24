@@ -5,8 +5,9 @@ import path from "node:path"
 import fs from "node:fs"
 import { getTVAlertsConfig, updateTVAlertsConfig } from "@fxflow/db"
 import type { ApiResponse } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 interface DeployResult {
   workerUrl: string

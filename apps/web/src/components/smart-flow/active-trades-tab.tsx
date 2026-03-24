@@ -5,8 +5,9 @@ import type { SmartFlowTradeData } from "@fxflow/types"
 import { toast } from "sonner"
 import { Zap } from "lucide-react"
 import { ActiveTradeCard } from "./active-trade-card"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getClientDaemonUrl()
 
 interface ActiveTradesTabProps {
   trades: SmartFlowTradeData[]

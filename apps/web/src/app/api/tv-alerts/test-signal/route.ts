@@ -9,8 +9,9 @@ import {
 } from "@fxflow/db"
 import { mapTVTickerToOandaInstrument } from "@fxflow/shared"
 import type { ApiResponse, TVAlertSignal } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 interface TestSignalResult {
   cfWorkerResponse: { status: string; instrument?: string; action?: string; reason?: string }

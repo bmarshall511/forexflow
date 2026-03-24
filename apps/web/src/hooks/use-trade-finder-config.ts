@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react"
 import type { TradeFinderConfigData, TradeFinderCircuitBreakerState } from "@fxflow/types"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getClientDaemonUrl()
 
 export function useTradeFinderConfig() {
   const [config, setConfig] = useState<TradeFinderConfigData | null>(null)

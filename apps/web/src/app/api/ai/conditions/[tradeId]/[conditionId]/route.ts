@@ -6,8 +6,9 @@ import type {
   TradeConditionTriggerType,
   TradeConditionActionType,
 } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 async function notifyDaemon(conditionId: string, action: "reload" | "remove") {
   try {

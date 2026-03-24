@@ -62,6 +62,8 @@ if (!gotTheLock) {
 
 /** Port for the embedded web server — avoids conflict with dev server on 3000. */
 const WEB_SERVER_PORT = 3456
+/** Port for the desktop daemon — avoids conflict with dev daemon on 4100. */
+const DAEMON_PORT = 4200
 
 let mainWindow: BrowserWindow | null = null
 let webServerProcess: ChildProcess | null = null
@@ -95,6 +97,11 @@ function startWebServer(env: Record<string, string>): void {
   const publicDir = path.join(serverDir, "public")
   log(`[startup] public/ exists: ${existsSync(publicDir)}`)
 
+  // Pass daemon URLs to the web server so both server-side API routes and
+  // client-side hooks connect to the desktop daemon port (not the dev port).
+  const daemonRestUrl = env.DAEMON_URL ?? `http://localhost:${DAEMON_PORT}`
+  const daemonWsUrl = env.DAEMON_WS_URL ?? `ws://localhost:${DAEMON_PORT}`
+
   webServerProcess = fork(serverEntry, [], {
     cwd: serverDir,
     env: {
@@ -103,6 +110,11 @@ function startWebServer(env: Record<string, string>): void {
       PORT: String(WEB_SERVER_PORT),
       NODE_ENV: "production",
       FXFLOW_ELECTRON: "1",
+      // Server-side API routes use these
+      DAEMON_REST_URL: daemonRestUrl,
+      // Client-side hooks use NEXT_PUBLIC_ variants (runtime override for standalone)
+      NEXT_PUBLIC_DAEMON_REST_URL: daemonRestUrl,
+      NEXT_PUBLIC_DAEMON_URL: daemonWsUrl,
     } as Record<string, string>,
     stdio: ["pipe", "pipe", "pipe", "ipc"],
     silent: true,
@@ -143,8 +155,9 @@ function buildChildEnv(): Record<string, string> {
     }
   } else {
     env.DATABASE_URL = `file:${path.join(dataDir, "fxflow.db")}`
-    env.DAEMON_URL = "http://localhost:4100"
-    env.DAEMON_WS_URL = "ws://localhost:4100"
+    env.DAEMON_PORT = String(DAEMON_PORT)
+    env.DAEMON_URL = `http://localhost:${DAEMON_PORT}`
+    env.DAEMON_WS_URL = `ws://localhost:${DAEMON_PORT}`
   }
 
   return env

@@ -3,8 +3,9 @@ import { listConditionsForTrade, createCondition } from "@fxflow/db"
 import type { ApiResponse, TradeConditionData } from "@fxflow/types"
 import { CreateConditionSchema } from "@fxflow/types"
 import { parseBody, apiSuccess, apiError } from "@/lib/api-validation"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 export async function GET(
   _request: NextRequest,

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { listDigests, createDigest } from "@fxflow/db"
 import type { ApiResponse, AiDigestData } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
 export async function GET(
   request: NextRequest,
@@ -39,7 +40,7 @@ export async function POST(
     })
 
     // Notify daemon to generate the digest
-    const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+    const DAEMON_URL = getServerDaemonUrl()
     try {
       await fetch(`${DAEMON_URL}/actions/ai/generate-digest`, {
         method: "POST",

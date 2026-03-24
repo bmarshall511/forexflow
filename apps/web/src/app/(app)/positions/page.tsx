@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 import { useSearchParams } from "next/navigation"
 import { useUrlState } from "@/hooks/use-url-state"
 import type { TradeDirection } from "@fxflow/types"
@@ -125,12 +126,9 @@ export default function PositionsPage() {
         toast.success(`Cleared ${count} closed trade${count !== 1 ? "s" : ""}`)
         if (rawPositions) setPositions({ ...rawPositions, closed: [] })
         history.refetch()
-        fetch(
-          `${process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"}/actions/refresh-positions`,
-          {
-            method: "POST",
-          },
-        ).catch(() => {})
+        fetch(`${getClientDaemonUrl()}/actions/refresh-positions`, {
+          method: "POST",
+        }).catch(() => {})
       } else {
         toast.error("Failed to clear trade history")
       }

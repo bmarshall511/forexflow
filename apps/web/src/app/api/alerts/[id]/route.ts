@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getPriceAlert, updatePriceAlert, deletePriceAlert } from "@fxflow/db"
 import type { ApiResponse, PriceAlertData } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 import { z } from "zod"
 
 type RouteParams = { params: Promise<{ id: string }> }
@@ -59,7 +60,7 @@ export async function PUT(
 
     // Notify daemon to reload alerts
     try {
-      const daemonUrl = process.env.DAEMON_REST_URL ?? "http://localhost:4100"
+      const daemonUrl = getServerDaemonUrl()
       await fetch(`${daemonUrl}/actions/alerts/reload`, { method: "POST" })
     } catch {
       // Best-effort
@@ -85,7 +86,7 @@ export async function DELETE(
 
     // Notify daemon to reload alerts
     try {
-      const daemonUrl = process.env.DAEMON_REST_URL ?? "http://localhost:4100"
+      const daemonUrl = getServerDaemonUrl()
       await fetch(`${daemonUrl}/actions/alerts/reload`, { method: "POST" })
     } catch {
       // Best-effort

@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server"
 import { getAnalysisHistory, getTradeWithDetails, getAiSettings } from "@fxflow/db"
 import type { ApiResponse, AiAnalysisData, AiClaudeModel, AiAnalysisDepth } from "@fxflow/types"
 import { AI_AUTO_ANALYSIS_DEFAULTS } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 export async function GET(
   _request: NextRequest,

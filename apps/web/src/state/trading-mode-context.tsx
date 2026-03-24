@@ -2,11 +2,9 @@
 
 import { createContext, useCallback, useEffect, useState, type ReactNode } from "react"
 import type { TradingMode, SettingsResponse } from "@fxflow/types"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_REST_URL =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100")
-    : ""
+const DAEMON_REST_URL = getClientDaemonUrl()
 
 export interface TradingModeContextValue {
   /** Current trading mode */

@@ -12,8 +12,9 @@ import { useTVAlertsConfig } from "@/hooks/use-tv-alerts-config"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { Settings2, Zap, BarChart3, Radio } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getClientDaemonUrl()
 
 type Tab = "overview" | "signals"
 

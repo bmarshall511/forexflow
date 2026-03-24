@@ -59,9 +59,12 @@ function resolveDaemonUrls(): { wsUrl: string; restUrl: string } {
   const isLocal = host === "localhost" || host === "127.0.0.1"
 
   if (isLocal) {
+    // Desktop app runs web server on port 3456, daemon on port 4200
+    const isDesktopApp = window.location.port === "3456"
+    const daemonPort = isDesktopApp ? "4200" : "4100"
     return {
-      wsUrl: process.env.NEXT_PUBLIC_DAEMON_URL ?? "ws://localhost:4100",
-      restUrl: process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100",
+      wsUrl: process.env.NEXT_PUBLIC_DAEMON_URL ?? `ws://localhost:${daemonPort}`,
+      restUrl: process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? `http://localhost:${daemonPort}`,
     }
   }
 

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { db } from "@fxflow/db"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 export async function GET() {
   // Fetch daemon health and DB storage stats in parallel

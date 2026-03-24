@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 import type {
   AiAnalysisData,
   AiAnalysisSections,
@@ -707,7 +708,7 @@ export function AiAnalysesTab({ onStatsChanged }: { onStatsChanged?: () => void 
   const handleClearAll = async () => {
     setIsClearing(true)
     try {
-      const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+      const DAEMON_URL = getClientDaemonUrl()
       await fetch(`${DAEMON_URL}/actions/ai/cancel-all-running`, { method: "POST" }).catch(() => {})
       const res = await fetch("/api/ai/analyses/clear", { method: "DELETE" })
       const json = (await res.json()) as { ok: boolean; data?: { count: number } }

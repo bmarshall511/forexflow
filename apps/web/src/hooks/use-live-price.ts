@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useDaemonConnection } from "./use-daemon-connection"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getClientDaemonUrl()
 const POLL_INTERVAL = 5_000 // 5 seconds
 
 interface LivePriceResult {

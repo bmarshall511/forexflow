@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 
 /**
  * Proxy route for daemon REST API calls from remote clients.
@@ -9,7 +10,7 @@ import { NextResponse, type NextRequest } from "next/server"
  * Example: GET /api/daemon/status → GET http://localhost:4100/status
  */
 
-const DAEMON_URL = process.env.DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getServerDaemonUrl()
 
 export async function GET(
   _request: NextRequest,

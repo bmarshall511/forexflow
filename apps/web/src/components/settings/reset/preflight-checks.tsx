@@ -13,8 +13,9 @@ import { useTradeFinderConfig } from "@/hooks/use-trade-finder-config"
 import { useAiTraderConfig } from "@/hooks/use-ai-trader-config"
 import { usePositions } from "@/hooks/use-positions"
 import { CloseAllConfirmation } from "./close-all-confirmation"
+import { getClientDaemonUrl } from "@/lib/daemon-url"
 
-const DAEMON_URL = process.env.NEXT_PUBLIC_DAEMON_REST_URL ?? "http://localhost:4100"
+const DAEMON_URL = getClientDaemonUrl()
 
 interface PreflightChecksProps {
   preflight: PreflightStatus

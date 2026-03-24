@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { listPriceAlerts, createPriceAlert, cancelAllAlerts } from "@fxflow/db"
 import type { ApiResponse, PriceAlertData } from "@fxflow/types"
+import { getServerDaemonUrl } from "@/lib/daemon-url"
 import { z } from "zod"
 
 const createAlertSchema = z.object({
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<P
 
     // Notify daemon to pick up the new alert
     try {
-      const daemonUrl = process.env.DAEMON_REST_URL ?? "http://localhost:4100"
+      const daemonUrl = getServerDaemonUrl()
       await fetch(`${daemonUrl}/actions/alerts/reload`, { method: "POST" })
     } catch {
       // Daemon might not be running — alert is persisted, will be picked up on next reload
@@ -69,7 +70,7 @@ export async function DELETE(): Promise<NextResponse<ApiResponse<{ cancelled: nu
 
     // Notify daemon to reload
     try {
-      const daemonUrl = process.env.DAEMON_REST_URL ?? "http://localhost:4100"
+      const daemonUrl = getServerDaemonUrl()
       await fetch(`${daemonUrl}/actions/alerts/reload`, { method: "POST" })
     } catch {
       // Best-effort
