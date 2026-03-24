@@ -206,7 +206,7 @@ export default function PositionsPage() {
             onClick={() => setTab("history")}
             icon={<TrendingUp className="size-3.5" />}
             label="Closed"
-            count={summary.closedTodayCount}
+            count={history.totalCount}
           />
         </TabNav>
 

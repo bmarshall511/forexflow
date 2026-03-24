@@ -27,6 +27,7 @@ export function HeaderPositions() {
             "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
           )}
           aria-label={`Positions: ${summary.pendingCount} pending, ${summary.openCount} open, ${summary.closedTodayCount} closed today`}
+          title={`${summary.pendingCount} pending · ${summary.openCount} open · ${summary.closedTodayCount} closed today`}
         >
           {/* Pending */}
           <Clock className="text-status-warning size-3" aria-hidden="true" />
@@ -52,14 +53,12 @@ export function HeaderPositions() {
             &middot;
           </span>
 
-          {/* Closed */}
+          {/* Closed today */}
           <CheckCircle2 className="text-muted-foreground size-3" aria-hidden="true" />
           <span className="text-foreground font-mono text-xs font-semibold tabular-nums">
             {summary.closedTodayCount}
           </span>
-          <span className="@5xl/header:inline text-muted-foreground hidden text-[11px]">
-            Closed
-          </span>
+          <span className="@5xl/header:inline text-muted-foreground hidden text-[11px]">Today</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0">
