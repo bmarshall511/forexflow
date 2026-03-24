@@ -32,6 +32,8 @@ export interface NavItem {
   badgeKey?: string
   /** Key for dynamic status text below the label (from useSidebarStatus) */
   statusKey?: string
+  /** PlacementSource key — used to sort automation items by source priority order */
+  priorityKey?: string
 }
 
 export interface NavGroup {
@@ -59,8 +61,15 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Search,
         badgeKey: "tradeFinder",
         statusKey: "tradeFinder",
+        priorityKey: "trade_finder",
       },
-      { label: "TradingView Alerts", href: "/tv-alerts", icon: Radio, badgeKey: "tvAlerts" },
+      {
+        label: "TradingView Alerts",
+        href: "/tv-alerts",
+        icon: Radio,
+        badgeKey: "tvAlerts",
+        priorityKey: "tv_alerts",
+      },
       { label: "AI Analysis", href: "/ai-analysis", icon: Sparkles, badgeKey: "aiAnalysis" },
       {
         label: "EdgeFinder",
@@ -68,8 +77,15 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Bot,
         badgeKey: "aiTrader",
         statusKey: "aiTrader",
+        priorityKey: "ai_trader",
       },
-      { label: "SmartFlow", href: "/smart-flow", icon: Zap, statusKey: "smartFlow" },
+      {
+        label: "SmartFlow",
+        href: "/smart-flow",
+        icon: Zap,
+        statusKey: "smartFlow",
+        priorityKey: "smart_flow",
+      },
       { label: "Alerts", href: "/alerts", icon: Bell },
     ],
   },
