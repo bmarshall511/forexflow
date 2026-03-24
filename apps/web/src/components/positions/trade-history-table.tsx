@@ -3,37 +3,14 @@
 import { useState, useMemo } from "react"
 import type { ClosedTradeData, AiAnalysisData } from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
-import { formatCurrency, formatPips } from "@fxflow/shared"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
+import { Table, TableHeader, TableHead, TableBody, TableRow } from "@/components/ui/table"
 import { useIsMobile } from "@/hooks/use-is-mobile"
-import { DirectionBadge } from "./direction-badge"
-import { SourceBadge } from "./source-badge"
-import { TimeframeSelect } from "./timeframe-select"
-import { TagBadges } from "./tag-badges"
-import { OutcomeBadge } from "./outcome-badge"
-import { RiskRewardDisplay } from "./risk-reward-display"
-import { DurationDisplay } from "./duration-display"
 import { TradeCardMobile } from "./trade-card-mobile"
+import { TradeHistoryRow } from "./trade-history-row"
 import { TradeDetailDrawer } from "./trade-detail-drawer"
 import { AiAnalysisSheet } from "@/components/ai/ai-analysis-sheet"
 import { Button } from "@/components/ui/button"
 import { SortableHead, nextSort, compareValues, type SortState } from "./sortable-head"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { AiAnalysisCell } from "./ai-analysis-cell"
-import { MoreHorizontal, Eye, Sparkles } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useBulkSelection } from "@/hooks/use-bulk-selection"
 import { BulkActionBar } from "./bulk-action-bar"
@@ -326,163 +303,27 @@ export function TradeHistoryTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((trade) => {
-              const plColor =
-                trade.realizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
-
-              return (
-                <TableRow
-                  key={trade.id}
-                  className="cursor-pointer select-none"
-                  onMouseDown={(e) => {
-                    if (e.button === 0) setDrawerTrade(trade)
-                  }}
-                >
-                  <TableCell
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Checkbox
-                      checked={bulk.isSelected(trade.id)}
-                      onCheckedChange={() => bulk.toggle(trade.id)}
-                      aria-label={`Select ${trade.instrument.replace("_", "/")} trade`}
-                    />
-                  </TableCell>
-                  <TableCell className="text-xs font-medium">
-                    {trade.instrument.replace("_", "/")}
-                  </TableCell>
-                  <TableCell>
-                    <DirectionBadge direction={trade.direction} />
-                  </TableCell>
-                  <TableCell>
-                    <SourceBadge source={trade.source} />
-                  </TableCell>
-                  <TableCell
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <TimeframeSelect
-                      value={trade.timeframe}
-                      onChange={async (tf) => {
-                        await fetch(`/api/trades/${trade.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ timeframe: tf }),
-                        })
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {trade.entryPrice}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {trade.exitPrice ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
-                    {trade.stopLoss ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
-                    {trade.takeProfit ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {trade.units}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right font-mono text-xs font-semibold tabular-nums",
-                      plColor,
-                    )}
-                  >
-                    {formatCurrency(trade.realizedPL, currency)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <RiskRewardDisplay
-                      direction={trade.direction}
-                      entryPrice={trade.entryPrice}
-                      stopLoss={trade.stopLoss}
-                      takeProfit={trade.takeProfit}
-                      instrument={trade.instrument}
-                      compact
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <OutcomeBadge
-                      outcome={trade.outcome}
-                      closeReason={trade.closeReason}
-                      closeContext={trade.closeContext}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {trade.mfe !== null ? (
-                      <span className="text-status-connected">{formatPips(trade.mfe)}</span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {trade.mae !== null ? (
-                      <span className="text-status-disconnected">
-                        {formatPips(Math.abs(trade.mae))}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    <DurationDisplay
-                      openedAt={trade.openedAt}
-                      closedAt={trade.closedAt}
-                      className="font-mono tabular-nums"
-                    />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {new Date(trade.closedAt).toLocaleString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <TagBadges tags={trade.tags} />
-                  </TableCell>
-                  <TableCell
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <AiAnalysisCell
-                      latestAnalysis={latestAnalysisByTradeId?.[trade.id]}
-                      analysisCount={countByTradeId?.[trade.id]}
-                      activeProgress={activeAiByTradeId?.[trade.id]}
-                      onClick={() => setAiAnalysisTrade(trade)}
-                    />
-                  </TableCell>
-                  <TableCell
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="size-7 p-0">
-                          <MoreHorizontal className="size-4" />
-                          <span className="sr-only">Actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setDrawerTrade(trade)}>
-                          <Eye className="size-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAiAnalysisTrade(trade)}>
-                          <Sparkles className="size-4" />
-                          AI Analysis
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
+            {sorted.map((trade) => (
+              <TradeHistoryRow
+                key={trade.id}
+                trade={trade}
+                currency={currency}
+                isSelected={bulk.isSelected(trade.id)}
+                latestAnalysis={latestAnalysisByTradeId?.[trade.id]}
+                analysisCount={countByTradeId?.[trade.id]}
+                activeProgress={activeAiByTradeId?.[trade.id]}
+                onToggleSelect={() => bulk.toggle(trade.id)}
+                onViewDetails={() => setDrawerTrade(trade)}
+                onAiAnalysis={() => setAiAnalysisTrade(trade)}
+                onTimeframeChange={async (tf) => {
+                  await fetch(`/api/trades/${trade.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ timeframe: tf }),
+                  })
+                }}
+              />
+            ))}
           </TableBody>
         </Table>
         {totalPages > 1 && (

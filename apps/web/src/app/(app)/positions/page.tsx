@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { Suspense, useState, useMemo } from "react"
 import { getClientDaemonUrl } from "@/lib/daemon-url"
 import { useSearchParams } from "next/navigation"
 import { useUrlState } from "@/hooks/use-url-state"
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Trash2, Clock, TrendingUp, CircleDot, Crosshair } from "lucide-react"
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { toast } from "sonner"
 import { OverviewCards } from "@/components/positions/overview-cards"
 import { TradeCardList } from "@/components/positions/trade-card-list"
@@ -144,197 +145,201 @@ export default function PositionsPage() {
 
   return (
     <PageErrorBoundary>
-      <div className="min-h-screen">
-        {/* ─── Hero Header ─── */}
-        <PageHeader
-          title="My Trades"
-          subtitle="Track your orders, see how open trades are doing, and review past results"
-          icon={Crosshair}
-          bordered
-          className={isPositivePL ? "bg-green-500/[0.02]" : isNegativePL ? "bg-red-500/[0.02]" : ""}
-          actions={
-            summary.openCount > 0 ? (
-              <div className="text-right">
-                <div
-                  className={cn(
-                    "font-mono text-3xl font-bold tabular-nums tracking-tight",
-                    isPositivePL
-                      ? "text-green-500"
-                      : isNegativePL
-                        ? "text-red-500"
-                        : "text-muted-foreground",
-                  )}
-                >
-                  {isPositivePL ? "+" : ""}
-                  {formatCurrency(totalUnrealizedPL, currency)}
+      <Suspense fallback={<PageSkeleton />}>
+        <div className="min-h-screen">
+          {/* ─── Hero Header ─── */}
+          <PageHeader
+            title="My Trades"
+            subtitle="Track your orders, see how open trades are doing, and review past results"
+            icon={Crosshair}
+            bordered
+            className={
+              isPositivePL ? "bg-green-500/[0.02]" : isNegativePL ? "bg-red-500/[0.02]" : ""
+            }
+            actions={
+              summary.openCount > 0 ? (
+                <div className="text-right">
+                  <div
+                    className={cn(
+                      "font-mono text-3xl font-bold tabular-nums tracking-tight",
+                      isPositivePL
+                        ? "text-green-500"
+                        : isNegativePL
+                          ? "text-red-500"
+                          : "text-muted-foreground",
+                    )}
+                  >
+                    {isPositivePL ? "+" : ""}
+                    {formatCurrency(totalUnrealizedPL, currency)}
+                  </div>
+                  <div className="text-muted-foreground mt-0.5 text-xs">
+                    open P/L across {summary.openCount} trade{summary.openCount !== 1 ? "s" : ""}
+                  </div>
                 </div>
-                <div className="text-muted-foreground mt-0.5 text-xs">
-                  open P/L across {summary.openCount} trade{summary.openCount !== 1 ? "s" : ""}
-                </div>
+              ) : undefined
+            }
+          >
+            <OverviewCards
+              positions={positions}
+              openWithPrices={openWithPrices}
+              currency={currency}
+            />
+          </PageHeader>
+
+          {/* ─── Tab Navigation ─── */}
+          <TabNav label="Trade sections">
+            <TabNavButton
+              active={tab === "pending"}
+              onClick={() => setTab("pending")}
+              icon={<Clock className="size-3.5" />}
+              label="Waiting"
+              count={summary.pendingCount}
+            />
+            <TabNavButton
+              active={tab === "open"}
+              onClick={() => setTab("open")}
+              icon={<CircleDot className="size-3.5" />}
+              label="Live"
+              count={summary.openCount}
+              pulse={summary.openCount > 0}
+            />
+            <TabNavButton
+              active={tab === "history"}
+              onClick={() => setTab("history")}
+              icon={<TrendingUp className="size-3.5" />}
+              label="Closed"
+              count={history.totalCount}
+            />
+          </TabNav>
+
+          {/* ─── Tab Content ─── */}
+          <div className="space-y-4 px-4 py-6 md:px-6">
+            {/* Filter bar */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="min-w-0 flex-1">
+                {tab === "pending" && (
+                  <PositionsFilterBar
+                    tab="pending"
+                    instruments={instruments}
+                    instrumentFilter={pendingInstrument}
+                    directionFilter={pendingDirection}
+                    onInstrumentChange={setPendingInstrument}
+                    onDirectionChange={setPendingDirection}
+                    tags={tags}
+                    tagIds={pendingTagIds}
+                    onTagIdsChange={setPendingTagIds}
+                  />
+                )}
+                {tab === "open" && (
+                  <PositionsFilterBar
+                    tab="open"
+                    instruments={instruments}
+                    instrumentFilter={openInstrument}
+                    directionFilter={openDirection}
+                    onInstrumentChange={setOpenInstrument}
+                    onDirectionChange={setOpenDirection}
+                    tags={tags}
+                    tagIds={openTagIds}
+                    onTagIdsChange={setOpenTagIds}
+                  />
+                )}
+                {tab === "history" && (
+                  <PositionsFilterBar
+                    tab="history"
+                    instruments={instruments}
+                    filters={history.filters}
+                    onFiltersChange={history.setFilters}
+                    tags={tags}
+                  />
+                )}
               </div>
-            ) : undefined
-          }
-        >
-          <OverviewCards
-            positions={positions}
-            openWithPrices={openWithPrices}
-            currency={currency}
-          />
-        </PageHeader>
-
-        {/* ─── Tab Navigation ─── */}
-        <TabNav label="Trade sections">
-          <TabNavButton
-            active={tab === "pending"}
-            onClick={() => setTab("pending")}
-            icon={<Clock className="size-3.5" />}
-            label="Waiting"
-            count={summary.pendingCount}
-          />
-          <TabNavButton
-            active={tab === "open"}
-            onClick={() => setTab("open")}
-            icon={<CircleDot className="size-3.5" />}
-            label="Live"
-            count={summary.openCount}
-            pulse={summary.openCount > 0}
-          />
-          <TabNavButton
-            active={tab === "history"}
-            onClick={() => setTab("history")}
-            icon={<TrendingUp className="size-3.5" />}
-            label="Closed"
-            count={history.totalCount}
-          />
-        </TabNav>
-
-        {/* ─── Tab Content ─── */}
-        <div className="space-y-4 px-4 py-6 md:px-6">
-          {/* Filter bar */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-0 flex-1">
-              {tab === "pending" && (
-                <PositionsFilterBar
-                  tab="pending"
-                  instruments={instruments}
-                  instrumentFilter={pendingInstrument}
-                  directionFilter={pendingDirection}
-                  onInstrumentChange={setPendingInstrument}
-                  onDirectionChange={setPendingDirection}
-                  tags={tags}
-                  tagIds={pendingTagIds}
-                  onTagIdsChange={setPendingTagIds}
-                />
-              )}
-              {tab === "open" && (
-                <PositionsFilterBar
-                  tab="open"
-                  instruments={instruments}
-                  instrumentFilter={openInstrument}
-                  directionFilter={openDirection}
-                  onInstrumentChange={setOpenInstrument}
-                  onDirectionChange={setOpenDirection}
-                  tags={tags}
-                  tagIds={openTagIds}
-                  onTagIdsChange={setOpenTagIds}
-                />
-              )}
-              {tab === "history" && (
-                <PositionsFilterBar
-                  tab="history"
-                  instruments={instruments}
-                  filters={history.filters}
-                  onFiltersChange={history.setFilters}
-                  tags={tags}
-                />
+              {tab === "history" && history.totalCount > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive shrink-0 gap-1.5"
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span className="hidden sm:inline">Clear History</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Clear trade history?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete all closed trades from the database. This
+                        action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleClearHistory}
+                        disabled={clearingHistory}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {clearingHistory ? "Clearing..." : "Clear All"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
-            {tab === "history" && history.totalCount > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:text-destructive shrink-0 gap-1.5"
-                  >
-                    <Trash2 className="size-3.5" />
-                    <span className="hidden sm:inline">Clear History</span>
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Clear trade history?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete all closed trades from the database. This action
-                      cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleClearHistory}
-                      disabled={clearingHistory}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {clearingHistory ? "Clearing..." : "Clear All"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+
+            {/* Trade lists */}
+            {tab === "pending" && (
+              <TradeCardList
+                variant="pending"
+                trades={filteredPending}
+                pricesByInstrument={pricesByInstrument}
+                tagsByTradeId={tagsByTradeId}
+                instrumentFilter={pendingInstrument}
+                directionFilter={pendingDirection}
+                currency={currency}
+                latestAnalysisByTradeId={liveAnalyses}
+                countByTradeId={liveCounts}
+                activeAiByTradeId={activeAiByTradeId}
+                triggerAiFor={triggerPendingAiTrade}
+                onTagMutated={refetchTags}
+              />
+            )}
+            {tab === "open" && (
+              <TradeCardList
+                variant="open"
+                trades={filteredOpen}
+                pricesByInstrument={pricesByInstrument}
+                tagsByTradeId={tagsByTradeId}
+                currency={currency}
+                instrumentFilter={openInstrument}
+                directionFilter={openDirection}
+                latestAnalysisByTradeId={liveAnalyses}
+                countByTradeId={liveCounts}
+                activeAiByTradeId={activeAiByTradeId}
+                triggerAiFor={triggerOpenAiTrade}
+                onTagMutated={refetchTags}
+              />
+            )}
+            {tab === "history" && (
+              <TradeCardList
+                variant="closed"
+                trades={history.trades}
+                currency={currency}
+                isLoading={history.isLoading}
+                totalCount={history.totalCount}
+                page={history.page}
+                pageSize={history.pageSize}
+                onPageChange={history.setPage}
+                latestAnalysisByTradeId={historyAnalyses}
+                countByTradeId={historyCounts}
+                activeAiByTradeId={activeAiByTradeId}
+                onTagMutated={history.refetch}
+              />
             )}
           </div>
-
-          {/* Trade lists */}
-          {tab === "pending" && (
-            <TradeCardList
-              variant="pending"
-              trades={filteredPending}
-              pricesByInstrument={pricesByInstrument}
-              tagsByTradeId={tagsByTradeId}
-              instrumentFilter={pendingInstrument}
-              directionFilter={pendingDirection}
-              currency={currency}
-              latestAnalysisByTradeId={liveAnalyses}
-              countByTradeId={liveCounts}
-              activeAiByTradeId={activeAiByTradeId}
-              triggerAiFor={triggerPendingAiTrade}
-              onTagMutated={refetchTags}
-            />
-          )}
-          {tab === "open" && (
-            <TradeCardList
-              variant="open"
-              trades={filteredOpen}
-              pricesByInstrument={pricesByInstrument}
-              tagsByTradeId={tagsByTradeId}
-              currency={currency}
-              instrumentFilter={openInstrument}
-              directionFilter={openDirection}
-              latestAnalysisByTradeId={liveAnalyses}
-              countByTradeId={liveCounts}
-              activeAiByTradeId={activeAiByTradeId}
-              triggerAiFor={triggerOpenAiTrade}
-              onTagMutated={refetchTags}
-            />
-          )}
-          {tab === "history" && (
-            <TradeCardList
-              variant="closed"
-              trades={history.trades}
-              currency={currency}
-              isLoading={history.isLoading}
-              totalCount={history.totalCount}
-              page={history.page}
-              pageSize={history.pageSize}
-              onPageChange={history.setPage}
-              latestAnalysisByTradeId={historyAnalyses}
-              countByTradeId={historyCounts}
-              activeAiByTradeId={activeAiByTradeId}
-              onTagMutated={history.refetch}
-            />
-          )}
         </div>
-      </div>
+      </Suspense>
     </PageErrorBoundary>
   )
 }

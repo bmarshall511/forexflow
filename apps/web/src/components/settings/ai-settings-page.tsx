@@ -27,6 +27,7 @@ import {
 // ─── Key Field ────────────────────────────────────────────────────────────────
 
 function ApiKeyField({
+  id,
   label,
   description,
   hasKey,
@@ -34,6 +35,7 @@ function ApiKeyField({
   onSave,
   onRemove,
 }: {
+  id: string
   label: string
   description: string
   hasKey: boolean
@@ -75,7 +77,9 @@ function ApiKeyField({
 
   return (
     <div className="space-y-2">
-      <Label className="text-sm">{label}</Label>
+      <Label htmlFor={id} className="text-sm">
+        {label}
+      </Label>
       <p className="text-muted-foreground text-xs">{description}</p>
 
       {hasKey ? (
@@ -118,6 +122,7 @@ function ApiKeyField({
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Input
+              id={id}
               type={showValue ? "text" : "password"}
               placeholder="Paste API key…"
               value={value}
@@ -304,6 +309,7 @@ export function AiSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <ApiKeyField
+            id="claude-api-key"
             label="Claude API Key"
             description="Required for AI analysis. Get your key at console.anthropic.com."
             hasKey={settings.hasClaudeKey}
@@ -315,6 +321,7 @@ export function AiSettingsPage() {
           <Separator />
 
           <ApiKeyField
+            id="finnhub-api-key"
             label="FinnHub API Key (optional)"
             description="Provides economic calendar and forex news context. Free tier available at finnhub.io."
             hasKey={settings.hasFinnhubKey}
@@ -335,8 +342,11 @@ export function AiSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-xs">Default Model</Label>
+            <Label htmlFor="default-model" className="text-xs">
+              Default Model
+            </Label>
             <select
+              id="default-model"
               value={autoAnalysis.defaultModel}
               onChange={(e) => void updatePref({ defaultModel: e.target.value as AiClaudeModel })}
               disabled={saving}
@@ -350,8 +360,11 @@ export function AiSettingsPage() {
             </select>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Default Depth</Label>
+            <Label htmlFor="default-depth" className="text-xs">
+              Default Depth
+            </Label>
             <select
+              id="default-depth"
               value={autoAnalysis.defaultDepth}
               onChange={(e) => void updatePref({ defaultDepth: e.target.value as AiAnalysisDepth })}
               disabled={saving}
@@ -463,11 +476,13 @@ export function AiSettingsPage() {
                   {autoAnalysis.intervalEnabled && (
                     <div className="flex items-center gap-2 pl-1">
                       <Input
+                        id="interval-hours"
                         type="number"
                         min="1"
                         max="24"
                         step="1"
                         className="h-8 w-24 text-xs"
+                        aria-label="Hours between analyses"
                         value={autoAnalysis.intervalHours}
                         onChange={(e) =>
                           void updatePref({ intervalHours: parseInt(e.target.value) || 4 })
@@ -508,8 +523,11 @@ export function AiSettingsPage() {
               <>
                 <Separator />
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Minimum Confidence for Conditions</Label>
+                  <Label htmlFor="min-condition-confidence" className="text-xs">
+                    Minimum Confidence for Conditions
+                  </Label>
                   <select
+                    id="min-condition-confidence"
                     value={autoAnalysis.autoApplyMinConditionConfidence ?? "medium"}
                     onChange={(e) =>
                       void updatePref({
@@ -529,8 +547,11 @@ export function AiSettingsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Minimum Confidence for Stop-Loss Conditions</Label>
+                  <Label htmlFor="min-sl-condition-confidence" className="text-xs">
+                    Minimum Confidence for Stop-Loss Conditions
+                  </Label>
                   <select
+                    id="min-sl-condition-confidence"
                     value={autoAnalysis.autoApplyMinSLConditionConfidence ?? "high"}
                     onChange={(e) =>
                       void updatePref({
@@ -602,11 +623,14 @@ export function AiSettingsPage() {
               <>
                 <Separator />
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Minimum Confidence for Actions</Label>
+                  <Label htmlFor="min-action-confidence" className="text-xs">
+                    Minimum Confidence for Actions
+                  </Label>
                   <p className="text-muted-foreground text-[11px]">
                     Only auto-apply actions at or above this confidence level
                   </p>
                   <select
+                    id="min-action-confidence"
                     value={autoAnalysis.autoApplyMinConfidence ?? "high"}
                     onChange={(e) =>
                       void updatePref({
@@ -680,8 +704,11 @@ export function AiSettingsPage() {
             <>
               <Separator />
               <div className="space-y-1.5">
-                <Label className="text-xs">Frequency</Label>
+                <Label htmlFor="digest-frequency" className="text-xs">
+                  Frequency
+                </Label>
                 <select
+                  id="digest-frequency"
                   value={autoAnalysis.digestFrequency ?? "weekly"}
                   onChange={(e) =>
                     void updatePref({

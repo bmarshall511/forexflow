@@ -9,35 +9,15 @@ import type {
   AiAnalysisData,
 } from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
-import { formatRelativeTime, formatCurrency } from "@fxflow/shared"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
+import { Table, TableHeader, TableHead, TableBody, TableRow } from "@/components/ui/table"
 import { useIsMobile } from "@/hooks/use-is-mobile"
-import { AnimatedNumber } from "@/components/ui/animated-number"
-import { DirectionBadge } from "./direction-badge"
-import { SourceBadge } from "./source-badge"
-import { TimeframeSelect } from "./timeframe-select"
-import { TagBadges } from "./tag-badges"
-import { RiskRewardDisplay } from "./risk-reward-display"
-import { PendingProgressBar } from "./progress-bar-pending"
 import { TradeCardMobile } from "./trade-card-mobile"
+import { PendingOrderRow } from "./pending-order-row"
 import { SortableHead, nextSort, compareValues, type SortState } from "./sortable-head"
 import { TradeDetailDrawer } from "./trade-detail-drawer"
 import { CancelOrderDialog } from "./cancel-order-dialog"
 import { useTradeActions } from "@/hooks/use-trade-actions"
 import { AiAnalysisSheet } from "@/components/ai/ai-analysis-sheet"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -50,8 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { AiAnalysisCell } from "./ai-analysis-cell"
-import { MoreHorizontal, Eye, XCircle, Sparkles, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useBulkSelection } from "@/hooks/use-bulk-selection"
 import { BulkActionBar } from "./bulk-action-bar"
@@ -471,169 +450,31 @@ export function PendingOrdersTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.map((order) => {
-            const currentPrice = getCurrentPrice(order)
-            const { gain, loss } = getGainLoss(order)
-
-            return (
-              <TableRow
-                key={order.id}
-                className="cursor-pointer select-none"
-                onMouseDown={(e) => {
-                  if (e.button === 0) setDrawerOrder(order)
-                }}
-              >
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Checkbox
-                    checked={bulk.isSelected(order.id)}
-                    onCheckedChange={() => bulk.toggle(order.id)}
-                    aria-label={`Select ${order.instrument.replace("_", "/")} order`}
-                  />
-                </TableCell>
-                <TableCell className="text-xs font-medium">
-                  {order.instrument.replace("_", "/")}
-                </TableCell>
-                <TableCell>
-                  <DirectionBadge direction={order.direction} />
-                </TableCell>
-                <TableCell>
-                  <SourceBadge source={order.source} />
-                </TableCell>
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <TimeframeSelect
-                    value={order.timeframe}
-                    onChange={async (tf) => {
-                      await fetch(`/api/trades/${order.id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ timeframe: tf }),
-                      })
-                      await refreshPositions()
-                    }}
-                  />
-                </TableCell>
-                <TableCell className="text-muted-foreground text-xs">{order.orderType}</TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {order.entryPrice}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {currentPrice !== null ? (
-                    <AnimatedNumber value={currentPrice.toString()} />
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="min-w-[120px]">
-                  <PendingProgressBar
-                    instrument={order.instrument}
-                    entryPrice={order.entryPrice}
-                    currentPrice={currentPrice}
-                    stopLoss={order.stopLoss}
-                    direction={order.direction}
-                  />
-                </TableCell>
-                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
-                  {order.stopLoss ?? "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
-                  {order.takeProfit ?? "—"}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {order.units}
-                </TableCell>
-                <TableCell className="text-right">
-                  <RiskRewardDisplay
-                    direction={order.direction}
-                    entryPrice={order.entryPrice}
-                    stopLoss={order.stopLoss}
-                    takeProfit={order.takeProfit}
-                    instrument={order.instrument}
-                    compact
-                  />
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {gain !== null ? (
-                    <span className="text-status-connected">+{formatCurrency(gain, currency)}</span>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {loss !== null ? (
-                    <span className="text-status-disconnected">
-                      {formatCurrency(loss, currency)}
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-xs">
-                  {formatRelativeTime(order.createdAt)}
-                </TableCell>
-                <TableCell className="text-xs">
-                  {order.timeInForce === "GTD" && order.gtdTime ? (
-                    <span className="text-muted-foreground">
-                      {new Date(order.gtdTime).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">Never</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <TagBadges tags={tagsByTradeId[order.id] ?? order.tags} />
-                </TableCell>
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <AiAnalysisCell
-                    latestAnalysis={latestAnalysisByTradeId?.[order.id]}
-                    analysisCount={countByTradeId?.[order.id]}
-                    activeProgress={activeAiByTradeId?.[order.id]}
-                    onClick={() => setAiAnalysisOrder(order)}
-                  />
-                </TableCell>
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="size-7 p-0">
-                        <MoreHorizontal className="size-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setDrawerOrder(order)}>
-                        <Eye className="size-4" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setAiAnalysisOrder(order)}>
-                        <Sparkles className="size-4" />
-                        AI Analysis
-                      </DropdownMenuItem>
-                      <DropdownMenuItem variant="destructive" onClick={() => setCancelOrder(order)}>
-                        <XCircle className="size-4" />
-                        Cancel Order
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            )
-          })}
+          {filtered.map((order) => (
+            <PendingOrderRow
+              key={order.id}
+              order={order}
+              currentPrice={getCurrentPrice(order)}
+              tags={tagsByTradeId[order.id] ?? order.tags}
+              currency={currency}
+              isSelected={bulk.isSelected(order.id)}
+              latestAnalysis={latestAnalysisByTradeId?.[order.id]}
+              analysisCount={countByTradeId?.[order.id]}
+              activeProgress={activeAiByTradeId?.[order.id]}
+              onToggleSelect={() => bulk.toggle(order.id)}
+              onViewDetails={() => setDrawerOrder(order)}
+              onCancelOrder={() => setCancelOrder(order)}
+              onAiAnalysis={() => setAiAnalysisOrder(order)}
+              onTimeframeChange={async (tf) => {
+                await fetch(`/api/trades/${order.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ timeframe: tf }),
+                })
+                await refreshPositions()
+              }}
+            />
+          ))}
         </TableBody>
       </Table>
 

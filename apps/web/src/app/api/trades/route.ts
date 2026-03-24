@@ -1,39 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { listTrades, deleteClosedTrades, type TradeListResponse } from "@fxflow/db"
-import type { ApiResponse, TradeDirection, TradeOutcome, TradeStatus } from "@fxflow/types"
+import type { ApiResponse } from "@fxflow/types"
+import { parseSearchParams } from "@/lib/api-validation"
+import { tradeListParamsSchema } from "@/lib/api-schemas"
 
 export async function GET(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse<TradeListResponse>>> {
   try {
-    const { searchParams } = request.nextUrl
+    const parsed = parseSearchParams(request.nextUrl.searchParams, tradeListParamsSchema)
+    if (!parsed.success) return parsed.response
 
-    const status = searchParams.get("status") as TradeStatus | null
-    const instrument = searchParams.get("instrument")
-    const direction = searchParams.get("direction") as TradeDirection | null
-    const outcome = searchParams.get("outcome") as TradeOutcome | null
-    const from = searchParams.get("from")
-    const to = searchParams.get("to")
-    const tags = searchParams.get("tags")
-    const sort = searchParams.get("sort")
-    const order = searchParams.get("order") as "asc" | "desc" | null
-    const page = searchParams.get("page")
-    const limit = searchParams.get("limit")
-
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 20
+    const { status, instrument, direction, outcome, from, to, tags, sort, order } = parsed.data
+    const pageNum = parsed.data.page ?? 1
+    const limitNum = parsed.data.limit ?? 20
     const offset = (pageNum - 1) * limitNum
 
     const result = await listTrades({
-      status: status ?? undefined,
-      instrument: instrument ?? undefined,
-      direction: direction ?? undefined,
-      outcome: outcome ?? undefined,
+      status,
+      instrument,
+      direction,
+      outcome,
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
       tagIds: tags ? tags.split(",").filter(Boolean) : undefined,
-      sort: sort ?? undefined,
-      order: order ?? undefined,
+      sort,
+      order,
       limit: limitNum,
       offset,
     })

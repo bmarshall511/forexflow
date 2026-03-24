@@ -9,38 +9,16 @@ import type {
   AiAnalysisData,
 } from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
-import { formatCurrency, formatPips } from "@fxflow/shared"
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
+import { Table, TableHeader, TableHead, TableBody, TableRow } from "@/components/ui/table"
 import { useIsMobile } from "@/hooks/use-is-mobile"
-import { AnimatedNumber } from "@/components/ui/animated-number"
-import { DirectionBadge } from "./direction-badge"
-import { SourceBadge } from "./source-badge"
-import { TimeframeSelect } from "./timeframe-select"
-import { TagBadges } from "./tag-badges"
-import { RiskRewardDisplay } from "./risk-reward-display"
-import { OpenProgressBar } from "./progress-bar-open"
-import { DurationDisplay } from "./duration-display"
 import { TradeCardMobile } from "./trade-card-mobile"
+import { OpenTradeRow } from "./open-trade-row"
 import { SortableHead, nextSort, compareValues, type SortState } from "./sortable-head"
 import { TradeDetailDrawer } from "./trade-detail-drawer"
 import { CloseTradeDialog } from "./close-trade-dialog"
 import { useTradeActions } from "@/hooks/use-trade-actions"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { AiAnalysisSheet } from "@/components/ai/ai-analysis-sheet"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -53,10 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { AiAnalysisCell } from "./ai-analysis-cell"
-import { MoreHorizontal, Eye, XCircle, Sparkles, Trash2 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { SpreadDisplay } from "@/components/ui/spread-display"
+import { Trash2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useBulkSelection } from "@/hooks/use-bulk-selection"
 import { BulkActionBar } from "./bulk-action-bar"
@@ -498,173 +473,31 @@ export function OpenTradesTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {stableResult.map((trade) => {
-            const plColor =
-              trade.unrealizedPL >= 0 ? "text-status-connected" : "text-status-disconnected"
-
-            return (
-              <TableRow
-                key={trade.id}
-                className="cursor-pointer select-none"
-                onMouseDown={(e) => {
-                  if (e.button === 0) setDrawerTrade(trade)
-                }}
-              >
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Checkbox
-                    checked={bulk.isSelected(trade.id)}
-                    onCheckedChange={() => bulk.toggle(trade.id)}
-                    aria-label={`Select ${trade.instrument.replace("_", "/")} trade`}
-                  />
-                </TableCell>
-                <TableCell className="text-xs font-medium">
-                  {trade.instrument.replace("_", "/")}
-                </TableCell>
-                <TableCell>
-                  <DirectionBadge direction={trade.direction} />
-                </TableCell>
-                <TableCell>
-                  <SourceBadge source={trade.source} />
-                </TableCell>
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <TimeframeSelect
-                    value={trade.timeframe}
-                    onChange={async (tf) => {
-                      await fetch(`/api/trades/${trade.id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ timeframe: tf }),
-                      })
-                      await refreshPositions()
-                    }}
-                  />
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {trade.entryPrice}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {trade.currentPrice ? (
-                    <AnimatedNumber value={trade.currentPrice.toString()} className={plColor} />
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  {(() => {
-                    const tick = pricesByInstrument?.get(trade.instrument)
-                    if (!tick) return <span className="text-muted-foreground text-xs">—</span>
-                    return (
-                      <SpreadDisplay bid={tick.bid} ask={tick.ask} instrument={trade.instrument} />
-                    )
-                  })()}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
-                  {trade.stopLoss ?? "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
-                  {trade.takeProfit ?? "—"}
-                </TableCell>
-                <TableCell>
-                  <OpenProgressBar
-                    instrument={trade.instrument}
-                    direction={trade.direction}
-                    entryPrice={trade.entryPrice}
-                    currentPrice={trade.currentPrice}
-                    stopLoss={trade.stopLoss}
-                    takeProfit={trade.takeProfit}
-                  />
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {trade.currentUnits !== trade.initialUnits
-                    ? `${trade.currentUnits}/${trade.initialUnits}`
-                    : trade.currentUnits}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  <AnimatedNumber
-                    value={formatCurrency(trade.unrealizedPL, currency)}
-                    className={cn("font-semibold", plColor)}
-                  />
-                </TableCell>
-                <TableCell className="text-right">
-                  <RiskRewardDisplay
-                    direction={trade.direction}
-                    entryPrice={trade.entryPrice}
-                    stopLoss={trade.stopLoss}
-                    takeProfit={trade.takeProfit}
-                    instrument={trade.instrument}
-                    compact
-                  />
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {trade.mfe !== null ? (
-                    <span className="text-status-connected">{formatPips(trade.mfe)}</span>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs tabular-nums">
-                  {trade.mae !== null ? (
-                    <span className="text-status-disconnected">
-                      {formatPips(Math.abs(trade.mae))}
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell className="text-xs">
-                  <DurationDisplay openedAt={trade.openedAt} className="font-mono tabular-nums" />
-                </TableCell>
-                <TableCell>
-                  <TagBadges tags={tagsByTradeId[trade.id] ?? trade.tags} />
-                </TableCell>
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <AiAnalysisCell
-                    latestAnalysis={latestAnalysisByTradeId?.[trade.id]}
-                    analysisCount={countByTradeId?.[trade.id]}
-                    activeProgress={activeAiByTradeId?.[trade.id]}
-                    onClick={() => setAiAnalysisTrade(trade)}
-                  />
-                </TableCell>
-                <TableCell
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="size-7 p-0">
-                        <MoreHorizontal className="size-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setDrawerTrade(trade)}>
-                        <Eye className="size-4" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setAiAnalysisTrade(trade)}>
-                        <Sparkles className="size-4" />
-                        AI Analysis
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem variant="destructive" onClick={() => setCloseTrade(trade)}>
-                        <XCircle className="size-4" />
-                        Close Trade
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            )
-          })}
+          {stableResult.map((trade) => (
+            <OpenTradeRow
+              key={trade.id}
+              trade={trade}
+              tick={pricesByInstrument?.get(trade.instrument)}
+              tags={tagsByTradeId[trade.id] ?? trade.tags}
+              currency={currency}
+              isSelected={bulk.isSelected(trade.id)}
+              latestAnalysis={latestAnalysisByTradeId?.[trade.id]}
+              analysisCount={countByTradeId?.[trade.id]}
+              activeProgress={activeAiByTradeId?.[trade.id]}
+              onToggleSelect={() => bulk.toggle(trade.id)}
+              onViewDetails={() => setDrawerTrade(trade)}
+              onCloseTrade={() => setCloseTrade(trade)}
+              onAiAnalysis={() => setAiAnalysisTrade(trade)}
+              onTimeframeChange={async (tf) => {
+                await fetch(`/api/trades/${trade.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ timeframe: tf }),
+                })
+                await refreshPositions()
+              }}
+            />
+          ))}
         </TableBody>
       </Table>
 

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { revealToken, getSettings } from "@fxflow/db"
 import type { TradingMode } from "@fxflow/types"
+import { parseSearchParams } from "@/lib/api-validation"
+import { candleParamsSchema } from "@/lib/api-schemas"
 
 const OANDA_URLS: Record<TradingMode, string> = {
   practice: "https://api-fxpractice.oanda.com",
@@ -34,16 +36,16 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const { instrument } = await params
-    const { searchParams } = request.nextUrl
-    const granularity = searchParams.get("granularity") ?? "H1"
-    const count = searchParams.get("count") ?? "100"
+    const parsed = parseSearchParams(request.nextUrl.searchParams, candleParamsSchema)
+    if (!parsed.success) return parsed.response
+
+    const { granularity, count, to } = parsed.data
 
     const settings = await getSettings()
     const mode = settings.tradingMode
     const token = await revealToken(mode)
     const baseUrl = OANDA_URLS[mode]
 
-    const to = searchParams.get("to") // ISO 8601 timestamp — fetch candles BEFORE this time
     let url = `${baseUrl}/v3/instruments/${instrument}/candles?granularity=${granularity}&count=${count}&price=M`
     if (to) url += `&to=${encodeURIComponent(to)}`
     const response = await fetch(url, {

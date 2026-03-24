@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { Suspense, useState, useMemo, useCallback, useEffect, useRef } from "react"
 import type { PositionPriceTick, TradeDirection, PlaceOrderRequest, Timeframe } from "@fxflow/types"
 import type { TradeUnion } from "@/components/positions/trade-editor-panel"
 import type { TradeChartConfig } from "@/components/charts/chart-panel"
@@ -20,6 +20,7 @@ import { OrderTicketPanel } from "@/components/charts/order-ticket-panel"
 import { ChartGrid } from "@/components/charts/chart-grid"
 import { MobileChartSwiper } from "@/components/charts/mobile-chart-swiper"
 import { ErrorBoundary } from "@/components/ui/error-boundary"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 /** Map of panel index → assigned trade */
 type TradesByPanel = Record<number, TradeUnion>
@@ -403,71 +404,77 @@ export default function ChartsPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-var(--header-height))] flex-col overflow-hidden">
-      {/* Header */}
-      <header className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
-        <h1 className="text-sm font-semibold">Charts</h1>
-        {!isMobile && <LayoutSelector value={layout.layout} onChange={handleLayoutChange} />}
-        <PositionPicker value={activeTrade} onChange={assignTrade} assignedIds={assignedTradeIds} />
-      </header>
+    <Suspense fallback={<PageSkeleton />}>
+      <div className="flex h-[calc(100vh-var(--header-height))] flex-col overflow-hidden">
+        {/* Header */}
+        <header className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
+          <h1 className="text-sm font-semibold">Charts</h1>
+          {!isMobile && <LayoutSelector value={layout.layout} onChange={handleLayoutChange} />}
+          <PositionPicker
+            value={activeTrade}
+            onChange={assignTrade}
+            assignedIds={assignedTradeIds}
+          />
+        </header>
 
-      {/* Trade control bar — shows editor for the active panel's trade */}
-      {activeTrade && (
-        <TradeControlBar
-          trade={activeTrade}
-          editor={editor}
-          currentPrice={activeLivePrice}
-          onClear={() => assignTrade(null)}
-        />
-      )}
-
-      {/* Chart grid + order ticket */}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 flex-1 flex-col">
-          <ErrorBoundary>
-            {isMobile ? (
-              <MobileChartSwiper
-                panels={layout.panels}
-                onPanelChange={setPanel}
-                chartPrices={priceMap}
-                tradeCharts={tradeCharts}
-                onClearTrade={clearPanelTrade}
-                onOrderEntry={handleOrderEntry}
-                orderOverlay={orderOverlay}
-                orderOverlayPanelIndex={orderTicket?.panelIndex}
-              />
-            ) : (
-              <ChartGrid
-                layout={layout.layout}
-                panels={layout.panels}
-                onPanelChange={setPanel}
-                chartPrices={priceMap}
-                activeIndex={activeIndex}
-                onActiveChange={setActiveIndex}
-                tradeCharts={tradeCharts}
-                onClearTrade={clearPanelTrade}
-                onOrderEntry={handleOrderEntry}
-                orderOverlay={orderOverlay}
-                orderOverlayPanelIndex={orderTicket?.panelIndex}
-              />
-            )}
-          </ErrorBoundary>
-        </div>
-        {orderTicket && (
-          <OrderTicketPanel
-            instrument={orderTicketInstrument}
-            direction={orderTicket.direction}
-            bid={orderTicketTick?.bid ?? null}
-            ask={orderTicketTick?.ask ?? null}
-            accountBalance={accountOverview?.summary.balance ?? 0}
-            accountCurrency={accountOverview?.summary.currency ?? "USD"}
-            ticket={ticket}
-            openTrades={openWithPrices}
-            onClose={handleCloseOrderTicket}
-            onSubmit={handlePlaceOrder}
+        {/* Trade control bar — shows editor for the active panel's trade */}
+        {activeTrade && (
+          <TradeControlBar
+            trade={activeTrade}
+            editor={editor}
+            currentPrice={activeLivePrice}
+            onClear={() => assignTrade(null)}
           />
         )}
+
+        {/* Chart grid + order ticket */}
+        <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <ErrorBoundary>
+              {isMobile ? (
+                <MobileChartSwiper
+                  panels={layout.panels}
+                  onPanelChange={setPanel}
+                  chartPrices={priceMap}
+                  tradeCharts={tradeCharts}
+                  onClearTrade={clearPanelTrade}
+                  onOrderEntry={handleOrderEntry}
+                  orderOverlay={orderOverlay}
+                  orderOverlayPanelIndex={orderTicket?.panelIndex}
+                />
+              ) : (
+                <ChartGrid
+                  layout={layout.layout}
+                  panels={layout.panels}
+                  onPanelChange={setPanel}
+                  chartPrices={priceMap}
+                  activeIndex={activeIndex}
+                  onActiveChange={setActiveIndex}
+                  tradeCharts={tradeCharts}
+                  onClearTrade={clearPanelTrade}
+                  onOrderEntry={handleOrderEntry}
+                  orderOverlay={orderOverlay}
+                  orderOverlayPanelIndex={orderTicket?.panelIndex}
+                />
+              )}
+            </ErrorBoundary>
+          </div>
+          {orderTicket && (
+            <OrderTicketPanel
+              instrument={orderTicketInstrument}
+              direction={orderTicket.direction}
+              bid={orderTicketTick?.bid ?? null}
+              ask={orderTicketTick?.ask ?? null}
+              accountBalance={accountOverview?.summary.balance ?? 0}
+              accountCurrency={accountOverview?.summary.currency ?? "USD"}
+              ticket={ticket}
+              openTrades={openWithPrices}
+              onClose={handleCloseOrderTicket}
+              onSubmit={handlePlaceOrder}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </Suspense>
   )
 }
