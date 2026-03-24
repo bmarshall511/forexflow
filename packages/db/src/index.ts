@@ -289,6 +289,7 @@ export {
   getTodayAiCost,
   getMonthlyAiCost,
   expireOldOpportunities,
+  reconcileStaleOpportunities,
   cleanupOldOpportunities,
   getOpportunitiesByProfile,
   getAllOpportunities,

@@ -514,6 +514,42 @@ export async function expireOldOpportunities(maxAgeHours = 4): Promise<number> {
 }
 
 /**
+ * Reconcile "placed"/"filled"/"managed" opportunities against actual open trades.
+ * Any opportunity in an active status whose resultTradeId is not in the set of
+ * open trade IDs is marked as expired/cancelled (order was cancelled, SL hit, etc.
+ * without the close callback firing — e.g., after a daemon restart).
+ *
+ * @param openTradeSourceIds - Set of OANDA source trade IDs currently open.
+ * @returns Number of stale opportunities cleaned up.
+ */
+export async function reconcileStaleOpportunities(
+  openTradeSourceIds: Set<string>,
+): Promise<number> {
+  const active = await db.aiTraderOpportunity.findMany({
+    where: { status: { in: ["placed", "filled", "managed"] } },
+    select: { id: true, resultTradeId: true },
+  })
+
+  const staleIds: string[] = []
+  for (const opp of active) {
+    // No trade ID = order never filled / was cancelled
+    // Trade ID not in open set = trade was closed without callback
+    if (!opp.resultTradeId || !openTradeSourceIds.has(opp.resultTradeId)) {
+      staleIds.push(opp.id)
+    }
+  }
+
+  if (staleIds.length === 0) return 0
+
+  const result = await db.aiTraderOpportunity.updateMany({
+    where: { id: { in: staleIds } },
+    data: { status: "expired", outcome: "cancelled", updatedAt: new Date() },
+  })
+
+  return result.count
+}
+
+/**
  * Delete old historical opportunities beyond the retention period.
  *
  * @param days - Age threshold in days (default: 90)

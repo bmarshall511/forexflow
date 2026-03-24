@@ -22,6 +22,7 @@ import {
   updateOpportunityStatus,
   expireOldOpportunities,
   cleanupOldOpportunities,
+  reconcileStaleOpportunities,
   countOpenAiTrades,
   findOpportunityByResultTradeId,
   getTradeBySourceId,
@@ -199,6 +200,7 @@ export class AiTraderScanner {
     console.log("[ai-trader] Scanner started")
     await this.tradeManager.start()
     await expireOldOpportunities(4)
+    await this.reconcileOpportunitiesOnStartup()
     await cleanupOldOpportunities(90)
     this.scheduleScan(10_000)
   }
@@ -267,6 +269,24 @@ export class AiTraderScanner {
 
   isPaused(): boolean {
     return this.paused
+  }
+
+  /**
+   * On startup, reconcile "placed"/"filled"/"managed" opportunities against
+   * actual OANDA open trades. Any opportunity whose trade no longer exists
+   * is marked as expired/cancelled.
+   */
+  private async reconcileOpportunitiesOnStartup(): Promise<void> {
+    try {
+      const positions = this.positionManager.getPositions()
+      const openSourceIds = new Set(positions.open.map((t) => t.sourceTradeId))
+      const cleaned = await reconcileStaleOpportunities(openSourceIds)
+      if (cleaned > 0) {
+        console.log(`[ai-trader] Reconciled ${cleaned} stale opportunity/ies on startup`)
+      }
+    } catch (err) {
+      console.warn("[ai-trader] Opportunity reconciliation error:", err)
+    }
   }
 
   // ─── Public API ──────────────────────────────────────────────────
