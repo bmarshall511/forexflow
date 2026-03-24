@@ -4,14 +4,15 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TabNav, TabNavButton } from "@/components/ui/tab-nav"
-import { Radar, Zap, Shield, Settings } from "lucide-react"
+import { Radar, Zap, Shield, Settings, HelpCircle } from "lucide-react"
 import type { SmartFlowSettingsData } from "@fxflow/types"
 import { SfSettingsScanner } from "./sf-settings-scanner"
 import { SfSettingsAutoTrade } from "./sf-settings-auto-trade"
 import { SfSettingsSafety } from "./sf-settings-safety-limits"
 import { SfSettingsGeneral } from "./sf-settings-general"
+import { SfSettingsHowItWorks } from "./sf-settings-how-it-works"
 
-type Tab = "scanner" | "auto-trade" | "safety" | "general"
+type Tab = "scanner" | "auto-trade" | "safety" | "general" | "how-it-works"
 
 export function SmartFlowSettingsPage() {
   const [settings, setSettings] = useState<SmartFlowSettingsData | null>(null)
@@ -102,12 +103,20 @@ export function SmartFlowSettingsPage() {
           label="General"
           count={0}
         />
+        <TabNavButton
+          active={activeTab === "how-it-works"}
+          onClick={() => setActiveTab("how-it-works")}
+          icon={<HelpCircle className="size-3.5" />}
+          label="How It Works"
+          count={0}
+        />
       </TabNav>
 
       {activeTab === "scanner" && <SfSettingsScanner settings={settings} onUpdate={save} />}
       {activeTab === "auto-trade" && <SfSettingsAutoTrade settings={settings} onUpdate={save} />}
       {activeTab === "safety" && <SfSettingsSafety settings={settings} onUpdate={save} />}
       {activeTab === "general" && <SfSettingsGeneral settings={settings} onUpdate={save} />}
+      {activeTab === "how-it-works" && <SfSettingsHowItWorks />}
     </div>
   )
 }
