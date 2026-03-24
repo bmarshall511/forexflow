@@ -3,7 +3,6 @@ import type { IChartApi, ISeriesApi, Time } from "lightweight-charts"
 import type { SeriesMarker } from "lightweight-charts"
 import type { ReplayCandle, ReplayTradeInfo } from "@/app/api/trades/[tradeId]/replay-candles/route"
 import type { OverlayVisibility } from "./replay-overlay-legend"
-import { getPipSize } from "@fxflow/shared"
 
 /** Shared options for all overlay line series */
 function baseLineOptions(color: string, style: number, label: string) {

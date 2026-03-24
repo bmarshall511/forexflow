@@ -90,9 +90,15 @@ export class SignalProcessor {
     )
 
     // Initial cleanup + sync closed signal results for P&L tracking
-    void cleanupOldSignals(30).catch(() => {})
-    void cleanupOldAuditEvents(30).catch(() => {})
-    void syncClosedSignalResults().catch(() => {})
+    void cleanupOldSignals(30).catch((err) =>
+      console.error("[signal-processor] Background task error:", err),
+    )
+    void cleanupOldAuditEvents(30).catch((err) =>
+      console.error("[signal-processor] Background task error:", err),
+    )
+    void syncClosedSignalResults().catch((err) =>
+      console.error("[signal-processor] Background task error:", err),
+    )
 
     // Periodically sync closed signal results (catches SL/TP hits between signals)
     this.syncTimer = setInterval(() => {
@@ -103,7 +109,7 @@ export class SignalProcessor {
             void getTodayAutoTradePL().then((pl) => this.alertsState.updateDailyPL(pl))
           }
         })
-        .catch(() => {})
+        .catch((err) => console.error("[signal-processor] Background task error:", err))
     }, 30_000) // every 30 seconds
 
     // Self-healing: rebuild autoTradeIds from DB metadata every 60 seconds
@@ -359,7 +365,9 @@ export class SignalProcessor {
     signalId?: string,
     t0?: number,
   ): Promise<void> {
-    await syncClosedSignalResults().catch(() => {})
+    await syncClosedSignalResults().catch((err) =>
+      console.error("[signal-processor] Background task error:", err),
+    )
 
     const autoCount = await getActiveAutoTradeCount()
     this.alertsState.setActiveAutoPositions(autoCount)

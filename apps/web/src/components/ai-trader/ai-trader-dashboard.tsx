@@ -47,7 +47,6 @@ export function AiTraderDashboard() {
     triggerScan,
     pauseScanner,
     resumeScanner,
-    handleAction,
   } = useAiTrader()
 
   const isScanning =
@@ -97,17 +96,6 @@ export function AiTraderDashboard() {
       toast.error("Failed to resume scanner")
     } finally {
       setActionInFlight(false)
-    }
-  }
-
-  const onAction = async (id: string, action: "approve" | "reject") => {
-    try {
-      await handleAction(id, action)
-      toast.success(
-        action === "approve" ? "Trade approved — placing order" : "Opportunity rejected",
-      )
-    } catch {
-      toast.error(`Failed to ${action} opportunity`)
     }
   }
 

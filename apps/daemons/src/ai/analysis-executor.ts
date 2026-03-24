@@ -394,8 +394,7 @@ export async function executeAnalysis(opts: {
     let inputTokens = 0
     let outputTokens = 0
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const streamOpts: any = {
+    const baseOpts = {
       model,
       max_tokens: depth === "deep" ? 16000 : maxTokens[depth],
       system: systemPrompt,
@@ -403,9 +402,10 @@ export async function executeAnalysis(opts: {
     }
 
     // Enable extended thinking for deep analysis (non-haiku models)
-    if (depth === "deep" && !model.includes("haiku")) {
-      streamOpts.thinking = { type: "enabled", budget_tokens: 8000 }
-    }
+    const streamOpts =
+      depth === "deep" && !model.includes("haiku")
+        ? { ...baseOpts, thinking: { type: "enabled" as const, budget_tokens: 8000 } }
+        : baseOpts
 
     const stream = anthropic.messages.stream(streamOpts)
     activeStreams.set(analysisId, stream)

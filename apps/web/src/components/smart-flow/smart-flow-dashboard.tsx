@@ -62,7 +62,7 @@ export function SmartFlowDashboard() {
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
   const todayTrades = closedTrades.filter((t) => t.closedAt && new Date(t.closedAt) >= todayStart)
-  const todayPL = todayTrades.reduce((sum, _t) => {
+  const todayPL = todayTrades.reduce((sum) => {
     // TODO: wire actual P&L from linked Trade records
     return sum
   }, 0)

@@ -5,19 +5,7 @@ import type {
   SmartFlowOpportunityScores,
   SmartFlowScanMode,
 } from "@fxflow/types"
-import { safeJsonParse } from "./utils"
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function safeIso(val: unknown): string {
-  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString()
-  if (typeof val === "string" && val) {
-    const d = new Date(val)
-    if (!isNaN(d.getTime())) return d.toISOString()
-  }
-  if (typeof val === "number") return new Date(val).toISOString()
-  return new Date().toISOString()
-}
+import { safeIso, safeJsonParse } from "./utils"
 
 function toOpportunityData(row: Record<string, unknown>): SmartFlowOpportunityData {
   return {

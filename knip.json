@@ -27,7 +27,9 @@
       "project": ["src/**/*.ts"]
     },
     "packages/db": {
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.ts"],
+      "ignore": ["prisma/prisma.config.ts"],
+      "prisma": false
     }
   }
 }

@@ -116,7 +116,7 @@ export function ConfigsTab({ configs, activeTrades: propTrades, onRefresh }: Con
         setDeleteId(null)
       }
     },
-    [onRefresh],
+    [onRefresh, configs],
   )
 
   const handleToggle = useCallback(

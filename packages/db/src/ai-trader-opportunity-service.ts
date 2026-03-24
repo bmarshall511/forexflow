@@ -8,6 +8,7 @@
  * @module ai-trader-opportunity-service
  */
 import { db } from "./client"
+import { safeIso, safeJsonParse } from "./utils"
 import type {
   AiTraderOpportunityData,
   AiTraderOpportunityStatus,
@@ -21,34 +22,7 @@ import type {
   TradeOutcome,
 } from "@fxflow/types"
 
-/** Safely convert a Prisma date (may be invalid with libsql adapter) to ISO string. */
-function safeIso(val: unknown): string {
-  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString()
-  if (typeof val === "string" && val) {
-    const d = new Date(val)
-    if (!isNaN(d.getTime())) return d.toISOString()
-  }
-  if (typeof val === "number") return new Date(val).toISOString()
-  return new Date().toISOString()
-}
-
 // ─── Mappers ────────────────────────────────────────────────────────────────
-
-/**
- * Safely parse a JSON string with a fallback value.
- *
- * @param val - JSON string to parse, or null
- * @param fallback - Value to return on null input or parse failure
- * @returns Parsed value or fallback
- */
-function parseJson<T>(val: string | null, fallback: T): T {
-  if (!val) return fallback
-  try {
-    return JSON.parse(val) as T
-  } catch {
-    return fallback
-  }
-}
 
 /**
  * Map a Prisma opportunity row to the `AiTraderOpportunityData` DTO,
@@ -122,9 +96,9 @@ function toOpportunityData(row: {
     session: row.session as AiTraderSession | null,
     primaryTechnique: row.primaryTechnique as AiTraderTechnique | null,
     entryRationale: row.entryRationale,
-    technicalSnapshot: parseJson<unknown>(row.technicalSnapshot, {}),
-    fundamentalSnapshot: parseJson<unknown>(row.fundamentalSnapshot, {}),
-    sentimentSnapshot: parseJson<unknown>(row.sentimentSnapshot, {}),
+    technicalSnapshot: safeJsonParse<unknown>(row.technicalSnapshot, {}),
+    fundamentalSnapshot: safeJsonParse<unknown>(row.fundamentalSnapshot, {}),
+    sentimentSnapshot: safeJsonParse<unknown>(row.sentimentSnapshot, {}),
     tier2Response: row.tier2Response,
     tier2Model: row.tier2Model,
     tier2InputTokens: row.tier2InputTokens,
@@ -139,7 +113,7 @@ function toOpportunityData(row: {
     resultSourceId: row.resultSourceId,
     realizedPL: row.realizedPL,
     outcome: row.outcome as TradeOutcome | null,
-    managementLog: parseJson<AiTraderManagementAction[]>(row.managementLog, []),
+    managementLog: safeJsonParse<AiTraderManagementAction[]>(row.managementLog, []),
     detectedAt: safeIso(row.detectedAt),
     suggestedAt: row.suggestedAt ? safeIso(row.suggestedAt) : null,
     placedAt: row.placedAt ? safeIso(row.placedAt) : null,
@@ -272,7 +246,7 @@ export async function appendManagementAction(
     where: { id },
     select: { managementLog: true },
   })
-  const log = parseJson<AiTraderManagementAction[]>(row.managementLog, [])
+  const log = safeJsonParse<AiTraderManagementAction[]>(row.managementLog, [])
   log.push(action)
   await db.aiTraderOpportunity.update({
     where: { id },

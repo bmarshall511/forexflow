@@ -36,7 +36,6 @@ export interface TVASettingsConnectionProps {
 export function TVASettingsConnection({
   config,
   onUpdate,
-  saving,
   daemonUp,
   cfConnected,
   regenerateToken,

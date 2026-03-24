@@ -52,6 +52,10 @@ import { getConfig } from "./config.js"
 import { getRestUrl } from "./oanda/api-client.js"
 import type { AnyDaemonMessage } from "@fxflow/types"
 
+process.on("unhandledRejection", (reason) => {
+  console.error("[daemon] Unhandled promise rejection:", reason)
+})
+
 async function main() {
   const config = getConfig()
   console.log(`[daemon] Starting on port ${config.port}...`)
@@ -207,7 +211,7 @@ async function main() {
       .then(({ getTodayAutoTradePL }) =>
         getTodayAutoTradePL().then((pl) => tvAlertsState.updateDailyPL(pl)),
       )
-      .catch(() => {})
+      .catch((err) => console.error("[daemon] Background task error:", err))
   })
 
   // Wire TV alerts status broadcasts
@@ -326,7 +330,7 @@ async function main() {
           tfInstruments = cfg.pairs.filter((p) => p.enabled).map((p) => p.instrument)
           positionPriceTracker.evaluateInstrumentsPublic()
         })
-        .catch(() => {})
+        .catch((err) => console.error("[daemon] Background task error:", err))
     }
     positionPriceTracker.addInstrumentSource(() => tfInstruments)
     refreshTfInstruments()

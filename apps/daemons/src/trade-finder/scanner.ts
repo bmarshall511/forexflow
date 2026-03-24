@@ -802,7 +802,7 @@ export class TradeFinderScanner {
         setup.scores,
         setup.distanceToEntryPips,
         freshPositionSize,
-      ).catch(() => {})
+      ).catch((err) => console.error("[trade-finder] Background task error:", err))
 
       this.pushAutoTradeEvent({
         type: "placed",
@@ -848,7 +848,9 @@ export class TradeFinderScanner {
   /** Broadcast skip + persist reason to DB for UI display */
   private async skipAutoTrade(setup: TradeFinderSetupData, reason: string): Promise<void> {
     this.broadcastAutoTradeSkipped(setup, reason)
-    await updateSetupSkipReason(setup.id, reason).catch(() => {})
+    await updateSetupSkipReason(setup.id, reason).catch((err) =>
+      console.error("[trade-finder] Background task error:", err),
+    )
   }
 
   private broadcastAutoTradeSkipped(setup: TradeFinderSetupData, reason: string): void {
@@ -1343,7 +1345,7 @@ export class TradeFinderScanner {
                 setup.id,
                 confirmation.refinedEntry,
                 confirmation.pattern,
-              ).catch(() => {})
+              ).catch((err) => console.error("[trade-finder] Background task error:", err))
               console.log(
                 `[trade-finder] Entry confirmed: ${setup.instrument} ${confirmation.pattern} → MARKET entry ${confirmation.refinedEntry.toFixed(5)}`,
               )
@@ -1356,7 +1358,9 @@ export class TradeFinderScanner {
             } else {
               // No confirmation yet — increment wait counter and check timeout
               const waited = (setup.confirmationCandlesWaited ?? 0) + 1
-              await updateSetupConfirmationWait(setup.id, waited).catch(() => {})
+              await updateSetupConfirmationWait(setup.id, waited).catch((err) =>
+                console.error("[trade-finder] Background task error:", err),
+              )
               if (waited >= config.confirmationTimeout) {
                 await updateSetupStatus(setup.id, "invalidated")
                 this.broadcast({

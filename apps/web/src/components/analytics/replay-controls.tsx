@@ -42,7 +42,6 @@ export function ReplayControls({
   currentTime,
   timeframe,
   entryTime,
-  exitTime: _exitTime,
   currentCandleTime,
 }: ReplayControlsProps) {
   const maxIndex = Math.max(0, totalCandles - 1)

@@ -315,7 +315,7 @@ Rules:
           status: "failed",
           errorMessage: error instanceof Error ? error.message : "Unknown error",
           durationMs: Date.now() - startTime,
-        }).catch(() => {})
+        }).catch((err) => console.error("[digest-generator] Background task error:", err))
       }
     } finally {
       this.running = false

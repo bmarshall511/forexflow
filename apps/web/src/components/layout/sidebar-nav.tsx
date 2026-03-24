@@ -46,14 +46,14 @@ export function SidebarNav() {
   const statuses = useSidebarStatus()
   const { config: priorityConfig } = useSourcePriority()
 
-  const priorityOrder = priorityConfig?.priorityOrder ?? []
+  const priorityOrder = priorityConfig?.priorityOrder
 
   // Reorder the Automation group by source priority
   const groups = useMemo(
     () =>
       NAV_GROUPS.map((group) => {
         if (group.label !== "Automation") return group
-        return { ...group, items: sortByPriority(group.items, priorityOrder) }
+        return { ...group, items: sortByPriority(group.items, priorityOrder ?? []) }
       }),
     [priorityOrder],
   )

@@ -217,7 +217,7 @@ export function TradeReplay({
     } else if (markers.length > 0) {
       markersRef.current = createSeriesMarkers(series, markers)
     }
-  }, [candles, currentIndex, tradeInfo, entryCandleIdx, exitCandleIdx, overlayVisibility])
+  }, [candles, currentIndex, tradeInfo, entryCandleIdx, exitCandleIdx, overlayVisibility, isDark])
 
   // Sync Trade Finder zone/trend/curve overlays
   useEffect(() => {
