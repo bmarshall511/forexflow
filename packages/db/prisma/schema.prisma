@@ -134,6 +134,32 @@ model TVAlertsConfig {
   updatedAt           DateTime @updatedAt
 }
 
+model TVAlertsQualityConfig {
+  id                 Int      @id @default(1)
+  enabled            Boolean  @default(false)
+  minScore           Float    @default(5.0)
+  trendFilter        Boolean  @default(true)
+  trendWeight        Int      @default(25)
+  momentumFilter     Boolean  @default(true)
+  momentumWeight     Int      @default(20)
+  volatilityFilter   Boolean  @default(true)
+  volatilityWeight   Int      @default(20)
+  htfFilter          Boolean  @default(true)
+  htfWeight          Int      @default(20)
+  sessionFilter      Boolean  @default(true)
+  sessionWeight      Int      @default(15)
+  autoSL             Boolean  @default(true)
+  slAtrMultiplier    Float    @default(1.5)
+  autoTP             Boolean  @default(true)
+  tpRiskRewardRatio  Float    @default(2.0)
+  dynamicSizing      Boolean  @default(false)
+  highConfThreshold  Float    @default(7.5)
+  highConfMultiplier Float    @default(1.25)
+  lowConfThreshold   Float    @default(5.5)
+  lowConfMultiplier  Float    @default(0.75)
+  updatedAt          DateTime @updatedAt
+}
+
 model AiSettings {
   id               Int      @id @default(1)
   claudeApiKey     String? // AES-256-GCM encrypted

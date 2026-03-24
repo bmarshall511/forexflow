@@ -93,13 +93,22 @@ export class AlertRouter implements DurableObject {
     }
 
     // Build the typed webhook payload
-    // P0.5: Handle price as string (TradingView sends {{close}} as a string)
-    const rawPrice = body.price
+    // Handle price/close as string or number (TradingView sends {{close}} as a string)
+    const rawPrice = body.price ?? body.close
     const parsedPrice =
       typeof rawPrice === "number"
         ? rawPrice
         : typeof rawPrice === "string"
           ? parseFloat(rawPrice) || undefined
+          : undefined
+
+    // Parse interval — may come as number from TradingView (e.g., 15, 60)
+    const rawInterval = body.interval
+    const parsedInterval =
+      typeof rawInterval === "string"
+        ? rawInterval
+        : typeof rawInterval === "number"
+          ? String(rawInterval)
           : undefined
 
     const signalId = crypto.randomUUID()
@@ -109,7 +118,7 @@ export class AlertRouter implements DurableObject {
       ticker,
       price: parsedPrice,
       exchange: typeof body.exchange === "string" ? body.exchange : undefined,
-      interval: typeof body.interval === "string" ? body.interval : undefined,
+      interval: parsedInterval,
       time: typeof body.time === "string" ? body.time : undefined,
       signalId,
     }

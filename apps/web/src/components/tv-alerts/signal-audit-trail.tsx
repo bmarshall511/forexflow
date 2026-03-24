@@ -28,6 +28,10 @@ const STAGE_CONFIG: Record<string, { label: string; color: string }> = {
     label: "Post-Execution",
     color: "text-slate-400 bg-slate-500/10 border-slate-500/30",
   },
+  confluence_evaluated: {
+    label: "Confluence",
+    color: "text-purple-500 bg-purple-500/10 border-purple-500/30",
+  },
 }
 
 function getStageConfig(stage: string) {
@@ -219,6 +223,23 @@ function EventSummary({ event }: { event: SignalAuditEventData }) {
       return (
         <span className="text-[10px] text-yellow-500">
           {(d.reason as string)?.replace(/_/g, " ")}
+        </span>
+      )
+
+    case "confluence_evaluated":
+      return (
+        <span
+          className={cn(
+            "text-[10px]",
+            d.passed ? "text-green-500" : d.error ? "text-amber-500" : "text-red-500",
+          )}
+        >
+          score {typeof d.score === "number" ? (d.score as number).toFixed(1) : "?"}/10
+          {d.passed
+            ? " — passed"
+            : d.error
+              ? " — error (fallthrough)"
+              : ` — rejected (min ${d.minScore})`}
         </span>
       )
 

@@ -26,6 +26,7 @@ import { AnimatedNumber } from "@/components/ui/animated-number"
 import { DataTile, InlineStat, ProportionBar } from "@/components/ui/data-tile"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { useTVAlertsConfig } from "@/hooks/use-tv-alerts-config"
+import { useTVAlertsQualityConfig } from "@/hooks/use-tv-alerts-quality-config"
 import { useTVAlertsStats } from "@/hooks/use-tv-alerts-stats"
 import { useTVAlertsPeriodPnL } from "@/hooks/use-tv-alerts-period-pnl"
 import { formatPnL, type PnLColorIntent } from "@fxflow/shared"
@@ -199,8 +200,10 @@ export function TVAlertsDashboardCard() {
   const { tvAlertsStatus, isConnected, isReachable } = useDaemonStatus()
   const daemonUp = isConnected || isReachable
   const { config, isLoading: configLoading } = useTVAlertsConfig()
+  const { config: qualityConfig } = useTVAlertsQualityConfig()
   const { stats, isLoading: statsLoading } = useTVAlertsStats()
   const { data: periodPnL } = useTVAlertsPeriodPnL()
+  const qualityEnabled = qualityConfig?.enabled ?? false
   const s = tvAlertsStatus
 
   const moduleEnabled = s?.enabled ?? config?.enabled ?? false
@@ -456,6 +459,7 @@ export function TVAlertsDashboardCard() {
                   }
                 />
                 <InlineStat label="Market Hours" value={config.marketHoursFilter ? "On" : "Off"} />
+                <InlineStat label="Signal Quality" value={qualityEnabled ? "Active" : "Off"} />
               </div>
             </div>
 

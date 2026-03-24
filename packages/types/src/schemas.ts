@@ -360,6 +360,37 @@ export const TradeUpdateSchema = z
   })
   .strict()
 
+// ─── TV Alerts Quality Config (PUT) ─────────────────────────────────────────
+
+export const TVAlertsQualityConfigUpdateSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    minScore: z.number().min(0).max(10).optional(),
+
+    trendFilter: z.boolean().optional(),
+    trendWeight: z.number().int().min(0).max(100).optional(),
+    momentumFilter: z.boolean().optional(),
+    momentumWeight: z.number().int().min(0).max(100).optional(),
+    volatilityFilter: z.boolean().optional(),
+    volatilityWeight: z.number().int().min(0).max(100).optional(),
+    htfFilter: z.boolean().optional(),
+    htfWeight: z.number().int().min(0).max(100).optional(),
+    sessionFilter: z.boolean().optional(),
+    sessionWeight: z.number().int().min(0).max(100).optional(),
+
+    autoSL: z.boolean().optional(),
+    slAtrMultiplier: z.number().min(0.5).max(5).optional(),
+    autoTP: z.boolean().optional(),
+    tpRiskRewardRatio: z.number().min(0.5).max(10).optional(),
+
+    dynamicSizing: z.boolean().optional(),
+    highConfThreshold: z.number().min(0).max(10).optional(),
+    highConfMultiplier: z.number().min(0.5).max(3).optional(),
+    lowConfThreshold: z.number().min(0).max(10).optional(),
+    lowConfMultiplier: z.number().min(0.1).max(1).optional(),
+  })
+  .strict()
+
 // ─── Test Signal ────────────────────────────────────────────────────────────
 
 export const TestSignalSchema = z
@@ -380,6 +411,7 @@ export const UpdateTradingModeSchema = z
 // ─── Inferred Types (for convenience) ───────────────────────────────────────
 
 export type TVAlertsConfigUpdate = z.infer<typeof TVAlertsConfigUpdateSchema>
+export type TVAlertsQualityConfigUpdate = z.infer<typeof TVAlertsQualityConfigUpdateSchema>
 export type AiSettingsUpdate = z.infer<typeof AiSettingsUpdateSchema>
 export type CreateConditionInput = z.infer<typeof CreateConditionSchema>
 export type TradeFinderConfigUpdate = z.infer<typeof TradeFinderConfigUpdateSchema>

@@ -1120,6 +1120,7 @@ export type TVAlertRejectionReason =
   | "manual_position_conflict"
   | "same_direction_exists"
   | "execution_failed"
+  | "low_confluence"
 
 /** Raw webhook payload from TradingView */
 export interface TVWebhookPayload {
@@ -1185,6 +1186,16 @@ export interface TVExecutionDetails {
   realizedPL?: number
   /** Financing/swap charges (backfilled after trade closes) */
   financing?: number
+  /** Confluence score (0-10) when signal quality engine is enabled */
+  confluenceScore?: number
+  /** Per-factor confluence breakdown */
+  confluenceBreakdown?: ConfluenceBreakdown
+  /** Calculated stop loss price (if auto-SL enabled) */
+  stopLossPrice?: number
+  /** Calculated take profit price (if auto-TP enabled) */
+  takeProfitPrice?: number
+  /** Position size multiplier applied by dynamic sizing (1.0 = base size) */
+  sizeMultiplier?: number
 }
 
 /** TV Alerts module configuration (persisted in DB) */
@@ -1349,6 +1360,157 @@ export interface TVAlertsDetailedStats {
   recentResults: TVSignalRecentResult[]
   /** Signal volume breakdown by instrument. */
   signalsByPair: TVSignalPairStats[]
+}
+
+// ─── Signal Confluence Engine ────────────────────────────────────────────────
+
+/** Names of individual confluence factors. */
+export type ConfluenceFactor = "trend" | "momentum" | "volatility" | "htfTrend" | "session"
+
+/** Detail for trend factor (EMA 50/200 alignment). */
+export interface TrendFactorDetail {
+  ema50: number
+  ema200: number
+  price: number
+  /** "with_trend" | "against_trend" | "neutral" */
+  alignment: string
+}
+
+/** Detail for momentum factor (RSI 14). */
+export interface MomentumFactorDetail {
+  rsi: number
+  /** "bullish" | "bearish" | "neutral" | "overbought" | "oversold" */
+  zone: string
+  directionMatch: boolean
+}
+
+/** Detail for volatility factor (ADX 14). */
+export interface VolatilityFactorDetail {
+  adx: number
+  plusDI: number
+  minusDI: number
+  /** "trending" | "weak_trend" | "ranging" */
+  regime: string
+}
+
+/** Detail for higher-timeframe trend factor. */
+export interface HTFTrendFactorDetail {
+  timeframe: string
+  ema50: number
+  ema200: number
+  /** "aligned" | "against" | "neutral" */
+  alignment: string
+}
+
+/** Detail for session quality factor. */
+export interface SessionFactorDetail {
+  session: string
+  isKillZone: boolean
+  isPairOptimal: boolean
+  sessionScore: number
+}
+
+/** Single factor result in a confluence evaluation. */
+export interface ConfluenceFactorResult<D = unknown> {
+  score: number
+  enabled: boolean
+  weight: number
+  detail: D
+}
+
+/** Full per-factor breakdown from a confluence evaluation. */
+export interface ConfluenceBreakdown {
+  trend: ConfluenceFactorResult<TrendFactorDetail>
+  momentum: ConfluenceFactorResult<MomentumFactorDetail>
+  volatility: ConfluenceFactorResult<VolatilityFactorDetail>
+  htfTrend: ConfluenceFactorResult<HTFTrendFactorDetail>
+  session: ConfluenceFactorResult<SessionFactorDetail>
+}
+
+/** Result of a full confluence evaluation. */
+export interface ConfluenceResult {
+  /** Weighted score from 0-10. */
+  score: number
+  /** Per-factor breakdown. */
+  breakdown: ConfluenceBreakdown
+  /** ATR value at signal timeframe (used for SL/TP calculation). */
+  atr: number
+  /** Whether the signal passed the minimum score threshold. */
+  passed: boolean
+}
+
+/** Signal quality / confluence engine configuration. */
+export interface TVAlertsQualityConfig {
+  /** Master toggle for the confluence engine. */
+  enabled: boolean
+  /** Minimum weighted score (0-10) required to execute a signal. */
+  minScore: number
+
+  /** Whether to evaluate EMA 50/200 trend alignment. */
+  trendFilter: boolean
+  /** Weight for trend factor (percentage, all enabled weights should sum to 100). */
+  trendWeight: number
+  /** Whether to evaluate RSI momentum confirmation. */
+  momentumFilter: boolean
+  /** Weight for momentum factor. */
+  momentumWeight: number
+  /** Whether to evaluate ADX volatility regime. */
+  volatilityFilter: boolean
+  /** Weight for volatility factor. */
+  volatilityWeight: number
+  /** Whether to evaluate higher-timeframe trend alignment. */
+  htfFilter: boolean
+  /** Weight for higher-TF factor. */
+  htfWeight: number
+  /** Whether to evaluate trading session quality. */
+  sessionFilter: boolean
+  /** Weight for session factor. */
+  sessionWeight: number
+
+  /** Whether to automatically set ATR-based stop loss on executed signals. */
+  autoSL: boolean
+  /** Stop loss distance = ATR × this multiplier. */
+  slAtrMultiplier: number
+  /** Whether to automatically set risk:reward-based take profit. */
+  autoTP: boolean
+  /** Take profit distance = SL distance × this ratio. */
+  tpRiskRewardRatio: number
+
+  /** Whether to scale position size based on confluence score. */
+  dynamicSizing: boolean
+  /** Score threshold for high-confidence sizing (scale up). */
+  highConfThreshold: number
+  /** Position size multiplier for high-confidence signals. */
+  highConfMultiplier: number
+  /** Score threshold for low-confidence sizing (scale down). */
+  lowConfThreshold: number
+  /** Position size multiplier for low-confidence signals. */
+  lowConfMultiplier: number
+}
+
+/** Default quality config values. */
+export const TV_ALERTS_QUALITY_DEFAULT_CONFIG: TVAlertsQualityConfig = {
+  enabled: false,
+  minScore: 5.0,
+  trendFilter: true,
+  trendWeight: 25,
+  momentumFilter: true,
+  momentumWeight: 20,
+  volatilityFilter: true,
+  volatilityWeight: 20,
+  htfFilter: true,
+  htfWeight: 20,
+  sessionFilter: true,
+  sessionWeight: 15,
+  autoSL: true,
+  slAtrMultiplier: 1.5,
+  autoTP: true,
+  tpRiskRewardRatio: 2.0,
+  dynamicSizing: false,
+  highConfThreshold: 7.5,
+  highConfMultiplier: 1.25,
+  lowConfThreshold: 5.5,
+  lowConfMultiplier: 0.75,
 }
 
 // ─── CF Worker ↔ Daemon Messages ───────────────────────────────────────────

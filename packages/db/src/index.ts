@@ -177,6 +177,8 @@ export {
   setTVAlertsKillSwitch,
 } from "./tv-alerts-config-service"
 
+export { getTVAlertsQualityConfig, updateTVAlertsQualityConfig } from "./tv-alerts-quality-service"
+
 export {
   createSignal,
   updateSignalStatus,

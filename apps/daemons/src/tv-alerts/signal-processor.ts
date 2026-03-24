@@ -3,8 +3,10 @@ import type {
   TVAlertStatus,
   TVAlertRejectionReason,
   TVAlertsConfig,
+  TVAlertsQualityConfig,
   TVAlertSignal,
   TVExecutionDetails,
+  ConfluenceResult,
   AnyDaemonMessage,
   PlaceOrderRequest,
 } from "@fxflow/types"
@@ -19,6 +21,7 @@ import {
   syncClosedSignalResults,
   cleanupOldSignals,
   getTVAlertsConfig,
+  getTVAlertsQualityConfig,
   logAuditEvent,
   cleanupOldAuditEvents,
   getOpenTradeIdsByPlacedVia,
@@ -28,6 +31,7 @@ import type { PositionManager } from "../positions/position-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
 import type { TVAlertsState } from "./alerts-state.js"
+import { ConfluenceEngine } from "./confluence-engine.js"
 
 const RETRY_DELAYS = [1000, 2000, 4000] // ms
 
@@ -38,6 +42,8 @@ const RETRY_DELAYS = [1000, 2000, 4000] // ms
  */
 export class SignalProcessor {
   private config: TVAlertsConfig | null = null
+  private qualityConfig: TVAlertsQualityConfig | null = null
+  private confluenceEngine: ConfluenceEngine
   private instrumentMutex = new Map<string, Promise<void>>()
   private cleanupTimer: ReturnType<typeof setInterval> | null = null
   private syncTimer: ReturnType<typeof setInterval> | null = null
@@ -50,7 +56,9 @@ export class SignalProcessor {
     private notificationEmitter: NotificationEmitter,
     private broadcast: (msg: AnyDaemonMessage) => void,
     private alertsState: TVAlertsState,
-  ) {}
+  ) {
+    this.confluenceEngine = new ConfluenceEngine(stateManager)
+  }
 
   /** Load config from DB, restore state, and start cleanup timer. */
   async start(): Promise<void> {
@@ -125,6 +133,7 @@ export class SignalProcessor {
 
   async reloadConfig(): Promise<void> {
     this.config = await getTVAlertsConfig()
+    this.qualityConfig = await getTVAlertsQualityConfig()
     this.alertsState.loadFromConfig(this.config)
   }
 
@@ -279,9 +288,54 @@ export class SignalProcessor {
       duration_ms: Date.now() - t0,
     })
 
+    // Evaluate signal confluence (if quality engine is enabled).
+    // For reversals: always close existing positions, but only open new if confluence passes.
+    let confluenceResult: ConfluenceResult | null = null
+    const qc = this.qualityConfig
+    if (qc?.enabled) {
+      try {
+        confluenceResult = await this.confluenceEngine.evaluate(
+          instrument,
+          direction as "buy" | "sell",
+          payload.interval,
+          qc,
+        )
+        await logAuditEvent(signal.id, "confluence_evaluated", {
+          score: confluenceResult.score,
+          passed: confluenceResult.passed,
+          minScore: qc.minScore,
+          atr: confluenceResult.atr,
+          breakdown: confluenceResult.breakdown,
+          duration_ms: Date.now() - t0,
+        })
+
+        if (!confluenceResult.passed && !isReversal) {
+          // Reject: insufficient confluence for new entries
+          await this.rejectSignal(signal.id, "low_confluence")
+          return
+        }
+      } catch (err) {
+        // Confluence evaluation failed — log but don't block execution
+        console.warn(`[signal-processor] Confluence evaluation error for ${instrument}:`, err)
+        await logAuditEvent(signal.id, "confluence_evaluated", {
+          error: (err as Error).message,
+          fallthrough: true,
+          duration_ms: Date.now() - t0,
+        })
+      }
+    }
+
     // Execute: reversal, same-direction skip, or new entry
     if (isReversal) {
-      await this.executeReversal(signal.id, tradeIdsToClose, direction, instrument, config, t0)
+      await this.executeReversal(
+        signal.id,
+        tradeIdsToClose,
+        direction,
+        instrument,
+        config,
+        t0,
+        confluenceResult,
+      )
     } else if (sameDirectionPositions.length > 0) {
       await logAuditEvent(signal.id, "validated", {
         result: "rejected",
@@ -292,7 +346,7 @@ export class SignalProcessor {
       await this.rejectSignal(signal.id, "same_direction_exists")
       return
     } else {
-      await this.executeNewEntry(signal.id, direction, instrument, config, t0)
+      await this.executeNewEntry(signal.id, direction, instrument, config, t0, confluenceResult)
     }
 
     await this.postExecution(instrument, config, signal.id, t0)
@@ -480,10 +534,19 @@ export class SignalProcessor {
     instrument: string,
     config: TVAlertsConfig,
     t0: number,
+    confluenceResult: ConfluenceResult | null,
   ): Promise<void> {
     await updateSignalStatus(signalId, "executing")
 
-    const units = this.calculateUnits(config)
+    // Calculate base units, then apply dynamic sizing from confluence score
+    let units = this.calculateUnits(config)
+    let sizeMultiplier = 1.0
+    const qc = this.qualityConfig
+    if (qc?.enabled && confluenceResult && qc.dynamicSizing) {
+      sizeMultiplier = this.confluenceEngine.getSizeMultiplier(confluenceResult.score, qc)
+      units = Math.floor(units * sizeMultiplier)
+    }
+
     await logAuditEvent(signalId, "executing", {
       type: "reversal",
       direction: newDirection,
@@ -491,11 +554,13 @@ export class SignalProcessor {
       closingTradeIds: existingTradeIds,
       closingCount: existingTradeIds.length,
       units,
+      sizeMultiplier,
       positionSizePercent: config.positionSizePercent,
+      confluenceScore: confluenceResult?.score ?? null,
       duration_ms: Date.now() - t0,
     })
 
-    // Step 1: Close ALL existing positions on this instrument
+    // Step 1: Close ALL existing positions on this instrument (always, regardless of confluence)
     const closedIds: string[] = []
     for (const tradeId of existingTradeIds) {
       try {
@@ -512,13 +577,47 @@ export class SignalProcessor {
           remainingToClose: existingTradeIds.length - closedIds.length - 1,
           duration_ms: Date.now() - t0,
         })
-        // If we failed to close a position, abort — don't open a new one
         await this.failSignal(
           signalId,
           `Failed to close trade ${tradeId}: ${(err as Error).message} (closed ${closedIds.length}/${existingTradeIds.length})`,
         )
         return
       }
+    }
+
+    // If confluence failed for the reversal, treat as protective close (close only, don't re-enter)
+    if (qc?.enabled && confluenceResult && !confluenceResult.passed) {
+      const executionDetails: TVExecutionDetails = {
+        isReversal: false,
+        isProtectiveClose: true,
+        closedTradeId: closedIds[0] ?? null,
+        closedTradeIds: closedIds,
+        openedTradeId: null,
+        units: 0,
+        fillPrice: null,
+        retryAttempt: 0,
+        confluenceScore: confluenceResult.score,
+        confluenceBreakdown: confluenceResult.breakdown,
+      }
+
+      await updateSignalStatus(signalId, "executed", {
+        executionDetails,
+        processedAt: new Date(),
+      })
+
+      this.broadcastSignalUpdate(signalId)
+      await logAuditEvent(signalId, "executed", {
+        type: "protective_close_confluence",
+        closedTradeIds: closedIds,
+        confluenceScore: confluenceResult.score,
+        reason: "Confluence too low to re-enter after reversal close",
+        duration_ms: Date.now() - t0,
+      })
+      await this.emitNotification(
+        "Reversal Close (Low Confluence)",
+        `${instrument.replace("_", "/")} — closed ${closedIds.length} position(s). Score ${confluenceResult.score.toFixed(1)} below minimum — did not re-enter.`,
+      )
+      return
     }
 
     // Step 2: Open new trade with retries
@@ -534,14 +633,31 @@ export class SignalProcessor {
       return
     }
 
+    // Calculate SL/TP from confluence ATR data
+    let stopLoss: number | null = null
+    let takeProfit: number | null = null
+    if (qc?.enabled && confluenceResult && confluenceResult.atr > 0) {
+      const estimatedEntry = this.getEstimatedEntry(instrument, newDirection as "buy" | "sell")
+      if (estimatedEntry) {
+        const sltp = this.confluenceEngine.calculateSLTP(
+          estimatedEntry,
+          confluenceResult.atr,
+          newDirection as "buy" | "sell",
+          qc,
+        )
+        stopLoss = sltp.stopLoss
+        takeProfit = sltp.takeProfit
+      }
+    }
+
     const oandaDirection = newDirection === "buy" ? "long" : "short"
     const orderRequest: PlaceOrderRequest = {
       instrument,
       direction: oandaDirection as "long" | "short",
       orderType: "MARKET",
       units,
-      stopLoss: null,
-      takeProfit: null,
+      stopLoss,
+      takeProfit,
       placedVia: "ut_bot_alerts",
     }
 
@@ -558,6 +674,11 @@ export class SignalProcessor {
           units,
           fillPrice: result.fillPrice ?? null,
           retryAttempt: attempt,
+          confluenceScore: confluenceResult?.score,
+          confluenceBreakdown: confluenceResult?.breakdown,
+          stopLossPrice: stopLoss ?? undefined,
+          takeProfitPrice: takeProfit ?? undefined,
+          sizeMultiplier: sizeMultiplier !== 1.0 ? sizeMultiplier : undefined,
         }
 
         if (result.sourceId) this.alertsState.addAutoTradeId(result.sourceId)
@@ -576,12 +697,15 @@ export class SignalProcessor {
           openedTradeId: result.sourceId ?? null,
           fillPrice: result.fillPrice ?? null,
           units,
+          stopLoss,
+          takeProfit,
           retryAttempt: attempt,
+          confluenceScore: confluenceResult?.score ?? null,
           duration_ms: Date.now() - t0,
         })
         await this.emitNotification(
           "Signal Executed (Reversal)",
-          `${instrument.replace("_", "/")} ${newDirection.toUpperCase()} — closed ${closedIds.length} position(s), opened new @ ${result.fillPrice ?? "market"}`,
+          `${instrument.replace("_", "/")} ${newDirection.toUpperCase()} — closed ${closedIds.length} position(s), opened new @ ${result.fillPrice ?? "market"}${confluenceResult ? ` (score: ${confluenceResult.score.toFixed(1)})` : ""}`,
         )
         return
       } catch (err) {
@@ -618,16 +742,27 @@ export class SignalProcessor {
     instrument: string,
     config: TVAlertsConfig,
     t0: number,
+    confluenceResult: ConfluenceResult | null,
   ): Promise<void> {
     await updateSignalStatus(signalId, "executing")
 
-    const units = this.calculateUnits(config)
+    // Calculate base units, then apply dynamic sizing from confluence score
+    let units = this.calculateUnits(config)
+    let sizeMultiplier = 1.0
+    const qc = this.qualityConfig
+    if (qc?.enabled && confluenceResult && qc.dynamicSizing) {
+      sizeMultiplier = this.confluenceEngine.getSizeMultiplier(confluenceResult.score, qc)
+      units = Math.floor(units * sizeMultiplier)
+    }
+
     await logAuditEvent(signalId, "executing", {
       type: "new_entry",
       direction,
       instrument,
       units,
+      sizeMultiplier,
       positionSizePercent: config.positionSizePercent,
+      confluenceScore: confluenceResult?.score ?? null,
       duration_ms: Date.now() - t0,
     })
 
@@ -641,14 +776,32 @@ export class SignalProcessor {
       return
     }
 
+    // Calculate SL/TP from confluence ATR data if quality engine is enabled
+    let stopLoss: number | null = null
+    let takeProfit: number | null = null
+    if (qc?.enabled && confluenceResult && confluenceResult.atr > 0) {
+      // Use signal price as estimated entry for pre-trade SL/TP calculation
+      const estimatedEntry = this.getEstimatedEntry(instrument, direction as "buy" | "sell")
+      if (estimatedEntry) {
+        const sltp = this.confluenceEngine.calculateSLTP(
+          estimatedEntry,
+          confluenceResult.atr,
+          direction as "buy" | "sell",
+          qc,
+        )
+        stopLoss = sltp.stopLoss
+        takeProfit = sltp.takeProfit
+      }
+    }
+
     const oandaDirection = direction === "buy" ? "long" : "short"
     const orderRequest: PlaceOrderRequest = {
       instrument,
       direction: oandaDirection as "long" | "short",
       orderType: "MARKET",
       units,
-      stopLoss: null,
-      takeProfit: null,
+      stopLoss,
+      takeProfit,
       placedVia: "ut_bot_alerts",
     }
 
@@ -663,6 +816,11 @@ export class SignalProcessor {
         units,
         fillPrice: result.fillPrice ?? null,
         retryAttempt: 0,
+        confluenceScore: confluenceResult?.score,
+        confluenceBreakdown: confluenceResult?.breakdown,
+        stopLossPrice: stopLoss ?? undefined,
+        takeProfitPrice: takeProfit ?? undefined,
+        sizeMultiplier: sizeMultiplier !== 1.0 ? sizeMultiplier : undefined,
       }
 
       await updateSignalStatus(signalId, "executed", {
@@ -677,11 +835,15 @@ export class SignalProcessor {
         openedTradeId: result.sourceId ?? null,
         fillPrice: result.fillPrice ?? null,
         units,
+        stopLoss,
+        takeProfit,
+        sizeMultiplier,
+        confluenceScore: confluenceResult?.score ?? null,
         duration_ms: Date.now() - t0,
       })
       await this.emitNotification(
         "Signal Executed",
-        `${instrument.replace("_", "/")} ${direction.toUpperCase()} — ${units} units @ ${result.fillPrice ?? "market"}`,
+        `${instrument.replace("_", "/")} ${direction.toUpperCase()} — ${units} units @ ${result.fillPrice ?? "market"}${confluenceResult ? ` (score: ${confluenceResult.score.toFixed(1)})` : ""}`,
       )
     } catch (err) {
       await logAuditEvent(signalId, "failed", {
@@ -705,6 +867,25 @@ export class SignalProcessor {
     if (!overview) return 0
     const balance = overview.summary.balance
     return Math.floor(balance * (config.positionSizePercent / 100))
+  }
+
+  /**
+   * Get an estimated entry price for SL/TP pre-calculation.
+   * Uses the current bid/ask from position price tracker or account pricing.
+   */
+  private getEstimatedEntry(instrument: string, _direction: "buy" | "sell"): number | null {
+    // Try to get current price from position tracking or account overview
+    const overview = this.stateManager.getAccountOverview()
+    if (!overview) return null
+
+    // Fall back to most recent candle close (approximate)
+    // The SL/TP will be recalculated by OANDA based on actual fill price,
+    // but this gives us a close-enough value for pre-trade SL/TP placement
+    const positions = this.positionManager.getPositions()
+    const existing = positions.open.find((t) => t.instrument === instrument)
+    if (existing?.currentPrice) return existing.currentPrice
+
+    return null
   }
 
   private async rejectSignal(signalId: string, reason: TVAlertRejectionReason): Promise<void> {

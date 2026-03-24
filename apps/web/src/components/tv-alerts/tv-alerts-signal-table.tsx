@@ -18,6 +18,10 @@ import {
 import { useTVAlertsSignals } from "@/hooks/use-tv-alerts-signals"
 import { cn } from "@/lib/utils"
 import { SignalAuditTrail } from "./signal-audit-trail"
+import {
+  ConfluenceScoreBadge,
+  ConfluenceBreakdownView as ConfluenceBreakdownInline,
+} from "./signal-confluence-badge"
 import type { TVAlertSignal, TVAlertStatus } from "@fxflow/types"
 
 const STATUS_STYLES: Record<TVAlertStatus, { dot: string; label: string; badge: string }> = {
@@ -330,6 +334,11 @@ function SignalCard({
           {style.label}
         </Badge>
 
+        {/* Confluence score badge (if available) */}
+        {signal.executionDetails?.confluenceScore != null && (
+          <ConfluenceScoreBadge score={signal.executionDetails.confluenceScore} />
+        )}
+
         {/* Reason (if any) */}
         {reason && (
           <span className="text-muted-foreground hidden truncate text-[10px] md:inline">
@@ -390,6 +399,48 @@ function SignalCard({
                   {JSON.stringify(signal.rawPayload, null, 2)}
                 </pre>
               </details>
+            )}
+
+            {signal.executionDetails?.confluenceBreakdown && (
+              <details className="text-xs" open>
+                <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[11px] font-medium">
+                  Confluence Breakdown (Score:{" "}
+                  {signal.executionDetails.confluenceScore?.toFixed(1) ?? "N/A"})
+                </summary>
+                <div className="mt-1.5">
+                  <ConfluenceBreakdownInline
+                    breakdown={signal.executionDetails.confluenceBreakdown}
+                  />
+                </div>
+              </details>
+            )}
+
+            {signal.executionDetails?.stopLossPrice != null && (
+              <p className="text-muted-foreground text-xs">
+                SL:{" "}
+                <span className="font-mono">
+                  {signal.executionDetails.stopLossPrice.toFixed(5)}
+                </span>
+                {signal.executionDetails.takeProfitPrice != null && (
+                  <>
+                    {" "}
+                    | TP:{" "}
+                    <span className="font-mono">
+                      {signal.executionDetails.takeProfitPrice.toFixed(5)}
+                    </span>
+                  </>
+                )}
+                {signal.executionDetails.sizeMultiplier != null &&
+                  signal.executionDetails.sizeMultiplier !== 1 && (
+                    <>
+                      {" "}
+                      | Size:{" "}
+                      <span className="font-mono">
+                        {signal.executionDetails.sizeMultiplier.toFixed(2)}x
+                      </span>
+                    </>
+                  )}
+              </p>
             )}
 
             {signal.resultTradeId && (

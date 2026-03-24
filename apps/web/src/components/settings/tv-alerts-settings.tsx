@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label"
 import { useTVAlertsConfig } from "@/hooks/use-tv-alerts-config"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { cn } from "@/lib/utils"
+import { TVAlertsQualitySettings } from "./tv-alerts-quality-settings"
 
 export function TVAlertsSettings() {
   const {
@@ -477,6 +478,9 @@ export function TVAlertsSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Signal Quality / Confluence Engine */}
+      <TVAlertsQualitySettings />
     </div>
   )
 }

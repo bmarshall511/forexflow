@@ -43,7 +43,24 @@ export {
   type RiskRewardResult,
 } from "./pip-utils"
 
-export { TIMEFRAME_OPTIONS } from "./timeframe-utils"
+export {
+  TIMEFRAME_OPTIONS,
+  mapTVIntervalToGranularity,
+  getCandleCountForGranularity,
+} from "./timeframe-utils"
+
+export {
+  scoreTrend,
+  scoreMomentum,
+  scoreVolatility,
+  scoreHTFTrend,
+  scoreSession,
+  calculateWeightedScore,
+  buildConfluenceResult,
+  calculateATRStopLoss,
+  calculateRRTakeProfit,
+  calculateSizeMultiplier,
+} from "./confluence-scoring"
 
 export {
   FOREX_PAIR_GROUPS,
