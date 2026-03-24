@@ -13,6 +13,7 @@
  */
 import { app, BrowserWindow } from "electron"
 import path from "node:path"
+import net from "node:net"
 import {
   appendFileSync,
   copyFileSync,
@@ -61,9 +62,42 @@ if (!gotTheLock) {
 }
 
 /** Port for the embedded web server — avoids conflict with dev server on 3000. */
-const WEB_SERVER_PORT = 3456
+let WEB_SERVER_PORT = 3456
 /** Port for the desktop daemon — avoids conflict with dev daemon on 4100. */
-const DAEMON_PORT = 4200
+let DAEMON_PORT = 4200
+
+const PORT_SCAN_MAX_ATTEMPTS = 5
+
+/** Check if a port is available by attempting to bind to it. */
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+    server.once("error", () => resolve(false))
+    server.once("listening", () => {
+      server.close(() => resolve(true))
+    })
+    server.listen(port, "127.0.0.1")
+  })
+}
+
+/** Find an available port starting from the given port, trying up to maxAttempts consecutive ports. */
+async function findAvailablePort(startPort: number, label: string): Promise<number> {
+  for (let i = 0; i < PORT_SCAN_MAX_ATTEMPTS; i++) {
+    const port = startPort + i
+    if (await isPortAvailable(port)) {
+      if (i > 0) {
+        log(`[ports] ${label} port ${startPort} was occupied, using ${port} instead`)
+      }
+      return port
+    }
+    log(`[ports] ${label} port ${port} is in use, trying next...`)
+  }
+  // Fall back to the original port and let the process fail with a clear error
+  log(
+    `[ports] WARNING: No available port found for ${label} after ${PORT_SCAN_MAX_ATTEMPTS} attempts, using ${startPort}`,
+  )
+  return startPort
+}
 
 let mainWindow: BrowserWindow | null = null
 let webServerProcess: ChildProcess | null = null
@@ -175,11 +209,17 @@ app.whenReady().then(async () => {
   log("[startup] app.whenReady fired")
   const mode = store.get("deploymentMode")
   log(`[startup] deploymentMode: ${mode}`)
-  const env = buildChildEnv()
 
   // Show splash screen immediately so user sees the app is loading
   const splash = createSplashWindow()
   log("[startup] Splash window created")
+
+  // Resolve available ports before starting anything
+  DAEMON_PORT = await findAvailablePort(DAEMON_PORT, "daemon")
+  WEB_SERVER_PORT = await findAvailablePort(WEB_SERVER_PORT, "web-server")
+  log(`[startup] Using ports — web: ${WEB_SERVER_PORT}, daemon: ${DAEMON_PORT}`)
+
+  const env = buildChildEnv()
 
   // Ensure data directory and database exist (local mode)
   if (mode === "local") {
@@ -207,6 +247,13 @@ app.whenReady().then(async () => {
     daemonManager = new DaemonManager((running) => {
       if (mainWindow) {
         trayManager.setDaemonStatus(running, mainWindow)
+      }
+    })
+    daemonManager.onDaemonReady((status) => {
+      if (status === "ready") {
+        log("[startup] Daemon is healthy and ready")
+      } else {
+        log("[startup] WARNING: Daemon failed to become healthy within timeout")
       }
     })
     daemonManager.start(env)

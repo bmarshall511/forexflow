@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { daemonGet } from "../lib/daemon-client.js"
+import { formatDaemonError } from "../lib/errors.js"
 import type { DaemonStatusSnapshot } from "@fxflow/types"
 
 export function registerAccountTools(server: McpServer) {
@@ -36,12 +37,7 @@ export function registerAccountTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
+          content: [{ type: "text" as const, text: formatDaemonError(error) }],
           isError: true,
         }
       }
@@ -60,12 +56,7 @@ export function registerAccountTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
+          content: [{ type: "text" as const, text: formatDaemonError(error) }],
           isError: true,
         }
       }

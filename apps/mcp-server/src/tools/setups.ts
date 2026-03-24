@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
 import { daemonGet } from "../lib/daemon-client.js"
+import { formatDaemonError } from "../lib/errors.js"
 import { getSetupHistory } from "@fxflow/db"
 
 export function registerSetupTools(server: McpServer) {
@@ -16,12 +17,7 @@ export function registerSetupTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
+          content: [{ type: "text" as const, text: formatDaemonError(error) }],
           isError: true,
         }
       }

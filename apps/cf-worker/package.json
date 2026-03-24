@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@fxflow/shared": "workspace:*",
-    "@fxflow/types": "workspace:*"
+    "@fxflow/types": "workspace:*",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4",

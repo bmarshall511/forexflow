@@ -1,5 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 import { getServerDaemonUrl } from "@/lib/daemon-url"
+import { withLogging } from "@/lib/api-logger"
 
 /**
  * Proxy route for daemon REST API calls from remote clients.
@@ -12,11 +13,8 @@ import { getServerDaemonUrl } from "@/lib/daemon-url"
 
 const DAEMON_URL = getServerDaemonUrl()
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> },
-): Promise<NextResponse> {
-  const { path } = await params
+export const GET = withLogging(async (_request, { params }) => {
+  const { path } = (await params) as { path: string[] }
   const daemonPath = `/${path.join("/")}`
 
   try {
@@ -31,13 +29,10 @@ export async function GET(
       { status: 502 },
     )
   }
-}
+})
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> },
-): Promise<NextResponse> {
-  const { path } = await params
+export const POST = withLogging(async (request, { params }) => {
+  const { path } = (await params) as { path: string[] }
   const daemonPath = `/${path.join("/")}`
 
   try {
@@ -55,4 +50,4 @@ export async function POST(
       { status: 502 },
     )
   }
-}
+})

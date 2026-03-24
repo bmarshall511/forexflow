@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
 import { daemonGet } from "../lib/daemon-client.js"
+import { formatDaemonError } from "../lib/errors.js"
 import { listTrades, getTradeWithDetails } from "@fxflow/db"
 
 export function registerTradeTools(server: McpServer) {
@@ -18,12 +19,7 @@ export function registerTradeTools(server: McpServer) {
         }
       } catch (error) {
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error fetching open trades: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
+          content: [{ type: "text" as const, text: formatDaemonError(error) }],
           isError: true,
         }
       }
@@ -40,12 +36,7 @@ export function registerTradeTools(server: McpServer) {
       }
     } catch (error) {
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error fetching pending orders: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
+        content: [{ type: "text" as const, text: formatDaemonError(error) }],
         isError: true,
       }
     }

@@ -8,6 +8,52 @@ interface Env {
   DAEMON_SECRET: string
 }
 
+// ─── IP-based Rate Limiter ──────────────────────────────────────────────────
+
+const RATE_LIMIT_MAX = 10
+const RATE_LIMIT_WINDOW_MS = 60_000
+
+interface RateLimitEntry {
+  count: number
+  resetAt: number
+}
+
+const rateLimitMap = new Map<string, RateLimitEntry>()
+
+/**
+ * Check rate limit for a given IP. Returns null if allowed,
+ * or the number of seconds until the window resets if exceeded.
+ */
+function checkRateLimit(ip: string): number | null {
+  const now = Date.now()
+
+  // Sweep expired entries (simple linear scan, safe for moderate cardinality)
+  for (const [key, entry] of rateLimitMap) {
+    if (now >= entry.resetAt) {
+      rateLimitMap.delete(key)
+    }
+  }
+
+  const existing = rateLimitMap.get(ip)
+
+  if (!existing || now >= existing.resetAt) {
+    // New window
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return null
+  }
+
+  existing.count++
+
+  if (existing.count > RATE_LIMIT_MAX) {
+    const retryAfterSeconds = Math.ceil((existing.resetAt - now) / 1000)
+    return retryAfterSeconds
+  }
+
+  return null
+}
+
+// ─── Worker Entry Point ─────────────────────────────────────────────────────
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -21,6 +67,13 @@ export default {
 
     // ─── Webhook Endpoint: POST /webhook/{token} ──────────────────────────
     if (request.method === "POST" && url.pathname.startsWith("/webhook/")) {
+      // Rate limit by source IP before any other processing
+      const clientIP = request.headers.get("CF-Connecting-IP") ?? "unknown"
+      const retryAfter = checkRateLimit(clientIP)
+      if (retryAfter !== null) {
+        return jsonResponse({ status: "rate_limited", retryAfterSeconds: retryAfter }, 429)
+      }
+
       const token = url.pathname.split("/webhook/")[1]
       if (!token || token !== env.WEBHOOK_TOKEN) {
         // Always return 200 to TradingView to prevent retries
@@ -28,7 +81,6 @@ export default {
       }
 
       // Validate TradingView IP (test signals bypass via daemon secret header)
-      const clientIP = request.headers.get("CF-Connecting-IP")
       if (!isAllowedIP(clientIP) && !isTestSignal(request, env.DAEMON_SECRET)) {
         return jsonResponse({ status: "rejected", reason: "ip_not_allowed" }, 200)
       }

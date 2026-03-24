@@ -1,5 +1,6 @@
 import { mapTVTickerToOandaInstrument } from "@fxflow/shared"
 import type { TVWebhookPayload } from "@fxflow/types"
+import { webhookPayloadSchema } from "./webhook-schema"
 
 /** Signal message sent to daemon over WebSocket */
 interface SignalMessage {
@@ -54,32 +55,50 @@ export class AlertRouter implements DurableObject {
   // ─── Webhook Handler ───────────────────────────────────────────────────────
 
   private async handleWebhook(request: Request): Promise<Response> {
-    let body: Record<string, unknown>
+    let body: unknown
     try {
-      body = (await request.json()) as Record<string, unknown>
+      body = await request.json()
     } catch {
       return jsonResponse({ status: "rejected", reason: "invalid_json" }, 200)
     }
 
-    // Validate required fields
-    const action = typeof body.action === "string" ? body.action.toLowerCase() : ""
-    if (action !== "buy" && action !== "sell") {
-      return jsonResponse({ status: "rejected", reason: "invalid_action" }, 200)
+    // Validate payload with Zod schema
+    const result = webhookPayloadSchema.safeParse(body)
+    if (!result.success) {
+      const firstIssue = result.error.issues[0]
+      const field = firstIssue?.path[0] ?? "unknown"
+      const reason =
+        field === "action"
+          ? "invalid_action"
+          : field === "ticker"
+            ? "missing_ticker"
+            : `invalid_field:${String(field)}`
+      return jsonResponse(
+        {
+          status: "rejected",
+          reason,
+          errors: result.error.issues.map((i) => ({
+            field: i.path.join("."),
+            message: i.message,
+          })),
+        },
+        200,
+      )
     }
 
-    const ticker = body.ticker
-    if (!ticker || typeof ticker !== "string") {
-      return jsonResponse({ status: "rejected", reason: "missing_ticker" }, 200)
-    }
+    const parsed = result.data
 
     // Map ticker to OANDA instrument
-    const instrument = mapTVTickerToOandaInstrument(ticker)
+    const instrument = mapTVTickerToOandaInstrument(parsed.ticker)
     if (!instrument) {
-      return jsonResponse({ status: "rejected", reason: "unknown_instrument", ticker }, 200)
+      return jsonResponse(
+        { status: "rejected", reason: "unknown_instrument", ticker: parsed.ticker },
+        200,
+      )
     }
 
     // Dedup check
-    const dedupKey = `${instrument}:${action}`
+    const dedupKey = `${instrument}:${parsed.action}`
     const now = Date.now()
     const lastSeen = this.dedupMap.get(dedupKey)
     if (lastSeen && now - lastSeen < DEDUP_WINDOW_MS) {
@@ -92,34 +111,18 @@ export class AlertRouter implements DurableObject {
       if (now - ts > DEDUP_WINDOW_MS * 2) this.dedupMap.delete(key)
     }
 
-    // Build the typed webhook payload
-    // Handle price/close as string or number (TradingView sends {{close}} as a string)
-    const rawPrice = body.price ?? body.close
-    const parsedPrice =
-      typeof rawPrice === "number"
-        ? rawPrice
-        : typeof rawPrice === "string"
-          ? parseFloat(rawPrice) || undefined
-          : undefined
-
-    // Parse interval — may come as number from TradingView (e.g., 15, 60)
-    const rawInterval = body.interval
-    const parsedInterval =
-      typeof rawInterval === "string"
-        ? rawInterval
-        : typeof rawInterval === "number"
-          ? String(rawInterval)
-          : undefined
+    // Resolve price: prefer explicit price, fall back to close
+    const resolvedPrice = parsed.price ?? parsed.close
 
     const signalId = crypto.randomUUID()
 
     const payload: TVWebhookPayload = {
-      action: action as "buy" | "sell",
-      ticker,
-      price: parsedPrice,
-      exchange: typeof body.exchange === "string" ? body.exchange : undefined,
-      interval: parsedInterval,
-      time: typeof body.time === "string" ? body.time : undefined,
+      action: parsed.action,
+      ticker: parsed.ticker,
+      price: resolvedPrice,
+      exchange: parsed.exchange,
+      interval: parsed.interval,
+      time: parsed.time,
       signalId,
     }
 
@@ -134,7 +137,7 @@ export class AlertRouter implements DurableObject {
     if (this.daemonWs && this.daemonWs.readyState === WebSocket.OPEN) {
       try {
         this.daemonWs.send(JSON.stringify(signal))
-        return jsonResponse({ status: "ok", instrument, action }, 200)
+        return jsonResponse({ status: "ok", instrument, action: parsed.action }, 200)
       } catch {
         // WS send failed, queue it
       }
@@ -146,7 +149,7 @@ export class AlertRouter implements DurableObject {
     }
     this.missedQueue.push({ message: signal, queuedAt: now })
 
-    return jsonResponse({ status: "queued", instrument, action }, 200)
+    return jsonResponse({ status: "queued", instrument, action: parsed.action }, 200)
   }
 
   // ─── Daemon WebSocket Handler ──────────────────────────────────────────────
