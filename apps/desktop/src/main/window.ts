@@ -44,8 +44,6 @@ export function createMainWindow(): BrowserWindow {
   // Show when ready to avoid white flash
   win.once("ready-to-show", () => {
     win.show()
-    // Auto-open DevTools for debugging blank screen
-    win.webContents.openDevTools({ mode: "detach" })
   })
 
   // Log navigation events
