@@ -69,7 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
         badgeKey: "aiTrader",
         statusKey: "aiTrader",
       },
-      { label: "SmartFlow", href: "/smart-flow", icon: Zap },
+      { label: "SmartFlow", href: "/smart-flow", icon: Zap, statusKey: "smartFlow" },
       { label: "Alerts", href: "/alerts", icon: Bell },
     ],
   },

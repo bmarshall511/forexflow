@@ -16,9 +16,59 @@ export interface SidebarStatus {
 export function useSidebarStatus(): Record<string, SidebarStatus> {
   const { tradeFinderScanStatus, tradeFinderSetupCounts } = useTradeFinderNavData()
   const { lastAiTraderScanStatus, lastAiTraderScanProgress } = useDaemonConnection()
+  const smartFlowNavData = useSmartFlowNavData()
 
   return useMemo(() => {
     const result: Record<string, SidebarStatus> = {}
+
+    // ─── SmartFlow status ─────────────────────────────────────────────
+    if (smartFlowNavData) {
+      const {
+        scannerEnabled,
+        scanning,
+        lastScanAt,
+        nextScanAt,
+        found,
+        placed,
+        activeTrades,
+        paused,
+        pauseReason,
+        error,
+      } = smartFlowNavData
+      let line1: string
+      let line2: string | undefined
+      let variant: SidebarStatus["variant"] = "default"
+
+      if (error) {
+        line1 = "Something went wrong"
+        variant = "error"
+      } else if (!scannerEnabled) {
+        line1 = "Scanner off"
+        variant = "default"
+      } else if (paused) {
+        line1 = pauseReason ?? "Paused"
+        variant = "warning"
+      } else if (scanning) {
+        line1 = "Scanning markets..."
+        variant = "active"
+      } else if (nextScanAt) {
+        line1 = `Scans again in ${formatCountdown(nextScanAt)}`
+      } else if (lastScanAt) {
+        line1 = `Scanned ${formatTimeAgo(lastScanAt)}`
+      } else {
+        line1 = "Ready"
+      }
+
+      if (activeTrades > 0) {
+        line2 = `${activeTrades} trade${activeTrades !== 1 ? "s" : ""} active`
+      } else if (found > 0) {
+        line2 = `${found} found, ${placed} placed`
+      } else if (scannerEnabled && lastScanAt) {
+        line2 = "No opportunities right now"
+      }
+
+      result.smartFlow = { line1, line2, variant }
+    }
 
     // ─── EdgeFinder status ────────────────────────────────────────────
     if (lastAiTraderScanStatus) {
@@ -106,6 +156,7 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
 
     return result
   }, [
+    smartFlowNavData,
     tradeFinderScanStatus,
     tradeFinderSetupCounts,
     lastAiTraderScanStatus,
@@ -147,6 +198,90 @@ function useTradeFinderNavData() {
     tradeFinderScanStatus,
     tradeFinderSetupCounts: setupCounts,
   }
+}
+
+/** Gathers SmartFlow scanner data for the sidebar nav status. */
+function useSmartFlowNavData() {
+  const [data, setData] = useState<{
+    scannerEnabled: boolean
+    scanning: boolean
+    lastScanAt: string | null
+    nextScanAt: string | null
+    found: number
+    placed: number
+    activeTrades: number
+    paused: boolean
+    pauseReason: string | null
+    error: boolean
+  } | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/daemon/smart-flow/scanner/status")
+        if (!res.ok || !mountedRef.current) return
+        const json = (await res.json()) as {
+          ok: boolean
+          progress: {
+            phase: string
+            lastScanAt: string | null
+            nextScanAt: string | null
+            opportunitiesFound: number
+            opportunitiesPlaced: number
+          } | null
+          circuitBreaker: { paused: boolean; reason: string | null } | null
+        }
+        if (!json.ok || !mountedRef.current) return
+
+        // Also fetch active trade count
+        let activeTrades = 0
+        try {
+          const tradesRes = await fetch("/api/smart-flow/trades")
+          if (tradesRes.ok) {
+            const tradesJson = (await tradesRes.json()) as {
+              ok: boolean
+              data?: Array<{ status: string }>
+            }
+            if (tradesJson.ok && tradesJson.data) {
+              activeTrades = tradesJson.data.filter(
+                (t) => t.status !== "closed" && t.status !== "waiting_entry",
+              ).length
+            }
+          }
+        } catch {
+          // Non-critical
+        }
+
+        const p = json.progress
+        const scanning =
+          p?.phase === "scanning" || p?.phase === "analyzing" || p?.phase === "placing"
+        setData({
+          scannerEnabled: (p != null && p.phase !== "idle") || p?.lastScanAt != null,
+          scanning: scanning ?? false,
+          lastScanAt: p?.lastScanAt ?? null,
+          nextScanAt: p?.nextScanAt ?? null,
+          found: p?.opportunitiesFound ?? 0,
+          placed: p?.opportunitiesPlaced ?? 0,
+          activeTrades,
+          paused: json.circuitBreaker?.paused ?? false,
+          pauseReason: json.circuitBreaker?.reason ?? null,
+          error: p?.phase === "error",
+        })
+      } catch {
+        // Daemon unreachable
+      }
+    }
+    void fetchData()
+    const interval = setInterval(fetchData, 15_000)
+    return () => {
+      mountedRef.current = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  return data
 }
 
 function formatCountdown(isoDate: string): string {

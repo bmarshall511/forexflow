@@ -2,8 +2,21 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Radar, RefreshCw, AlertTriangle, TrendingUp, Filter, CheckCircle2 } from "lucide-react"
-import type { SmartFlowScanProgress, SmartFlowScannerCircuitBreakerState } from "@fxflow/types"
+import {
+  Radar,
+  RefreshCw,
+  AlertTriangle,
+  TrendingUp,
+  Filter,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react"
+import type {
+  SmartFlowScanProgress,
+  SmartFlowScannerCircuitBreakerState,
+  SmartFlowScanLogEntry,
+} from "@fxflow/types"
 
 interface ScannerStatusBarProps {
   daemonUrl: string
@@ -15,21 +28,18 @@ interface StatusApiResponse {
   circuitBreaker: SmartFlowScannerCircuitBreakerState | null
 }
 
-function formatTimeDistance(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
+function timeAgo(dateStr: string): string {
+  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
   if (mins < 1) return "just now"
   if (mins === 1) return "1 min ago"
   if (mins < 60) return `${mins} min ago`
   const hrs = Math.floor(mins / 60)
-  if (hrs === 1) return "1 hr ago"
-  return `${hrs} hrs ago`
+  return hrs === 1 ? "1 hr ago" : `${hrs} hrs ago`
 }
 
-function formatTimeUntil(dateStr: string): string {
-  const diff = new Date(dateStr).getTime() - Date.now()
-  if (diff <= 0) return "soon"
-  const mins = Math.ceil(diff / 60000)
+function timeUntil(dateStr: string): string {
+  const mins = Math.ceil((new Date(dateStr).getTime() - Date.now()) / 60000)
+  if (mins <= 0) return "soon"
   if (mins === 1) return "in 1 min"
   if (mins < 60) return `in ${mins} min`
   const hrs = Math.floor(mins / 60)
@@ -51,25 +61,38 @@ function resolveState(
 ): DisplayState {
   if (!progress) return "off"
   if (cb?.paused) return "paused"
-  if (
-    progress.phase === "scanning" ||
-    progress.phase === "analyzing" ||
-    progress.phase === "placing"
-  )
-    return "scanning"
-  if (progress.phase === "idle" || progress.phase === "complete") return "idle"
-  if (progress.phase === "error") return "idle"
+  const p = progress.phase
+  if (p === "scanning" || p === "analyzing" || p === "placing") return "scanning"
+  if (p === "idle" || p === "complete" || p === "error") return "idle"
   return "off"
+}
+
+const LOG_ICONS: Record<string, { icon: string; color: string }> = {
+  opportunity_found: { icon: "✓", color: "text-emerald-500" },
+  opportunity_filtered: { icon: "✕", color: "text-amber-500" },
+  opportunity_placed: { icon: "⚡", color: "text-teal-500" },
+  scan_complete: { icon: "●", color: "text-blue-500" },
+  scan_start: { icon: "→", color: "text-muted-foreground" },
+  error: { icon: "!", color: "text-red-500" },
 }
 
 export function ScannerStatusBar({ daemonUrl }: ScannerStatusBarProps) {
   const [data, setData] = useState<StatusApiResponse | null>(null)
+  const [scanLog, setScanLog] = useState<SmartFlowScanLogEntry[]>([])
   const [scanning, setScanning] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch(`${daemonUrl}/smart-flow/scanner/status`)
-      if (res.ok) setData((await res.json()) as StatusApiResponse)
+      const [statusRes, logRes] = await Promise.all([
+        fetch(`${daemonUrl}/smart-flow/scanner/status`),
+        fetch(`${daemonUrl}/smart-flow/scanner/log`),
+      ])
+      if (statusRes.ok) setData((await statusRes.json()) as StatusApiResponse)
+      if (logRes.ok) {
+        const logJson = (await logRes.json()) as { ok: boolean; log: SmartFlowScanLogEntry[] }
+        if (logJson.ok) setScanLog(logJson.log)
+      }
     } catch {
       /* daemon unreachable */
     }
@@ -110,65 +133,58 @@ export function ScannerStatusBar({ daemonUrl }: ScannerStatusBarProps) {
   const placed = progress.opportunitiesPlaced
   const filtered = found - placed
 
+  // Get recent interesting log entries (last scan's results)
+  const recentLog = scanLog
+    .filter((e) => e.type !== "scan_start")
+    .slice(-10)
+    .reverse()
+
   return (
-    <div className="space-y-2">
-      {/* Status row */}
+    <div className="space-y-0">
+      {/* Main status row */}
       <div
         className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-4 py-2.5 text-sm"
         role="status"
         aria-label={`Scanner ${label}`}
       >
-        {/* Status indicator */}
         <span className="flex items-center gap-1.5">
           <Radar className="text-muted-foreground size-3.5" aria-hidden="true" />
           <span className={`size-2 rounded-full ${dotClass}`} aria-hidden="true" />
           <span className="font-medium">{label}</span>
         </span>
 
-        {/* Timing */}
         <span className="text-muted-foreground text-xs">
-          {hasScanned ? `Last scan ${formatTimeDistance(progress.lastScanAt!)}` : "No scans yet"}
+          {hasScanned ? `Last scan ${timeAgo(progress.lastScanAt!)}` : "No scans yet"}
         </span>
         {progress.nextScanAt && state !== "off" && (
           <span className="text-muted-foreground hidden text-xs sm:inline">
-            Next {formatTimeUntil(progress.nextScanAt)}
+            Next {timeUntil(progress.nextScanAt)}
           </span>
         )}
 
-        {/* Scan results summary — only show if we've scanned */}
+        {/* Results summary */}
         {hasScanned && (
           <span className="hidden items-center gap-3 text-xs md:flex">
-            <span className="flex items-center gap-1">
+            <span className="text-muted-foreground flex items-center gap-1">
               <TrendingUp className="size-3 text-blue-500" aria-hidden="true" />
-              <span className="text-muted-foreground">{progress.pairsScanned} pairs checked</span>
+              {progress.pairsScanned} pairs
             </span>
-            <span className="flex items-center gap-1">
-              <CheckCircle2
-                className={`size-3 ${found > 0 ? "text-emerald-500" : "text-muted-foreground"}`}
-                aria-hidden="true"
-              />
-              <span
-                className={
-                  found > 0
-                    ? "font-medium text-emerald-600 dark:text-emerald-400"
-                    : "text-muted-foreground"
-                }
-              >
-                {found} found
-              </span>
+            <span
+              className={`flex items-center gap-1 ${found > 0 ? "font-medium text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+            >
+              <CheckCircle2 className="size-3" aria-hidden="true" />
+              {found} found
             </span>
             {placed > 0 && (
-              <span className="flex items-center gap-1">
-                <Radar className="size-3 text-teal-500" aria-hidden="true" />
-                <span className="font-medium text-teal-600 dark:text-teal-400">
-                  {placed} placed
-                </span>
+              <span className="flex items-center gap-1 font-medium text-teal-600 dark:text-teal-400">
+                <Radar className="size-3" aria-hidden="true" />
+                {placed} placed
               </span>
             )}
             {filtered > 0 && (
-              <span className="flex items-center gap-1">
+              <span className="text-muted-foreground flex items-center gap-1">
                 <Filter className="size-3 text-amber-500" aria-hidden="true" />
-                <span className="text-muted-foreground">{filtered} filtered</span>
+                {filtered} filtered
               </span>
             )}
           </span>
@@ -176,7 +192,20 @@ export function ScannerStatusBar({ daemonUrl }: ScannerStatusBarProps) {
 
         <span className="flex-1" />
 
-        {/* Manual scan button */}
+        {/* Expand detail button */}
+        {recentLog.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={() => setExpanded(!expanded)}
+            aria-label={expanded ? "Hide scan details" : "Show scan details"}
+          >
+            {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            Details
+          </Button>
+        )}
+
         <Button
           variant="ghost"
           size="sm"
@@ -190,10 +219,35 @@ export function ScannerStatusBar({ daemonUrl }: ScannerStatusBarProps) {
         </Button>
       </div>
 
-      {/* Last scan results detail — mobile-friendly expandable summary */}
-      {hasScanned && found === 0 && state === "idle" && (
-        <p className="text-muted-foreground px-1 text-xs md:hidden">
-          Last scan checked {progress.pairsScanned} pairs — no opportunities found this time.
+      {/* Expanded scan log detail */}
+      {expanded && recentLog.length > 0 && (
+        <div className="rounded-b-lg border border-t-0 px-4 py-2">
+          <p className="text-muted-foreground mb-1.5 text-[10px] font-medium uppercase tracking-wider">
+            Last Scan Results
+          </p>
+          <div className="space-y-1">
+            {recentLog.map((entry) => {
+              const style = LOG_ICONS[entry.type] ?? LOG_ICONS.scan_complete!
+              return (
+                <div key={entry.id} className="flex items-start gap-2 text-xs">
+                  <span className={`mt-0.5 shrink-0 font-mono ${style.color}`}>{style.icon}</span>
+                  <span className="text-foreground/80">{entry.message}</span>
+                  {entry.detail && (
+                    <span className="text-muted-foreground ml-auto shrink-0 text-[10px]">
+                      {entry.detail}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-friendly summary when no opportunities */}
+      {hasScanned && found === 0 && state === "idle" && !expanded && (
+        <p className="text-muted-foreground px-1 py-1 text-xs md:hidden">
+          Checked {progress.pairsScanned} pairs — no opportunities this time
         </p>
       )}
 
@@ -211,9 +265,9 @@ export function ScannerStatusBar({ daemonUrl }: ScannerStatusBarProps) {
         </div>
       )}
 
-      {/* Scanning progress message */}
+      {/* Scanning progress */}
       {state === "scanning" && progress.message && (
-        <p className="text-muted-foreground animate-pulse px-1 text-xs">{progress.message}</p>
+        <p className="text-muted-foreground animate-pulse px-1 py-1 text-xs">{progress.message}</p>
       )}
     </div>
   )
