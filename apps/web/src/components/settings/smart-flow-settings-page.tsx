@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleSwitch } from "@/components/ui/toggle-switch"
 import { Zap, DollarSign, ShieldCheck, Info, AlertTriangle } from "lucide-react"
 import type { SmartFlowSettingsData, SmartFlowPreset } from "@fxflow/types"
+import { SfSettingsScanner } from "./sf-settings-scanner"
 
 const selectClass =
   "flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
@@ -252,6 +253,9 @@ export function SmartFlowSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Market Scanner */}
+      <SfSettingsScanner settings={settings} onUpdate={save} />
 
       {/* Safety Defaults */}
       <Card>

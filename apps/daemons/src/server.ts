@@ -1236,6 +1236,59 @@ export async function startServer(port: number, deps: ServerDeps) {
       return
     }
 
+    // ─── SmartFlow Scanner Endpoints ──────────────────────────────────────
+    if (req.method === "GET" && req.url === "/smart-flow/scanner/status") {
+      const scanner = _smartFlowManager?.getScanner()
+      if (!scanner) {
+        sendJson(res, 200, { ok: true, progress: null, circuitBreaker: null })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        progress: scanner.getProgress(),
+        circuitBreaker: scanner.getCircuitBreakerState(),
+      })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/scanner/log") {
+      const scanner = _smartFlowManager?.getScanner()
+      sendJson(res, 200, { ok: true, log: scanner?.getScanLog() ?? [] })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/smart-flow/scanner/scan") {
+      const scanner = _smartFlowManager?.getScanner()
+      if (!scanner) {
+        sendJson(res, 503, { ok: false, error: "Scanner not initialized" })
+        return
+      }
+      scanner
+        .triggerManualScan()
+        .then(() => sendJson(res, 200, { ok: true }))
+        .catch((err: unknown) => sendJson(res, 500, { ok: false, error: (err as Error).message }))
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/smart-flow/scanner/reset-circuit-breaker") {
+      const scanner = _smartFlowManager?.getScanner()
+      if (!scanner) {
+        sendJson(res, 503, { ok: false, error: "Scanner not initialized" })
+        return
+      }
+      scanner.resetCircuitBreaker()
+      sendJson(res, 200, { ok: true })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/scanner/opportunities") {
+      import("@fxflow/db")
+        .then(({ getSmartFlowOpportunities }) => getSmartFlowOpportunities({ limit: 50 }))
+        .then((opps) => sendJson(res, 200, { ok: true, opportunities: opps }))
+        .catch((err: unknown) => sendJson(res, 500, { ok: false, error: (err as Error).message }))
+      return
+    }
+
     sendJson(res, 404, { ok: false, error: "Not found" })
   })
 

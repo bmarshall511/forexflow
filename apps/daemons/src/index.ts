@@ -49,6 +49,7 @@ import { SourcePriorityManager } from "./source-priority-manager.js"
 import { SmartFlowManager } from "./smart-flow/manager.js"
 import { ManagementEngine } from "./smart-flow/management-engine.js"
 import { getConfig } from "./config.js"
+import { getRestUrl } from "./oanda/api-client.js"
 import type { AnyDaemonMessage } from "@fxflow/types"
 
 async function main() {
@@ -428,6 +429,44 @@ async function main() {
 
   await smartFlowManager.start()
 
+  // SmartFlow Market Scanner — autonomous market scanning for trade opportunities
+  const { SmartFlowMarketScanner } = await import("./smart-flow/market-scanner.js")
+  const sfScanner = new SmartFlowMarketScanner(broadcast)
+  const sfCreds = stateManager.getCredentials()
+  if (sfCreds) {
+    sfScanner.setOandaCredentials(getRestUrl(sfCreds.mode), sfCreds.token)
+  }
+  sfScanner.setBalanceFn(() => stateManager.getSnapshot().accountOverview?.summary.balance ?? 0)
+  const { getRiskPercent: getSfRiskPercent } = await import("@fxflow/db")
+  let cachedRiskPercent = await getSfRiskPercent()
+  // Refresh cached value periodically (every scan will have a recent value)
+  setInterval(
+    () =>
+      void getSfRiskPercent().then((v) => {
+        cachedRiskPercent = v
+      }),
+    60_000,
+  )
+  sfScanner.setRiskPercentFn(() => cachedRiskPercent)
+  sfScanner.setOpenPositionsFn(() => {
+    const positions = positionManager.getPositions()
+    return positions.open.map((p) => ({
+      instrument: p.instrument,
+      direction: p.currentUnits > 0 ? "long" : "short",
+    }))
+  })
+  sfScanner.setOpenTradeCountFn(() => positionManager.getPositions().open.length)
+  sfScanner.setSpreadFn((instrument: string) => {
+    const tick = positionPriceTracker.getLatestPrice(instrument)
+    if (tick) return tick.ask - tick.bid
+    return null
+  })
+  sfScanner.setOnOpportunityApproved(async (configId: string) => {
+    await smartFlowManager.placeMarketEntry(configId)
+  })
+  smartFlowManager.setScanner(sfScanner)
+  await sfScanner.start()
+
   // 12i. Economic calendar fetcher — periodic Finnhub calendar sync
   const calendarFetcher = new CalendarFetcher(async () => {
     const { getDecryptedFinnhubKey } = await import("@fxflow/db")
@@ -488,6 +527,7 @@ async function main() {
     tradeFinderScanner.stop()
     aiTraderScanner.stop()
     smartFlowManager.stop()
+    sfScanner.stop()
     alertMonitor.stop()
     calendarFetcher.stop()
     cleanupScheduler.stop()

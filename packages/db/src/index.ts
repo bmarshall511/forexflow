@@ -433,3 +433,12 @@ export {
   clearActivityLogs,
   cleanupOldActivityLogs,
 } from "./smart-flow-activity-service"
+export {
+  getSmartFlowOpportunities,
+  getSmartFlowOpportunity,
+  countTodaySmartFlowOpportunities,
+  createSmartFlowOpportunity,
+  updateSmartFlowOpportunityStatus,
+  cleanupOldSmartFlowOpportunities,
+  type CreateSmartFlowOpportunityInput,
+} from "./smart-flow-opportunity-service"

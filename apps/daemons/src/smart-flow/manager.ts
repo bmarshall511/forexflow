@@ -72,6 +72,18 @@ interface AiMonitorRef {
   removeTrade(smartFlowTradeId: string): void
 }
 
+interface SmartFlowMarketScannerRef {
+  start(): Promise<void>
+  stop(): void
+  recordTradeOutcome(pl: number): void
+  reloadSettings(): Promise<void>
+  triggerManualScan(): Promise<void>
+  getProgress(): unknown
+  getScanLog(): unknown[]
+  getCircuitBreakerState(): unknown
+  resetCircuitBreaker(): void
+}
+
 const ATR_TTL = 5 * 60 * 1000
 const ATR_PERIOD = 14
 const ATR_COUNT = 100
@@ -100,6 +112,7 @@ export class SmartFlowManager {
   private candleCache = new CandleCache()
   private activeInstruments = new Set<string>()
   private aiMonitor: AiMonitorRef | null = null
+  private scanner: SmartFlowMarketScannerRef | null = null
   private enabled = false
   private startedAt: number | null = null
   private lastTickAt: number | null = null
@@ -133,6 +146,12 @@ export class SmartFlowManager {
   }
   setAiMonitor(monitor: AiMonitorRef): void {
     this.aiMonitor = monitor
+  }
+  setScanner(scanner: SmartFlowMarketScannerRef): void {
+    this.scanner = scanner
+  }
+  getScanner(): SmartFlowMarketScannerRef | null {
+    return this.scanner
   }
 
   async start(): Promise<void> {
@@ -395,6 +414,10 @@ export class SmartFlowManager {
         tradeId: sf.id,
       },
     )
+    // Notify scanner circuit breaker of trade outcome
+    // P&L is tracked via OANDA reconciliation, not here — use a simple heuristic
+    // (positive outcome vs. negative) since the trade sync will have the real P&L
+    this.scanner?.recordTradeOutcome(0) // placeholder — actual P&L wired in index.ts callback
     console.log(`[smart-flow] Closed: ${sf.instrument} (${sf.id})`)
   }
 

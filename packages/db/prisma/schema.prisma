@@ -613,6 +613,24 @@ model SmartFlowSettings {
   defaultMaxFinancingUsd     Float    @default(50.0)
   spreadProtectionEnabled    Boolean  @default(true)
   spreadProtectionMultiple   Float    @default(3.0) // trigger when spread > avg * this
+  shadowMode                 Boolean  @default(false)
+  // Scanner — autonomous market scanning
+  scannerEnabled             Boolean  @default(false)
+  scanIntervalMinutes        Int      @default(15)
+  operatingMode              String   @default("full_auto") // "manual" | "semi_auto" | "full_auto"
+  autoTradeMinScore          Int      @default(60) // 0-100, semi_auto score threshold
+  scanModesJson              String   @default("{}") // Record<SmartFlowScanMode, boolean>
+  pairWhitelistJson          String   @default("[]") // string[] — empty = all majors+crosses
+  maxDailyScans              Int      @default(50)
+  maxDailyAutoTrades         Int      @default(5)
+  preferredPreset            String   @default("auto") // "auto" = regime-based, or specific preset
+  scannerEntryMode           String   @default("optimal") // "market" | "optimal" | "smart_entry"
+  sessionRestriction         String   @default("kill_zones") // "kill_zones" | "extended" | "any"
+  newsBufferMinutes          Int      @default(60)
+  circuitBreakerConsecLosses Int      @default(3)
+  circuitBreakerConsecPause  Int      @default(120) // pause minutes after consecutive losses
+  circuitBreakerDailyLosses  Int      @default(4)
+  circuitBreakerDailyDD      Float    @default(3.0) // max daily drawdown percent before pause
   updatedAt                  DateTime @updatedAt
 }
 
@@ -756,6 +774,43 @@ model SmartFlowActivityLog {
   @@index([createdAt])
   @@index([configId, createdAt])
   @@index([instrument, createdAt])
+}
+
+model SmartFlowOpportunity {
+  id               String   @id @default(uuid())
+  instrument       String
+  direction        String // "long" | "short"
+  scanMode         String // SmartFlowScanMode: "trend_following" | "mean_reversion" | "breakout" | "session_momentum"
+  status           String   @default("detected") // SmartFlowOpportunityStatus
+  score            Int      @default(0) // 0-100 composite score
+  scoresJson       String   @default("{}") // SmartFlowOpportunityScores breakdown
+  regime           String? // AiTraderMarketRegime
+  session          String? // ForexSession
+  preset           String? // SmartFlowPreset auto-selected
+  entryPrice       Float
+  stopLoss         Float
+  takeProfit       Float
+  riskPips         Float
+  rewardPips       Float
+  riskRewardRatio  Float
+  positionSize     Int      @default(0)
+  reasons          String   @default("[]") // string[] — why this signal was generated
+  filterResults    String   @default("{}") // Record<string, { passed: boolean; reason?: string }>
+  resultConfigId   String? // SmartFlowConfig.id if auto-created
+  resultTradeId    String? // OANDA trade ID if placed
+  realizedPL       Float?
+  outcome          String? // "win" | "loss" | "breakeven"
+  expiresAt        DateTime?
+  detectedAt       DateTime @default(now())
+  placedAt         DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([instrument, status])
+  @@index([status, score])
+  @@index([scanMode, status])
+  @@index([detectedAt])
 }
 
 // ─── Authentication ─────────────────────────────────────────────────────────

@@ -256,16 +256,16 @@ export class SmartFlowAiMonitor {
         },
       } as AnyDaemonMessage)
 
-      // Activity feed
+      // Activity feed — use distinct event type for auto-executed vs. suggested
       void emitActivity(
-        "ai_suggestion",
+        suggestion.autoExecuted ? "ai_action_executed" : "ai_suggestion",
         `AI ${suggestion.autoExecuted ? "executed" : "suggests"}: ${parsed.action} (${parsed.confidence}% confidence)`,
         {
           configId: trade.configId,
           tradeId: smartFlowTradeId,
           instrument: config.instrument,
           detail: parsed.rationale,
-          severity: suggestion.autoExecuted ? "info" : "warning",
+          severity: suggestion.autoExecuted ? "success" : "warning",
         },
       )
     } catch (err) {

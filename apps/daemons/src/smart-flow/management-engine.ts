@@ -792,7 +792,7 @@ export class ManagementEngine {
         const elapsedHours = (Date.now() - entry.createdAt) / 3_600_000
         if (elapsedHours >= entry.entryExpireHours) {
           emitActivity(
-            "trade_closed",
+            "entry_expired",
             `Smart entry expired for ${instrument.replace("_", "/")} — waited ${Math.round(elapsedHours)} hours`,
             {
               instrument,

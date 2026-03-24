@@ -3215,6 +3215,153 @@ export type SmartFlowPreset =
   | "recovery"
   | "custom"
 
+/** Scanner operating mode — controls how opportunities become trades. */
+export type SmartFlowOperatingMode = "manual" | "semi_auto" | "full_auto"
+
+/** Scanner autonomous scan mode. */
+export type SmartFlowScanMode =
+  | "trend_following"
+  | "mean_reversion"
+  | "breakout"
+  | "session_momentum"
+
+/** All scan modes with defaults for new installs. */
+export const SMART_FLOW_DEFAULT_SCAN_MODES: Record<SmartFlowScanMode, boolean> = {
+  trend_following: true,
+  mean_reversion: true,
+  breakout: true,
+  session_momentum: false,
+}
+
+/** Scanner entry mode — how the scanner enters trades. */
+export type SmartFlowScannerEntryMode = "market" | "optimal" | "smart_entry"
+
+/** Session restriction for scanner auto-trades. */
+export type SmartFlowSessionRestriction = "kill_zones" | "extended" | "any"
+
+/** Status of a scanner-detected opportunity. */
+export type SmartFlowOpportunityStatus =
+  | "detected"
+  | "suggested"
+  | "approved"
+  | "placed"
+  | "filled"
+  | "closed"
+  | "expired"
+  | "rejected"
+  | "filtered"
+
+/** Score breakdown for a scanner opportunity. */
+export interface SmartFlowOpportunityScores {
+  confluence: number // 0-30 — multi-signal agreement
+  trendAlignment: number // 0-20 — trading with the trend
+  zoneQuality: number // 0-15 — at S/D zone
+  sessionQuality: number // 0-10 — institutional timing
+  regimeMatch: number // 0-10 — mode matches conditions
+  rrQuality: number // 0-10 — higher R:R = higher score
+  spreadQuality: number // 0-5 — lower spread relative to SL
+  total: number // 0-100
+}
+
+/** Scanner opportunity data sent to UI. */
+export interface SmartFlowOpportunityData {
+  id: string
+  instrument: string
+  direction: "long" | "short"
+  scanMode: SmartFlowScanMode
+  status: SmartFlowOpportunityStatus
+  score: number
+  scores: SmartFlowOpportunityScores
+  regime: string | null
+  session: string | null
+  preset: SmartFlowPreset | null
+  entryPrice: number
+  stopLoss: number
+  takeProfit: number
+  riskPips: number
+  rewardPips: number
+  riskRewardRatio: number
+  positionSize: number
+  reasons: string[]
+  filterResults: Record<string, { passed: boolean; reason?: string }>
+  resultConfigId: string | null
+  resultTradeId: string | null
+  realizedPL: number | null
+  outcome: string | null
+  expiresAt: string | null
+  detectedAt: string
+  placedAt: string | null
+  closedAt: string | null
+}
+
+/** Scanner scan progress broadcast data. */
+export interface SmartFlowScanProgress {
+  phase: "idle" | "starting" | "scanning" | "analyzing" | "placing" | "complete" | "error"
+  message: string
+  pairsTotal: number
+  pairsScanned: number
+  opportunitiesFound: number
+  opportunitiesPlaced: number
+  scanMode: SmartFlowScanMode | null
+  elapsedMs: number
+  lastScanAt: string | null
+  nextScanAt: string | null
+}
+
+/** Scanner circuit breaker state. */
+export interface SmartFlowScannerCircuitBreakerState {
+  paused: boolean
+  pausedUntil: string | null
+  reason: string | null
+  consecutiveLosses: number
+  dailyLosses: number
+  dailyDrawdownPercent: number
+}
+
+/** Scanner scan log entry. */
+export interface SmartFlowScanLogEntry {
+  id: string
+  timestamp: string
+  type:
+    | "scan_start"
+    | "opportunity_found"
+    | "opportunity_filtered"
+    | "opportunity_placed"
+    | "scan_complete"
+    | "error"
+  message: string
+  detail?: string
+  metadata?: Record<string, unknown>
+}
+
+/** Default major + cross pairs for scanner when whitelist is empty. */
+export const SMART_FLOW_DEFAULT_PAIRS: string[] = [
+  "EUR_USD",
+  "GBP_USD",
+  "USD_JPY",
+  "USD_CHF",
+  "AUD_USD",
+  "NZD_USD",
+  "USD_CAD",
+  "EUR_GBP",
+  "EUR_JPY",
+  "GBP_JPY",
+  "EUR_AUD",
+  "EUR_CAD",
+  "EUR_CHF",
+  "GBP_AUD",
+  "GBP_CAD",
+  "GBP_CHF",
+  "AUD_JPY",
+  "AUD_NZD",
+  "AUD_CAD",
+  "CAD_JPY",
+  "CHF_JPY",
+  "NZD_JPY",
+  "NZD_CAD",
+  "NZD_CHF",
+]
+
 /** SmartFlow trade lifecycle status. */
 export type SmartFlowTradeStatus =
   | "waiting_entry"
@@ -3359,6 +3506,24 @@ export interface SmartFlowSettingsData {
   defaultMaxFinancingUsd: number
   spreadProtectionEnabled: boolean
   spreadProtectionMultiple: number
+  shadowMode: boolean
+  // Scanner settings
+  scannerEnabled: boolean
+  scanIntervalMinutes: number
+  operatingMode: SmartFlowOperatingMode
+  autoTradeMinScore: number
+  scanModes: Record<SmartFlowScanMode, boolean>
+  pairWhitelist: string[]
+  maxDailyScans: number
+  maxDailyAutoTrades: number
+  preferredPreset: string
+  scannerEntryMode: SmartFlowScannerEntryMode
+  sessionRestriction: SmartFlowSessionRestriction
+  newsBufferMinutes: number
+  circuitBreakerConsecLosses: number
+  circuitBreakerConsecPause: number
+  circuitBreakerDailyLosses: number
+  circuitBreakerDailyDD: number
 }
 
 /** SmartFlow config data sent to UI. */

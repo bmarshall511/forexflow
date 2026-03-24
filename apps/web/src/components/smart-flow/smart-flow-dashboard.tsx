@@ -29,6 +29,7 @@ import { ActivityTab } from "./activity-tab"
 import { HealthPanel } from "./health-panel"
 import { SmartFlowOnboarding } from "./smart-flow-onboarding"
 import { HistoryTab } from "./history-tab"
+import { ScannerStatusBar } from "./scanner-status-bar"
 
 type Tab = "trade" | "active" | "configs" | "activity" | "history" | "rankings"
 
@@ -151,6 +152,13 @@ export function SmartFlowDashboard() {
           />
         </div>
       </PageHeader>
+
+      {/* Scanner status bar — shows scan progress, last scan time, opportunities */}
+      {settings?.scannerEnabled && (
+        <div className="border-b px-4 py-2 md:px-6">
+          <ScannerStatusBar daemonUrl="/api/daemon" />
+        </div>
+      )}
 
       <TabNav label="SmartFlow sections">
         <TabNavButton
