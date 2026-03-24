@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Bot, Clock, Crosshair, TrendingUp, type LucideIcon } from "lucide-react"
+import { Bot, Clock, Crosshair, Radio, TrendingUp, type LucideIcon } from "lucide-react"
 import { useDaemonStatus } from "./use-daemon-status"
 import { useDaemonConnection } from "./use-daemon-connection"
 import { usePositions } from "./use-positions"
@@ -48,9 +48,16 @@ export function useSidebarBadges(): Record<string, NavBadge[]> {
       ],
       tvAlerts: [
         {
+          count: tvAlertsStatus?.activeAutoPositions ?? 0,
+          label: "positions",
+          color: "text-emerald-500",
+          icon: TrendingUp,
+        },
+        {
           count: tvAlertsStatus?.signalCountToday ?? 0,
           label: "signals today",
-          color: "text-emerald-500",
+          color: "text-blue-500",
+          icon: Radio,
         },
       ],
       aiAnalysis: [
@@ -66,6 +73,7 @@ export function useSidebarBadges(): Record<string, NavBadge[]> {
       summary.pendingCount,
       tradeFinderScanStatus?.activeSetups,
       lastAiTraderScanStatus?.openAiTradeCount,
+      tvAlertsStatus?.activeAutoPositions,
       tvAlertsStatus?.signalCountToday,
       activeAnalyses,
     ],

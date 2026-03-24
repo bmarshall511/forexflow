@@ -15,7 +15,7 @@ export interface SidebarStatus {
 /** Returns a map of statusKey → SidebarStatus for nav items with dynamic status text. */
 export function useSidebarStatus(): Record<string, SidebarStatus> {
   const { tradeFinderScanStatus, tradeFinderSetupCounts } = useTradeFinderNavData()
-  const { lastAiTraderScanStatus, lastAiTraderScanProgress } = useDaemonConnection()
+  const { lastAiTraderScanStatus, lastAiTraderScanProgress, tvAlertsStatus } = useDaemonConnection()
   const smartFlowNavData = useSmartFlowNavData()
 
   return useMemo(() => {
@@ -154,6 +154,54 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
       result.tradeFinder = { line1, line2, variant }
     }
 
+    // ─── TV Alerts status ───────────────────────────────────────────
+    if (tvAlertsStatus) {
+      const {
+        enabled,
+        cfWorkerConnected,
+        activeAutoPositions,
+        todayAutoPL,
+        circuitBreakerTripped,
+        signalCountToday,
+        lastSignalAt,
+      } = tvAlertsStatus
+      let line1: string
+      let line2: string | undefined
+      let variant: SidebarStatus["variant"] = "default"
+
+      if (circuitBreakerTripped) {
+        line1 = "Circuit breaker tripped"
+        variant = "error"
+      } else if (!enabled) {
+        line1 = "Module disabled"
+        variant = "default"
+      } else if (!cfWorkerConnected) {
+        line1 = "CF Worker disconnected"
+        variant = "warning"
+      } else if (lastSignalAt) {
+        line1 = `Last signal ${formatTimeAgo(lastSignalAt)}`
+        variant = "active"
+      } else {
+        line1 = "Waiting for signals"
+        variant = "active"
+      }
+
+      // Line 2: positions + P&L or signal count
+      if (activeAutoPositions > 0) {
+        const plStr =
+          todayAutoPL !== 0 ? ` · ${todayAutoPL >= 0 ? "+" : ""}$${todayAutoPL.toFixed(0)}` : ""
+        line2 = `${activeAutoPositions} position${activeAutoPositions !== 1 ? "s" : ""} open${plStr}`
+      } else if (signalCountToday > 0) {
+        const plStr =
+          todayAutoPL !== 0 ? ` · P&L ${todayAutoPL >= 0 ? "+" : ""}$${todayAutoPL.toFixed(0)}` : ""
+        line2 = `${signalCountToday} signal${signalCountToday !== 1 ? "s" : ""} today${plStr}`
+      } else if (enabled && cfWorkerConnected) {
+        line2 = "No signals today"
+      }
+
+      result.tvAlerts = { line1, line2, variant }
+    }
+
     return result
   }, [
     smartFlowNavData,
@@ -161,6 +209,7 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
     tradeFinderSetupCounts,
     lastAiTraderScanStatus,
     lastAiTraderScanProgress,
+    tvAlertsStatus,
   ])
 }
 

@@ -68,6 +68,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/tv-alerts",
         icon: Radio,
         badgeKey: "tvAlerts",
+        statusKey: "tvAlerts",
         priorityKey: "tv_alerts",
       },
       { label: "AI Analysis", href: "/ai-analysis", icon: Sparkles, badgeKey: "aiAnalysis" },
