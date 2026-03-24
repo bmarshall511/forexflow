@@ -1,10 +1,3 @@
----
-title: "Directory Structure"
-description: "Monorepo layout, import boundaries, and where to place new code in FXFlow"
-category: "dev"
-order: 2
----
-
 # Directory Structure
 
 ## Monorepo Layout
@@ -42,7 +35,6 @@ apps/
     src/
       oanda/            # OANDA API client, streaming, account management
       ai/               # AI analysis pipeline (context, executor, monitor)
-      smart-flow/       # SmartFlow management engine, trade lifecycle, activity feed
       trade-finder/     # Scanner, setup detection, auto-trade
       tv-alerts/        # Signal processor, webhook handling
   desktop/              # Electron macOS app — wraps web + daemon for end users

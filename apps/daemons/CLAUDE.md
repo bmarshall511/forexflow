@@ -139,6 +139,10 @@ src/
 - `PORT` env var auto-set by Railway/Fly.io — `config.ts` falls back: `DAEMON_PORT ?? PORT ?? "4100"`.
 - Cloud DB: `DATABASE_URL=libsql://...` + `TURSO_AUTH_TOKEN` for Turso connections.
 
+## Naming
+
+- **EdgeFinder** is the user-facing display name for the AI Trader feature. Code uses `ai-trader` in paths, types, and DB models. UI shows "EdgeFinder" in titles and navigation.
+
 ## Gotchas
 
 - Config values come from env vars — check `config.ts` for defaults before adding new ones.

@@ -60,6 +60,8 @@ Every term you will see in FXFlow, explained so anyone can understand it. Terms 
 
 ## E
 
+**EdgeFinder** — FXFlow's AI-powered trade scanner that automatically analyzes currency pairs using 14 techniques (Smart Money Concepts, technical indicators, Fibonacci, and more) across multiple timeframes. It runs a 3-tier AI pipeline to find and evaluate trade opportunities. In the codebase, EdgeFinder is called "AI Trader" (`ai-trader` in paths, types, and database models), but the UI always shows "EdgeFinder." Found under the EdgeFinder page in the sidebar.
+
 **EMA (Exponential Moving Average)** — A smoothed line on the chart that follows the price, giving more importance to recent prices. Traders use EMAs to spot trends. The EdgeFinder uses EMA crossovers as one of its techniques.
 
 **Equity** — Your account balance _plus or minus_ the profit or loss of all open trades. Equity changes in real time as prices move. Shown on the Dashboard.

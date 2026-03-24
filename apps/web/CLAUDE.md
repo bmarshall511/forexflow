@@ -96,6 +96,10 @@ Every feature page follows this structure:
 - PWA manifest + service worker for installable mobile experience.
 - See `docs/dev/06-remote-access.md` for full architecture.
 
+## Naming
+
+- **EdgeFinder** is the user-facing display name for the AI Trader feature. Code uses `ai-trader` in paths, types, and DB models. UI shows "EdgeFinder" in titles and navigation.
+
 ## Gotchas
 
 - `middleware.ts` handles auth — public paths are exempted (api/auth, static assets).
