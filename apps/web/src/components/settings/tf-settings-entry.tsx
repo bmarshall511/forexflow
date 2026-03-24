@@ -68,8 +68,8 @@ export function TFSettingsEntry({ config, onUpdate, saving }: TFSettingsProps) {
           <div>
             <Label>Shadow Mode</Label>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              Practice run -- find trades but don&apos;t place real orders. Great for testing
-              your settings.
+              Practice run -- find trades but don&apos;t place real orders. Great for testing your
+              settings.
             </p>
           </div>
           <ToggleSwitch
@@ -86,8 +86,8 @@ export function TFSettingsEntry({ config, onUpdate, saving }: TFSettingsProps) {
           <div>
             <Label>Smart Position Sizing</Label>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              Bet more on high-quality setups, less on lower-quality ones. Never risks more
-              than your configured amount.
+              Bet more on high-quality setups, less on lower-quality ones. Never risks more than
+              your configured amount.
             </p>
           </div>
           <ToggleSwitch

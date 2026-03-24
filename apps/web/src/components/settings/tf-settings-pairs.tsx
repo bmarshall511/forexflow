@@ -4,7 +4,13 @@ import type { TradeFinderPairConfig, TradeFinderTimeframeSet } from "@fxflow/typ
 import type { TFSettingsProps } from "./tf-settings-scanner"
 import { FOREX_PAIR_GROUPS } from "@fxflow/shared"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Globe2, Zap } from "lucide-react"
@@ -31,9 +37,7 @@ export function TFSettingsPairs({ config, onUpdate, saving, autoTradeEnabledPair
     const existing = getPairConfig(instrument)
     let newPairs: TradeFinderPairConfig[]
     if (existing) {
-      newPairs = pairs.map((p) =>
-        p.instrument === instrument ? { ...p, enabled: !p.enabled } : p,
-      )
+      newPairs = pairs.map((p) => (p.instrument === instrument ? { ...p, enabled: !p.enabled } : p))
     } else {
       if (enabledCount >= config.maxEnabledPairs) {
         toast.error(`Maximum ${config.maxEnabledPairs} pairs allowed`)
@@ -49,17 +53,13 @@ export function TFSettingsPairs({ config, onUpdate, saving, autoTradeEnabledPair
 
   const togglePairAutoTrade = async (instrument: string) => {
     const newPairs = pairs.map((p) =>
-      p.instrument === instrument
-        ? { ...p, autoTradeEnabled: !(p.autoTradeEnabled !== false) }
-        : p,
+      p.instrument === instrument ? { ...p, autoTradeEnabled: !(p.autoTradeEnabled !== false) } : p,
     )
     await onUpdate({ pairs: newPairs })
   }
 
   const changeTfSet = async (instrument: string, timeframeSet: TradeFinderTimeframeSet) => {
-    const newPairs = pairs.map((p) =>
-      p.instrument === instrument ? { ...p, timeframeSet } : p,
-    )
+    const newPairs = pairs.map((p) => (p.instrument === instrument ? { ...p, timeframeSet } : p))
     await onUpdate({ pairs: newPairs })
   }
 
@@ -72,8 +72,7 @@ export function TFSettingsPairs({ config, onUpdate, saving, autoTradeEnabledPair
         </div>
         <CardDescription>
           {enabledCount}/{config.maxEnabledPairs} enabled.
-          {config.autoTradeEnabled &&
-            ` ${autoTradeEnabledPairCount} with auto-trade.`}
+          {config.autoTradeEnabled && ` ${autoTradeEnabledPairCount} with auto-trade.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
@@ -97,7 +96,17 @@ export function TFSettingsPairs({ config, onUpdate, saving, autoTradeEnabledPair
 }
 
 /* Extracted to keep parent under 150 LOC */
-function PairGroup({ label, groupPairs, config, enabledCount, getPairConfig, onToggle, onToggleAuto, onChangeTf, saving }: {
+function PairGroup({
+  label,
+  groupPairs,
+  config,
+  enabledCount,
+  getPairConfig,
+  onToggle,
+  onToggleAuto,
+  onChangeTf,
+  saving,
+}: {
   label: string
   groupPairs: { value: string; label: string }[]
   config: TFSettingsProps["config"]
@@ -143,13 +152,24 @@ function PairGroup({ label, groupPairs, config, enabledCount, getPairConfig, onT
                 aria-label={`Toggle ${fp.label}`}
               >
                 {isEnabled && (
-                  <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    viewBox="0 0 12 12"
+                    className="size-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M2 6l3 3 5-5" />
                   </svg>
                 )}
               </button>
 
-              <span className={cn("flex-1 font-mono text-sm", isEnabled ? "text-foreground" : "text-muted-foreground")}>
+              <span
+                className={cn(
+                  "flex-1 font-mono text-sm",
+                  isEnabled ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
                 {fp.label}
               </span>
 

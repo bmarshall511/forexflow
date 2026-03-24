@@ -33,9 +33,7 @@ export function TFSettingsScanner({ config, onUpdate, saving }: TFSettingsProps)
         <div className="flex items-center justify-between">
           <div>
             <Label>Scanner</Label>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Turn the scanner on or off
-            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">Turn the scanner on or off</p>
           </div>
           <ToggleSwitch
             checked={config.enabled}

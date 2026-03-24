@@ -15,8 +15,7 @@ import { Globe2, Search, Shield, Zap } from "lucide-react"
 type Tab = "scanner" | "auto-trade" | "protection" | "pairs"
 
 export function TradeFinderSettingsPage() {
-  const { config, circuitBreaker, isLoading, update, resetCircuitBreaker } =
-    useTradeFinderConfig()
+  const { config, circuitBreaker, isLoading, update, resetCircuitBreaker } = useTradeFinderConfig()
   const [activeTab, setActiveTab] = useState<Tab>("scanner")
   const [saving, setSaving] = useState(false)
   const [cancellingAuto, setCancellingAuto] = useState(false)
@@ -53,9 +52,7 @@ export function TradeFinderSettingsPage() {
   }, [])
 
   if (isLoading || !config) {
-    return (
-      <div className="text-muted-foreground py-12 text-center text-sm">Loading...</div>
-    )
+    return <div className="text-muted-foreground py-12 text-center text-sm">Loading...</div>
   }
 
   const pairs = config.pairs
@@ -116,10 +113,7 @@ export function TradeFinderSettingsPage() {
         <div className="space-y-6">
           <TFSettingsEntry config={config} onUpdate={handleUpdate} saving={saving} />
           <TFSettingsManagement config={config} onUpdate={handleUpdate} saving={saving} />
-          <TFSettingsSafety
-            circuitBreaker={circuitBreaker}
-            onReset={resetCircuitBreaker}
-          />
+          <TFSettingsSafety circuitBreaker={circuitBreaker} onReset={resetCircuitBreaker} />
         </div>
       )}
 

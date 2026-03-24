@@ -17,7 +17,10 @@ export const STATUS_STYLES: Record<string, { className: string; label: string }>
   },
   placed: { className: "bg-teal-500/10 text-teal-500 border-teal-500/20", label: "Order placed" },
   filled: { className: "bg-green-500/10 text-green-500 border-green-500/20", label: "Trade open" },
-  invalidated: { className: "bg-red-500/10 text-red-500 border-red-500/20", label: "No longer valid" },
+  invalidated: {
+    className: "bg-red-500/10 text-red-500 border-red-500/20",
+    label: "No longer valid",
+  },
   expired: { className: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20", label: "Expired" },
 }
 
@@ -76,7 +79,10 @@ export function getAutoTradeStatus(
 
   const rrNum = parseFloat(setup.rrRatio)
   if (!isNaN(rrNum) && rrNum < config.autoTradeMinRR) {
-    return { type: "blocked", reason: `Profit target too small — needs at least ${config.autoTradeMinRR}:1` }
+    return {
+      type: "blocked",
+      reason: `Profit target too small — needs at least ${config.autoTradeMinRR}:1`,
+    }
   }
 
   if (setup.lastSkipReason) {
@@ -87,7 +93,11 @@ export function getAutoTradeStatus(
   }
 
   if (setup.queuePosition != null) {
-    return { type: "queued", position: setup.queuePosition, reason: "In line — waiting for a trade slot to open up" }
+    return {
+      type: "queued",
+      position: setup.queuePosition,
+      reason: "In line — waiting for a trade slot to open up",
+    }
   }
 
   const pair = setup.instrument.replace("_", "/")

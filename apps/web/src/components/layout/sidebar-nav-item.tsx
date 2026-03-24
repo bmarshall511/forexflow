@@ -88,7 +88,9 @@ export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
                         title={`${badge.count} ${badge.label}`}
                       >
                         {BadgeIcon && <BadgeIcon className="size-3" />}
-                        <span className="text-[11px] font-semibold leading-none">{badge.count}</span>
+                        <span className="text-[11px] font-semibold leading-none">
+                          {badge.count}
+                        </span>
                       </span>
                     )
                   })}
@@ -99,11 +101,16 @@ export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
             {status && (
               <div className={cn("mt-1 space-y-0.5", STATUS_COLORS[status.variant])}>
                 <p className="flex items-center gap-1.5 text-[10px] leading-snug">
-                  <span className={cn("inline-block size-1.5 shrink-0 rounded-full", STATUS_DOT[status.variant])} />
+                  <span
+                    className={cn(
+                      "inline-block size-1.5 shrink-0 rounded-full",
+                      STATUS_DOT[status.variant],
+                    )}
+                  />
                   {status.line1}
                 </p>
                 {status.line2 && (
-                  <p className="text-[10px] leading-snug opacity-70 pl-[13px]">{status.line2}</p>
+                  <p className="pl-[13px] text-[10px] leading-snug opacity-70">{status.line2}</p>
                 )}
               </div>
             )}
@@ -122,10 +129,15 @@ export function SidebarNavItem({ item, badges, status }: SidebarNavItemProps) {
           {status && (
             <div className={cn("space-y-0.5", STATUS_COLORS[status.variant])}>
               <p className="flex items-center gap-1.5 text-xs">
-                <span className={cn("inline-block size-1.5 shrink-0 rounded-full", STATUS_DOT[status.variant])} />
+                <span
+                  className={cn(
+                    "inline-block size-1.5 shrink-0 rounded-full",
+                    STATUS_DOT[status.variant],
+                  )}
+                />
                 {status.line1}
               </p>
-              {status.line2 && <p className="text-xs opacity-70 pl-[13px]">{status.line2}</p>}
+              {status.line2 && <p className="pl-[13px] text-xs opacity-70">{status.line2}</p>}
             </div>
           )}
           {hasBadges && (

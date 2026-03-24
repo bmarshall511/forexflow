@@ -99,13 +99,13 @@ function AutoTradeFields({ config, onUpdate, saving }: TFSettingsProps) {
       <div className="flex items-center justify-between">
         <div>
           <Label>Minimum quality score</Label>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Only auto-trade the best setups
-          </p>
+          <p className="text-muted-foreground mt-0.5 text-xs">Only auto-trade the best setups</p>
         </div>
         <input
           type="number"
-          min={1} max={18} step={0.5}
+          min={1}
+          max={18}
+          step={0.5}
           defaultValue={config.autoTradeMinScore}
           onBlur={(e) => {
             const n = parseFloat(e.target.value)
@@ -128,7 +128,9 @@ function AutoTradeFields({ config, onUpdate, saving }: TFSettingsProps) {
         </div>
         <input
           type="number"
-          min={0.5} max={10} step={0.5}
+          min={0.5}
+          max={10}
+          step={0.5}
           defaultValue={config.autoTradeMinRR}
           onBlur={(e) => {
             const n = parseFloat(e.target.value)
@@ -151,7 +153,9 @@ function AutoTradeFields({ config, onUpdate, saving }: TFSettingsProps) {
         </div>
         <input
           type="number"
-          min={1} max={20} step={1}
+          min={1}
+          max={20}
+          step={1}
           defaultValue={config.autoTradeMaxConcurrent}
           onBlur={(e) => {
             const n = parseInt(e.target.value)
@@ -174,7 +178,9 @@ function AutoTradeFields({ config, onUpdate, saving }: TFSettingsProps) {
         </div>
         <input
           type="number"
-          min={0} max={50} step={1}
+          min={0}
+          max={50}
+          step={1}
           defaultValue={config.autoTradeMaxDaily}
           onBlur={(e) => {
             const n = parseInt(e.target.value)
@@ -198,7 +204,9 @@ function AutoTradeFields({ config, onUpdate, saving }: TFSettingsProps) {
         <div className="flex items-center gap-1">
           <input
             type="number"
-            min={0.5} max={50} step={0.5}
+            min={0.5}
+            max={50}
+            step={0.5}
             defaultValue={config.autoTradeMaxRiskPercent}
             onBlur={(e) => {
               const n = parseFloat(e.target.value)

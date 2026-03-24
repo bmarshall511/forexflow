@@ -26,9 +26,7 @@ export function TFSettingsSafety({ circuitBreaker, onReset }: Props) {
       </CardHeader>
       <CardContent className="space-y-6">
         {!circuitBreaker ? (
-          <p className="text-muted-foreground text-sm">
-            Connect to daemon to see safety status
-          </p>
+          <p className="text-muted-foreground text-sm">Connect to daemon to see safety status</p>
         ) : (
           <>
             {/* Status badge */}

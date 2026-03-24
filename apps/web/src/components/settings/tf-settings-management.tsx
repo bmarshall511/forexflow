@@ -5,7 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { ToggleSwitch } from "@/components/ui/toggle-switch"
 import { Separator } from "@/components/ui/separator"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Shield } from "lucide-react"
 
 const INPUT_CLASS = "bg-background h-8 w-16 rounded border px-2 text-right font-mono text-sm"
@@ -18,9 +24,7 @@ export function TFSettingsManagement({ config, onUpdate, saving }: TFSettingsPro
           <Shield className="size-5 text-emerald-500" />
           <CardTitle>After You&apos;re In a Trade</CardTitle>
         </div>
-        <CardDescription>
-          Manage open trades to protect profits and cut losses.
-        </CardDescription>
+        <CardDescription>Manage open trades to protect profits and cut losses.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Breakeven */}
@@ -28,8 +32,7 @@ export function TFSettingsManagement({ config, onUpdate, saving }: TFSettingsPro
           <div>
             <Label>Protect Your Money</Label>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              Once the trade is going well, move your safety net so you can&apos;t lose money
-              on it.
+              Once the trade is going well, move your safety net so you can&apos;t lose money on it.
             </p>
           </div>
           <ToggleSwitch
@@ -81,13 +84,13 @@ export function TFSettingsManagement({ config, onUpdate, saving }: TFSettingsPro
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Close %</Label>
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    What percentage to close
-                  </p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">What percentage to close</p>
                 </div>
                 <input
                   type="number"
-                  min={10} max={90} step={10}
+                  min={10}
+                  max={90}
+                  step={10}
                   defaultValue={config.partialClosePercent}
                   onBlur={(e) => {
                     const num = parseFloat(e.target.value)
@@ -109,12 +112,13 @@ export function TFSettingsManagement({ config, onUpdate, saving }: TFSettingsPro
               </div>
               <input
                 type="number"
-                min={0.5} max={10} step={0.5}
+                min={0.5}
+                max={10}
+                step={0.5}
                 defaultValue={config.partialCloseRR}
                 onBlur={(e) => {
                   const num = parseFloat(e.target.value)
-                  if (!isNaN(num) && num >= 0.5 && num <= 10)
-                    void onUpdate({ partialCloseRR: num })
+                  if (!isNaN(num) && num >= 0.5 && num <= 10) void onUpdate({ partialCloseRR: num })
                 }}
                 className={INPUT_CLASS}
                 aria-label="Partial close profit target"
@@ -139,8 +143,8 @@ function TrailingAndTimeExit({ config, onUpdate, saving }: TFSettingsProps) {
         <div>
           <Label>Lock In Profits</Label>
           <p className="text-muted-foreground mt-0.5 text-xs">
-            As the price keeps moving in your favor, keep raising your safety net to protect
-            more profit.
+            As the price keeps moving in your favor, keep raising your safety net to protect more
+            profit.
           </p>
         </div>
         <ToggleSwitch
@@ -160,12 +164,13 @@ function TrailingAndTimeExit({ config, onUpdate, saving }: TFSettingsProps) {
           </div>
           <input
             type="number"
-            min={1} max={20} step={1}
+            min={1}
+            max={20}
+            step={1}
             defaultValue={config.trailingStopCandles}
             onBlur={(e) => {
               const num = parseInt(e.target.value)
-              if (!isNaN(num) && num >= 1 && num <= 20)
-                void onUpdate({ trailingStopCandles: num })
+              if (!isNaN(num) && num >= 1 && num <= 20) void onUpdate({ trailingStopCandles: num })
             }}
             className={INPUT_CLASS}
             aria-label="Trailing stop candles"
@@ -200,12 +205,13 @@ function TrailingAndTimeExit({ config, onUpdate, saving }: TFSettingsProps) {
           </div>
           <input
             type="number"
-            min={5} max={100} step={5}
+            min={5}
+            max={100}
+            step={5}
             defaultValue={config.timeExitCandles}
             onBlur={(e) => {
               const num = parseInt(e.target.value)
-              if (!isNaN(num) && num >= 5 && num <= 100)
-                void onUpdate({ timeExitCandles: num })
+              if (!isNaN(num) && num >= 5 && num <= 100) void onUpdate({ timeExitCandles: num })
             }}
             className={INPUT_CLASS}
             aria-label="Time exit candles"

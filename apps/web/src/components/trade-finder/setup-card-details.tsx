@@ -5,14 +5,7 @@ import type { TradeFinderSetupData, TrendVisualSettings } from "@fxflow/types"
 import { TIMEFRAME_SET_MAP } from "@fxflow/types"
 import { formatInstrument, formatRelativeTime, getPipSize } from "@fxflow/shared"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import {
-  ChevronRight,
-  Target,
-  ShieldAlert,
-  DollarSign,
-  CheckCircle2,
-  Zap,
-} from "lucide-react"
+import { ChevronRight, Target, ShieldAlert, DollarSign, CheckCircle2, Zap } from "lucide-react"
 import { PriceCard, StatRow } from "@/components/ui/price-card"
 import { SetupScoreBreakdown } from "./setup-score-breakdown"
 import { StandaloneChart } from "@/components/charts/standalone-chart"
@@ -91,11 +84,7 @@ export function SetupDetailSheet({
         className="flex w-full flex-col gap-0 p-0 sm:w-[520px] sm:max-w-xl"
         showCloseButton
       >
-        <SetupDetailContent
-          setup={setup}
-          onPlace={onPlace}
-          autoTradeConfig={autoTradeConfig}
-        />
+        <SetupDetailContent setup={setup} onPlace={onPlace} autoTradeConfig={autoTradeConfig} />
       </SheetContent>
     </Sheet>
   )
@@ -189,12 +178,7 @@ function SetupDetailContent({
               )}
             </SheetTitle>
             <SheetDescription className="flex items-center gap-1.5 text-sm">
-              <span
-                className={cn(
-                  isLong ? "text-green-500" : "text-red-500",
-                  "font-semibold",
-                )}
-              >
+              <span className={cn(isLong ? "text-green-500" : "text-red-500", "font-semibold")}>
                 {isLong ? "Buy" : "Sell"}
               </span>
               <span className="text-muted-foreground/40">&middot;</span>
@@ -205,9 +189,7 @@ function SetupDetailContent({
                   </span>
                   <span className="text-muted-foreground/40">&middot;</span>
                   <span className="text-muted-foreground">
-                    {liveDistancePips < 1
-                      ? "at entry"
-                      : `${liveDistancePips.toFixed(1)}p away`}
+                    {liveDistancePips < 1 ? "at entry" : `${liveDistancePips.toFixed(1)}p away`}
                   </span>
                   <span className="text-muted-foreground/40">&middot;</span>
                 </>
@@ -324,8 +306,13 @@ function SetupDetailContent({
             <StatRow label="Risk:Reward" value={setup.rrRatio} />
             <StatRow label="Zone" value={setup.zone.formation.replace(/_/g, " ")} />
             <StatRow label="Distance" value={`${liveDistancePips.toFixed(1)} pips`} />
-            <StatRow label="Timeframe" value={TF_LABELS[setup.timeframeSet] ?? setup.timeframeSet} />
-            {setup.placedAt && <StatRow label="Placed" value={formatRelativeTime(setup.placedAt)} />}
+            <StatRow
+              label="Timeframe"
+              value={TF_LABELS[setup.timeframeSet] ?? setup.timeframeSet}
+            />
+            {setup.placedAt && (
+              <StatRow label="Placed" value={formatRelativeTime(setup.placedAt)} />
+            )}
           </div>
         </div>
 
@@ -366,21 +353,25 @@ function SetupDetailContent({
                       "size-2.5 rounded-full",
                       setup.curveData.position === "low" || setup.curveData.position === "below"
                         ? "bg-green-500"
-                        : setup.curveData.position === "high" || setup.curveData.position === "above"
+                        : setup.curveData.position === "high" ||
+                            setup.curveData.position === "above"
                           ? "bg-red-500"
                           : "bg-amber-500",
                     )}
                   />
                   <span>
-                    Price in the{" "}
-                    <span className="font-medium">{setup.curveData.position}</span> zone
+                    Price in the <span className="font-medium">{setup.curveData.position}</span>{" "}
+                    zone
                     <span className="text-muted-foreground">
                       {" "}
-                      ({setup.curveData.position === "low" || setup.curveData.position === "below"
+                      (
+                      {setup.curveData.position === "low" || setup.curveData.position === "below"
                         ? "favorable"
-                        : setup.curveData.position === "high" || setup.curveData.position === "above"
+                        : setup.curveData.position === "high" ||
+                            setup.curveData.position === "above"
                           ? "unfavorable"
-                          : "neutral"})
+                          : "neutral"}
+                      )
                     </span>
                   </span>
                 </div>
@@ -421,13 +412,33 @@ function SetupDetailContent({
 
           {/* Chart overlay toggles */}
           <div className="flex flex-wrap gap-1.5">
-            <OverlayToggle label="Entry/SL/TP" on={showOrder} onToggle={() => setShowOrder(!showOrder)} color="blue" />
-            <OverlayToggle label="Zone" on={showZone} onToggle={() => setShowZone(!showZone)} color="purple" />
+            <OverlayToggle
+              label="Entry/SL/TP"
+              on={showOrder}
+              onToggle={() => setShowOrder(!showOrder)}
+              color="blue"
+            />
+            <OverlayToggle
+              label="Zone"
+              on={showZone}
+              onToggle={() => setShowZone(!showZone)}
+              color="purple"
+            />
             {setup.trendData && (
-              <OverlayToggle label="Trend" on={showTrend} onToggle={() => setShowTrend(!showTrend)} color="teal" />
+              <OverlayToggle
+                label="Trend"
+                on={showTrend}
+                onToggle={() => setShowTrend(!showTrend)}
+                color="teal"
+              />
             )}
             {setup.curveData && (
-              <OverlayToggle label="Big Picture" on={showCurve} onToggle={() => setShowCurve(!showCurve)} color="amber" />
+              <OverlayToggle
+                label="Big Picture"
+                on={showCurve}
+                onToggle={() => setShowCurve(!showCurve)}
+                color="amber"
+              />
             )}
           </div>
 
@@ -496,13 +507,35 @@ function SetupDetailContent({
 }
 
 const OVERLAY_COLORS: Record<string, { on: string; off: string }> = {
-  blue: { on: "border-blue-500/30 bg-blue-500/10 text-blue-500", off: "border-border text-muted-foreground" },
-  purple: { on: "border-purple-500/30 bg-purple-500/10 text-purple-500", off: "border-border text-muted-foreground" },
-  teal: { on: "border-teal-500/30 bg-teal-500/10 text-teal-500", off: "border-border text-muted-foreground" },
-  amber: { on: "border-amber-500/30 bg-amber-500/10 text-amber-500", off: "border-border text-muted-foreground" },
+  blue: {
+    on: "border-blue-500/30 bg-blue-500/10 text-blue-500",
+    off: "border-border text-muted-foreground",
+  },
+  purple: {
+    on: "border-purple-500/30 bg-purple-500/10 text-purple-500",
+    off: "border-border text-muted-foreground",
+  },
+  teal: {
+    on: "border-teal-500/30 bg-teal-500/10 text-teal-500",
+    off: "border-border text-muted-foreground",
+  },
+  amber: {
+    on: "border-amber-500/30 bg-amber-500/10 text-amber-500",
+    off: "border-border text-muted-foreground",
+  },
 }
 
-function OverlayToggle({ label, on, onToggle, color }: { label: string; on: boolean; onToggle: () => void; color: string }) {
+function OverlayToggle({
+  label,
+  on,
+  onToggle,
+  color,
+}: {
+  label: string
+  on: boolean
+  onToggle: () => void
+  color: string
+}) {
   const colors = OVERLAY_COLORS[color] ?? OVERLAY_COLORS.blue!
   return (
     <button

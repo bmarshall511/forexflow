@@ -612,10 +612,7 @@ export class TradeFinderScanner {
     // 4. Trend alignment guard — require trend alignment unless exceptional score
     const trendScore = setup.scores.trend?.value ?? 0
     if (trendScore < 1 && setup.scores.total < 13) {
-      await this.skipAutoTrade(
-        setup,
-        `Market isn't trending in the right direction for this trade`,
-      )
+      await this.skipAutoTrade(setup, `Market isn't trending in the right direction for this trade`)
       return
     }
 
@@ -631,7 +628,10 @@ export class TradeFinderScanner {
 
     // 6. Same-instrument guard — skip if existing open trade or pending order
     if (this.hasExistingPositionFn && this.hasExistingPositionFn(setup.instrument)) {
-      await this.skipAutoTrade(setup, `Already have a trade on ${setup.instrument.replace("_", "/")}`)
+      await this.skipAutoTrade(
+        setup,
+        `Already have a trade on ${setup.instrument.replace("_", "/")}`,
+      )
       return
     }
 

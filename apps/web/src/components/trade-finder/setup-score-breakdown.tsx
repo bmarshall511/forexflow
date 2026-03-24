@@ -54,7 +54,13 @@ function ScoreRow({ id, score }: { id: string; score: OddsEnhancerScore }) {
   const info = SCORE_INFO[id]
   const pct = score.max > 0 ? (score.value / score.max) * 100 : 0
   const colorClass =
-    pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-amber-500" : pct > 0 ? "bg-orange-500" : "bg-zinc-400"
+    pct >= 80
+      ? "bg-green-500"
+      : pct >= 50
+        ? "bg-amber-500"
+        : pct > 0
+          ? "bg-orange-500"
+          : "bg-zinc-400"
   const label = score.label === "N/A" ? "Not applicable" : score.label
 
   return (
@@ -62,19 +68,32 @@ function ScoreRow({ id, score }: { id: string; score: OddsEnhancerScore }) {
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium">{info?.name ?? id}</span>
         <span className="flex items-center gap-1.5 text-[10px]">
-          <span className={pct >= 80 ? "text-green-500" : pct >= 50 ? "text-amber-500" : pct > 0 ? "text-orange-500" : "text-muted-foreground"}>
+          <span
+            className={
+              pct >= 80
+                ? "text-green-500"
+                : pct >= 50
+                  ? "text-amber-500"
+                  : pct > 0
+                    ? "text-orange-500"
+                    : "text-muted-foreground"
+            }
+          >
             {label}
           </span>
-          <span className="text-muted-foreground font-mono tabular-nums">{score.value}/{score.max}</span>
+          <span className="text-muted-foreground font-mono tabular-nums">
+            {score.value}/{score.max}
+          </span>
         </span>
       </div>
       <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-        <div className={`h-full rounded-full transition-all ${colorClass}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full rounded-full transition-all ${colorClass}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       {/* Explanation — always show why this score was given */}
-      <p className="text-muted-foreground text-[10px] leading-snug">
-        {score.explanation}
-      </p>
+      <p className="text-muted-foreground text-[10px] leading-snug">{score.explanation}</p>
     </div>
   )
 }
@@ -105,9 +124,7 @@ export function SetupScoreBreakdown({ scores }: SetupScoreBreakdownProps) {
         more things are working in your favor. Tap any factor to learn what it means.
       </p>
 
-      {rows.map(([id, score]) =>
-        score ? <ScoreRow key={id} id={id} score={score} /> : null,
-      )}
+      {rows.map(([id, score]) => (score ? <ScoreRow key={id} id={id} score={score} /> : null))}
 
       {/* Total */}
       <div className="flex items-center justify-between border-t pt-2">

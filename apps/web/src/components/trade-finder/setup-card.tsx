@@ -52,7 +52,9 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
   const riskDollars = computeDollarAmount(setup.positionSize, setup.riskPips, setup.instrument)
   const rewardDollars = computeDollarAmount(setup.positionSize, setup.rewardPips, setup.instrument)
 
-  const autoTradeStatus = autoTradeConfig ? getAutoTradeStatus(setup, autoTradeConfig, liveDistancePips) : null
+  const autoTradeStatus = autoTradeConfig
+    ? getAutoTradeStatus(setup, autoTradeConfig, liveDistancePips)
+    : null
 
   const statusLabel = (() => {
     if (setup.autoPlaced && setup.status === "filled") return "Auto Filled"
@@ -74,9 +76,10 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
     return null
   })()
 
-  const statusIcon = setup.autoPlaced && (setup.status === "placed" || setup.status === "filled")
-    ? <Zap className="size-2.5" />
-    : null
+  const statusIcon =
+    setup.autoPlaced && (setup.status === "placed" || setup.status === "filled") ? (
+      <Zap className="size-2.5" />
+    ) : null
 
   const isApproaching = setup.status === "approaching"
   const canPlace = (setup.status === "active" || setup.status === "approaching") && !!onPlace
@@ -89,12 +92,12 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
       className={cn(
         "bg-card flex cursor-pointer flex-col overflow-hidden rounded-xl border border-l-4 shadow-sm transition-shadow hover:shadow-md",
         setup.autoPlaced && setup.status === "placed"
-          ? "border-l-teal-500 border-border/60"
+          ? "border-border/60 border-l-teal-500"
           : setup.autoPlaced && setup.status === "filled"
-            ? "border-l-green-500 border-border/60"
+            ? "border-border/60 border-l-green-500"
             : isLong
-              ? "border-l-green-500 border-border/60"
-              : "border-l-red-500 border-border/60",
+              ? "border-border/60 border-l-green-500"
+              : "border-border/60 border-l-red-500",
         isApproaching && "ring-2 ring-amber-500/30",
       )}
       onClick={() => onSelect(setup)}
@@ -203,7 +206,7 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
               : `${liveDistancePips.toFixed(0)} pips from entry`}
         </p>
         {livePrice && (
-          <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+          <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
             {livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5)}
           </span>
         )}
@@ -269,13 +272,26 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
   )
 }
 
-function MetricRow({ label, value, color }: { label: string; value: string; color: "red" | "green" }) {
+function MetricRow({
+  label,
+  value,
+  color,
+}: {
+  label: string
+  value: string
+  color: "red" | "green"
+}) {
   return (
     <div className="flex items-center justify-between text-xs">
       <span className="text-muted-foreground">{label}</span>
       <span className="flex items-center gap-1.5 font-medium">
         <span className={color === "red" ? "text-red-500" : "text-green-500"}>{value}</span>
-        <span className={cn("inline-block size-2 rounded-full", color === "red" ? "bg-red-500" : "bg-green-500")} />
+        <span
+          className={cn(
+            "inline-block size-2 rounded-full",
+            color === "red" ? "bg-red-500" : "bg-green-500",
+          )}
+        />
       </span>
     </div>
   )
