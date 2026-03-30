@@ -278,13 +278,18 @@ export function TradeEventsTimeline({ events }: TradeEventsTimelineProps) {
                 </span>
               </div>
 
-              {/* SL/TP structured detail */}
-              {sltpDetail && (
-                <div className="bg-muted/40 mt-1.5 space-y-0.5 rounded-md px-2.5 py-1.5">
-                  <SltpChange label="SL" oldVal={sltpDetail.oldSL} newVal={sltpDetail.newSL} />
-                  <SltpChange label="TP" oldVal={sltpDetail.oldTP} newVal={sltpDetail.newTP} />
-                </div>
-              )}
+              {/* SL/TP structured detail — only show if at least one value actually changed */}
+              {sltpDetail &&
+                (sltpDetail.oldSL !== sltpDetail.newSL ||
+                  sltpDetail.oldTP !== sltpDetail.newTP) && (
+                  <div className="bg-muted/40 mt-1.5 space-y-0.5 rounded-md px-2.5 py-1.5">
+                    <SltpChange label="SL" oldVal={sltpDetail.oldSL} newVal={sltpDetail.newSL} />
+                    <SltpChange label="TP" oldVal={sltpDetail.oldTP} newVal={sltpDetail.newTP} />
+                    {sltpDetail.modifiedBy === "external" && (
+                      <span className="text-muted-foreground text-[10px]">Changed on OANDA</span>
+                    )}
+                  </div>
+                )}
 
               {/* Cancel detail */}
               {cancelDetail && (

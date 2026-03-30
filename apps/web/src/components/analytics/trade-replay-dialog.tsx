@@ -138,14 +138,19 @@ export function TradeReplayDialog({
     ? Math.floor(new Date(tradeInfo.closedAt).getTime() / 1000)
     : null
 
-  const entryCandleIdx = useMemo(
-    () => candles.findIndex((c) => c.time >= entryTime),
-    [candles, entryTime],
-  )
-  const exitCandleIdx = useMemo(
-    () => (exitTime !== null ? candles.findIndex((c) => c.time >= exitTime) : -1),
-    [candles, exitTime],
-  )
+  const entryCandleIdx = useMemo(() => {
+    for (let i = candles.length - 1; i >= 0; i--) {
+      if (candles[i]!.time <= entryTime) return i
+    }
+    return -1
+  }, [candles, entryTime])
+  const exitCandleIdx = useMemo(() => {
+    if (exitTime === null) return -1
+    for (let i = candles.length - 1; i >= 0; i--) {
+      if (candles[i]!.time <= exitTime) return i
+    }
+    return -1
+  }, [candles, exitTime])
 
   const hasEnteredTrade = entryCandleIdx >= 0 && currentIndex >= entryCandleIdx
   const showScoreCard = exitCandleIdx >= 0 && currentIndex >= exitCandleIdx + 5

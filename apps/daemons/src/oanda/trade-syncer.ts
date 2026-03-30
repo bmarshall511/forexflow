@@ -1507,6 +1507,43 @@ export class OandaTradeSyncer {
           }
 
           for (const trade of instrumentTrades) {
+            // Detect external SL/TP changes (modified directly on OANDA, not through FXFlow)
+            // by comparing the OANDA values with the DB record BEFORE the upsert overwrites them.
+            const existingRecord = await getTradeBySourceId("oanda", trade.sourceTradeId)
+            if (existingRecord && existingRecord.status === "open") {
+              const decimals = getDecimalPlaces(trade.instrument)
+              const oldSL = existingRecord.stopLoss?.toFixed(decimals) ?? null
+              const newSL = trade.stopLoss?.toFixed(decimals) ?? null
+              const oldTP = existingRecord.takeProfit?.toFixed(decimals) ?? null
+              const newTP = trade.takeProfit?.toFixed(decimals) ?? null
+
+              if (oldSL !== newSL || oldTP !== newTP) {
+                const changes: string[] = []
+                if (oldSL !== newSL) changes.push(`SL: ${oldSL ?? "none"} → ${newSL ?? "none"}`)
+                if (oldTP !== newTP) changes.push(`TP: ${oldTP ?? "none"} → ${newTP ?? "none"}`)
+
+                try {
+                  await createTradeEvent({
+                    tradeId: existingRecord.id,
+                    eventType: "SL_TP_MODIFIED",
+                    detail: JSON.stringify({
+                      modifiedBy: "external",
+                      oldSL: existingRecord.stopLoss,
+                      newSL: trade.stopLoss,
+                      oldTP: existingRecord.takeProfit,
+                      newTP: trade.takeProfit,
+                      time: new Date().toISOString(),
+                    }),
+                  })
+                  console.log(
+                    `[trade-syncer] External SL/TP change detected for ${trade.instrument}: ${changes.join(", ")}`,
+                  )
+                } catch {
+                  /* best-effort */
+                }
+              }
+            }
+
             // Detect orders that transitioned pending → open (just filled)
             const wasKnownPending = this.knownPendingSourceIds.has(trade.sourceTradeId)
             const dbRecord = await upsertTrade({

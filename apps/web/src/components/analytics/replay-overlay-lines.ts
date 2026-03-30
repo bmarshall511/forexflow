@@ -125,7 +125,7 @@ export function getReplayMarkers(
   const markers: SeriesMarker<Time>[] = []
   const isLong = tradeInfo.direction === "long"
 
-  // Entry arrow
+  // Entry marker — small circle + label (dashed line drawn separately by overlay lines)
   if (entryCandleIdx >= 0 && currentIndex >= entryCandleIdx) {
     const candle = candles[entryCandleIdx]
     if (candle) {
@@ -133,13 +133,13 @@ export function getReplayMarkers(
         time: candle.time as Time,
         position: isLong ? "belowBar" : "aboveBar",
         color: "#f59e0b",
-        shape: isLong ? "arrowUp" : "arrowDown",
+        shape: "circle",
         text: isLong ? "BOUGHT HERE" : "SOLD HERE",
       })
     }
   }
 
-  // Exit arrow with close reason context
+  // Exit marker — small circle + label with close reason context
   if (exitCandleIdx >= 0 && currentIndex >= exitCandleIdx && tradeInfo.exitPrice !== null) {
     const candle = candles[exitCandleIdx]
     if (candle) {
@@ -148,7 +148,7 @@ export function getReplayMarkers(
         time: candle.time as Time,
         position: isLong ? "aboveBar" : "belowBar",
         color: tradeInfo.realizedPL >= 0 ? "#22c55e" : "#ef4444",
-        shape: isLong ? "arrowDown" : "arrowUp",
+        shape: "circle",
         text: exitLabel,
       })
     }

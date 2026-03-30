@@ -88,14 +88,21 @@ export function TradeReplay({
     [tradeInfo.closedAt],
   )
 
-  const entryCandleIdx = useMemo(
-    () => candles.findIndex((c) => c.time >= entryTime),
-    [candles, entryTime],
-  )
-  const exitCandleIdx = useMemo(
-    () => (exitTime !== null ? candles.findIndex((c) => c.time >= exitTime) : -1),
-    [candles, exitTime],
-  )
+  // Find the candle that contains each timestamp (last candle that starts at or before the time).
+  // Using >= would snap forward to the NEXT candle for mid-candle trades.
+  const entryCandleIdx = useMemo(() => {
+    for (let i = candles.length - 1; i >= 0; i--) {
+      if (candles[i]!.time <= entryTime) return i
+    }
+    return -1
+  }, [candles, entryTime])
+  const exitCandleIdx = useMemo(() => {
+    if (exitTime === null) return -1
+    for (let i = candles.length - 1; i >= 0; i--) {
+      if (candles[i]!.time <= exitTime) return i
+    }
+    return -1
+  }, [candles, exitTime])
 
   // Create chart once — recreate when theme/decimals/height change
   useEffect(() => {
