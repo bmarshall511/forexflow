@@ -29,6 +29,7 @@ import { CloseTradeDialog } from "./close-trade-dialog"
 import { CancelOrderDialog } from "./cancel-order-dialog"
 import { AiAnalysisSheet } from "@/components/ai/ai-analysis-sheet"
 import { useTradeActions } from "@/hooks/use-trade-actions"
+import { useSourceIndicators } from "@/hooks/use-source-indicators"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import {
   ArrowUpDown,
@@ -114,6 +115,21 @@ export function TradeCardList({
     isLoading: actionLoading,
   } = useTradeActions()
   const { positions, setPositions } = useDaemonStatus()
+
+  // Batch-fetch source indicators (score, confidence, phase) for all visible trades
+  const indicatorTrades = useMemo(
+    () =>
+      trades.map((t) => ({
+        id: t.id,
+        sourceTradeId:
+          "sourceTradeId" in t
+            ? (t as OpenTradeData).sourceTradeId
+            : (t as PendingOrderData).sourceOrderId,
+        source: t.source,
+      })),
+    [trades],
+  )
+  const sourceIndicators = useSourceIndicators(indicatorTrades)
 
   // Deep-link: open AI sheet for a specific trade
   useEffect(() => {
@@ -322,6 +338,7 @@ export function TradeCardList({
                 ? (pricesByInstrument.get(trade.instrument)?.bid ?? null)
                 : undefined
             }
+            sourceIndicator={sourceIndicators[trade.id]}
             isExpanded={expandedId === trade.id}
             onToggleExpand={() => setExpandedId(expandedId === trade.id ? null : trade.id)}
             onViewDetails={() => setDrawerTrade(trade)}

@@ -33,6 +33,7 @@ export interface OpenTradeRowProps {
   tags: TradeTagData[]
   currency: string
   isSelected: boolean
+  sourceIndicator?: string | null
   latestAnalysis: AiAnalysisData | undefined
   analysisCount: number | undefined
   activeProgress: ActiveAnalysisProgress | undefined
@@ -50,6 +51,7 @@ export const OpenTradeRow = memo(
     tags,
     currency,
     isSelected,
+    sourceIndicator,
     latestAnalysis,
     analysisCount,
     activeProgress,
@@ -80,7 +82,7 @@ export const OpenTradeRow = memo(
           <DirectionBadge direction={trade.direction} />
         </TableCell>
         <TableCell>
-          <SourceBadge source={trade.source} />
+          <SourceBadge source={trade.source} indicator={sourceIndicator} />
         </TableCell>
         <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
           <TimeframeSelect value={trade.timeframe} onChange={onTimeframeChange} />

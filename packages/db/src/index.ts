@@ -194,6 +194,7 @@ export {
   cleanupOldSignals,
   clearAllSignals,
   markSignalAsTest,
+  findSignalByResultTradeId,
   getSignalPeriodPnL,
   getAutoTradesSummary,
   getSignalPnLDistribution,

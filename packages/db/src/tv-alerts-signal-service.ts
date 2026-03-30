@@ -171,6 +171,14 @@ export async function updateSignalStatus(
   return rowToSignal(row)
 }
 
+/** Find a signal by its linked OANDA sourceTradeId. */
+export async function findSignalByResultTradeId(
+  resultTradeId: string,
+): Promise<TVAlertSignal | null> {
+  const row = await db.tVAlertSignal.findFirst({ where: { resultTradeId } })
+  return row ? rowToSignal(row) : null
+}
+
 /** Mark a signal as a test signal. */
 export async function markSignalAsTest(id: string): Promise<void> {
   await db.tVAlertSignal.update({ where: { id }, data: { isTest: true } })

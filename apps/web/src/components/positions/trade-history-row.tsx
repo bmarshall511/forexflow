@@ -28,6 +28,7 @@ export interface TradeHistoryRowProps {
   trade: ClosedTradeData
   currency: string
   isSelected: boolean
+  sourceIndicator?: string | null
   latestAnalysis: AiAnalysisData | undefined
   analysisCount: number | undefined
   activeProgress: ActiveAnalysisProgress | undefined
@@ -42,6 +43,7 @@ export const TradeHistoryRow = memo(
     trade,
     currency,
     isSelected,
+    sourceIndicator,
     latestAnalysis,
     analysisCount,
     activeProgress,
@@ -71,7 +73,7 @@ export const TradeHistoryRow = memo(
           <DirectionBadge direction={trade.direction} />
         </TableCell>
         <TableCell>
-          <SourceBadge source={trade.source} />
+          <SourceBadge source={trade.source} indicator={sourceIndicator} />
         </TableCell>
         <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
           <TimeframeSelect value={trade.timeframe} onChange={onTimeframeChange} />

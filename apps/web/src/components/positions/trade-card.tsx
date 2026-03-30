@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { SourceBadge } from "./source-badge"
+import { SourceContextPanel } from "./source-context-panel"
 import { OutcomeBadge } from "./outcome-badge"
 import { TagBadges } from "./tag-badges"
 import { OpenProgressBar } from "./progress-bar-open"
@@ -40,6 +41,8 @@ interface TradeCardProps {
   currency?: string
   /** Current market price for pending orders (from live price feed) */
   currentPrice?: number | null
+  /** Source-specific indicator (e.g., "14/18" for Trade Finder score) */
+  sourceIndicator?: string | null
   isExpanded: boolean
   onToggleExpand: () => void
   onViewDetails?: () => void
@@ -75,11 +78,18 @@ function getUnits(data: TradeData, variant: TradeCardVariant): number {
   return (data as ClosedTradeData).units
 }
 
+function getSourceTradeId(data: TradeData, variant: TradeCardVariant): string {
+  if (variant === "pending") return (data as PendingOrderData).sourceOrderId
+  if (variant === "open") return (data as OpenTradeData).sourceTradeId
+  return (data as ClosedTradeData).sourceTradeId
+}
+
 export function TradeCard({
   variant,
   data,
   currency = "USD",
   currentPrice: currentPriceProp,
+  sourceIndicator,
   isExpanded,
   onToggleExpand,
   onViewDetails,
@@ -100,6 +110,7 @@ export function TradeCard({
 
   const entryPrice = getEntryPrice(data, variant)
   const units = getUnits(data, variant)
+  const sourceTradeId = getSourceTradeId(data, variant)
 
   // P/L
   const plValue = isOpen
@@ -179,7 +190,7 @@ export function TradeCard({
 
                 {/* Subtitle: source + metrics */}
                 <div className="text-muted-foreground mt-1 flex items-center gap-2 text-[11px]">
-                  <SourceBadge source={data.source} />
+                  <SourceBadge source={data.source} indicator={sourceIndicator} />
                   {rr.ratio && <span>{rr.ratio} R:R</span>}
                   {isOpen && (
                     <DurationDisplay
@@ -483,6 +494,14 @@ export function TradeCard({
                 <TagBadges tags={tags ?? data.tags} maxVisible={4} />
               </div>
             )}
+
+            {/* Source-specific context (lazy-loaded on expand) */}
+            <SourceContextPanel
+              sourceTradeId={sourceTradeId}
+              tradeId={data.id}
+              source={data.source}
+              isExpanded={isExpanded}
+            />
 
             {/* AI Analysis inline */}
             {onAiAnalysis && (

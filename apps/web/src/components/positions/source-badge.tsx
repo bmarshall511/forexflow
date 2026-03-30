@@ -45,10 +45,30 @@ const SOURCE_CONFIG: Record<TradeSource, { label: string; className: string }> =
 
 interface SourceBadgeProps {
   source: TradeSource
+  /** Optional score/confidence indicator shown after the label */
+  indicator?: string | null
   className?: string
 }
 
-export function SourceBadge({ source, className }: SourceBadgeProps) {
+/** Color a score indicator: green >= 80%, amber >= 50%, orange > 0% */
+function indicatorColor(source: TradeSource): string {
+  switch (source) {
+    case "trade_finder":
+    case "trade_finder_auto":
+      return "text-teal-500 dark:text-teal-400"
+    case "ai_trader":
+    case "ai_trader_manual":
+      return "text-indigo-500 dark:text-indigo-400"
+    case "smart_flow":
+      return "text-sky-500 dark:text-sky-400"
+    case "ut_bot_alerts":
+      return "text-emerald-500 dark:text-emerald-400"
+    default:
+      return "text-muted-foreground"
+  }
+}
+
+export function SourceBadge({ source, indicator, className }: SourceBadgeProps) {
   const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.oanda
   return (
     <Badge
@@ -56,6 +76,11 @@ export function SourceBadge({ source, className }: SourceBadgeProps) {
       className={cn("px-1.5 py-0 text-[10px] font-medium", config.className, className)}
     >
       {config.label}
+      {indicator && (
+        <span className={cn("ml-1 font-mono font-bold tabular-nums", indicatorColor(source))}>
+          {indicator}
+        </span>
+      )}
     </Badge>
   )
 }

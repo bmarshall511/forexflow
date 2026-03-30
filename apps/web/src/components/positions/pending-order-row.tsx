@@ -53,6 +53,7 @@ export interface PendingOrderRowProps {
   tags: TradeTagData[]
   currency: string
   isSelected: boolean
+  sourceIndicator?: string | null
   latestAnalysis: AiAnalysisData | undefined
   analysisCount: number | undefined
   activeProgress: ActiveAnalysisProgress | undefined
@@ -70,6 +71,7 @@ export const PendingOrderRow = memo(
     tags,
     currency,
     isSelected,
+    sourceIndicator,
     latestAnalysis,
     analysisCount,
     activeProgress,
@@ -100,7 +102,7 @@ export const PendingOrderRow = memo(
           <DirectionBadge direction={order.direction} />
         </TableCell>
         <TableCell>
-          <SourceBadge source={order.source} />
+          <SourceBadge source={order.source} indicator={sourceIndicator} />
         </TableCell>
         <TableCell onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
           <TimeframeSelect value={order.timeframe} onChange={onTimeframeChange} />
