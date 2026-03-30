@@ -3,6 +3,8 @@ import {
   resetModule,
   resetTradingData,
   resetFactory,
+  disableAllAutomation,
+  setLastResetAt,
   type ResetModule,
   type ResetResult,
 } from "@fxflow/db"
@@ -13,32 +15,54 @@ const DAEMON_URL = getServerDaemonUrl()
 
 /**
  * Close all open trades and cancel all pending orders on OANDA before DB reset.
+ * Returns an array of warning messages for any operations that failed.
  * Without this, OANDA orders survive the DB reset and get re-created as "OANDA" source
  * on the next reconcile cycle — losing source attribution permanently.
  */
-async function closeAllOandaPositions(): Promise<void> {
+async function closeAllOandaPositions(): Promise<string[]> {
+  const warnings: string[] = []
+
+  // Cancel all pending orders (omit sourceOrderIds to cancel ALL)
   try {
-    // Cancel all pending orders (omit sourceOrderIds to cancel ALL)
-    await fetch(`${DAEMON_URL}/actions/cancel-all-orders`, {
+    const res = await fetch(`${DAEMON_URL}/actions/cancel-all-orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason: "Trading data reset" }),
-    }).catch(() => {})
-
-    // Close all open trades (omit sourceTradeIds to close ALL)
-    await fetch(`${DAEMON_URL}/actions/close-all-trades`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: "Trading data reset" }),
-    }).catch(() => {})
-
-    // Cancel AI conditions
-    await fetch(`${DAEMON_URL}/actions/ai/cancel-all-conditions`, { method: "POST" }).catch(
-      () => {},
-    )
-  } catch {
-    // Best-effort — don't block the reset
+    })
+    if (!res.ok) {
+      warnings.push(`Cancel orders: daemon returned ${res.status}`)
+    }
+  } catch (err) {
+    warnings.push(`Cancel orders: ${err instanceof Error ? err.message : "daemon unreachable"}`)
   }
+
+  // Close all open trades (omit sourceTradeIds to close ALL)
+  try {
+    const res = await fetch(`${DAEMON_URL}/actions/close-all-trades`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "Trading data reset" }),
+    })
+    if (!res.ok) {
+      warnings.push(`Close trades: daemon returned ${res.status}`)
+    }
+  } catch (err) {
+    warnings.push(`Close trades: ${err instanceof Error ? err.message : "daemon unreachable"}`)
+  }
+
+  // Cancel AI conditions
+  try {
+    const res = await fetch(`${DAEMON_URL}/actions/ai/cancel-all-conditions`, { method: "POST" })
+    if (!res.ok) {
+      warnings.push(`Cancel AI conditions: daemon returned ${res.status}`)
+    }
+  } catch (err) {
+    warnings.push(
+      `Cancel AI conditions: ${err instanceof Error ? err.message : "daemon unreachable"}`,
+    )
+  }
+
+  return warnings
 }
 
 /** Notify daemon to re-sync in-memory state after DB resets (best-effort). */
@@ -85,15 +109,21 @@ export async function POST(request: Request) {
     if (!parsed.success) return parsed.response
 
     const { level, modules } = parsed.data
+    const oandaWarnings: string[] = []
 
     if (level === "selective") {
       if (!modules || modules.length === 0) {
         return apiError("At least one module is required for selective reset")
       }
 
-      // Close OANDA positions before clearing trading history to prevent orphaned orders
-      if (modules.includes("trading_history")) {
-        await closeAllOandaPositions()
+      const includesTrading = modules.includes("trading_history")
+
+      // Server-side: disable automation before clearing data to prevent
+      // auto-trade systems from immediately re-placing trades after reset
+      if (includesTrading) {
+        await disableAllAutomation()
+        oandaWarnings.push(...(await closeAllOandaPositions()))
+        await setLastResetAt()
       }
 
       const errors: string[] = []
@@ -110,29 +140,41 @@ export async function POST(request: Request) {
         }
       }
 
-      const result: ResetResult = {
+      const result: ResetResult & { oandaWarnings?: string[] } = {
         success: errors.length === 0,
         modulesReset,
         recordsDeleted,
         errors,
+        ...(oandaWarnings.length > 0 && { oandaWarnings }),
       }
       // Notify daemon to re-sync in-memory state for reset modules
       await notifyDaemonAfterReset(modulesReset)
       return apiSuccess(result)
     }
 
+    // Both trading_data and factory: disable automation + close OANDA + set reset timestamp
+    await disableAllAutomation()
+    oandaWarnings.push(...(await closeAllOandaPositions()))
+    await setLastResetAt()
+
+    const allModules: ResetModule[] = ["trading_history", "tv_alerts", "trade_finder", "ai_trader"]
+
     if (level === "trading_data") {
-      await closeAllOandaPositions()
       const result = await resetTradingData()
-      await notifyDaemonAfterReset(["trading_history", "tv_alerts", "trade_finder", "ai_trader"])
-      return apiSuccess(result)
+      await notifyDaemonAfterReset(allModules)
+      return apiSuccess({
+        ...result,
+        ...(oandaWarnings.length > 0 && { oandaWarnings }),
+      })
     }
 
     // factory
-    await closeAllOandaPositions()
     const result = await resetFactory()
-    await notifyDaemonAfterReset(["trading_history", "tv_alerts", "trade_finder", "ai_trader"])
-    return apiSuccess(result)
+    await notifyDaemonAfterReset(allModules)
+    return apiSuccess({
+      ...result,
+      ...(oandaWarnings.length > 0 && { oandaWarnings }),
+    })
   } catch (error) {
     console.error("[POST /api/settings/reset/execute]", error)
     return apiError(error instanceof Error ? error.message : "Unknown error", 500)

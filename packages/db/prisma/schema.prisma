@@ -18,6 +18,7 @@ model Settings {
   onboardingCompleted   Boolean  @default(false)
   deploymentMode        String   @default("local") // "local" | "cloud"
   cloudDaemonUrl        String?  // Remote daemon URL for cloud mode (e.g. https://daemon.railway.app)
+  lastResetAt           DateTime? // Timestamp of last trading data/factory reset — gates backfill
   updatedAt             DateTime @updatedAt
 }
 

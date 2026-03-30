@@ -236,6 +236,17 @@ export async function setOnboardingCompleted(): Promise<void> {
 }
 
 /**
+ * Get the timestamp of the last trading data or factory reset.
+ * Used by the daemon backfill to skip trades opened before the reset.
+ *
+ * @returns The reset timestamp, or null if no reset has occurred
+ */
+export async function getLastResetAt(): Promise<Date | null> {
+  const settings = await getOrCreateSettings()
+  return settings.lastResetAt
+}
+
+/**
  * Test the OANDA API connection for a trading mode by making a live API call.
  *
  * @param mode - The trading mode to test ("practice" or "live")

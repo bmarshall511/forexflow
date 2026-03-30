@@ -181,6 +181,53 @@ export async function getResetPreflightStatus(): Promise<PreflightStatus> {
   }
 }
 
+/**
+ * Disable all automation systems (TV Alerts, Trade Finder auto-trade,
+ * AI Trader, SmartFlow) server-side. Called before DB reset to prevent
+ * automation from immediately re-placing trades after data is cleared.
+ */
+export async function disableAllAutomation(): Promise<string[]> {
+  const disabled: string[] = []
+
+  try {
+    await db.tVAlertsConfig.updateMany({ data: { enabled: false } })
+    disabled.push("TV Alerts")
+  } catch {
+    /* Table may not exist yet */
+  }
+
+  try {
+    await db.tradeFinderConfig.updateMany({ data: { autoTradeEnabled: false } })
+    disabled.push("Trade Finder auto-trade")
+  } catch {
+    /* Table may not exist yet */
+  }
+
+  try {
+    await db.aiTraderConfig.updateMany({ data: { enabled: false } })
+    disabled.push("AI Trader")
+  } catch {
+    /* Table may not exist yet */
+  }
+
+  try {
+    await db.smartFlowSettings.updateMany({ data: { enabled: false } })
+    disabled.push("SmartFlow")
+  } catch {
+    /* Table may not exist yet */
+  }
+
+  return disabled
+}
+
+/** Record the current timestamp as the last reset time. Gates daemon backfill. */
+export async function setLastResetAt(): Promise<void> {
+  const existing = await db.settings.findUnique({ where: { id: 1 } })
+  if (existing) {
+    await db.settings.update({ where: { id: 1 }, data: { lastResetAt: new Date() } })
+  }
+}
+
 /** Reset a single module. Deletes children before parents for FK safety. */
 export async function resetModule(module: ResetModule): Promise<{ deleted: number }> {
   let deleted = 0

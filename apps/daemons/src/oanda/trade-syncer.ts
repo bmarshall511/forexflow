@@ -840,24 +840,34 @@ export class OandaTradeSyncer {
       const refreshed = await getTradeBySourceId("oanda", sourceId)
       if (refreshed) dbTrade = refreshed
     } else {
-      // LIMIT order: the real order ID was assigned during reconcile.
-      // Find the record that reconcile just created.
-      const { db: prisma } = await import("@fxflow/db")
-      const recent = await prisma.trade.findFirst({
-        where: {
-          source: "oanda",
-          instrument,
-          direction,
-          status: "pending",
-          openedAt: { gte: new Date(Date.now() - 60_000) },
-        },
-        orderBy: { openedAt: "desc" },
-      })
-      if (recent) {
-        dbTrade = recent
+      // LIMIT order: try direct sourceTradeId match first (orderCreateTransaction.id
+      // should equal the order ID in OANDA's GET /orders response).
+      dbTrade = await getTradeBySourceId("oanda", sourceId)
+      if (dbTrade) {
         console.log(
-          `[placeOrder] Found LIMIT order after reconcile: id=${recent.id}, sourceTradeId=${recent.sourceTradeId}`,
+          `[placeOrder] Found LIMIT order by sourceTradeId: id=${dbTrade.id}, sourceTradeId=${sourceId}`,
         )
+      } else {
+        // Fallback: fuzzy match by instrument + direction + recent timestamp.
+        // Exclude records with existing metadata to avoid tagging the wrong order.
+        const { db: prisma } = await import("@fxflow/db")
+        const recent = await prisma.trade.findFirst({
+          where: {
+            source: "oanda",
+            instrument,
+            direction,
+            status: "pending",
+            metadata: null,
+            openedAt: { gte: new Date(Date.now() - 60_000) },
+          },
+          orderBy: { openedAt: "desc" },
+        })
+        if (recent) {
+          dbTrade = recent
+          console.log(
+            `[placeOrder] Found LIMIT order by fuzzy match: id=${recent.id}, sourceTradeId=${recent.sourceTradeId}`,
+          )
+        }
       }
     }
 
@@ -1121,9 +1131,19 @@ export class OandaTradeSyncer {
         console.log(`[trade-syncer] Repair complete: ${repaired}/${orphans.length} trades updated`)
       }
 
-      // Also repair trades with null metadata (source attribution lost)
+      // Also repair trades with null metadata (source attribution lost).
+      // Includes closed trades from the last 30 days — not just open/pending.
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       const nullMeta = await prisma.trade.findMany({
-        where: { source: "oanda", metadata: null, status: { in: ["open", "pending"] } },
+        where: {
+          source: "oanda",
+          metadata: null,
+          OR: [
+            { status: { in: ["open", "pending"] } },
+            { status: "closed", closedAt: { gte: thirtyDaysAgo } },
+          ],
+        },
         select: { id: true, sourceTradeId: true, instrument: true },
       })
 
@@ -1165,10 +1185,26 @@ export class OandaTradeSyncer {
     this.abortController?.abort()
     this.abortController = new AbortController()
 
-    const fromDate = new Date()
-    fromDate.setDate(fromDate.getDate() - this.config.backfillDays)
+    const defaultFrom = new Date()
+    defaultFrom.setDate(defaultFrom.getDate() - this.config.backfillDays)
 
-    console.log(`[trade-syncer] Backfilling last ${this.config.backfillDays} days of trades...`)
+    // Gate backfill: if a reset timestamp exists, only backfill trades after that point.
+    // This prevents resurrecting old OANDA trades (with lost metadata) after a reset.
+    let fromDate = defaultFrom
+    try {
+      const { getLastResetAt } = await import("@fxflow/db")
+      const resetAt = await getLastResetAt()
+      if (resetAt && resetAt > defaultFrom) {
+        fromDate = resetAt
+        console.log(
+          `[trade-syncer] Backfill gated by lastResetAt: ${resetAt.toISOString()} (skipping pre-reset trades)`,
+        )
+      }
+    } catch {
+      // Settings table may not exist yet — use default
+    }
+
+    console.log(`[trade-syncer] Backfilling trades from ${fromDate.toISOString()}...`)
 
     try {
       const pagesResponse = await oandaGet<OandaTransactionPagesResponse>({
@@ -1217,7 +1253,7 @@ export class OandaTradeSyncer {
       const units = parseFloat(fill.units) || 0
       const direction: TradeDirection = units > 0 ? "long" : "short"
 
-      await upsertTrade({
+      const dbRecord = await upsertTrade({
         source: "oanda",
         sourceTradeId: fill.tradeOpened.tradeID,
         status: "closed", // Backfill assumes trades are closed (we'll update open ones during reconcile)
@@ -1229,6 +1265,18 @@ export class OandaTradeSyncer {
         currentUnits: Math.abs(units),
         openedAt: new Date(fill.time),
       })
+
+      // Recover missing metadata from cross-reference tables (Trade Finder, AI Trader, TV Alerts)
+      if (!dbRecord.metadata) {
+        const recovered = await this.recoverSourceMetadata(fill.tradeOpened.tradeID)
+        if (recovered) {
+          try {
+            await updateTradeMetadata(dbRecord.id, recovered)
+          } catch {
+            /* best-effort */
+          }
+        }
+      }
     }
 
     // Handle trade closes

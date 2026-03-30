@@ -64,6 +64,13 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 
 - `calculateCost()` uses `AI_MODEL_OPTIONS` pricing from `@fxflow/types`.
 
+### Reset
+
+- `reset-service.ts` — selective, trading data, factory, and fresh install resets.
+- `disableAllAutomation()` — server-side kill switch for all automation systems (TV Alerts, Trade Finder, AI Trader, SmartFlow). Called before DB reset to prevent auto-trade systems from re-placing trades.
+- `setLastResetAt()` — records reset timestamp in `Settings.lastResetAt`. Daemon backfill uses this to skip pre-reset trades.
+- `getLastResetAt()` in `settings-service.ts` — read the reset timestamp for backfill gating.
+
 ### Cleanup
 
 - Most services have cleanup methods for pruning old records.

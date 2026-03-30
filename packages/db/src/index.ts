@@ -30,6 +30,7 @@ export {
   setRiskPercent,
   getOnboardingCompleted,
   setOnboardingCompleted,
+  getLastResetAt,
 } from "./settings-service"
 
 export {
@@ -352,6 +353,8 @@ export {
   resetFactory,
   getDatabasePath,
   deleteDatabaseFile,
+  disableAllAutomation,
+  setLastResetAt,
   type ResetModule,
   type PreflightStatus,
   type AutomationStatus,

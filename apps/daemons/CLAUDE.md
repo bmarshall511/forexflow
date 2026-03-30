@@ -50,7 +50,10 @@ src/
 - **Orphan close details**: when a trade disappears from OANDA, `closeOrphanedTrades()` fetches actual close details (P&L, exit price, close reason) from OANDA's API before marking closed, instead of recording UNKNOWN/$0.
 - **Metadata recovery**: `recoverSourceMetadata()` checks both `placeOrder` audit trail and TV Alert signals (`TVAlertSignal.resultTradeId`) to restore missing metadata.
 - **SL/TP pre-validation**: `placeOrder()` validates stop-loss and take-profit before submission — SL/TP must be on the correct side of entry, and neither can equal entry after rounding.
-- **Startup repair**: `repairOrphanedTrades()` runs on startup to fix existing trades with UNKNOWN close reason/$0 P&L, and repairs trades with null metadata by running recovery checks.
+- **Startup repair**: `repairOrphanedTrades()` runs on startup to fix existing trades with UNKNOWN close reason/$0 P&L, and repairs trades with null metadata by running recovery checks (includes closed trades from the last 30 days, not just open/pending).
+- **Backfill gating**: `performBackfill()` reads `Settings.lastResetAt` and skips trades opened before the reset timestamp. Prevents resurrecting old OANDA trades with lost metadata after a reset.
+- **Backfill metadata recovery**: `processBackfillFill()` calls `recoverSourceMetadata()` for each backfilled trade to restore source attribution from cross-reference tables.
+- **LIMIT order correlation**: `placeOrder()` matches LIMIT orders by direct `sourceTradeId` first, then falls back to fuzzy instrument+direction match with `metadata: null` filter to avoid tagging the wrong record.
 
 ## Position Tracking
 
