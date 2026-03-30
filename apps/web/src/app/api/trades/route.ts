@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { listTrades, deleteClosedTrades, type TradeListResponse } from "@fxflow/db"
+import { listTrades, deleteClosedTrades, setLastResetAt, type TradeListResponse } from "@fxflow/db"
 import type { ApiResponse } from "@fxflow/types"
 import { parseSearchParams } from "@/lib/api-validation"
 import { tradeListParamsSchema } from "@/lib/api-schemas"
@@ -46,6 +46,8 @@ export async function DELETE(
 ): Promise<NextResponse<ApiResponse<{ count: number }>>> {
   try {
     const result = await deleteClosedTrades()
+    // Update lastResetAt so backfill doesn't re-create cleared trades from OANDA history
+    if (result.count > 0) await setLastResetAt()
     return NextResponse.json({ ok: true, data: { count: result.count } })
   } catch (error) {
     console.error("[DELETE /api/trades]", error)
