@@ -627,17 +627,16 @@ export async function cleanupOldAnalyses(days = 90): Promise<number> {
 }
 
 /**
- * On daemon startup: mark any analyses still in "running" or "pending" state
+ * On daemon startup: mark ALL analyses still in "running" or "pending" state
  * as "failed". These are orphaned records left by a previous daemon crash.
- * We use a generous cutoff (15 min) so analyses that just started on a
- * slow machine aren't incorrectly marked failed.
+ * No cutoff needed — this only runs at startup, so nothing can be legitimately
+ * running yet. A previous 15-min cutoff caused recently-created analyses to
+ * remain stuck after a fast restart.
  */
 export async function resetStuckAnalyses(): Promise<number> {
-  const cutoff = new Date(Date.now() - 15 * 60 * 1000)
   const result = await db.aiAnalysis.updateMany({
     where: {
       status: { in: ["running", "pending"] },
-      createdAt: { lt: cutoff },
     },
     data: {
       status: "failed",
