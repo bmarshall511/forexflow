@@ -971,6 +971,26 @@ export class OandaTradeSyncer {
     const instrument = trade?.instrument ?? "EUR_USD"
     const decimals = getDecimalPlaces(instrument)
 
+    // Skip values that haven't actually changed (prevents spurious "SL: X → X" notifications)
+    if (stopLoss !== undefined && trade) {
+      const currentSL = trade.stopLoss !== null ? trade.stopLoss.toFixed(decimals) : null
+      const requestedSL = stopLoss !== null ? stopLoss.toFixed(decimals) : null
+      if (currentSL === requestedSL) stopLoss = undefined
+    }
+    if (takeProfit !== undefined && trade) {
+      const currentTP = trade.takeProfit !== null ? trade.takeProfit.toFixed(decimals) : null
+      const requestedTP = takeProfit !== null ? takeProfit.toFixed(decimals) : null
+      if (currentTP === requestedTP) takeProfit = undefined
+    }
+
+    // Nothing actually changed — skip the OANDA call entirely
+    if (stopLoss === undefined && takeProfit === undefined) {
+      return {
+        stopLoss: trade?.stopLoss ?? null,
+        takeProfit: trade?.takeProfit ?? null,
+      }
+    }
+
     // Build request body — null cancels the order, undefined leaves unchanged
     const body: Record<string, unknown> = {}
     if (stopLoss !== undefined) {
