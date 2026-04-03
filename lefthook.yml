@@ -11,11 +11,20 @@ commit-msg:
       run: pnpm commitlint --edit {1}
 
 pre-push:
-  parallel: true
+  piped: true
   commands:
+    prisma-generate:
+      run: DATABASE_URL=file:./dev.db pnpm --filter @fxflow/db db:generate
+      priority: 1
+    format-check:
+      run: pnpm format:check
+      priority: 2
     lint:
       run: pnpm turbo lint
+      priority: 2
     typecheck:
       run: pnpm turbo typecheck
+      priority: 2
     test:
       run: pnpm turbo test
+      priority: 2

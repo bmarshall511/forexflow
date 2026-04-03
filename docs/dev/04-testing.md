@@ -59,6 +59,28 @@ order: 4
 - Each test suite gets a clean DB state via `beforeEach(resetTestDb)`.
 - Seed helpers for common entities: trades, signals, setups, AI analyses.
 
+## Local Preflight
+
+Run `pnpm preflight` before pushing to mirror every GitHub Actions CI check locally:
+
+1. Frozen lockfile validation
+2. Prisma client generation
+3. Format check (`prettier --check`)
+4. Lint (ESLint via Turbo)
+5. Typecheck (`tsc --noEmit` via Turbo)
+6. Tests with coverage
+7. Next.js web build
+8. Prisma schema drift detection
+9. Dependency audit (`pnpm audit --audit-level=high`)
+10. Import boundary check (packages must not import from apps)
+11. Secret scanning (gitleaks, if installed)
+
+Quick mode: `pnpm preflight:quick` skips build, audit, and security.
+Individual skips: `--no-build`, `--no-audit`, `--no-security`, `--no-coverage`.
+Run all steps regardless of failures: `--continue`.
+
+The **pre-push git hook** (lefthook) automatically runs the critical subset (prisma generate, format, lint, typecheck, tests). Skip with `git push --no-verify`.
+
 ## CI Expectations
 
 - All tests must pass before merge.
