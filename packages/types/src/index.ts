@@ -1204,8 +1204,14 @@ export interface TVAlertsConfig {
   enabled: boolean
   /** Webhook secret token (for URL path authentication) */
   webhookToken: string
-  /** Position sizing: percentage of account balance */
+  /** @deprecated Use riskPercent instead. Kept for migration compat. */
   positionSizePercent: number
+  /** Risk-based sizing: percentage of account balance risked per trade (e.g., 1 = 1%) */
+  riskPercent: number
+  /** Minimum position size in units — trades below this are skipped (default 1000 = 0.01 lots) */
+  minUnits: number
+  /** ATR multiplier for implied stop loss when no SL is provided (default 1.5 = 1.5× ATR) */
+  fallbackAtrMultiplier: number
   /** Cooldown period in seconds (prevents whipsaw) */
   cooldownSeconds: number
   /** Maximum concurrent auto-trade positions */
@@ -1232,7 +1238,10 @@ export interface TVAlertsConfig {
 export const TV_ALERTS_DEFAULT_CONFIG: TVAlertsConfig = {
   enabled: false,
   webhookToken: "",
-  positionSizePercent: 1,
+  positionSizePercent: 1, // Legacy
+  riskPercent: 1,
+  minUnits: 1000,
+  fallbackAtrMultiplier: 1.5,
   cooldownSeconds: 60,
   maxOpenPositions: 3,
   dailyLossLimit: 0,

@@ -445,7 +445,7 @@ export function TVAlertsDashboardCard() {
                 Configuration
               </h3>
               <div className="bg-muted/30 space-y-0.5 rounded-lg px-3 py-2">
-                <InlineStat label="Position Size" value={`${config.positionSizePercent}%`} />
+                <InlineStat label="Risk Per Trade" value={`${config.riskPercent}%`} />
                 <InlineStat label="Cooldown" value={`${config.cooldownSeconds}s`} />
                 <InlineStat label="Max Positions" value={String(config.maxOpenPositions)} />
                 <InlineStat

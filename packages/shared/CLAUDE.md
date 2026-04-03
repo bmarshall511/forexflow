@@ -78,6 +78,9 @@ src/
 ### Formatting
 
 - `format-currency.ts` — handles P&L display with sign, color hints, currency symbols.
+- `formatCurrency()` uses adaptive precision (4 decimals for sub-cent amounts).
+- `formatPnL()` uses ±1e-8 threshold for accurate color/sign on sub-cent values.
+- `formatPnLWithPips()` — returns dollar P/L alongside pip P/L for trade rows and cards.
 
 ### Ticker Mapping
 

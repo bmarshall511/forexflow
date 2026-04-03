@@ -3,7 +3,7 @@
 import { memo } from "react"
 import type { OpenTradeData, PositionPriceTick, TradeTagData, AiAnalysisData } from "@fxflow/types"
 import type { ActiveAnalysisProgress } from "@/hooks/use-active-ai-analyses"
-import { formatCurrency, formatPips } from "@fxflow/shared"
+import { formatCurrency, formatPips, priceToPips } from "@fxflow/shared"
 import { TableRow, TableCell } from "@/components/ui/table"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { DirectionBadge } from "./direction-badge"
@@ -126,10 +126,22 @@ export const OpenTradeRow = memo(
             : trade.currentUnits}
         </TableCell>
         <TableCell className="text-right font-mono text-xs tabular-nums">
-          <AnimatedNumber
-            value={`${trade.unrealizedPL >= 0 ? "+" : ""}${formatCurrency(trade.unrealizedPL, currency)}`}
-            className={cn("font-semibold", plColor)}
-          />
+          <div className="flex flex-col items-end gap-0.5">
+            <AnimatedNumber
+              value={`${trade.unrealizedPL >= 0 ? "+" : ""}${formatCurrency(trade.unrealizedPL, currency)}`}
+              className={cn("font-semibold", plColor)}
+            />
+            {trade.currentPrice != null && (
+              <span className={cn("text-[10px] opacity-70", plColor)}>
+                {(() => {
+                  const dist = trade.currentPrice - trade.entryPrice
+                  const signed = trade.direction === "long" ? dist : -dist
+                  const absPips = priceToPips(trade.instrument, Math.abs(dist))
+                  return `${signed >= 0 ? "+" : "-"}${absPips.toFixed(1)}p`
+                })()}
+              </span>
+            )}
+          </div>
         </TableCell>
         <TableCell className="text-right">
           <RiskRewardDisplay

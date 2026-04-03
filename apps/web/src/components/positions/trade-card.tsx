@@ -15,6 +15,7 @@ import {
   formatShortDateTime,
   calculateRiskReward,
   getPipSize,
+  priceToPips,
   TIMEFRAME_OPTIONS,
 } from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
@@ -118,12 +119,12 @@ export function TradeCard({
     : isClosed
       ? (data as ClosedTradeData).realizedPL
       : 0
-  const isPositive = plValue >= 0.005
-  const isNegative = plValue <= -0.005
+  const isPositive = plValue > 1e-8
+  const isNegative = plValue < -1e-8
   const plColor = isPositive
-    ? "text-green-500"
+    ? "text-status-connected"
     : isNegative
-      ? "text-red-500"
+      ? "text-status-disconnected"
       : "text-muted-foreground"
 
   // Risk / Reward
@@ -226,7 +227,22 @@ export function TradeCard({
                       )}
                     </div>
                     <div className="text-muted-foreground mt-0.5 text-[10px]">
-                      {isOpen ? "unrealized P/L" : "final result"}
+                      {isOpen && (data as OpenTradeData).currentPrice != null
+                        ? (() => {
+                            const t = data as OpenTradeData
+                            const dist = t.currentPrice! - t.entryPrice
+                            const signed = t.direction === "long" ? dist : -dist
+                            const absPips = priceToPips(t.instrument, Math.abs(dist))
+                            return (
+                              <span className={plColor}>
+                                {signed >= 0 ? "+" : "-"}
+                                {absPips.toFixed(1)}p
+                              </span>
+                            )
+                          })()
+                        : isOpen
+                          ? "unrealized P/L"
+                          : "final result"}
                     </div>
                   </div>
                 )}

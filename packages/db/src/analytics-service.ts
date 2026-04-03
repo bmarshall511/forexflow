@@ -380,7 +380,7 @@ export async function getSourceBreakdown(): Promise<SourceDetailedPerformance[]>
   // Fetch open trades for unrealized P&L
   const openRows = await db.trade.findMany({
     where: { status: "open" },
-    select: { source: true, metadata: true, realizedPL: true },
+    select: { source: true, metadata: true, unrealizedPL: true },
   })
 
   // Period boundaries
@@ -400,7 +400,7 @@ export async function getSourceBreakdown(): Promise<SourceDetailedPerformance[]>
     const src = enrichSource(o.source, o.metadata)
     const entry = openBySource.get(src) ?? { count: 0, unrealizedPL: 0 }
     entry.count++
-    entry.unrealizedPL += o.realizedPL
+    entry.unrealizedPL += o.unrealizedPL
     openBySource.set(src, entry)
   }
 

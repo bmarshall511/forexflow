@@ -69,6 +69,7 @@ Every feature page follows this structure:
 - Container queries in header for adaptive layout.
 - Card-based layout on mobile, table layout on desktop.
 - Use Tailwind responsive prefixes (`sm:`, `md:`, `lg:`).
+- **P/L display**: pip P/L shown alongside dollar P/L on trade rows, cards, and mobile cards via `formatPnLWithPips()`. P/L colors use semantic tokens `text-status-connected`/`text-status-disconnected` (not raw green/red).
 
 ## Hook Conventions
 

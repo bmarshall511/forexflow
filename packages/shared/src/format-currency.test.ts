@@ -19,8 +19,19 @@ describe("formatCurrency", () => {
     expect(formatCurrency(-500.5)).toBe("-$500.50")
   })
 
-  it("should round to two decimal places", () => {
+  it("should round to two decimal places for normal amounts", () => {
     expect(formatCurrency(99.999)).toBe("$100.00")
+  })
+
+  it("should use 4 decimals for sub-cent amounts", () => {
+    expect(formatCurrency(0.0006)).toBe("$0.0006")
+    expect(formatCurrency(-0.0042)).toBe("-$0.0042")
+    expect(formatCurrency(0.0099)).toBe("$0.0099")
+  })
+
+  it("should use 2 decimals for values >= $0.01", () => {
+    expect(formatCurrency(0.01)).toBe("$0.01")
+    expect(formatCurrency(0.05)).toBe("$0.05")
   })
 })
 
@@ -37,15 +48,20 @@ describe("formatPnL", () => {
     expect(result.colorIntent).toBe("negative")
   })
 
-  it("should return neutral intent for near-zero values", () => {
+  it("should return neutral intent for zero", () => {
     const result = formatPnL(0)
     expect(result.formatted).toBe("$0.00")
     expect(result.colorIntent).toBe("neutral")
   })
 
-  it("should treat values within ±0.005 as neutral", () => {
-    expect(formatPnL(0.004).colorIntent).toBe("neutral")
-    expect(formatPnL(-0.004).colorIntent).toBe("neutral")
+  it("should show direction for sub-cent amounts", () => {
+    const pos = formatPnL(0.0006)
+    expect(pos.colorIntent).toBe("positive")
+    expect(pos.formatted).toBe("+$0.0006")
+
+    const neg = formatPnL(-0.004)
+    expect(neg.colorIntent).toBe("negative")
+    expect(neg.formatted).toBe("-$0.0040")
   })
 
   it("should support non-USD currencies", () => {

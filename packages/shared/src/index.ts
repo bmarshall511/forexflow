@@ -26,8 +26,10 @@ export {
 export {
   formatCurrency,
   formatPnL,
+  formatPnLWithPips,
   formatRelativeTime,
   type FormattedPnL,
+  type FormattedPnLWithPips,
   type PnLColorIntent,
 } from "./format-currency"
 

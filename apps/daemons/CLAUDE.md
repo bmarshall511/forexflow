@@ -120,6 +120,7 @@ src/
 ## TV Alerts
 
 - `signal-processor.ts` — processes signals from CF Worker with per-instrument mutex.
+- **Risk-based position sizing**: `units = riskAmount / (slDistance × pipValuePerUnit)`. Uses `riskPercent` (default 1%) from TVAlertsConfig. ATR(14) fallback when no SL is available. Minimum units enforced via `minUnits` (default 1000). Legacy flat `positionSizePercent` field is deprecated.
 - `CFWorkerClient` maintains WS connection to Cloudflare Durable Object.
 - On WS client connect, a dedicated `tv_alerts_status` message is sent so the dashboard gets signal count immediately without waiting for the next broadcast cycle.
 

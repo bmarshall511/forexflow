@@ -1,5 +1,19 @@
 "use client"
 
+// Suppress "Object is disposed" — see tradingview-chart.tsx for explanation
+if (
+  typeof window !== "undefined" &&
+  !(window as unknown as Record<string, unknown>).__lcDisposeSuppressed
+) {
+  ;(window as unknown as Record<string, unknown>).__lcDisposeSuppressed = true
+  window.addEventListener("error", (e) => {
+    if (e.message?.includes("Object is disposed")) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  })
+}
+
 import { useEffect, useRef, useState, useCallback, memo } from "react"
 import { useTheme } from "next-themes"
 import { createChart, CandlestickSeries, LineStyle, createSeriesMarkers } from "lightweight-charts"

@@ -17,6 +17,9 @@ function rowToConfig(row: {
   enabled: boolean
   webhookToken: string
   positionSizePercent: number
+  riskPercent: number
+  minUnits: number
+  fallbackAtrMultiplier: number
   cooldownSeconds: number
   maxOpenPositions: number
   dailyLossLimit: number
@@ -39,6 +42,9 @@ function rowToConfig(row: {
     enabled: row.enabled,
     webhookToken: row.webhookToken,
     positionSizePercent: row.positionSizePercent,
+    riskPercent: row.riskPercent,
+    minUnits: row.minUnits,
+    fallbackAtrMultiplier: row.fallbackAtrMultiplier,
     cooldownSeconds: row.cooldownSeconds,
     maxOpenPositions: row.maxOpenPositions,
     dailyLossLimit: row.dailyLossLimit,
@@ -69,6 +75,10 @@ export async function updateTVAlertsConfig(
   if (input.webhookToken !== undefined) updateData.webhookToken = input.webhookToken
   if (input.positionSizePercent !== undefined)
     updateData.positionSizePercent = input.positionSizePercent
+  if (input.riskPercent !== undefined) updateData.riskPercent = input.riskPercent
+  if (input.minUnits !== undefined) updateData.minUnits = input.minUnits
+  if (input.fallbackAtrMultiplier !== undefined)
+    updateData.fallbackAtrMultiplier = input.fallbackAtrMultiplier
   if (input.cooldownSeconds !== undefined) updateData.cooldownSeconds = input.cooldownSeconds
   if (input.maxOpenPositions !== undefined) updateData.maxOpenPositions = input.maxOpenPositions
   if (input.dailyLossLimit !== undefined) updateData.dailyLossLimit = input.dailyLossLimit

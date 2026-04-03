@@ -123,7 +123,10 @@ model TVAlertsConfig {
   id                  Int      @id @default(1)
   enabled             Boolean  @default(false)
   webhookToken        String   @default("")
-  positionSizePercent Float    @default(1.0)
+  positionSizePercent Float    @default(1.0) // Legacy — kept for migration compat
+  riskPercent         Float    @default(1.0) // Risk-based sizing: % of account risked per trade
+  minUnits            Int      @default(1000) // Minimum position size (units) — below this, trade is skipped
+  fallbackAtrMultiplier Float  @default(1.5) // ATR multiplier for implied SL when no SL provided
   cooldownSeconds     Int      @default(60)
   maxOpenPositions    Int      @default(3)
   dailyLossLimit      Float    @default(0)

@@ -41,6 +41,22 @@ export const TVAlertsConfigUpdateSchema = z
       .min(0.1, "Must be at least 0.1")
       .max(100, "Must be at most 100")
       .optional(),
+    riskPercent: z
+      .number()
+      .min(0.1, "Must be at least 0.1%")
+      .max(10, "Must be at most 10%")
+      .optional(),
+    minUnits: z
+      .number()
+      .int()
+      .min(1, "Must be at least 1")
+      .max(1_000_000, "Must be at most 1,000,000")
+      .optional(),
+    fallbackAtrMultiplier: z
+      .number()
+      .min(0.5, "Must be at least 0.5")
+      .max(5, "Must be at most 5")
+      .optional(),
     cooldownSeconds: z
       .number()
       .int()

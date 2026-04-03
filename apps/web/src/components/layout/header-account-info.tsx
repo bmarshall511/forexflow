@@ -20,8 +20,8 @@ function formatCompactCurrency(value: number, currency: string): string {
 
 function formatSignedCurrency(value: number, currency: string): string {
   const formatted = formatCurrency(Math.abs(value), currency)
-  if (value >= 0.005) return `+${formatted}`
-  if (value <= -0.005) return `-${formatted}`
+  if (value > 1e-8) return `+${formatted}`
+  if (value < -1e-8) return `-${formatted}`
   return formatted
 }
 
@@ -41,11 +41,11 @@ function SummaryRow({ label, value, colored, numericValue }: SummaryRowProps) {
           "font-mono tabular-nums",
           colored &&
             numericValue !== undefined &&
-            numericValue >= 0.005 &&
+            numericValue > 1e-8 &&
             "text-status-connected font-semibold",
           colored &&
             numericValue !== undefined &&
-            numericValue <= -0.005 &&
+            numericValue < -1e-8 &&
             "text-status-disconnected font-semibold",
         )}
       >
@@ -73,9 +73,9 @@ export function HeaderAccountInfo() {
   const hasData = accountOverview !== null
 
   const uplColor =
-    totalUnrealized >= 0.005
+    totalUnrealized > 1e-8
       ? "text-status-connected"
-      : totalUnrealized <= -0.005
+      : totalUnrealized < -1e-8
         ? "text-status-disconnected"
         : "text-muted-foreground"
 
