@@ -26,8 +26,8 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <CardTitle>Auto-Trading</CardTitle>
           </div>
           <CardDescription>
-            When enabled, incoming UT Bot signals are automatically executed as trades on your OANDA
-            account.
+            When turned on, trading signals from TradingView are automatically placed as real trades
+            on your OANDA account.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -36,8 +36,8 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
               <Label>Module</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
                 {config.enabled
-                  ? "Active and processing signals"
-                  : "Disabled — signals are ignored"}
+                  ? "On — signals will be placed as trades"
+                  : "Off — signals are received but no trades are placed"}
               </p>
             </div>
             <ToggleSwitch
@@ -49,30 +49,93 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
 
           <Separator />
 
-          {/* Position sizing */}
+          {/* Risk per trade */}
           <div className="flex items-center justify-between">
             <div>
-              <Label>Position Size</Label>
+              <Label>Risk Per Trade</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Percentage of account balance used per trade
+                How much of your account you&apos;re willing to lose on a single trade.
+                <br />
+                1% means if you have $10,000, you&apos;d risk $100 per trade.
               </p>
             </div>
             <div className="flex items-center gap-1.5">
               <input
                 type="number"
                 min={0.1}
-                max={100}
+                max={10}
                 step={0.1}
-                defaultValue={config.positionSizePercent}
+                defaultValue={config.riskPercent}
                 onBlur={(e) => {
                   const num = parseFloat(e.target.value)
-                  if (!isNaN(num) && num >= 0.1 && num <= 100)
-                    void onUpdate({ positionSizePercent: num })
+                  if (!isNaN(num) && num >= 0.1 && num <= 10) void onUpdate({ riskPercent: num })
                 }}
                 className={INPUT_CLASS}
-                aria-label="Position size percent"
+                aria-label="Risk percent per trade"
               />
               <span className="text-muted-foreground text-xs">%</span>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Minimum position size */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Minimum Trade Size</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Smallest trade the app will place. If the math says to trade less
+                <br />
+                than this, the signal is skipped. 1,000 = 0.01 lots (micro lot).
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={1}
+                max={1000000}
+                step={1000}
+                defaultValue={config.minUnits}
+                onBlur={(e) => {
+                  const num = parseInt(e.target.value)
+                  if (!isNaN(num) && num >= 1 && num <= 1_000_000) void onUpdate({ minUnits: num })
+                }}
+                className="bg-background h-8 w-24 rounded border px-2 text-right font-mono text-sm"
+                aria-label="Minimum trade size in units"
+              />
+              <span className="text-muted-foreground text-xs">units</span>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* ATR multiplier for risk sizing */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Risk Distance (ATR)</Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Controls how far away the app assumes your stop loss is when calculating trade size.
+                Higher = wider stop = smaller trade size.
+                <br />
+                1.5 means 1.5x the average price movement.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={0.5}
+                max={5}
+                step={0.1}
+                defaultValue={config.fallbackAtrMultiplier}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value)
+                  if (!isNaN(num) && num >= 0.5 && num <= 5)
+                    void onUpdate({ fallbackAtrMultiplier: num })
+                }}
+                className={INPUT_CLASS}
+                aria-label="ATR multiplier for risk calculation"
+              />
+              <span className="text-muted-foreground text-xs">&times; ATR</span>
             </div>
           </div>
         </CardContent>
@@ -86,7 +149,7 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <CardTitle>Safety Controls</CardTitle>
           </div>
           <CardDescription>
-            Configure risk limits, cooldowns, and signal filtering safeguards.
+            Rules that protect your account from too many trades or big losses.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -95,7 +158,8 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <div>
               <Label>Cooldown</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Seconds to wait before accepting another signal on the same pair
+                After a trade is placed, wait this many seconds before allowing another trade on the
+                same currency pair. Prevents rapid-fire trades.
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -123,7 +187,8 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <div>
               <Label>Max Open Positions</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Maximum concurrent auto-trade positions from TV alerts
+                The most trades that can be open at the same time from alerts. New signals are
+                skipped if you&apos;re already at this limit.
               </p>
             </div>
             <input
@@ -148,7 +213,8 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <div>
               <Label>Daily Loss Limit</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Circuit breaker trips when daily losses exceed this amount (0 = off)
+                If your losses for the day hit this dollar amount, all new trades are blocked until
+                tomorrow. Set to 0 to turn this off.
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -173,9 +239,10 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
           {/* Dedup window */}
           <div className="flex items-center justify-between">
             <div>
-              <Label>Dedup Window</Label>
+              <Label>Duplicate Filter</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Ignore duplicate signals within this window
+                If the same signal arrives twice within this many seconds, the second one is
+                ignored. Prevents accidental double trades.
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -204,7 +271,8 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <div>
               <Label>Market Hours Filter</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Only accept signals when the forex market is open
+                When on, signals that arrive on weekends or when the market is closed are
+                automatically ignored.
               </p>
             </div>
             <ToggleSwitch
@@ -221,7 +289,8 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <div>
               <Label>Chart Markers</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Show signal markers on charts by default
+                Show buy/sell arrows on your charts when signals come in, so you can see exactly
+                where each trade was triggered.
               </p>
             </div>
             <ToggleSwitch
@@ -238,7 +307,7 @@ export function TVASettingsTrading({ config, onUpdate, saving }: TVASettingsTrad
             <div>
               <Label>Sound Notifications</Label>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Play a sound when a new signal is received
+                Play a notification sound whenever a new trading signal arrives.
               </p>
             </div>
             <ToggleSwitch

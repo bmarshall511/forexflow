@@ -42,8 +42,8 @@ function Tile({
       <div
         className={cn(
           "font-mono text-xl font-bold tabular-nums tracking-tight",
-          variant === "positive" && "text-green-500",
-          variant === "negative" && "text-red-500",
+          variant === "positive" && "text-status-connected",
+          variant === "negative" && "text-status-disconnected",
         )}
       >
         {value}
@@ -93,11 +93,7 @@ export function OverviewCards({ positions, openWithPrices, currency = "USD" }: O
         label="Open P/L"
         value={formatCurrency(totalUnrealizedPL, currency)}
         variant={
-          totalUnrealizedPL >= 0.005
-            ? "positive"
-            : totalUnrealizedPL <= -0.005
-              ? "negative"
-              : "default"
+          totalUnrealizedPL > 1e-8 ? "positive" : totalUnrealizedPL < -1e-8 ? "negative" : "default"
         }
         subtitle={`${open.length} trade${open.length !== 1 ? "s" : ""} open · ${formatCurrency(totalMarginUsed, currency)} margin`}
         icon={<BarChart3 className="size-3.5" />}

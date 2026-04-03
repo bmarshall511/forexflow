@@ -9,3 +9,4 @@ coverage/
 pnpm-lock.yaml
 apps/desktop/release/
 apps/desktop/daemon-bundle/
+site/.astro/

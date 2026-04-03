@@ -7,6 +7,7 @@ import {
   formatShortDateTime,
   calculateRiskReward,
   getPipSize,
+  priceToPips,
 } from "@fxflow/shared"
 import { Badge } from "@/components/ui/badge"
 import { SourceBadge } from "./source-badge"
@@ -82,12 +83,12 @@ export function TradeCardMobile({
     : isClosed
       ? (data as ClosedTradeData).realizedPL
       : null
-  const isPositive = plValue !== null && plValue >= 0.005
-  const isNegative = plValue !== null && plValue <= -0.005
+  const isPositive = plValue !== null && plValue > 1e-8
+  const isNegative = plValue !== null && plValue < -1e-8
   const plColor = isPositive
-    ? "text-green-500"
+    ? "text-status-connected"
     : isNegative
-      ? "text-red-500"
+      ? "text-status-disconnected"
       : "text-muted-foreground"
 
   // Risk / Reward
@@ -156,6 +157,17 @@ export function TradeCardMobile({
                 {isPositive ? "+" : ""}
                 {formatCurrency(plValue, currency)}
               </div>
+              {isOpen && (data as OpenTradeData).currentPrice != null && (
+                <div className={cn("font-mono text-[10px] tabular-nums", plColor)}>
+                  {(() => {
+                    const t = data as OpenTradeData
+                    const dist = t.currentPrice! - t.entryPrice
+                    const signed = t.direction === "long" ? dist : -dist
+                    const absPips = priceToPips(t.instrument, Math.abs(dist))
+                    return `${signed >= 0 ? "+" : "-"}${absPips.toFixed(1)}p`
+                  })()}
+                </div>
+              )}
             </div>
           )}
 

@@ -10,7 +10,7 @@ import type {
   AnyDaemonMessage,
   PlaceOrderRequest,
 } from "@fxflow/types"
-import { isMarketExpectedOpen } from "@fxflow/shared"
+import { isMarketExpectedOpen, getPipSize, computeATR } from "@fxflow/shared"
 import {
   createSignal,
   updateSignalStatus,
@@ -32,6 +32,8 @@ import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
 import type { TVAlertsState } from "./alerts-state.js"
 import { ConfluenceEngine } from "./confluence-engine.js"
+import { CandleCache, fetchOandaCandles } from "../trade-finder/candle-cache.js"
+import { getRestUrl } from "../oanda/api-client.js"
 
 const RETRY_DELAYS = [1000, 2000, 4000] // ms
 
@@ -44,6 +46,7 @@ export class SignalProcessor {
   private config: TVAlertsConfig | null = null
   private qualityConfig: TVAlertsQualityConfig | null = null
   private confluenceEngine: ConfluenceEngine
+  private candleCache = new CandleCache()
   private instrumentMutex = new Map<string, Promise<void>>()
   private cleanupTimer: ReturnType<typeof setInterval> | null = null
   private syncTimer: ReturnType<typeof setInterval> | null = null
@@ -228,7 +231,8 @@ export class SignalProcessor {
       cooldownSeconds: config.cooldownSeconds,
       maxOpenPositions: config.maxOpenPositions,
       dailyLossLimit: config.dailyLossLimit,
-      positionSizePercent: config.positionSizePercent,
+      riskPercent: config.riskPercent,
+      minUnits: config.minUnits,
       pairWhitelist: config.pairWhitelist,
       duration_ms: tConfig - t0,
     })
@@ -546,13 +550,37 @@ export class SignalProcessor {
   ): Promise<void> {
     await updateSignalStatus(signalId, "executing")
 
-    // Calculate base units, then apply dynamic sizing from confluence score
-    let units = this.calculateUnits(config)
+    // Risk-based position sizing with ATR fallback
+    const sizing = await this.calculateRiskBasedUnits(
+      config,
+      instrument,
+      newDirection as "buy" | "sell",
+      confluenceResult?.atr ?? null,
+    )
+    let units = sizing.units
     let sizeMultiplier = 1.0
     const qc = this.qualityConfig
     if (qc?.enabled && confluenceResult && qc.dynamicSizing) {
       sizeMultiplier = this.confluenceEngine.getSizeMultiplier(confluenceResult.score, qc)
       units = Math.floor(units * sizeMultiplier)
+    }
+
+    // Enforce minimum units floor
+    if (units > 0 && units < config.minUnits) {
+      await logAuditEvent(signalId, "failed", {
+        type: "reversal",
+        step: "min_units_check",
+        error: `Calculated ${units} units < minimum ${config.minUnits}`,
+        riskPercent: config.riskPercent,
+        slDistance: sizing.slDistance,
+        slSource: sizing.slSource,
+        duration_ms: Date.now() - t0,
+      })
+      await this.failSignal(
+        signalId,
+        `Position size ${units} below minimum ${config.minUnits} units`,
+      )
+      return
     }
 
     await logAuditEvent(signalId, "executing", {
@@ -563,7 +591,9 @@ export class SignalProcessor {
       closingCount: existingTradeIds.length,
       units,
       sizeMultiplier,
-      positionSizePercent: config.positionSizePercent,
+      riskPercent: config.riskPercent,
+      slDistance: sizing.slDistance,
+      slSource: sizing.slSource,
       confluenceScore: confluenceResult?.score ?? null,
       duration_ms: Date.now() - t0,
     })
@@ -633,7 +663,10 @@ export class SignalProcessor {
       await logAuditEvent(signalId, "failed", {
         type: "reversal",
         step: "calculate_units",
-        error: "Calculated units is zero or negative",
+        error: `Calculated units is zero — ${sizing.slSource === "no_atr_data" ? "could not determine ATR for risk calculation" : "account balance too low for risk parameters"}`,
+        riskPercent: config.riskPercent,
+        slDistance: sizing.slDistance,
+        slSource: sizing.slSource,
         closedTradeIds: closedIds,
         duration_ms: Date.now() - t0,
       })
@@ -754,8 +787,14 @@ export class SignalProcessor {
   ): Promise<void> {
     await updateSignalStatus(signalId, "executing")
 
-    // Calculate base units, then apply dynamic sizing from confluence score
-    let units = this.calculateUnits(config)
+    // Risk-based position sizing with ATR fallback
+    const sizing = await this.calculateRiskBasedUnits(
+      config,
+      instrument,
+      direction as "buy" | "sell",
+      confluenceResult?.atr ?? null,
+    )
+    let units = sizing.units
     let sizeMultiplier = 1.0
     const qc = this.qualityConfig
     if (qc?.enabled && confluenceResult && qc.dynamicSizing) {
@@ -769,7 +808,9 @@ export class SignalProcessor {
       instrument,
       units,
       sizeMultiplier,
-      positionSizePercent: config.positionSizePercent,
+      riskPercent: config.riskPercent,
+      slDistance: sizing.slDistance,
+      slSource: sizing.slSource,
       confluenceScore: confluenceResult?.score ?? null,
       duration_ms: Date.now() - t0,
     })
@@ -777,10 +818,31 @@ export class SignalProcessor {
     if (units <= 0) {
       await logAuditEvent(signalId, "failed", {
         type: "new_entry",
-        error: "Calculated units is zero or negative",
+        error: `Calculated units is zero — ${sizing.slSource === "no_atr_data" ? "could not determine ATR for risk calculation" : "account balance too low for risk parameters"}`,
+        riskPercent: config.riskPercent,
+        slDistance: sizing.slDistance,
+        slSource: sizing.slSource,
         duration_ms: Date.now() - t0,
       })
       await this.failSignal(signalId, "Calculated units is zero or negative")
+      return
+    }
+
+    // Enforce minimum units floor
+    if (units < config.minUnits) {
+      await logAuditEvent(signalId, "failed", {
+        type: "new_entry",
+        step: "min_units_check",
+        error: `Calculated ${units} units < minimum ${config.minUnits}`,
+        riskPercent: config.riskPercent,
+        slDistance: sizing.slDistance,
+        slSource: sizing.slSource,
+        duration_ms: Date.now() - t0,
+      })
+      await this.failSignal(
+        signalId,
+        `Position size ${units} below minimum ${config.minUnits} units`,
+      )
       return
     }
 
@@ -870,11 +932,90 @@ export class SignalProcessor {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private calculateUnits(config: TVAlertsConfig): number {
+  /**
+   * Risk-based position sizing.
+   *
+   * Formula: units = riskAmount / (slDistance × pipValuePerUnit)
+   *
+   * SL source priority:
+   *   1. Confluence ATR × quality config slAtrMultiplier (when quality engine enabled)
+   *   2. ATR(14) × fallbackAtrMultiplier fallback (fetched from OANDA H1 candles)
+   *   3. Returns 0 if no SL can be determined (trade will be skipped)
+   *
+   * @returns { units, slDistance, slSource } — units may be 0 if sizing fails
+   */
+  private async calculateRiskBasedUnits(
+    config: TVAlertsConfig,
+    instrument: string,
+    direction: "buy" | "sell",
+    confluenceATR: number | null,
+  ): Promise<{ units: number; slDistance: number; slSource: string }> {
     const overview = this.stateManager.getAccountOverview()
-    if (!overview) return 0
+    if (!overview) return { units: 0, slDistance: 0, slSource: "no_account" }
+
     const balance = overview.summary.balance
-    return Math.floor(balance * (config.positionSizePercent / 100))
+    if (balance <= 0) return { units: 0, slDistance: 0, slSource: "zero_balance" }
+
+    // Determine SL distance (in price, not pips)
+    let slDistance = 0
+    let slSource = "none"
+
+    if (confluenceATR && confluenceATR > 0) {
+      // Use quality config's ATR multiplier when available, otherwise fallback multiplier
+      const multiplier = this.qualityConfig?.slAtrMultiplier ?? config.fallbackAtrMultiplier
+      slDistance = confluenceATR * multiplier
+      slSource = "confluence_atr"
+    } else {
+      // Fallback: fetch H1 candles and compute ATR(14)
+      const atr = await this.fetchATRFallback(instrument)
+      if (atr > 0) {
+        slDistance = atr * config.fallbackAtrMultiplier
+        slSource = "fallback_atr"
+      }
+    }
+
+    if (slDistance <= 0) return { units: 0, slDistance: 0, slSource: "no_atr_data" }
+
+    // Risk-based formula (matches AI Trader pattern)
+    const pipSize = getPipSize(instrument)
+    const riskAmount = balance * (config.riskPercent / 100)
+    const [, quoteCcy] = instrument.split("_")
+    const isUsdQuote = quoteCcy === "USD"
+    const estimatedEntry = this.getEstimatedEntry(instrument, direction) ?? 1
+    const pipValuePerUnit = isUsdQuote ? pipSize : pipSize / Math.max(estimatedEntry, 0.0001)
+    const riskPips = slDistance / pipSize
+
+    if (riskPips <= 0 || pipValuePerUnit <= 0) {
+      return { units: 0, slDistance, slSource }
+    }
+
+    const units = Math.floor(riskAmount / (riskPips * pipValuePerUnit))
+    return { units, slDistance, slSource }
+  }
+
+  /** Fetch ATR(14) from H1 candles as fallback when confluence is not enabled. */
+  private async fetchATRFallback(instrument: string): Promise<number> {
+    const creds = this.stateManager.getCredentials()
+    if (!creds) return 0
+
+    try {
+      const apiUrl = getRestUrl(creds.mode)
+      const candles = await fetchOandaCandles(
+        instrument,
+        "H1",
+        30, // 30 H1 candles for ATR(14) calculation
+        apiUrl,
+        creds.token,
+        this.candleCache,
+      )
+      if (candles.length < 14) return 0
+
+      const atrSeries = computeATR(candles, 14)
+      return atrSeries.length > 0 ? atrSeries[atrSeries.length - 1]! : 0
+    } catch (err) {
+      console.warn(`[tv-alerts] ATR fallback fetch failed for ${instrument}:`, err)
+      return 0
+    }
   }
 
   /**
