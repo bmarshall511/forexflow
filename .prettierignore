@@ -7,3 +7,5 @@ out/
 coverage/
 .wrangler/
 pnpm-lock.yaml
+apps/desktop/release/
+apps/desktop/daemon-bundle/
