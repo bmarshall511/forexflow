@@ -1,10 +1,60 @@
-import { isAutoTradeSession } from "@fxflow/shared"
+import { isAutoTradeSession, isKillZone } from "@fxflow/shared"
 import { hasImminentHighImpactEvent } from "@fxflow/db"
 import type {
   SmartFlowSettingsData,
   SmartFlowSessionRestriction,
   SmartFlowScanMode,
 } from "@fxflow/types"
+
+// ─── Adaptive R:R Multipliers ───────────────────────────────────────────────
+
+/**
+ * Session-based R:R multiplier:
+ * - Kill zones (London/NY): standard (1.0x) — momentum carries, targets achievable
+ * - Extended session (06-21 UTC): slightly relaxed (0.85x)
+ * - Off-session (Asian/overnight): more selective (1.2x) — wider spreads, less follow-through
+ */
+function getSessionRRMultiplier(): number {
+  if (isKillZone()) return 1.0
+  const hour = new Date().getUTCHours()
+  if (hour >= 6 && hour < 21) return 0.85 // Extended session
+  return 1.2 // Off-session
+}
+
+/**
+ * Regime-based R:R multiplier:
+ * - Trending: standard (1.0x) — momentum carries
+ * - Ranging: lower (0.75x) — mean-reversion wins more often with smaller targets
+ * - Volatile: slightly relaxed (0.9x) — big moves both ways
+ * - Low volatility: very selective (1.3x) — barely moves, need high conviction
+ */
+function getRegimeRRMultiplier(regime: string | null): number {
+  if (!regime) return 1.0
+  switch (regime) {
+    case "trending":
+      return 1.0
+    case "ranging":
+      return 0.75
+    case "volatile":
+      return 0.9
+    case "low_volatility":
+      return 1.3
+    default:
+      return 1.0
+  }
+}
+
+/**
+ * Returns the effective minimum R:R for this scan context,
+ * adjusted by session and regime multipliers.
+ */
+export function getAdaptiveMinRR(baseMinRR: number, regime: string | null): number {
+  const sessionMultiplier = getSessionRRMultiplier()
+  const regimeMultiplier = getRegimeRRMultiplier(regime)
+  const effective = baseMinRR * sessionMultiplier * regimeMultiplier
+  // Floor at 1.0 — below 1:1 R:R is never acceptable
+  return Math.max(1.0, Math.round(effective * 100) / 100)
+}
 
 export interface FilterResult {
   passed: boolean
