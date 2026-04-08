@@ -7,7 +7,7 @@ import type {
   TradeFinderAutoTradeEvent,
   TradeFinderCapUtilization,
 } from "@fxflow/types"
-import { useDaemonConnection } from "./use-daemon-connection"
+import { useDaemonStatus } from "./use-daemon-status"
 import { getClientDaemonUrl } from "@/lib/daemon-url"
 
 const DAEMON_URL = getClientDaemonUrl()
@@ -26,7 +26,7 @@ export function useTradeFinder() {
     tradeFinderScanStatus,
     lastAutoTradeEvent,
     tradeFinderCapUtilization,
-  } = useDaemonConnection()
+  } = useDaemonStatus()
 
   // Fetch active setups
   const fetchSetups = useCallback(async () => {

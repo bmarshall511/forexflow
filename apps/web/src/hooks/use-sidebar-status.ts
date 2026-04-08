@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useEffect, useRef } from "react"
-import { useDaemonConnection } from "./use-daemon-connection"
+import { useDaemonStatus } from "./use-daemon-status"
 
 export interface SidebarStatus {
   /** Primary status line */
@@ -15,7 +15,7 @@ export interface SidebarStatus {
 /** Returns a map of statusKey → SidebarStatus for nav items with dynamic status text. */
 export function useSidebarStatus(): Record<string, SidebarStatus> {
   const { tradeFinderScanStatus, tradeFinderSetupCounts } = useTradeFinderNavData()
-  const { lastAiTraderScanStatus, lastAiTraderScanProgress, tvAlertsStatus } = useDaemonConnection()
+  const { lastAiTraderScanStatus, lastAiTraderScanProgress, tvAlertsStatus } = useDaemonStatus()
   const smartFlowNavData = useSmartFlowNavData()
 
   return useMemo(() => {
@@ -215,7 +215,7 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
 
 /** Gathers Trade Finder data needed for the sidebar nav status. */
 function useTradeFinderNavData() {
-  const { tradeFinderScanStatus } = useDaemonConnection()
+  const { tradeFinderScanStatus } = useDaemonStatus()
   const [setupCounts, setSetupCounts] = useState({ active: 0, approaching: 0 })
   const mountedRef = useRef(true)
 

@@ -3,7 +3,6 @@
 import { useMemo } from "react"
 import { Bot, Clock, Crosshair, Radio, TrendingUp, type LucideIcon } from "lucide-react"
 import { useDaemonStatus } from "./use-daemon-status"
-import { useDaemonConnection } from "./use-daemon-connection"
 import { usePositions } from "./use-positions"
 import { useActiveAiAnalyses } from "./use-active-ai-analyses"
 
@@ -19,8 +18,7 @@ export interface NavBadge {
 
 /** Returns a map of badge keys → array of badge items for sidebar nav. */
 export function useSidebarBadges(): Record<string, NavBadge[]> {
-  const { tvAlertsStatus } = useDaemonStatus()
-  const { tradeFinderScanStatus, lastAiTraderScanStatus } = useDaemonConnection()
+  const { tvAlertsStatus, tradeFinderScanStatus, lastAiTraderScanStatus } = useDaemonStatus()
   const { summary } = usePositions()
   const activeAnalyses = useActiveAiAnalyses()
 

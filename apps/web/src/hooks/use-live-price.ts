@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useDaemonConnection } from "./use-daemon-connection"
+import { useDaemonStatus } from "./use-daemon-status"
 import { getClientDaemonUrl } from "@/lib/daemon-url"
 
 const DAEMON_URL = getClientDaemonUrl()
@@ -10,23 +10,28 @@ const POLL_INTERVAL = 5_000 // 5 seconds
 interface LivePriceResult {
   bid: number | null
   ask: number | null
-  /** Whether this is from a live WS stream (true) or REST poll (false) */
+  /** Whether this is from a live WS stream (true) or REST poll / cached (false) */
   isStreaming: boolean
 }
 
 /**
  * Get the live price for an instrument, combining WS streams with REST polling.
  *
+ * Uses the shared daemon connection (context) — NOT a per-component WebSocket.
  * WS streams only cover instruments with open positions or active charts.
- * For Trade Finder setups on other instruments, this hook polls the daemon
+ * For other instruments (e.g. Trade Finder setups), this hook polls the daemon
  * REST endpoint every 5 seconds for fresh prices.
+ *
+ * A last-known-price ref ensures the price never flickers to null once a value
+ * has been obtained from any source.
  */
 export function useLivePrice(instrument: string): LivePriceResult {
-  const { positionsPrices, chartPrices } = useDaemonConnection()
+  const { positionsPrices, chartPrices } = useDaemonStatus()
   const [polledPrice, setPolledPrice] = useState<{ bid: number; ask: number } | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastKnownRef = useRef<{ bid: number; ask: number } | null>(null)
 
-  // Check WS streams first
+  // Check WS streams first (merged state — instruments accumulate, never flicker out)
   const wsTick =
     positionsPrices?.prices?.find((p) => p.instrument === instrument) ??
     chartPrices?.prices?.find((p) => p.instrument === instrument) ??
@@ -69,12 +74,20 @@ export function useLivePrice(instrument: string): LivePriceResult {
     }
   }, [instrument, needsPoll])
 
+  // Return chain: WS tick → polled price → last known → null
+  // Once a price is obtained, it never goes back to null (prevents flicker).
   if (wsTick) {
+    lastKnownRef.current = { bid: wsTick.bid, ask: wsTick.ask }
     return { bid: wsTick.bid, ask: wsTick.ask, isStreaming: true }
   }
 
   if (polledPrice) {
+    lastKnownRef.current = polledPrice
     return { bid: polledPrice.bid, ask: polledPrice.ask, isStreaming: false }
+  }
+
+  if (lastKnownRef.current) {
+    return { bid: lastKnownRef.current.bid, ask: lastKnownRef.current.ask, isStreaming: false }
   }
 
   return { bid: null, ask: null, isStreaming: false }

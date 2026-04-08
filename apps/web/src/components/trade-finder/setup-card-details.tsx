@@ -106,7 +106,7 @@ function SetupDetailContent({
   const scoreColor =
     scorePct >= 75 ? "text-green-500" : scorePct >= 58 ? "text-amber-500" : "text-orange-500"
 
-  const { bid: livePrice } = useLivePrice(setup.instrument)
+  const { bid: livePrice, isStreaming } = useLivePrice(setup.instrument)
   const pipSize = getPipSize(setup.instrument)
   const liveDistancePips = livePrice
     ? Math.abs(livePrice - setup.entryPrice) / pipSize
@@ -184,7 +184,13 @@ function SetupDetailContent({
               <span className="text-muted-foreground/40">&middot;</span>
               {livePrice && (
                 <>
-                  <span className="font-mono tabular-nums">
+                  <span
+                    className={cn(
+                      "font-mono tabular-nums",
+                      !isStreaming && "text-muted-foreground/60",
+                    )}
+                    title={isStreaming ? "Live price" : "Delayed price (polling)"}
+                  >
                     {livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5)}
                   </span>
                   <span className="text-muted-foreground/40">&middot;</span>

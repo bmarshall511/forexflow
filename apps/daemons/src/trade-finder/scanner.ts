@@ -142,6 +142,9 @@ export class TradeFinderScanner {
   private getOpenPositionsFn: GetOpenPositionsFn | null = null
   private getCurrentSpreadFn: GetCurrentSpreadFn | null = null
 
+  // Price seeder: seeds the daemon price cache so REST /price/:instrument works for TF instruments
+  private seedPriceFn: ((instrument: string, bid: number, ask: number) => void) | null = null
+
   // Circuit breaker for drawdown protection
   private circuitBreaker: TradeFinderCircuitBreaker
 
@@ -163,6 +166,11 @@ export class TradeFinderScanner {
   /** Set notification emitter for persisted auto-trade notifications */
   setNotificationEmitter(emitter: NotificationEmitter): void {
     this.notificationEmitter = emitter
+  }
+
+  /** Set price seeder so candle-derived prices are available via REST /price/:instrument */
+  setPriceSeeder(fn: (instrument: string, bid: number, ask: number) => void): void {
+    this.seedPriceFn = fn
   }
 
   /** Set auto-trade callbacks (called from index.ts after tradeSyncer is available) */
@@ -349,6 +357,9 @@ export class TradeFinderScanner {
     if (ltfCandles.length === 0 || mtfCandles.length === 0) return
 
     const currentPrice = ltfCandles[ltfCandles.length - 1]!.close
+
+    // Seed price cache so REST /price/:instrument works for Trade Finder instruments
+    this.seedPriceFn?.(instrument, currentPrice, currentPrice)
 
     // 2. HTF: Detect zones → build curve + store for confluence scoring
     let curveData: CurveData | null = null
@@ -1267,6 +1278,9 @@ export class TradeFinderScanner {
       const currentPrice = candles[candles.length - 1]!.close
       const pipSize = getPipSize(setup.instrument)
       const distanceToEntry = Math.abs(currentPrice - setup.entryPrice) / pipSize
+
+      // Seed price cache for REST /price/:instrument
+      this.seedPriceFn?.(setup.instrument, currentPrice, currentPrice)
 
       // Check if zone has been invalidated (price broke through distal)
       const zone = setup.zone

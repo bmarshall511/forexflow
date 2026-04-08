@@ -81,6 +81,21 @@ const RECONNECT_BASE_DELAY = 2000
 const RECONNECT_MAX_DELAY = 30000
 const REST_POLL_INTERVAL = 5000
 
+/**
+ * Merge incoming price ticks into existing state instead of replacing.
+ * The daemon broadcasts only instruments with ticks in the last 500ms (a delta),
+ * so replacing state would cause instruments to flicker in and out.
+ */
+function mergePriceData(
+  prev: PositionsPriceData | null,
+  incoming: PositionsPriceData,
+): PositionsPriceData {
+  if (!prev) return incoming
+  const merged = new Map(prev.prices.map((p) => [p.instrument, p]))
+  for (const p of incoming.prices) merged.set(p.instrument, p)
+  return { prices: Array.from(merged.values()) }
+}
+
 export interface DaemonConnectionState {
   /** Whether the WebSocket is currently connected to the daemon */
   isConnected: boolean
@@ -280,10 +295,10 @@ export function useDaemonConnection(): DaemonConnectionState {
               setPositions(msg.data)
               break
             case "positions_price_update":
-              setPositionsPrices(msg.data)
+              setPositionsPrices((prev) => mergePriceData(prev, msg.data))
               break
             case "chart_price_update":
-              setChartPrices(msg.data)
+              setChartPrices((prev) => mergePriceData(prev, msg.data))
               break
             case "notification_created":
               setLastNotification(msg.data)

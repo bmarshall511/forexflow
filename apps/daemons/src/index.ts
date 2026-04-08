@@ -318,6 +318,9 @@ async function main() {
   // 12d. Trade Finder Scanner
   const tradeFinderScanner = new TradeFinderScanner(stateManager, broadcast)
   tradeFinderScanner.setNotificationEmitter(notificationEmitter)
+  tradeFinderScanner.setPriceSeeder((inst, bid, ask) =>
+    positionPriceTracker.seedPrice(inst, bid, ask),
+  )
   setTradeFinderScanner(tradeFinderScanner)
 
   // Add Trade Finder instruments to price tracker so cards get live prices
@@ -392,6 +395,7 @@ async function main() {
   // 12e. AI Trader Scanner — autonomous trade discovery and management
   const aiTraderScanner = new AiTraderScanner(stateManager, tradeSyncer, positionManager, broadcast)
   aiTraderScanner.setNotificationEmitter(notificationEmitter)
+  aiTraderScanner.setPriceTracker(positionPriceTracker)
   setAiTraderScanner(aiTraderScanner)
   await aiTraderScanner.start()
 

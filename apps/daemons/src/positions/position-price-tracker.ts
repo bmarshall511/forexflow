@@ -221,6 +221,21 @@ export class PositionPriceTracker {
     return this.latestPrices.get(instrument) ?? null
   }
 
+  /**
+   * Seed a price into the cache from an external source (e.g. candle close).
+   * Used by the Trade Finder scanner so that `/price/:instrument` always has
+   * data for setup instruments even when they aren't actively streamed.
+   * Does NOT trigger a WS broadcast — this is a cache-only update.
+   */
+  seedPrice(instrument: string, bid: number, ask: number): void {
+    this.latestPrices.set(instrument, {
+      instrument,
+      bid,
+      ask,
+      time: new Date().toISOString(),
+    })
+  }
+
   /** Get all latest known prices. */
   getAllLatestPrices(): PositionPriceTick[] {
     return Array.from(this.latestPrices.values())

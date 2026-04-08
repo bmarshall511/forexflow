@@ -59,6 +59,7 @@ src/
 
 - `position-manager.ts` — in-memory FIFO position tracking.
 - `position-price-tracker.ts` — manages dynamic price streams per open position.
+- `seedPrice(instrument, bid, ask)` — external subsystems (e.g. Trade Finder scanner) seed the price cache so REST `/price/:instrument` returns data for instruments not actively streamed.
 - MFE/MAE watermarks updated on every tick, persisted to DB every 30 seconds.
 
 ## AI Pipeline
@@ -142,6 +143,27 @@ src/
 - Health endpoints: `/health` (liveness, always 200) + `/health/ready` (readiness, checks OANDA + DB). `/health/detailed` includes full tvAlerts data (signal counts, config status).
 - `PORT` env var auto-set by Railway/Fly.io — `config.ts` falls back: `DAEMON_PORT ?? PORT ?? "4100"`.
 - Cloud DB: `DATABASE_URL=libsql://...` + `TURSO_AUTH_TOKEN` for Turso connections.
+
+## SmartFlow
+
+- `smart-flow/manager.ts` — orchestrates trade plan lifecycle (placement, fill/close callbacks, tick delegation).
+- `smart-flow/market-scanner.ts` — autonomous scanner with 4 modes (trend_following, mean_reversion, breakout, session_momentum).
+- `smart-flow/management-engine.ts` — tick-by-tick rule evaluation (breakeven, trailing, partial close, safety checks).
+- `smart-flow/ai-monitor.ts` — periodic Claude-powered trade management suggestions.
+- `smart-flow/scan-modes.ts` — 4 analysis modes producing scored signals.
+- `smart-flow/entry-filters.ts` — 9 pre-placement filters (session, spread, correlation, news, regime, RSI, position, concurrent, daily cap). Also exports `getAdaptiveMinRR()` for regime/session-aware R:R thresholds.
+- `smart-flow/config-health.ts` — evaluates config health status (healthy, blocked_rr, blocked_spread, etc.).
+- `smart-flow/preset-defaults.ts` — 6 strategy presets (momentum_catch, steady_growth, swing_capture, trend_rider, recovery, custom).
+- `smart-flow/activity-feed.ts` — activity event emitter.
+- `smart-flow/scanner-circuit-breaker.ts` — consecutive/daily loss pause.
+- **SL/TP resolution**: config → preset defaults → hardcoded fallback. Uses `getPresetDefaults()` to resolve null ATR multiples.
+- **Adaptive R:R**: `calculateSLTP()` uses `getAdaptiveMinRR()` which adjusts `minRiskReward` by session (kill zone 1.0x, extended 0.85x, off-session 1.2x) and regime (trending 1.0x, ranging 0.75x, volatile 0.9x, low-vol 1.3x).
+- **Correlation guard**: `placeMarketEntry()` checks `checkCorrelation()` with max 2 same-currency same-direction before placement.
+- **Config health**: `getConfigRuntimeStatuses()` evaluates each config's health (R:R, spread, margin, ATR, source priority) and returns status with blocking reason.
+- **Startup repairs**: `repairMissingAtrMultiples()` patches configs with null ATR multiples from preset defaults on startup.
+- **Prolonged block alerts**: `autoPlaceActiveConfigs()` tracks block duration and emits alerts after 2+ hours.
+- **Scanner diagnostics**: `getDiagnostics()` returns filter breakdown, near-misses, error counts per scan.
+- REST endpoints: `GET /smart-flow/status`, `GET /smart-flow/configs`, `POST /smart-flow/place/{configId}`, `GET /smart-flow/scanner/status`, `GET /smart-flow/scanner/diagnostics`, etc.
 
 ## Naming
 

@@ -43,6 +43,8 @@ All four locations must be updated — missing any one breaks the chain.
 ## Performance Rules
 
 - **Price throttling**: 500ms minimum interval per instrument. Daemon throttles before broadcast.
+- **Price merging**: `positions_price_update` and `chart_price_update` are deltas (only instruments with ticks in that 500ms window). The client merges incoming prices into existing state to prevent flicker. Never replace price state — always merge.
+- **Live price consumers**: Always use `useLivePrice()` which reads from the shared `DaemonStatusContext`. Never call `useDaemonConnection()` directly from components — that creates a per-component WebSocket.
 - **Optimistic updates**: User actions (place order, close trade) update UI immediately, then reconcile on next sync.
 - **Batch updates**: Group multiple position changes into a single re-render cycle.
 - **No derived state in WS handler**: Dispatch raw data, compute derived values in components/hooks.

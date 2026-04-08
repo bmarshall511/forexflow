@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react"
 import type { PriceAlertData } from "@fxflow/types"
-import { useDaemonConnection } from "./use-daemon-connection"
+import { useDaemonStatus } from "./use-daemon-status"
 
 export function usePriceAlerts() {
   const [alerts, setAlerts] = useState<PriceAlertData[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { lastPriceAlertTriggered } = useDaemonConnection()
+  const { lastPriceAlertTriggered } = useDaemonStatus()
 
   const fetchAlerts = useCallback(async () => {
     try {

@@ -41,6 +41,8 @@ src/
 - Single connection: `use-daemon-connection.ts` manages WS to daemon.
 - Feeds into `DaemonStatusContext` — consuming hooks subscribe to specific message types.
 - Message types defined in `@fxflow/types` (`DaemonMessageType` enum).
+- **Price merging**: `positions_price_update` and `chart_price_update` are deltas (only instruments with ticks in the last 500ms). The handler merges incoming prices into existing state instead of replacing, preventing instruments from flickering in and out.
+- **Live price hook**: `use-live-price.ts` uses `useDaemonStatus()` (shared context) — NOT `useDaemonConnection()` directly. This avoids creating per-component WebSocket connections. Includes a `lastKnownPriceRef` so price never flickers to null once obtained.
 
 ## Component Conventions
 
@@ -107,7 +109,7 @@ Every feature page follows this structure:
 - **Middleware always fetches `http://localhost:${PORT}/api/auth/status`** — never `request.nextUrl.origin`, which fails when the request arrives via a tunnel URL.
 - API routes that proxy to daemon must handle daemon-down errors gracefully.
 - WS reconnection is handled automatically by `use-daemon-connection.ts`.
-- `use-daemon-status.ts` vs `use-daemon-connection.ts`: status is the consumer hook, connection is the provider.
+- `use-daemon-status.ts` vs `use-daemon-connection.ts`: status is the consumer hook, connection is the provider. **Never import `use-daemon-connection` directly from components or hooks** — always use `useDaemonStatus()` which reads from the shared context. Direct calls create per-component WebSocket connections.
 - `server.ts` is only used in production (`pnpm start`). Dev mode uses `next dev` directly (no WS proxy — REST polling fills the gap).
 - Deployment settings (local/cloud mode, cloud daemon URL) stored in `Settings` model via `deployment-service.ts`.
 - Settings > Deployment page: `components/settings/deployment/deployment-settings-page.tsx`.
