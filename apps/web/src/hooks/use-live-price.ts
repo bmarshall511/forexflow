@@ -14,6 +14,19 @@ interface LivePriceResult {
   isStreaming: boolean
 }
 
+/** Validate a price value is a usable finite number (not NaN, Infinity, 0, etc.) */
+function isValidPrice(n: unknown): n is number {
+  return typeof n === "number" && Number.isFinite(n) && n > 0
+}
+
+/**
+ * Module-level price cache keyed by instrument.
+ * Persists across component mount/unmount cycles (e.g. when a setup card moves
+ * between the "approaching" and "active" filter groups, React unmounts and
+ * remounts the component — useState and useRef reset, but this survives).
+ */
+const priceCache = new Map<string, { bid: number; ask: number }>()
+
 /**
  * Get the live price for an instrument, combining WS streams with REST polling.
  *
@@ -22,14 +35,13 @@ interface LivePriceResult {
  * For other instruments (e.g. Trade Finder setups), this hook polls the daemon
  * REST endpoint every 5 seconds for fresh prices.
  *
- * A last-known-price ref ensures the price never flickers to null once a value
- * has been obtained from any source.
+ * A module-level cache ensures the price never flickers to null, even across
+ * component unmount/remount cycles.
  */
 export function useLivePrice(instrument: string): LivePriceResult {
   const { positionsPrices, chartPrices } = useDaemonStatus()
   const [polledPrice, setPolledPrice] = useState<{ bid: number; ask: number } | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const lastKnownRef = useRef<{ bid: number; ask: number } | null>(null)
 
   // Check WS streams first (merged state — instruments accumulate, never flicker out)
   const wsTick =
@@ -41,7 +53,6 @@ export function useLivePrice(instrument: string): LivePriceResult {
   const needsPoll = !wsTick
   useEffect(() => {
     if (!needsPoll) {
-      // WS has it — stop polling
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
         pollIntervalRef.current = null
@@ -55,7 +66,13 @@ export function useLivePrice(instrument: string): LivePriceResult {
         const res = await fetch(`${DAEMON_URL}/price/${instrument}`)
         const json = await res.json()
         if (mounted && json.ok && json.data) {
-          setPolledPrice({ bid: json.data.bid, ask: json.data.ask })
+          const bid = json.data.bid as unknown
+          const ask = json.data.ask as unknown
+          if (isValidPrice(bid) && isValidPrice(ask)) {
+            const price = { bid, ask }
+            priceCache.set(instrument, price)
+            setPolledPrice(price)
+          }
         }
       } catch {
         // Non-critical — price will just be stale
@@ -74,20 +91,20 @@ export function useLivePrice(instrument: string): LivePriceResult {
     }
   }, [instrument, needsPoll])
 
-  // Return chain: WS tick → polled price → last known → null
-  // Once a price is obtained, it never goes back to null (prevents flicker).
-  if (wsTick) {
-    lastKnownRef.current = { bid: wsTick.bid, ask: wsTick.ask }
+  // Return chain: WS tick → polled price → module cache → null
+  // The module cache survives component unmount/remount, preventing flicker.
+  if (wsTick && isValidPrice(wsTick.bid) && isValidPrice(wsTick.ask)) {
+    priceCache.set(instrument, { bid: wsTick.bid, ask: wsTick.ask })
     return { bid: wsTick.bid, ask: wsTick.ask, isStreaming: true }
   }
 
   if (polledPrice) {
-    lastKnownRef.current = polledPrice
     return { bid: polledPrice.bid, ask: polledPrice.ask, isStreaming: false }
   }
 
-  if (lastKnownRef.current) {
-    return { bid: lastKnownRef.current.bid, ask: lastKnownRef.current.ask, isStreaming: false }
+  const cached = priceCache.get(instrument)
+  if (cached) {
+    return { bid: cached.bid, ask: cached.ask, isStreaming: false }
   }
 
   return { bid: null, ask: null, isStreaming: false }

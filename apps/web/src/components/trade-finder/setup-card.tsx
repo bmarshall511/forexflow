@@ -196,7 +196,7 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
         </div>
       </div>
 
-      {/* Distance + live price */}
+      {/* Distance + live price — always rendered (no conditional) to prevent DOM flicker */}
       <div className="flex items-center justify-between px-4 pt-2">
         <p className="text-muted-foreground text-xs">
           {liveDistancePips < 1
@@ -205,17 +205,20 @@ export function SetupCard({ setup, onSelect, onPlace, autoTradeConfig }: SetupCa
               ? `${liveDistancePips.toFixed(1)} pips from entry`
               : `${liveDistancePips.toFixed(0)} pips from entry`}
         </p>
-        {livePrice && (
-          <span
-            className={cn(
-              "font-mono text-[10px] tabular-nums",
-              isStreaming ? "text-muted-foreground" : "text-muted-foreground/60",
-            )}
-            title={isStreaming ? "Live price" : "Delayed price (polling)"}
-          >
-            {livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5)}
-          </span>
-        )}
+        <span
+          className={cn(
+            "font-mono text-[10px] tabular-nums transition-opacity duration-300",
+            livePrice
+              ? isStreaming
+                ? "text-muted-foreground opacity-100"
+                : "text-muted-foreground/60 opacity-100"
+              : "opacity-0",
+          )}
+          title={isStreaming ? "Live price" : "Delayed price (polling)"}
+          aria-hidden={!livePrice}
+        >
+          {livePrice ? livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5) : "\u00A0"}
+        </span>
       </div>
 
       {/* Status context: why it's waiting, blocked, invalidated, etc. */}

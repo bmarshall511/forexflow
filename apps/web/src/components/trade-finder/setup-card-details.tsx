@@ -182,24 +182,24 @@ function SetupDetailContent({
                 {isLong ? "Buy" : "Sell"}
               </span>
               <span className="text-muted-foreground/40">&middot;</span>
-              {livePrice && (
-                <>
-                  <span
-                    className={cn(
-                      "font-mono tabular-nums",
-                      !isStreaming && "text-muted-foreground/60",
-                    )}
-                    title={isStreaming ? "Live price" : "Delayed price (polling)"}
-                  >
-                    {livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5)}
-                  </span>
-                  <span className="text-muted-foreground/40">&middot;</span>
-                  <span className="text-muted-foreground">
-                    {liveDistancePips < 1 ? "at entry" : `${liveDistancePips.toFixed(1)}p away`}
-                  </span>
-                  <span className="text-muted-foreground/40">&middot;</span>
-                </>
-              )}
+              <span
+                className={cn(
+                  "font-mono tabular-nums transition-opacity duration-300",
+                  livePrice
+                    ? isStreaming
+                      ? "opacity-100"
+                      : "text-muted-foreground/60 opacity-100"
+                    : "opacity-0",
+                )}
+                title={isStreaming ? "Live price" : "Delayed price (polling)"}
+              >
+                {livePrice ? livePrice.toFixed(setup.instrument.includes("JPY") ? 3 : 5) : "\u00A0"}
+              </span>
+              {livePrice && <span className="text-muted-foreground/40">&middot;</span>}
+              <span className="text-muted-foreground">
+                {liveDistancePips < 1 ? "at entry" : `${liveDistancePips.toFixed(1)}p away`}
+              </span>
+              <span className="text-muted-foreground/40">&middot;</span>
               <span
                 className={cn(
                   setup.status === "approaching" && "text-amber-500",
