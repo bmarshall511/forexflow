@@ -28,11 +28,18 @@ import {
   getTradeBySourceId,
   getRiskPercent,
 } from "@fxflow/db"
-import { ALL_FOREX_PAIRS, getPipSize, priceToPips, classifyAiError } from "@fxflow/shared"
+import {
+  ALL_FOREX_PAIRS,
+  getPipSize,
+  getTypicalSpread,
+  priceToPips,
+  classifyAiError,
+} from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { PositionManager } from "../positions/position-manager.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
+import type { PositionPriceTracker } from "../positions/position-price-tracker.js"
 import { CandleCache, fetchOandaCandles } from "../trade-finder/candle-cache.js"
 import { CostTracker } from "./cost-tracker.js"
 import { DataAggregator } from "./data-aggregator.js"
@@ -133,6 +140,7 @@ export class AiTraderScanner {
   private positionManager: PositionManager
   private broadcast: (msg: AnyDaemonMessage) => void
   private notificationEmitter: NotificationEmitter | null = null
+  private priceTracker: PositionPriceTracker | null = null
 
   private timer: ReturnType<typeof setTimeout> | null = null
   private scanning = false
@@ -153,6 +161,9 @@ export class AiTraderScanner {
   // Scan progress tracking
   private scanProgress: AiTraderScanProgressData | null = null
   private scanLog: AiTraderScanLogEntry[] = []
+
+  // ATR cache from previous scans — used for pre-scan viability checks
+  private atrCache = new Map<string, number>() // "EUR_USD:M5" → ATR in price terms
 
   // Sub-modules
   private candleCache = new CandleCache()
@@ -193,6 +204,24 @@ export class AiTraderScanner {
       this.dataAggregator,
       this.performanceTracker,
     )
+  }
+
+  setPriceTracker(tracker: PositionPriceTracker): void {
+    this.priceTracker = tracker
+  }
+
+  /**
+   * Get live spread in pips from the pricing stream. Falls back to static typical spreads
+   * when live data is unavailable (e.g. pair not currently streamed).
+   */
+  getLiveSpread(instrument: string): { spreadPips: number; source: "live" | "typical" } {
+    const tick = this.priceTracker?.getLatestPrice(instrument)
+    if (tick && tick.bid > 0 && tick.ask > 0) {
+      const pipSize = getPipSize(instrument)
+      const rawSpread = tick.ask - tick.bid
+      return { spreadPips: rawSpread / pipSize, source: "live" }
+    }
+    return { spreadPips: getTypicalSpread(instrument), source: "typical" }
   }
 
   async start(): Promise<void> {
@@ -446,6 +475,75 @@ export class AiTraderScanner {
     return this.tradeManager.isAiTrade(tradeId)
   }
 
+  /**
+   * Get viability status for each pair/profile combo based on cached ATR and live spreads.
+   * Returns "viable", "marginal", or "blocked" per combo, plus supporting data.
+   */
+  getPairViability(): Array<{
+    pair: string
+    profile: string
+    status: "viable" | "marginal" | "blocked" | "unknown"
+    spreadPips: number
+    atrPips: number | null
+    rawRR: number | null
+    spreadPercent: number | null
+  }> {
+    const results: Array<{
+      pair: string
+      profile: string
+      status: "viable" | "marginal" | "blocked" | "unknown"
+      spreadPips: number
+      atrPips: number | null
+      rawRR: number | null
+      spreadPercent: number | null
+    }> = []
+
+    const profiles: AiTraderProfile[] = ["scalper", "intraday", "swing", "news"]
+    const pairs = ALL_FOREX_PAIRS.map((p) => p.value)
+
+    for (const pair of pairs) {
+      const { spreadPips } = this.getLiveSpread(pair)
+      for (const profile of profiles) {
+        const cfg = getProfileConfig(profile)
+        const cacheKey = `${pair}:${cfg.scanTimeframes.primary}`
+        const cachedAtr = this.atrCache.get(cacheKey)
+
+        if (cachedAtr === undefined) {
+          results.push({
+            pair,
+            profile,
+            status: "unknown",
+            spreadPips,
+            atrPips: null,
+            rawRR: null,
+            spreadPercent: null,
+          })
+          continue
+        }
+
+        const pipSize = getPipSize(pair)
+        const atrPips = cachedAtr / pipSize
+        const riskPips = atrPips * cfg.atrSlMultiplier
+        const rewardPips = atrPips * cfg.atrTpMultiplier
+        const rawRR = riskPips > 0 ? rewardPips / riskPips : 0
+        const spreadPercent = riskPips > 0 ? spreadPips / riskPips : 1
+
+        let status: "viable" | "marginal" | "blocked"
+        if (spreadPercent > 0.3 || rawRR < cfg.minRR) {
+          status = "blocked"
+        } else if (spreadPercent > 0.2 || rawRR < cfg.minRR * 1.2) {
+          status = "marginal"
+        } else {
+          status = "viable"
+        }
+
+        results.push({ pair, profile, status, spreadPips, atrPips, rawRR, spreadPercent })
+      }
+    }
+
+    return results
+  }
+
   onPriceTick(instrument: string, mid: number): void {
     this.tradeManager.onPriceTick(instrument, mid)
   }
@@ -657,6 +755,20 @@ export class AiTraderScanner {
             const tf = profileConfig.scanTimeframes
             const counts = profileConfig.candleCounts
 
+            // Pre-scan viability: skip pair/profile combos where spread makes R:R impossible
+            const { spreadPips } = this.getLiveSpread(pair)
+            const cachedAtrKey = `${pair}:${tf.primary}`
+            const cachedAtr = this.atrCache.get(cachedAtrKey)
+            if (cachedAtr !== undefined) {
+              const cachedAtrPips = cachedAtr / getPipSize(pair)
+              const riskPips = cachedAtrPips * profileConfig.atrSlMultiplier
+              if (riskPips > 0 && spreadPips > riskPips * 0.3) {
+                // This combo will always fail the spread gate — skip API call
+                if (filterStats) filterStats.spreadTooWide++
+                continue
+              }
+            }
+
             const [primaryCandles, secondaryCandles, htfCandles] = await Promise.all([
               fetchOandaCandles(
                 pair,
@@ -679,6 +791,21 @@ export class AiTraderScanner {
 
             if (primaryCandles.length < 30) continue
 
+            // Update ATR cache from fresh candle data
+            {
+              const { computeATR } = await import("@fxflow/shared")
+              const candles = primaryCandles.map((c) => ({
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                time: c.time,
+                volume: 0,
+              }))
+              const atrValue = computeATR(candles, 14)
+              if (atrValue !== null) this.atrCache.set(cachedAtrKey, atrValue)
+            }
+
             const signals = analyzeTier1(
               pair,
               primaryCandles,
@@ -687,6 +814,7 @@ export class AiTraderScanner {
               profile,
               config.enabledTechniques as Record<AiTraderTechnique, boolean>,
               filterStats,
+              (inst) => this.getLiveSpread(inst),
             )
 
             if (signals.length > 0) {
@@ -1408,6 +1536,23 @@ export class AiTraderScanner {
 
   private async executeOpportunity(opp: AiTraderOpportunityData): Promise<void> {
     const pairLabel = opp.instrument.replace("_", "/")
+
+    // Re-validate live spread before placement — reject if spread has widened excessively
+    const { spreadPips, source } = this.getLiveSpread(opp.instrument)
+    const riskPips = opp.riskPips
+    if (riskPips > 0 && spreadPips > riskPips * 0.5) {
+      console.warn(
+        `[ai-trader] Spread widened before placement: ${spreadPips.toFixed(1)} pips (${source}) > 50% of ${riskPips.toFixed(1)} pip risk — aborting ${pairLabel}`,
+      )
+      this.addLogEntry(
+        "trade_rejected",
+        `${pairLabel}: Spread widened to ${spreadPips.toFixed(1)} pips before placement — order aborted`,
+        `Spread source: ${source}, risk: ${riskPips.toFixed(1)} pips`,
+      )
+      await updateOpportunityStatus(opp.id, "rejected")
+      return
+    }
+
     try {
       const result = await this.tradeSyncer.placeOrder({
         instrument: opp.instrument,
