@@ -2949,6 +2949,17 @@ export interface AiTraderScanLogEntry {
     filterHTF?: number
     filterRSI?: number
     filterPassed?: number
+    /** Top N near-miss signals closest to passing filters (pair_scanned entries) */
+    nearMisses?: Array<{
+      pair: string
+      profile: string
+      dir: string
+      reason: string
+      rr: number
+      spread: number
+      risk: number
+      atr: number
+    }>
   }
 }
 
@@ -4017,6 +4028,57 @@ export interface SmartFlowConfigRuntimeStatus {
   activeTradeId: string | null
   managementPhase: string | null
   nextAiCheck: string | null
+  health: SmartFlowConfigHealth | null
+}
+
+export type SmartFlowConfigHealthStatus =
+  | "healthy"
+  | "blocked_rr"
+  | "blocked_spread"
+  | "blocked_margin"
+  | "blocked_correlation"
+  | "blocked_source_priority"
+  | "blocked_atr"
+  | "direction_stale"
+  | "scanner_disabled"
+  | "waiting_entry"
+  | "paused"
+  | "active_trade"
+
+export interface SmartFlowConfigHealth {
+  status: SmartFlowConfigHealthStatus
+  message: string
+  /** Computed R:R if available (helps user understand why blocked) */
+  computedRR: number | null
+  /** Required minimum R:R from preset/config */
+  requiredRR: number | null
+  /** ISO timestamp of when direction became misaligned (null if aligned) */
+  directionMisalignedSince: string | null
+  /** Current ATR for the instrument (null if unavailable) */
+  currentAtr: number | null
+}
+
+export interface SmartFlowScanDiagnostics {
+  pairsAnalyzed: number
+  scanErrors: number
+  insufficientData: number
+  signalsFound: number
+  candidatesFiltered: number
+  candidatesPlaced: number
+  filterBreakdown: Record<string, number>
+  nearMisses: SmartFlowNearMiss[]
+}
+
+export interface SmartFlowNearMiss {
+  instrument: string
+  direction: "long" | "short"
+  scanMode: string
+  score: number
+  requiredScore: number
+  riskRewardRatio: number
+  requiredRR: number
+  blockingFilter: string | null
+  reasons: string[]
 }
 
 // ─── Zod Schemas ────────────────────────────────────────────────────────────

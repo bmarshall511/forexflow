@@ -923,6 +923,15 @@ export async function startServer(port: number, deps: ServerDeps) {
       return
     }
 
+    if (req.method === "GET" && req.url === "/ai-trader/pair-viability") {
+      if (!_aiTraderScanner) {
+        sendJson(res, 503, { ok: false, error: "EdgeFinder not initialized" })
+        return
+      }
+      sendJson(res, 200, { ok: true, data: _aiTraderScanner.getPairViability() })
+      return
+    }
+
     if (req.method === "POST" && req.url?.startsWith("/actions/ai-trader/approve/")) {
       const opportunityId = req.url.replace("/actions/ai-trader/approve/", "")
       if (!_aiTraderScanner || !tradeSyncer) {
@@ -1278,6 +1287,12 @@ export async function startServer(port: number, deps: ServerDeps) {
       }
       scanner.resetCircuitBreaker()
       sendJson(res, 200, { ok: true })
+      return
+    }
+
+    if (req.method === "GET" && req.url === "/smart-flow/scanner/diagnostics") {
+      const scanner = _smartFlowManager?.getScanner()
+      sendJson(res, 200, { ok: true, diagnostics: scanner?.getDiagnostics() ?? null })
       return
     }
 

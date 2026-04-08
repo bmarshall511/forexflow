@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import type { AiTraderOpportunityData } from "@fxflow/types"
+import type { AiTraderOpportunityData, AiTraderOperatingMode } from "@fxflow/types"
 import { OpportunityFilters, type OpportunityFilterState } from "./opportunity-filters"
 import { OpportunityCompactCard } from "./opportunity-compact-card"
+import { OpportunityCard } from "./opportunity-card"
 import { PipelineExplainer } from "./pipeline-explainer"
 
 const PAGE_SIZE = 20
@@ -20,7 +21,17 @@ const DEFAULT_FILTERS: OpportunityFilterState = {
   sortDir: "desc",
 }
 
-export function OpportunityList() {
+interface OpportunityListProps {
+  operatingMode: AiTraderOperatingMode
+  confidenceThreshold: number
+  onAction: (id: string, action: "approve" | "reject") => Promise<void>
+}
+
+export function OpportunityList({
+  operatingMode,
+  confidenceThreshold,
+  onAction,
+}: OpportunityListProps) {
   const [filters, setFilters] = useState<OpportunityFilterState>(DEFAULT_FILTERS)
   const [data, setData] = useState<AiTraderOpportunityData[]>([])
   const [total, setTotal] = useState(0)
@@ -87,9 +98,22 @@ export function OpportunityList() {
         </div>
       ) : (
         <div className="space-y-2">
-          {data.map((opp) => (
-            <OpportunityCompactCard key={opp.id} opportunity={opp} />
-          ))}
+          {data.map((opp) =>
+            opp.status === "suggested" ? (
+              <OpportunityCard
+                key={opp.id}
+                opportunity={opp}
+                operatingMode={operatingMode}
+                confidenceThreshold={confidenceThreshold}
+                onAction={async (id, action) => {
+                  await onAction(id, action)
+                  void fetchOpportunities()
+                }}
+              />
+            ) : (
+              <OpportunityCompactCard key={opp.id} opportunity={opp} />
+            ),
+          )}
         </div>
       )}
 

@@ -46,7 +46,7 @@ Types are grouped by domain section (delimited by `// ─── Section ──�
 31. **Trend Detection** — trend analysis types
 32. **Trend Display Settings** — UI trend configuration
 33. **Trade Finder** — setup lifecycle, scanner config
-34. **AI Trader** — strategy profiles, scan pipeline, opportunities
+34. **AI Trader** — strategy profiles, scan pipeline, opportunities, `Tier1NearMiss` type, `AiTraderScanLogEntry.metadata.nearMisses` field, spread-adjusted R:R fields on `Tier1Signal` (`spreadAdjustedRR`, `spreadImpactPercent`, `spreadPips`)
 35. **AI Trader WebSocket Messages** — scan progress, activity log
 36. **Economic Calendar** — news event types
 37. **Price Alerts** — alert configuration and state

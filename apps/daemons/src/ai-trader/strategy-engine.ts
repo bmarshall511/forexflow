@@ -63,6 +63,12 @@ export interface Tier1Signal {
   riskPips: number
   rewardPips: number
   riskRewardRatio: number
+  /** Spread-adjusted R:R passed to AI as quality context (not used for gating). */
+  spreadAdjustedRR: number
+  /** How much spread degrades the R:R (0–1 scale, e.g. 0.15 = 15% degradation). */
+  spreadImpactPercent: number
+  /** Spread in pips used for this signal (live or typical fallback). */
+  spreadPips: number
   primaryTechnique: AiTraderTechnique
   technicalSnapshot: TechnicalSnapshot
   confluenceBreakdown: Record<string, { present: boolean; weight: number; contribution: number }>
@@ -89,30 +95,30 @@ const PROFILE_CONFIGS: Record<AiTraderProfile, ProfileConfig> = {
   scalper: {
     scanTimeframes: { primary: "M5", secondary: "M15", htf: "H1" },
     candleCounts: { primary: 100, secondary: 50, htf: 50 },
-    minRR: 1.5,
+    minRR: 1.3,
     atrSlMultiplier: 1.5,
-    atrTpMultiplier: 2.5,
+    atrTpMultiplier: 3.0,
   },
   intraday: {
     scanTimeframes: { primary: "M15", secondary: "H1", htf: "H4" },
     candleCounts: { primary: 100, secondary: 50, htf: 50 },
-    minRR: 2.0,
+    minRR: 1.8,
     atrSlMultiplier: 2.0,
-    atrTpMultiplier: 4.0,
+    atrTpMultiplier: 5.0,
   },
   swing: {
     scanTimeframes: { primary: "H4", secondary: "D", htf: "W" },
     candleCounts: { primary: 100, secondary: 50, htf: 30 },
-    minRR: 2.5,
+    minRR: 2.0,
     atrSlMultiplier: 2.5,
-    atrTpMultiplier: 6.0,
+    atrTpMultiplier: 7.5,
   },
   news: {
     scanTimeframes: { primary: "M5", secondary: "M15", htf: "H1" },
     candleCounts: { primary: 80, secondary: 40, htf: 40 },
-    minRR: 1.5,
+    minRR: 1.3,
     atrSlMultiplier: 2.0,
-    atrTpMultiplier: 3.0,
+    atrTpMultiplier: 4.0,
   },
 }
 
@@ -129,6 +135,20 @@ export interface Tier1FilterStats {
   passed: number
 }
 
+/** Per-signal rejection detail for diagnostics. */
+export interface Tier1NearMiss {
+  instrument: string
+  profile: string
+  direction: "long" | "short"
+  reason: "spread" | "rr" | "no_reasons"
+  rawRR: number
+  spreadPips: number
+  riskPips: number
+  rewardPips: number
+  atrPips: number
+  confidence: number
+}
+
 // ─── Tier 1 Analysis ─────────────────────────────────────────────────────────
 
 /**
@@ -143,6 +163,10 @@ export function analyzeTier1(
   profile: AiTraderProfile,
   enabledTechniques: Record<AiTraderTechnique, boolean>,
   filterStats?: Tier1FilterStats,
+  /** Optional live spread provider. Falls back to static typical spreads. */
+  getSpread?: (inst: string) => { spreadPips: number; source: "live" | "typical" },
+  /** Optional collector for near-miss rejection details (top N closest to passing). */
+  nearMisses?: Tier1NearMiss[],
 ): Tier1Signal[] {
   if (primaryCandles.length < 30) return []
 
@@ -423,20 +447,57 @@ export function analyzeTier1(
 
     const riskPips = priceToPips(instrument, Math.abs(entryPrice - sl))
     const rewardPips = priceToPips(instrument, Math.abs(tp - entryPrice))
+    const atrPips = priceToPips(instrument, atrVal)
 
-    // ─── Spread-aware R:R: reject if spread eats too much risk ─────
-    const spreadPips = getTypicalSpread(instrument)
-    if (spreadPips > riskPips * 0.3) {
-      if (filterStats) filterStats.spreadTooWide++
-      continue // Spread > 30% of risk
-    }
-    const effectiveRisk = riskPips + spreadPips
-    const effectiveReward = rewardPips - spreadPips
-    const rr = effectiveRisk > 0 ? effectiveReward / effectiveRisk : 0
-    if (rr < profileConfig.minRR) {
+    // ─── R:R Gate: raw ratio for hard filter, spread-adjusted for AI context ─
+    const rawRR = riskPips > 0 ? rewardPips / riskPips : 0
+    if (rawRR < profileConfig.minRR) {
       if (filterStats) filterStats.rrTooLow++
+      if (nearMisses) {
+        nearMisses.push({
+          instrument,
+          profile,
+          direction,
+          reason: "rr",
+          rawRR,
+          spreadPips: 0,
+          riskPips,
+          rewardPips,
+          atrPips,
+          confidence: adjustedScore,
+        })
+      }
       continue
     }
+
+    // Spread check: reject if spread consumes > 30% of risk (physical constraint)
+    const { spreadPips } = getSpread
+      ? getSpread(instrument)
+      : { spreadPips: getTypicalSpread(instrument) }
+    if (spreadPips > riskPips * 0.3) {
+      if (filterStats) filterStats.spreadTooWide++
+      if (nearMisses) {
+        nearMisses.push({
+          instrument,
+          profile,
+          direction,
+          reason: "spread",
+          rawRR,
+          spreadPips,
+          riskPips,
+          rewardPips,
+          atrPips,
+          confidence: adjustedScore,
+        })
+      }
+      continue
+    }
+
+    // Compute spread-adjusted R:R as quality context for AI tiers (not a gate)
+    const effectiveRisk = riskPips + spreadPips
+    const effectiveReward = rewardPips - spreadPips
+    const spreadAdjRR = effectiveRisk > 0 ? effectiveReward / effectiveRisk : 0
+    const spreadImpact = rawRR > 0 ? Math.max(0, (rawRR - spreadAdjRR) / rawRR) : 0
 
     const sorted = [...techs].sort((a, b) => b.str - a.str)
     const primaryTechnique = sorted[0]?.tech ?? "smc_structure"
@@ -453,7 +514,10 @@ export function analyzeTier1(
       suggestedTP: tp,
       riskPips,
       rewardPips,
-      riskRewardRatio: rr,
+      riskRewardRatio: rawRR,
+      spreadAdjustedRR: spreadAdjRR,
+      spreadImpactPercent: spreadImpact,
+      spreadPips,
       primaryTechnique,
       technicalSnapshot: snapshot,
       confluenceBreakdown: result.breakdown,

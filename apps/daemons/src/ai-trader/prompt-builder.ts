@@ -44,7 +44,8 @@ Assess this trade candidate and respond with JSON:
 - **Entry**: ${signal.entryPrice}
 - **SL**: ${signal.suggestedSL} (${signal.riskPips.toFixed(1)} pips)
 - **TP**: ${signal.suggestedTP} (${signal.rewardPips.toFixed(1)} pips)
-- **R:R**: ${signal.riskRewardRatio.toFixed(2)}
+- **R:R (raw)**: ${signal.riskRewardRatio.toFixed(2)}
+- **R:R (after spread)**: ${signal.spreadAdjustedRR.toFixed(2)} (spread: ${signal.spreadPips.toFixed(1)} pips, ${(signal.spreadImpactPercent * 100).toFixed(0)}% R:R degradation)
 - **Tier 1 Confluence Score**: ${signal.confidence}
 
 ### Technical Snapshot
@@ -134,7 +135,8 @@ You are making the FINAL decision on whether to execute this trade. Respond with
 - **Entry**: ${signal.entryPrice}
 - **SL**: ${signal.suggestedSL} (${signal.riskPips.toFixed(1)} pips risk)
 - **TP**: ${signal.suggestedTP} (${signal.rewardPips.toFixed(1)} pips reward)
-- **R:R**: ${signal.riskRewardRatio.toFixed(2)}
+- **R:R (raw)**: ${signal.riskRewardRatio.toFixed(2)}
+- **R:R (after spread)**: ${signal.spreadAdjustedRR.toFixed(2)} (spread: ${signal.spreadPips.toFixed(1)} pips, ${(signal.spreadImpactPercent * 100).toFixed(0)}% R:R degradation)
 
 ### Tier 1 Confluence (${signal.confidence}/100)
 ${signal.reasons.map((r) => `- ${r}`).join("\n")}
@@ -167,7 +169,8 @@ ${formatPerformance(performanceHistory)}
 ${buildRiskWarning(ctx)}
 IMPORTANT:
 - Position sizing is calculated automatically by the system — do NOT include positionSizeUnits
-- If adjusting entry/SL/TP, ensure R:R >= ${signal.profile === "scalper" ? "1.5" : signal.profile === "intraday" ? "2.0" : "2.5"}
+- If adjusting entry/SL/TP, ensure R:R >= ${signal.profile === "scalper" || signal.profile === "news" ? "1.3" : signal.profile === "intraday" ? "1.8" : "2.0"}
+- Factor in the spread impact on R:R — if spread degrades R:R by more than 25%, increase your risk assessment accordingly
 - Confidence must be honest — 80+ should be truly exceptional setups
 - entryRationale must cite specific price levels but use plain English, not jargon
 - riskAssessment and managementPlan must also be in simple, clear language`,

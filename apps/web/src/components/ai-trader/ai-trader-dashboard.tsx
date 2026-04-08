@@ -47,6 +47,7 @@ export function AiTraderDashboard() {
     triggerScan,
     pauseScanner,
     resumeScanner,
+    handleAction,
   } = useAiTrader()
 
   const isScanning =
@@ -241,7 +242,13 @@ export function AiTraderDashboard() {
       </TabNav>
 
       <div className="space-y-4 px-4 py-6 md:px-6">
-        {tab === "opportunities" && <OpportunityList />}
+        {tab === "opportunities" && (
+          <OpportunityList
+            operatingMode={operatingMode}
+            confidenceThreshold={confidenceThreshold}
+            onAction={handleAction}
+          />
+        )}
         {tab === "activity" && <ScanActivityLog entries={scanLog} />}
         {tab === "performance" && <PerformanceTab />}
       </div>

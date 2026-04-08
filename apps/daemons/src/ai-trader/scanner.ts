@@ -51,6 +51,7 @@ import {
   getProfileConfig,
   type Tier1Signal,
   type Tier1FilterStats,
+  type Tier1NearMiss,
 } from "./strategy-engine.js"
 import { buildTier2Prompt, buildTier3Prompt, type Tier3Context } from "./prompt-builder.js"
 
@@ -726,6 +727,7 @@ export class AiTraderScanner {
       )
 
       const allSignals: Tier1Signal[] = []
+      const allNearMisses: Tier1NearMiss[] = []
       const filterStats: Tier1FilterStats = {
         lowVolatility: 0,
         noReasons: 0,
@@ -794,16 +796,8 @@ export class AiTraderScanner {
             // Update ATR cache from fresh candle data
             {
               const { computeATR } = await import("@fxflow/shared")
-              const candles = primaryCandles.map((c) => ({
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-                time: c.time,
-                volume: 0,
-              }))
-              const atrValue = computeATR(candles, 14)
-              if (atrValue !== null) this.atrCache.set(cachedAtrKey, atrValue)
+              const atrArr = computeATR(primaryCandles, 14)
+              if (atrArr.length > 0) this.atrCache.set(cachedAtrKey, atrArr[atrArr.length - 1]!)
             }
 
             const signals = analyzeTier1(
@@ -815,6 +809,7 @@ export class AiTraderScanner {
               config.enabledTechniques as Record<AiTraderTechnique, boolean>,
               filterStats,
               (inst) => this.getLiveSpread(inst),
+              allNearMisses,
             )
 
             if (signals.length > 0) {
@@ -893,6 +888,20 @@ export class AiTraderScanner {
           filterHTF: filterStats.htfPenalized,
           filterRSI: filterStats.secondaryRsiPenalized,
           filterPassed: filterStats.passed,
+          // Top 5 near-misses (closest to passing): helps diagnose why signals are filtered
+          nearMisses: allNearMisses
+            .sort((a, b) => b.rawRR - a.rawRR)
+            .slice(0, 5)
+            .map((nm) => ({
+              pair: nm.instrument.replace("_", "/"),
+              profile: nm.profile,
+              dir: nm.direction,
+              reason: nm.reason,
+              rr: +nm.rawRR.toFixed(2),
+              spread: +nm.spreadPips.toFixed(1),
+              risk: +nm.riskPips.toFixed(1),
+              atr: +nm.atrPips.toFixed(1),
+            })),
         },
       )
       console.log(`[ai-trader] Tier 1 found ${allSignals.length} candidates`)
@@ -1157,7 +1166,11 @@ export class AiTraderScanner {
     // ─── Pre-Tier-3 Gate: check constraints (not confidence) ──────────
     const hasExistingPosition = (inst: string) => {
       const positions = this.positionManager.getPositions()
-      return positions.open.some((t) => t.instrument === inst)
+      // Check both open trades AND pending orders to prevent duplicate placements
+      return (
+        positions.open.some((t) => t.instrument === inst) ||
+        positions.pending.some((o) => o.instrument === inst)
+      )
     }
 
     const preTier3 = await this.executionGate.preTier3Check(

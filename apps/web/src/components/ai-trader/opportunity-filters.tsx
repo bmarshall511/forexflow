@@ -32,6 +32,18 @@ const STATUSES: { value: AiTraderOpportunityStatus; label: string }[] = [
   { value: "skipped", label: "Skipped" },
 ]
 
+const PROFILES: { value: AiTraderProfile; label: string }[] = [
+  { value: "scalper", label: "Scalper" },
+  { value: "intraday", label: "Intraday" },
+  { value: "swing", label: "Swing" },
+  { value: "news", label: "News" },
+]
+
+const DIRECTIONS: { value: TradeDirection; label: string }[] = [
+  { value: "long", label: "Long" },
+  { value: "short", label: "Short" },
+]
+
 const SORTS: { value: OpportunityFilterState["sort"]; label: string }[] = [
   { value: "detectedAt", label: "Date" },
   { value: "confidence", label: "Confidence" },
@@ -106,7 +118,7 @@ export function OpportunityFilters({ filters, onChange }: Props) {
         </select>
       </div>
 
-      {/* Status chips */}
+      {/* Filter chips: Status, Profile, Direction */}
       <div className="flex flex-wrap gap-1.5">
         {STATUSES.map((s) => {
           const active = filters.status.includes(s.value)
@@ -126,6 +138,51 @@ export function OpportunityFilters({ filters, onChange }: Props) {
             </button>
           )
         })}
+
+        <span className="border-border mx-0.5 border-l" />
+
+        {PROFILES.map((p) => {
+          const active = filters.profile === p.value
+          return (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => onChange({ ...filters, profile: active ? null : p.value })}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors",
+                active
+                  ? "border-blue-500/30 bg-blue-500/10 text-blue-600"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {p.label}
+            </button>
+          )
+        })}
+
+        <span className="border-border mx-0.5 border-l" />
+
+        {DIRECTIONS.map((d) => {
+          const active = filters.direction === d.value
+          return (
+            <button
+              key={d.value}
+              type="button"
+              onClick={() => onChange({ ...filters, direction: active ? null : d.value })}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors",
+                active
+                  ? d.value === "long"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                    : "border-red-500/30 bg-red-500/10 text-red-500"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {d.label}
+            </button>
+          )
+        })}
+
         {hasFilters && (
           <Button
             variant="ghost"

@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { AiTraderProfile, AiTraderTechnique } from "@fxflow/types"
 import { FOREX_PAIR_GROUPS } from "@fxflow/shared"
 import { Globe, TrendingUp, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { PairViabilityEntry } from "@/app/api/ai-trader/pair-viability/route"
 
 // ─── Labels ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +80,29 @@ interface AiTraderScanConfigProps {
   onSave: (updates: Record<string, unknown>) => void
 }
 
+/** Get best viability status across enabled profiles for a pair. */
+function getBestViability(
+  pair: string,
+  viability: PairViabilityEntry[],
+  enabledProfiles: Record<AiTraderProfile, boolean>,
+): "viable" | "marginal" | "blocked" | "unknown" {
+  const entries = viability.filter(
+    (v) => v.pair === pair && enabledProfiles[v.profile as AiTraderProfile],
+  )
+  if (entries.length === 0) return "unknown"
+  if (entries.some((e) => e.status === "viable")) return "viable"
+  if (entries.some((e) => e.status === "marginal")) return "marginal"
+  if (entries.some((e) => e.status === "unknown")) return "unknown"
+  return "blocked"
+}
+
+const VIABILITY_DOT: Record<string, { className: string; label: string }> = {
+  viable: { className: "bg-emerald-500", label: "Good spread/R:R for enabled profiles" },
+  marginal: { className: "bg-amber-500", label: "Tight margins — may be filtered" },
+  blocked: { className: "bg-red-500", label: "Spread too wide for enabled profiles" },
+  unknown: { className: "bg-muted-foreground/40", label: "No ATR data yet — needs first scan" },
+}
+
 export function AiTraderScanConfig({
   pairWhitelist,
   enabledProfiles,
@@ -86,6 +111,16 @@ export function AiTraderScanConfig({
   onSave,
 }: AiTraderScanConfigProps) {
   const [showPairPicker, setShowPairPicker] = useState(false)
+  const [viability, setViability] = useState<PairViabilityEntry[]>([])
+
+  useEffect(() => {
+    fetch("/api/ai-trader/pair-viability")
+      .then((r) => r.json())
+      .then((json: { ok: boolean; data?: PairViabilityEntry[] }) => {
+        if (json.ok && json.data) setViability(json.data)
+      })
+      .catch(() => {})
+  }, [])
 
   const toggleProfile = (profile: AiTraderProfile) => {
     const updated = { ...enabledProfiles, [profile]: !enabledProfiles[profile] }
@@ -168,22 +203,29 @@ export function AiTraderScanConfig({
           {/* Selected pairs */}
           {pairWhitelist.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {pairWhitelist.map((pair) => (
-                <span
-                  key={pair}
-                  className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
-                >
-                  {pair.replace("_", "/")}
-                  <button
-                    onClick={() => removePair(pair)}
-                    disabled={saving}
-                    className="hover:bg-primary/20 focus-visible:ring-ring ml-0.5 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-1"
-                    aria-label={`Remove ${pair.replace("_", "/")}`}
+              {pairWhitelist.map((pair) => {
+                const vs = getBestViability(pair, viability, enabledProfiles)
+                const dot = VIABILITY_DOT[vs]
+                return (
+                  <span
+                    key={pair}
+                    className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
                   >
-                    <X className="size-2.5" />
-                  </button>
-                </span>
-              ))}
+                    {viability.length > 0 && (
+                      <span className={cn("size-1.5 shrink-0 rounded-full", dot?.className)} />
+                    )}
+                    {pair.replace("_", "/")}
+                    <button
+                      onClick={() => removePair(pair)}
+                      disabled={saving}
+                      className="hover:bg-primary/20 focus-visible:ring-ring ml-0.5 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-1"
+                      aria-label={`Remove ${pair.replace("_", "/")}`}
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </span>
+                )
+              })}
             </div>
           )}
 
@@ -209,21 +251,44 @@ export function AiTraderScanConfig({
                   <div className="flex flex-wrap gap-1">
                     {group.pairs.map((pair) => {
                       const selected = pairWhitelist.includes(pair.value)
+                      const viabilityStatus = getBestViability(
+                        pair.value,
+                        viability,
+                        enabledProfiles,
+                      )
+                      const dot = VIABILITY_DOT[viabilityStatus]
                       return (
-                        <button
-                          key={pair.value}
-                          onClick={() => (selected ? removePair(pair.value) : addPair(pair.value))}
-                          disabled={saving}
-                          className={cn(
-                            "rounded-md px-2 py-1 text-xs font-medium transition-colors",
-                            "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-1",
-                            selected
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-background border-border hover:bg-muted border",
-                          )}
-                        >
-                          {pair.label}
-                        </button>
+                        <TooltipProvider key={pair.value} delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() =>
+                                  selected ? removePair(pair.value) : addPair(pair.value)
+                                }
+                                disabled={saving}
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                                  "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-1",
+                                  selected
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background border-border hover:bg-muted border",
+                                )}
+                              >
+                                {viability.length > 0 && (
+                                  <span
+                                    className={cn("size-1.5 shrink-0 rounded-full", dot?.className)}
+                                  />
+                                )}
+                                {pair.label}
+                              </button>
+                            </TooltipTrigger>
+                            {viability.length > 0 && dot && (
+                              <TooltipContent side="top" className="text-xs">
+                                {dot.label}
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                       )
                     })}
                   </div>

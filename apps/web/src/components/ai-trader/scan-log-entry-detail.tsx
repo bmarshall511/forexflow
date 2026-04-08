@@ -58,6 +58,50 @@ export function ScanLogEntryDetail({ entry }: ScanLogEntryDetailProps) {
               )}
             </div>
           )}
+        {/* Near-miss diagnostics: closest signals to passing */}
+        {entry.type === "pair_scanned" &&
+          Array.isArray(m?.nearMisses) &&
+          m.nearMisses.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+                Closest to passing
+              </p>
+              <div className="bg-muted/50 space-y-0.5 rounded-md px-2 py-1.5">
+                {(
+                  m.nearMisses as Array<{
+                    pair: string
+                    profile: string
+                    dir: string
+                    reason: string
+                    rr: number
+                    spread: number
+                    risk: number
+                    atr: number
+                  }>
+                ).map((nm, i) => (
+                  <div
+                    key={i}
+                    className="text-muted-foreground flex items-center gap-2 text-[11px]"
+                  >
+                    <span className="text-foreground w-16 shrink-0 font-medium">{nm.pair}</span>
+                    <span className="w-14 shrink-0 capitalize">{nm.profile}</span>
+                    <span
+                      className={`w-10 shrink-0 ${nm.dir === "long" ? "text-emerald-600" : "text-red-500"}`}
+                    >
+                      {nm.dir === "long" ? "BUY" : "SELL"}
+                    </span>
+                    <span className="shrink-0 tabular-nums">R:R {nm.rr}</span>
+                    <span className="shrink-0 tabular-nums">ATR {nm.atr}p</span>
+                    <span
+                      className={`ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium ${nm.reason === "spread" ? "bg-amber-500/10 text-amber-600" : "bg-red-500/10 text-red-500"}`}
+                    >
+                      {nm.reason === "spread" ? `spread ${nm.spread}p` : `R:R too low`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
       </div>
     )
   }

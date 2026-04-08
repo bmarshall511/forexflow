@@ -99,6 +99,13 @@ Every feature page follows this structure:
 - PWA manifest + service worker for installable mobile experience.
 - See `docs/dev/06-remote-access.md` for full architecture.
 
+## AI Trader (EdgeFinder) UI
+
+- **Manual approval workflow**: `OpportunityList` renders `OpportunityCard` (with Approve/Reject buttons) for opportunities with status `"suggested"`. All other statuses use `OpportunityCompactCard`. The list receives `operatingMode`, `confidenceThreshold`, and `onAction` props from the dashboard.
+- **Pair viability indicators**: `ai-trader-scan-config.tsx` pair picker shows colored viability dots next to each pair/profile combo — green (viable), amber (marginal), red (blocked), gray (unknown) — with tooltips. Data from `GET /api/ai-trader/pair-viability`.
+- **Near-miss diagnostics**: `scan-log-entry-detail.tsx` displays near-miss data for `pair_scanned` log entries, showing closest-to-passing signals with pair, profile, direction, R:R, ATR, and rejection reason.
+- **Opportunity filters**: `opportunity-filters.tsx` includes Profile (Scalper/Intraday/Swing/News) and Direction (Long/Short) filter chips in addition to existing filters.
+
 ## Naming
 
 - **EdgeFinder** is the user-facing display name for the AI Trader feature. Code uses `ai-trader` in paths, types, and DB models. UI shows "EdgeFinder" in titles and navigation.
