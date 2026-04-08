@@ -1,7 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { TradeSource, TradeFinderScoreBreakdown, AiTraderScoreBreakdown } from "@fxflow/types"
+import type {
+  TradeSource,
+  TradeFinderScoreBreakdown,
+  AiTraderScoreBreakdown,
+  AiTraderManagementAction,
+} from "@fxflow/types"
 import { SetupScoreBreakdown } from "@/components/trade-finder/setup-score-breakdown"
 import { StatRow } from "@/components/ui/price-card"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +20,14 @@ import {
   ShieldCheck,
   Scissors,
   TrendingUp,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  ClipboardList,
+  Target,
+  Activity,
+  Shield,
 } from "lucide-react"
 
 // ─── Types for API response ────────────────────────────────────────────────
@@ -33,6 +46,19 @@ interface TradeFinderContext {
   timeframeSet: string
 }
 
+interface AiTraderTechnicalSummary {
+  rsi: number | null
+  macd: { histogram: number } | null
+  adx: { adx: number; plusDI: number; minusDI: number } | null
+  ema20: number | null
+  ema50: number | null
+  ema200: number | null
+  atr: number | null
+  regime: string | null
+  isKillZone?: boolean
+  htfTrendBullish: boolean | null
+}
+
 interface AiTraderContext {
   confidence: number
   scores: AiTraderScoreBreakdown
@@ -41,12 +67,22 @@ interface AiTraderContext {
   session: string | null
   primaryTechnique: string | null
   entryRationale: string | null
+  riskAssessment: string | null
+  managementPlan: string | null
+  riskPips: number
+  rewardPips: number
+  positionSize: number
   tier2Model: string | null
   tier2Cost: number
   tier3Model: string | null
   tier3Cost: number
   riskRewardRatio: number
+  technicalSummary: AiTraderTechnicalSummary | null
+  managementLog: AiTraderManagementAction[]
   detectedAt: string
+  suggestedAt: string | null
+  placedAt: string | null
+  filledAt: string | null
 }
 
 interface TVAlertContext {
@@ -201,10 +237,38 @@ const AI_SCORE_LABELS: Record<string, string> = {
   confluence: "Multi-Signal Confluence",
 }
 
+const PROFILE_TIME_ESTIMATES: Record<string, string> = {
+  scalper: "< 8 hours",
+  intraday: "< 2 days",
+  swing: "1–7 days",
+  news: "< 4 hours",
+}
+
+const MGMT_ACTION_LABELS: Record<string, { label: string; icon: typeof ShieldCheck }> = {
+  breakeven: { label: "Breakeven", icon: ShieldCheck },
+  trailing_update: { label: "Trailing Stop", icon: TrendingUp },
+  partial_close: { label: "Partial Close", icon: Scissors },
+  adjust_sl: { label: "SL Adjusted", icon: Shield },
+  adjust_tp: { label: "TP Adjusted", icon: Target },
+  news_protection: { label: "News Protection", icon: AlertTriangle },
+  re_evaluate: { label: "Re-evaluated", icon: Brain },
+  close: { label: "Closed", icon: Activity },
+}
+
 function AiTraderPanel({ data }: { data: AiTraderContext }) {
+  const [showScores, setShowScores] = useState(false)
+  const [showTechnicals, setShowTechnicals] = useState(false)
   const totalCost = data.tier2Cost + data.tier3Cost
+
+  // Derive management status badges from log
+  const hasBreakeven = data.managementLog.some((a) => a.action === "breakeven")
+  const hasTrailing = data.managementLog.some((a) => a.action === "trailing_update")
+  const hasPartial = data.managementLog.some((a) => a.action === "partial_close")
+  const hasNewsProtection = data.managementLog.some((a) => a.action === "news_protection")
+
   return (
     <div className="space-y-3">
+      {/* ── Header: confidence badge ── */}
       <div className="flex items-center gap-2">
         <Brain className="size-4 text-indigo-500" />
         <span className="text-xs font-semibold">EdgeFinder Analysis</span>
@@ -223,46 +287,281 @@ function AiTraderPanel({ data }: { data: AiTraderContext }) {
         </Badge>
       </div>
 
+      {/* ── AI Reasoning: rationale, risk, management plan ── */}
       {data.entryRationale && (
-        <p className="text-muted-foreground text-[11px] italic leading-relaxed">
-          &ldquo;{data.entryRationale}&rdquo;
-        </p>
+        <div className="space-y-1.5">
+          <p className="text-muted-foreground text-[11px] italic leading-relaxed">
+            &ldquo;{data.entryRationale}&rdquo;
+          </p>
+          {data.riskAssessment && (
+            <div className="flex gap-1.5 text-[11px]">
+              <AlertTriangle className="mt-0.5 size-3 shrink-0 text-amber-500" />
+              <p className="text-muted-foreground leading-relaxed">{data.riskAssessment}</p>
+            </div>
+          )}
+          {data.managementPlan && (
+            <div className="flex gap-1.5 text-[11px]">
+              <ClipboardList className="mt-0.5 size-3 shrink-0 text-blue-500" />
+              <p className="text-muted-foreground leading-relaxed">{data.managementPlan}</p>
+            </div>
+          )}
+        </div>
       )}
 
+      {/* ── Trade parameters ── */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-        <StatRow label="Profile" value={data.profile} />
+        <StatRow label="Profile" value={<span className="capitalize">{data.profile}</span>} />
         <StatRow label="R:R" value={`${data.riskRewardRatio.toFixed(1)}:1`} />
-        {data.primaryTechnique && (
-          <StatRow label="Technique" value={data.primaryTechnique.replace(/_/g, " ")} />
+        <StatRow label="Risk" value={`${data.riskPips.toFixed(1)} pips`} />
+        <StatRow label="Reward" value={`${data.rewardPips.toFixed(1)} pips`} />
+        {data.positionSize > 0 && (
+          <StatRow label="Size" value={`${data.positionSize.toLocaleString()} units`} />
         )}
-        {data.regime && <StatRow label="Regime" value={data.regime} />}
-        {data.session && <StatRow label="Session" value={data.session} />}
-        <StatRow label="AI Cost" value={`$${totalCost.toFixed(4)}`} />
+        <StatRow label="Est. Duration" value={PROFILE_TIME_ESTIMATES[data.profile] ?? "—"} />
+        {data.primaryTechnique && (
+          <StatRow
+            label="Technique"
+            value={<span className="capitalize">{data.primaryTechnique.replace(/_/g, " ")}</span>}
+          />
+        )}
+        {data.regime && (
+          <StatRow
+            label="Regime"
+            value={<span className="capitalize">{data.regime.replace(/_/g, " ")}</span>}
+          />
+        )}
+        {data.session && (
+          <StatRow
+            label="Session"
+            value={<span className="capitalize">{data.session.replace(/_/g, " ")}</span>}
+          />
+        )}
       </div>
 
-      {/* Score breakdown */}
-      <div className="space-y-2">
-        <span className="text-muted-foreground text-[10px] font-medium">Score Breakdown</span>
-        {Object.entries(data.scores).map(([key, value]) => {
-          const pct = Math.round(value as number)
-          return (
-            <div key={key} className="space-y-0.5">
-              <div className="flex items-center justify-between text-[10px]">
-                <span>{AI_SCORE_LABELS[key] ?? key}</span>
-                <span className="text-muted-foreground font-mono tabular-nums">{pct}/100</span>
-              </div>
-              <div className="bg-muted h-1 overflow-hidden rounded-full">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-amber-500" : "bg-orange-500",
+      {/* ── Management status badges ── */}
+      {data.managementLog.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {hasBreakeven && (
+            <Badge
+              variant="outline"
+              className="border-green-500/20 bg-green-500/5 px-1.5 py-0 text-[10px] text-green-600 dark:text-green-400"
+            >
+              <ShieldCheck className="mr-1 size-3" />
+              Breakeven
+            </Badge>
+          )}
+          {hasTrailing && (
+            <Badge
+              variant="outline"
+              className="border-blue-500/20 bg-blue-500/5 px-1.5 py-0 text-[10px] text-blue-600 dark:text-blue-400"
+            >
+              <TrendingUp className="mr-1 size-3" />
+              Trailing
+            </Badge>
+          )}
+          {hasPartial && (
+            <Badge
+              variant="outline"
+              className="border-purple-500/20 bg-purple-500/5 px-1.5 py-0 text-[10px] text-purple-600 dark:text-purple-400"
+            >
+              <Scissors className="mr-1 size-3" />
+              Partial Close
+            </Badge>
+          )}
+          {hasNewsProtection && (
+            <Badge
+              variant="outline"
+              className="border-amber-500/20 bg-amber-500/5 px-1.5 py-0 text-[10px] text-amber-600 dark:text-amber-400"
+            >
+              <AlertTriangle className="mr-1 size-3" />
+              News Protected
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {/* ── Recent management activity ── */}
+      {data.managementLog.length > 0 && (
+        <div className="space-y-1">
+          <span className="text-muted-foreground text-[10px] font-medium">Management Activity</span>
+          {data.managementLog.map((entry, i) => {
+            const meta = MGMT_ACTION_LABELS[entry.action]
+            return (
+              <div
+                key={i}
+                className="text-muted-foreground flex items-center justify-between text-[10px]"
+              >
+                <span className="flex items-center gap-1">
+                  {meta && <meta.icon className="size-2.5" />}
+                  <span>{meta?.label ?? entry.action}</span>
+                  {entry.detail && (
+                    <span className="max-w-[160px] truncate opacity-70">— {entry.detail}</span>
                   )}
-                  style={{ width: `${pct}%` }}
-                />
+                </span>
+                <span className="font-mono tabular-nums">
+                  {new Date(entry.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
               </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Score breakdown (collapsible) ── */}
+      <button
+        type="button"
+        onClick={() => setShowScores(!showScores)}
+        className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1 text-[10px] font-medium"
+      >
+        {showScores ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+        Score Breakdown
+      </button>
+      {showScores && (
+        <div className="space-y-2">
+          {Object.entries(data.scores).map(([key, value]) => {
+            const pct = Math.round(value as number)
+            return (
+              <div key={key} className="space-y-0.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span>{AI_SCORE_LABELS[key] ?? key}</span>
+                  <span className="text-muted-foreground font-mono tabular-nums">{pct}/100</span>
+                </div>
+                <div className="bg-muted h-1 overflow-hidden rounded-full">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-amber-500" : "bg-orange-500",
+                    )}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Technical snapshot (collapsible) ── */}
+      {data.technicalSummary && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowTechnicals(!showTechnicals)}
+            className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1 text-[10px] font-medium"
+          >
+            {showTechnicals ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            Market Snapshot at Entry
+          </button>
+          {showTechnicals && <AiTraderTechSummary snap={data.technicalSummary} />}
+        </>
+      )}
+
+      {/* ── Pipeline timeline ── */}
+      <AiTraderTimeline data={data} />
+
+      {/* ── AI cost footer ── */}
+      <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[10px]">
+        <span>AI Cost: ${totalCost.toFixed(4)}</span>
+        <span className="font-mono tabular-nums">
+          {data.tier2Model?.split("-").slice(-2).join("-") ?? "haiku"} →{" "}
+          {data.tier3Model?.split("-").slice(-2).join("-") ?? "sonnet"}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Condensed technical snapshot at entry time */
+function AiTraderTechSummary({ snap }: { snap: AiTraderTechnicalSummary }) {
+  const emaAligned =
+    snap.ema20 !== null && snap.ema50 !== null && snap.ema200 !== null
+      ? snap.ema20 > snap.ema50 && snap.ema50 > snap.ema200
+        ? "Bullish (20 > 50 > 200)"
+        : snap.ema20 < snap.ema50 && snap.ema50 < snap.ema200
+          ? "Bearish (20 < 50 < 200)"
+          : "Mixed"
+      : null
+
+  const macdDir =
+    snap.macd?.histogram !== undefined ? (snap.macd.histogram > 0 ? "Bullish" : "Bearish") : null
+
+  return (
+    <div className="bg-muted/40 grid grid-cols-2 gap-x-6 gap-y-1 rounded-md px-3 py-2 text-xs">
+      {snap.rsi !== null && (
+        <StatRow
+          label="RSI(14)"
+          value={
+            <span
+              className={cn(snap.rsi > 70 ? "text-red-500" : snap.rsi < 30 ? "text-green-500" : "")}
+            >
+              {snap.rsi.toFixed(1)}
+            </span>
+          }
+        />
+      )}
+      {macdDir && <StatRow label="MACD" value={macdDir} />}
+      {snap.adx && (
+        <StatRow
+          label="ADX"
+          value={`${snap.adx.adx.toFixed(0)} (${snap.adx.adx > 25 ? "Trending" : "Weak"})`}
+        />
+      )}
+      {emaAligned && <StatRow label="EMA Stack" value={emaAligned} />}
+      {snap.atr !== null && <StatRow label="ATR(14)" value={snap.atr.toFixed(5)} />}
+      {snap.htfTrendBullish !== null && (
+        <StatRow label="HTF Trend" value={snap.htfTrendBullish ? "Bullish" : "Bearish"} />
+      )}
+      {snap.isKillZone && (
+        <StatRow label="Kill Zone" value={<span className="text-amber-500">Active</span>} />
+      )}
+    </div>
+  )
+}
+
+/** Pipeline timeline: detected → suggested → placed → filled */
+function AiTraderTimeline({ data }: { data: AiTraderContext }) {
+  const steps = [
+    { label: "Detected", time: data.detectedAt },
+    { label: "Suggested", time: data.suggestedAt },
+    { label: "Placed", time: data.placedAt },
+    { label: "Filled", time: data.filledAt },
+  ].filter((s) => s.time !== null) as { label: string; time: string }[]
+
+  if (steps.length <= 1) return null
+
+  const totalMs =
+    new Date(steps[steps.length - 1]!.time).getTime() - new Date(steps[0]!.time).getTime()
+
+  return (
+    <div className="space-y-1">
+      <div className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium">
+        <Clock className="size-3" />
+        Pipeline (
+        {totalMs < 60_000
+          ? `${(totalMs / 1000).toFixed(0)}s`
+          : `${Math.floor(totalMs / 60_000)}m ${Math.round((totalMs % 60_000) / 1000)}s`}
+        )
+      </div>
+      <div className="flex items-center gap-1">
+        {steps.map((step, i) => (
+          <div key={step.label} className="flex items-center gap-1">
+            <div className="text-center">
+              <div className="bg-primary mx-auto size-1.5 rounded-full" />
+              <p className="text-muted-foreground mt-0.5 text-[9px]">{step.label}</p>
+              <p className="font-mono text-[9px] tabular-nums">
+                {new Date(step.time).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </p>
             </div>
-          )
-        })}
+            {i < steps.length - 1 && <div className="bg-border mb-3 h-px w-4 shrink-0" />}
+          </div>
+        ))}
       </div>
     </div>
   )

@@ -53,6 +53,40 @@ export async function GET(
     if (source === "ai_trader" || source === "ai_trader_manual") {
       const opp = await findOpportunityByResultSourceId(sourceTradeId)
       if (!opp) return apiSuccess({ source, found: false })
+
+      // Parse tier3Response to extract riskAssessment and managementPlan
+      let riskAssessment: string | null = null
+      let managementPlan: string | null = null
+      if (opp.tier3Response) {
+        try {
+          const tier3 = JSON.parse(opp.tier3Response) as {
+            riskAssessment?: string
+            managementPlan?: string
+          }
+          riskAssessment = tier3.riskAssessment ?? null
+          managementPlan = tier3.managementPlan ?? null
+        } catch {
+          // tier3Response may not be valid JSON
+        }
+      }
+
+      // Extract condensed technical snapshot
+      const snap = opp.technicalSnapshot as Record<string, unknown> | null
+      const technicalSummary = snap
+        ? {
+            rsi: snap.rsi as number | null,
+            macd: snap.macd as { histogram: number } | null,
+            adx: snap.adx as { adx: number; plusDI: number; minusDI: number } | null,
+            ema20: snap.ema20 as number | null,
+            ema50: snap.ema50 as number | null,
+            ema200: snap.ema200 as number | null,
+            atr: snap.atr as number | null,
+            regime: snap.regime as string | null,
+            isKillZone: snap.isKillZone as boolean | undefined,
+            htfTrendBullish: snap.htfTrendBullish as boolean | null,
+          }
+        : null
+
       return apiSuccess({
         source,
         found: true,
@@ -64,12 +98,22 @@ export async function GET(
           session: opp.session,
           primaryTechnique: opp.primaryTechnique,
           entryRationale: opp.entryRationale,
+          riskAssessment,
+          managementPlan,
+          riskPips: opp.riskPips,
+          rewardPips: opp.rewardPips,
+          positionSize: opp.positionSize,
           tier2Model: opp.tier2Model,
           tier2Cost: opp.tier2Cost,
           tier3Model: opp.tier3Model,
           tier3Cost: opp.tier3Cost,
           riskRewardRatio: opp.riskRewardRatio,
+          technicalSummary,
+          managementLog: opp.managementLog.slice(-10),
           detectedAt: opp.detectedAt,
+          suggestedAt: opp.suggestedAt,
+          placedAt: opp.placedAt,
+          filledAt: opp.filledAt,
         },
       })
     }
