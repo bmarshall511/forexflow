@@ -7,9 +7,16 @@ import { formatRelativeTime } from "@fxflow/shared"
 import { SectionCard, DetailRow } from "@/components/ui/section-card"
 import { SetupScoreBreakdown } from "@/components/trade-finder/setup-score-breakdown"
 import { ScoreGauge } from "./score-gauge"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { Search, TrendingUp, TrendingDown, Minus, ChevronDown, ExternalLink } from "lucide-react"
 import Link from "next/link"
+import {
+  deriveManagementPhase,
+  getEstimatedHoldTime,
+  toConfidencePct,
+  TF_MGMT_ACTION_LABELS,
+} from "@/lib/trade-finder-display"
 
 interface SetupAnalysisSectionProps {
   setup: TradeFinderSetupData
@@ -171,6 +178,8 @@ function ContextItem({
 
 export function SetupAnalysisSection({ setup }: SetupAnalysisSectionProps) {
   const [showScores, setShowScores] = useState(false)
+  const confidencePct = toConfidencePct(setup.scores.total, setup.scores.maxPossible)
+  const phase = deriveManagementPhase(setup.breakevenMoved, setup.partialTaken, setup.managementLog)
 
   const metadata = useMemo(() => {
     const items: { label: string; value: string }[] = [
@@ -192,6 +201,7 @@ export function SetupAnalysisSection({ setup }: SetupAnalysisSectionProps) {
 
     items.push(
       { label: "Timeframe Set", value: setup.timeframeSet },
+      { label: "Est. Hold Time", value: getEstimatedHoldTime(setup.timeframeSet) },
       { label: "Risk", value: `${setup.riskPips.toFixed(1)} pips` },
       { label: "Reward", value: `${setup.rewardPips.toFixed(1)} pips` },
       { label: "Position Size", value: setup.positionSize.toLocaleString() + " units" },
@@ -207,10 +217,21 @@ export function SetupAnalysisSection({ setup }: SetupAnalysisSectionProps) {
       helper="The Trade Finder analysis snapshot from when this setup was detected."
     >
       <div className="space-y-3">
-        {/* Header: gauge + thesis + link */}
+        {/* Header: gauge + confidence + phase + thesis + link */}
         <div className="flex gap-3">
           <ScoreGauge score={setup.scores.total} max={setup.scores.maxPossible} />
-          <div className="min-w-0 flex-1 space-y-1">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-foreground text-xs font-semibold tabular-nums">
+                {confidencePct}% confidence
+              </span>
+              <Badge
+                variant="outline"
+                className={cn("px-1.5 py-0 text-[10px]", phase.border, phase.bg, phase.color)}
+              >
+                {phase.label}
+              </Badge>
+            </div>
             <TradeThesis setup={setup} />
             <Link
               href="/trade-finder"
@@ -231,6 +252,34 @@ export function SetupAnalysisSection({ setup }: SetupAnalysisSectionProps) {
             <DetailRow key={m.label} label={m.label} value={m.value} />
           ))}
         </div>
+
+        {/* Management activity log */}
+        {setup.managementLog.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+              Management Activity
+            </span>
+            {setup.managementLog.slice(-5).map((entry, i) => (
+              <div
+                key={`${entry.timestamp}-${i}`}
+                className="text-muted-foreground flex items-start justify-between gap-2 text-[10px]"
+              >
+                <span className="min-w-0">
+                  <span className="text-foreground font-medium">
+                    {TF_MGMT_ACTION_LABELS[entry.action] ?? entry.action}
+                  </span>
+                  {entry.detail && <span> — {entry.detail}</span>}
+                </span>
+                <span className="shrink-0 font-mono tabular-nums">
+                  {new Date(entry.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Score breakdown (collapsible) */}
         <button

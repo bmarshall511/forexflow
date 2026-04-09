@@ -101,6 +101,7 @@ src/
 - Auto-trade events ring buffer (max 50) exposed via `GET /trade-finder/auto-trade-events`.
 - Circuit breaker state: `GET /trade-finder/circuit-breaker` + `POST /actions/trade-finder/reset-circuit-breaker`.
 - Cap utilization: `GET /trade-finder/caps` endpoint + `trade_finder_cap_utilization` WS message.
+- **Management log**: Trade manager appends structured `TradeFinderManagementAction` entries to `TradeFinderSetup.managementLog` JSON column via `appendTradeFinderManagementLog()` for every action (breakeven, partial_close, thirds_partial, trailing_update, time_exit). Surfaced in trade detail UI.
 
 ## AI Trader
 

@@ -2640,8 +2640,23 @@ export interface TradeFinderSetupData {
   breakevenMoved: boolean
   /** Whether partial profit has been taken */
   partialTaken: boolean
+  /** Structured management log entries (chronological) */
+  managementLog: TradeFinderManagementAction[]
   /** Queue position when eligible but capped (null = not queued, 1 = next to be placed) */
   queuePosition: number | null
+}
+
+/** A single management action taken by the Trade Finder trade manager */
+export interface TradeFinderManagementAction {
+  action: "breakeven" | "partial_close" | "trailing_update" | "time_exit" | "thirds_partial"
+  /** Human-readable description of the action */
+  detail: string
+  /** Previous SL value (if action moved the stop loss) */
+  previousValue?: number
+  /** New SL value (if action moved the stop loss) */
+  newValue?: number
+  /** ISO timestamp when the action was taken */
+  timestamp: string
 }
 
 /** Auto-trade cap utilization snapshot */

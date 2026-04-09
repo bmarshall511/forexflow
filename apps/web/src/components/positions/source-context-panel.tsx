@@ -4,9 +4,24 @@ import { useEffect, useState } from "react"
 import type {
   TradeSource,
   TradeFinderScoreBreakdown,
+  TradeFinderManagementAction,
+  TradeFinderTimeframeSet,
   AiTraderScoreBreakdown,
   AiTraderManagementAction,
+  TrendData,
+  CurveData,
+  ZoneData,
+  TradeDirection,
 } from "@fxflow/types"
+import {
+  deriveManagementPhase,
+  getEstimatedHoldTime,
+  toConfidencePct,
+  getConfidenceColor,
+  buildThesis,
+  TF_MGMT_ACTION_LABELS,
+  FORMATION_LABELS,
+} from "@/lib/trade-finder-display"
 import { SetupScoreBreakdown } from "@/components/trade-finder/setup-score-breakdown"
 import { StatRow } from "@/components/ui/price-card"
 import { Badge } from "@/components/ui/badge"
@@ -36,14 +51,21 @@ interface TradeFinderContext {
   scoreTotal: number
   maxPossible: number
   scores: TradeFinderScoreBreakdown
+  zone: ZoneData
   rrRatio: string
+  riskPips: number
+  rewardPips: number
+  direction: TradeDirection
+  trendData: TrendData | null
+  curveData: CurveData | null
   autoPlaced: boolean
   confirmationPattern: string | null
   breakevenMoved: boolean
   partialTaken: boolean
+  managementLog: TradeFinderManagementAction[]
   detectedAt: string
   placedAt: string | null
-  timeframeSet: string
+  timeframeSet: TradeFinderTimeframeSet
 }
 
 interface AiTraderTechnicalSummary {
@@ -169,39 +191,68 @@ function useSourceContext(
 // ─── Sub-panels ────────────────────────────────────────────────────────────
 
 function TradeFinderPanel({ data }: { data: TradeFinderContext }) {
-  const pct = data.maxPossible > 0 ? Math.round((data.scoreTotal / data.maxPossible) * 100) : 0
+  const pct = toConfidencePct(data.scoreTotal, data.maxPossible)
+  const phase = deriveManagementPhase(data.breakevenMoved, data.partialTaken, data.managementLog)
+  const thesis = buildThesis({
+    zone: data.zone,
+    timeframeSet: data.timeframeSet,
+    direction: data.direction,
+    trendData: data.trendData,
+    curveData: data.curveData,
+  })
+  const zoneLabel = `${data.zone.formation} ${data.zone.type}`
+  const zoneTitle = FORMATION_LABELS[data.zone.formation] ?? data.zone.formation
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      {/* Header: icon + label + confidence + phase */}
+      <div className="flex flex-wrap items-center gap-2">
         <Search className="size-4 text-teal-500" />
         <span className="text-xs font-semibold">Trade Finder Setup</span>
-        <Badge
-          variant="outline"
-          className={cn(
-            "ml-auto px-1.5 py-0 font-mono text-[10px] font-bold tabular-nums",
-            pct >= 80
-              ? "border-green-500/30 bg-green-500/10 text-green-500"
-              : pct >= 60
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
-                : "border-orange-500/30 bg-orange-500/10 text-orange-500",
-          )}
-        >
-          {data.scoreTotal}/{data.maxPossible} ({pct}%)
-        </Badge>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Badge
+            variant="outline"
+            className={cn(
+              "px-1.5 py-0 font-mono text-[10px] font-bold tabular-nums",
+              getConfidenceColor(pct),
+            )}
+          >
+            {pct}% confidence
+          </Badge>
+          <Badge
+            variant="outline"
+            className={cn("px-1.5 py-0 text-[10px]", phase.border, phase.bg, phase.color)}
+          >
+            {phase.label}
+          </Badge>
+        </div>
       </div>
 
+      {/* Trade thesis */}
+      <p className="text-muted-foreground text-[11px] leading-relaxed" title={zoneTitle}>
+        {thesis}
+      </p>
+
+      {/* Stat grid */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-        <StatRow label="Timeframe Set" value={data.timeframeSet} />
+        <StatRow label="Score" value={`${data.scoreTotal}/${data.maxPossible}`} />
+        <StatRow label="Zone" value={zoneLabel} />
+        <StatRow label="Timeframe" value={data.timeframeSet} />
         <StatRow label="R:R" value={data.rrRatio} />
+        <StatRow
+          label="Risk / Reward"
+          value={`${data.riskPips.toFixed(1)} / ${data.rewardPips.toFixed(1)}p`}
+        />
+        <StatRow label="Est. Hold" value={getEstimatedHoldTime(data.timeframeSet)} />
         {data.confirmationPattern && (
-          <StatRow label="Confirmation" value={data.confirmationPattern.replace("_", " ")} />
+          <StatRow label="Confirmation" value={data.confirmationPattern.replace(/_/g, " ")} />
         )}
         {data.autoPlaced && <StatRow label="Placement" value="Automatic" />}
       </div>
 
-      {/* Management status */}
+      {/* Management status badges */}
       {(data.breakevenMoved || data.partialTaken) && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {data.breakevenMoved && (
             <Badge
               variant="outline"
@@ -223,7 +274,39 @@ function TradeFinderPanel({ data }: { data: TradeFinderContext }) {
         </div>
       )}
 
+      {/* Management activity log */}
+      {data.managementLog.length > 0 && <TradeFinderManagementLog entries={data.managementLog} />}
+
       <SetupScoreBreakdown scores={data.scores} />
+    </div>
+  )
+}
+
+function TradeFinderManagementLog({ entries }: { entries: TradeFinderManagementAction[] }) {
+  return (
+    <div className="space-y-1">
+      <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+        Management Activity
+      </span>
+      {entries.map((entry, i) => (
+        <div
+          key={`${entry.timestamp}-${i}`}
+          className="text-muted-foreground flex items-start justify-between gap-2 text-[10px]"
+        >
+          <span className="min-w-0">
+            <span className="text-foreground font-medium">
+              {TF_MGMT_ACTION_LABELS[entry.action] ?? entry.action}
+            </span>
+            {entry.detail && <span> — {entry.detail}</span>}
+          </span>
+          <span className="shrink-0 font-mono tabular-nums">
+            {new Date(entry.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

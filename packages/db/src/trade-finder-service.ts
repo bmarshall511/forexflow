@@ -14,6 +14,7 @@ import type {
   TradeFinderSetupStatus,
   TradeFinderScoreBreakdown,
   TradeFinderTimeframeSet,
+  TradeFinderManagementAction,
   TradeDirection,
   ZoneData,
   TrendData,
@@ -64,6 +65,9 @@ function toSetupData(row: {
   const zone = JSON.parse(row.zoneJson) as ZoneData
   const trendData = row.trendJson ? (JSON.parse(row.trendJson) as TrendData) : null
   const curveData = row.curveJson ? (JSON.parse(row.curveJson) as CurveData) : null
+  const managementLog: TradeFinderManagementAction[] = row.managementLog
+    ? (JSON.parse(row.managementLog) as TradeFinderManagementAction[])
+    : []
 
   return {
     id: row.id,
@@ -93,6 +97,7 @@ function toSetupData(row: {
     confirmationCandlesWaited: row.confirmationCandlesWaited,
     breakevenMoved: row.breakevenMoved,
     partialTaken: row.partialTaken,
+    managementLog,
     queuePosition: null, // Computed at runtime by the daemon scanner
   }
 }
@@ -248,6 +253,28 @@ export async function updateSetupManagement(
   await db.tradeFinderSetup.update({
     where: { id },
     data: { ...data, lastUpdatedAt: new Date() },
+  })
+}
+
+/**
+ * Append a structured management action entry to a Trade Finder setup's log.
+ * Reads the current log, pushes the new entry, and writes back atomically.
+ */
+export async function appendTradeFinderManagementLog(
+  id: string,
+  entry: TradeFinderManagementAction,
+): Promise<void> {
+  const row = await db.tradeFinderSetup.findUnique({
+    where: { id },
+    select: { managementLog: true },
+  })
+  const log: TradeFinderManagementAction[] = row?.managementLog
+    ? (JSON.parse(row.managementLog) as TradeFinderManagementAction[])
+    : []
+  log.push(entry)
+  await db.tradeFinderSetup.update({
+    where: { id },
+    data: { managementLog: JSON.stringify(log), lastUpdatedAt: new Date() },
   })
 }
 

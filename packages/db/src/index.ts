@@ -254,6 +254,7 @@ export {
   clearActiveSetups,
   clearSetupHistory,
   updateSetupManagement,
+  appendTradeFinderManagementLog,
   getFilledSetups,
   updateSetupConfirmation,
   updateSetupConfirmationWait,
@@ -443,6 +444,7 @@ export {
 export {
   getSmartFlowOpportunities,
   getSmartFlowOpportunity,
+  getSmartFlowOpportunityByConfigId,
   countTodaySmartFlowOpportunities,
   createSmartFlowOpportunity,
   updateSmartFlowOpportunityStatus,

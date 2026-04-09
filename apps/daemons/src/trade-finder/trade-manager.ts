@@ -22,6 +22,7 @@ import {
   findSetupByResultSourceId,
   findPlacedSetupByInstrumentDirection,
   updateSetupManagement,
+  appendTradeFinderManagementLog,
   getFilledSetups,
 } from "@fxflow/db"
 import { getPipSize, getDecimalPlaces } from "@fxflow/shared"
@@ -242,6 +243,12 @@ export class TradeFinderTradeManager {
             await this.modifyTradeFn(managed.sourceTradeId, roundedSL, undefined)
           }
           managed.lastModifiedAt = Date.now()
+          await appendTradeFinderManagementLog(setup.id, {
+            action: "thirds_partial",
+            detail: `2nd partial: ${unitsToClose} units, SL → ${roundedSL.toFixed(decimals)} (1R)`,
+            newValue: roundedSL,
+            timestamp: new Date().toISOString(),
+          })
           console.log(
             `[trade-finder-mgr] THIRDS 2nd PARTIAL: ${setup.instrument} closed ${unitsToClose} units, SL → ${roundedSL.toFixed(decimals)} (1R)`,
           )
@@ -270,7 +277,7 @@ export class TradeFinderTradeManager {
       const candleMinutes = this.getCandleMinutes(setup.timeframeSet)
       const candlesHeld = holdMinutes / candleMinutes
       if (candlesHeld >= config.timeExitCandles) {
-        await this.timeBasedExit(managed, trade)
+        await this.timeBasedExit(managed, trade, config.timeExitCandles)
         return
       }
     }
@@ -301,6 +308,13 @@ export class TradeFinderTradeManager {
       managed.setup = { ...setup, breakevenMoved: true }
       managed.lastModifiedAt = Date.now()
       await updateSetupManagement(setup.id, { breakevenMoved: true })
+      await appendTradeFinderManagementLog(setup.id, {
+        action: "breakeven",
+        detail: `SL moved to ${roundedSL.toFixed(decimals)}`,
+        previousValue: trade.stopLoss ?? undefined,
+        newValue: roundedSL,
+        timestamp: new Date().toISOString(),
+      })
 
       console.log(
         `[trade-finder-mgr] BREAKEVEN: ${setup.instrument} SL → ${roundedSL.toFixed(decimals)}`,
@@ -336,6 +350,11 @@ export class TradeFinderTradeManager {
       managed.setup = { ...setup, partialTaken: true }
       managed.lastModifiedAt = Date.now()
       await updateSetupManagement(setup.id, { partialTaken: true })
+      await appendTradeFinderManagementLog(setup.id, {
+        action: "partial_close",
+        detail: `Closed ${unitsToClose} units (${config.partialClosePercent}%) at ${config.partialCloseRR}:1 R:R`,
+        timestamp: new Date().toISOString(),
+      })
 
       console.log(
         `[trade-finder-mgr] PARTIAL: ${setup.instrument} closed ${unitsToClose} units (${config.partialClosePercent}%)`,
@@ -380,6 +399,13 @@ export class TradeFinderTradeManager {
     try {
       await this.modifyTradeFn(managed.sourceTradeId, roundedSL, undefined)
       managed.lastModifiedAt = Date.now()
+      await appendTradeFinderManagementLog(setup.id, {
+        action: "trailing_update",
+        detail: `Trailing SL → ${roundedSL.toFixed(decimals)}`,
+        previousValue: trade.stopLoss ?? undefined,
+        newValue: roundedSL,
+        timestamp: new Date().toISOString(),
+      })
 
       console.log(
         `[trade-finder-mgr] TRAIL: ${setup.instrument} SL → ${roundedSL.toFixed(decimals)}`,
@@ -389,7 +415,11 @@ export class TradeFinderTradeManager {
     }
   }
 
-  private async timeBasedExit(managed: ManagedTrade, _trade: OpenTradeData): Promise<void> {
+  private async timeBasedExit(
+    managed: ManagedTrade,
+    _trade: OpenTradeData,
+    maxCandles: number,
+  ): Promise<void> {
     if (!this.closeTradeFn) return
 
     const { setup } = managed
@@ -399,6 +429,11 @@ export class TradeFinderTradeManager {
         undefined, // Full close
         "Trade Finder time-based exit — no progress",
       )
+      await appendTradeFinderManagementLog(setup.id, {
+        action: "time_exit",
+        detail: `Closed after ${maxCandles} candles — no progress`,
+        timestamp: new Date().toISOString(),
+      })
       this.managedTrades.delete(managed.sourceTradeId)
 
       console.log(`[trade-finder-mgr] TIME EXIT: ${setup.instrument} closed — no progress`)
