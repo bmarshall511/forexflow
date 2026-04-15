@@ -68,7 +68,19 @@ export function useAiTrader(): UseAiTraderReturn {
       }
       if (logRes.ok) {
         const json = (await logRes.json()) as { ok: boolean; data?: AiTraderScanLogEntry[] }
-        if (json.ok && json.data) setScanLog(json.data)
+        if (json.ok && json.data) {
+          // Merge REST entries with any WS entries already in state, deduped
+          // on id. REST is the authoritative snapshot for older entries, WS
+          // is the authoritative source for newer ones — the simple union
+          // by id preserves both without triggering the duplicate-key error.
+          const incoming = json.data
+          setScanLog((prev) => {
+            const seen = new Set(incoming.map((e) => e.id))
+            const wsOnly = prev.filter((e) => !seen.has(e.id))
+            const merged = [...incoming, ...wsOnly]
+            return merged.length > 100 ? merged.slice(-100) : merged
+          })
+        }
       }
       if (configRes.ok) {
         const json = (await configRes.json()) as {
@@ -113,6 +125,12 @@ export function useAiTrader(): UseAiTraderReturn {
   useEffect(() => {
     if (!lastAiTraderScanLogEntry) return
     setScanLog((prev) => {
+      // Dedupe: the initial REST fetch and the WS `ai_trader_scan_log_entry`
+      // broadcast can deliver the same entry twice if the daemon emits it
+      // between the REST response and the WS subscription. React then throws
+      // "two children with the same key" in ScanActivityLog. Skip if we
+      // already have the id.
+      if (prev.some((e) => e.id === lastAiTraderScanLogEntry.id)) return prev
       const updated = [...prev, lastAiTraderScanLogEntry]
       if (updated.length > 100) return updated.slice(-100)
       return updated
