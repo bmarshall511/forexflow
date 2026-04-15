@@ -26,6 +26,7 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
       const {
         scannerEnabled,
         scanning,
+        hasScanHistory,
         lastScanAt,
         nextScanAt,
         found,
@@ -39,11 +40,20 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
       let line2: string | undefined
       let variant: SidebarStatus["variant"] = "default"
 
+      // Label ladder:
+      //   1. error            → "Something went wrong"
+      //   2. scanner disabled → "Scanner disabled" (user explicitly turned it off)
+      //   3. circuit breaker  → pauseReason
+      //   4. scanning now     → "Scanning markets..."
+      //   5. countdown        → "Scans again in Xm"
+      //   6. last scan        → "Scanned Xm ago"
+      //   7. no history yet   → "Starting scanner..."
+      //   8. default          → "Ready"
       if (error) {
         line1 = "Something went wrong"
         variant = "error"
       } else if (!scannerEnabled) {
-        line1 = "Scanner off"
+        line1 = "Scanner disabled"
         variant = "default"
       } else if (paused) {
         line1 = pauseReason ?? "Paused"
@@ -55,8 +65,10 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
         line1 = `Scans again in ${formatCountdown(nextScanAt)}`
       } else if (lastScanAt) {
         line1 = `Scanned ${formatTimeAgo(lastScanAt)}`
+      } else if (!hasScanHistory) {
+        line1 = "Starting scanner..."
       } else {
-        line1 = "Ready"
+        line1 = "Waiting for next scan"
       }
 
       if (activeTrades > 0) {
@@ -252,8 +264,16 @@ function useTradeFinderNavData() {
 /** Gathers SmartFlow scanner data for the sidebar nav status. */
 function useSmartFlowNavData() {
   const [data, setData] = useState<{
+    /**
+     * User-configured scanner toggle from `SmartFlowSettings.scannerEnabled`.
+     * Distinct from transient scan activity — the scanner can be enabled
+     * and simply idle between scan cycles.
+     */
     scannerEnabled: boolean
+    /** Whether the scanner is actively working right now. */
     scanning: boolean
+    /** Whether we have ever received scan progress data from the daemon. */
+    hasScanHistory: boolean
     lastScanAt: string | null
     nextScanAt: string | null
     found: number
@@ -269,53 +289,79 @@ function useSmartFlowNavData() {
     mountedRef.current = true
     const fetchData = async () => {
       try {
-        const res = await fetch("/api/daemon/smart-flow/scanner/status")
-        if (!res.ok || !mountedRef.current) return
-        const json = (await res.json()) as {
-          ok: boolean
-          progress: {
-            phase: string
-            lastScanAt: string | null
-            nextScanAt: string | null
-            opportunitiesFound: number
-            opportunitiesPlaced: number
-          } | null
-          circuitBreaker: { paused: boolean; reason: string | null } | null
-        }
-        if (!json.ok || !mountedRef.current) return
+        // Pull scanner runtime state, user-configured settings, and active
+        // trade count in parallel. User settings are the source of truth for
+        // "is the scanner enabled" — the runtime status only tells us what
+        // the scanner is doing RIGHT NOW (which is often "idle between scans"
+        // even when the user has it turned on).
+        const [runtimeRes, settingsRes, tradesRes] = await Promise.all([
+          fetch("/api/daemon/smart-flow/scanner/status"),
+          fetch("/api/smart-flow/settings"),
+          fetch("/api/smart-flow/trades"),
+        ])
+        if (!mountedRef.current) return
 
-        // Also fetch active trade count
-        let activeTrades = 0
-        try {
-          const tradesRes = await fetch("/api/smart-flow/trades")
-          if (tradesRes.ok) {
-            const tradesJson = (await tradesRes.json()) as {
-              ok: boolean
-              data?: Array<{ status: string }>
-            }
-            if (tradesJson.ok && tradesJson.data) {
-              activeTrades = tradesJson.data.filter(
-                (t) => t.status !== "closed" && t.status !== "waiting_entry",
-              ).length
-            }
+        type RuntimeProgress = {
+          phase: string
+          lastScanAt: string | null
+          nextScanAt: string | null
+          opportunitiesFound: number
+          opportunitiesPlaced: number
+        }
+        type RuntimeCircuitBreaker = { paused: boolean; reason: string | null }
+        let progress: RuntimeProgress | null = null
+        let circuitBreaker: RuntimeCircuitBreaker | null = null
+        if (runtimeRes.ok) {
+          const json = (await runtimeRes.json()) as {
+            ok: boolean
+            progress: RuntimeProgress | null
+            circuitBreaker: RuntimeCircuitBreaker | null
           }
-        } catch {
-          // Non-critical
+          if (json.ok) {
+            progress = json.progress
+            circuitBreaker = json.circuitBreaker
+          }
         }
 
-        const p = json.progress
+        let userEnabled = false
+        if (settingsRes.ok) {
+          const json = (await settingsRes.json()) as {
+            ok: boolean
+            data?: { scannerEnabled?: boolean }
+          }
+          if (json.ok && json.data?.scannerEnabled != null) {
+            userEnabled = json.data.scannerEnabled
+          }
+        }
+
+        let activeTrades = 0
+        if (tradesRes.ok) {
+          const tradesJson = (await tradesRes.json()) as {
+            ok: boolean
+            data?: Array<{ status: string }>
+          }
+          if (tradesJson.ok && tradesJson.data) {
+            activeTrades = tradesJson.data.filter(
+              (t) => t.status !== "closed" && t.status !== "waiting_entry",
+            ).length
+          }
+        }
+
+        if (!mountedRef.current) return
+        const p = progress
         const scanning =
           p?.phase === "scanning" || p?.phase === "analyzing" || p?.phase === "placing"
         setData({
-          scannerEnabled: (p != null && p.phase !== "idle") || p?.lastScanAt != null,
+          scannerEnabled: userEnabled,
           scanning: scanning ?? false,
+          hasScanHistory: p != null,
           lastScanAt: p?.lastScanAt ?? null,
           nextScanAt: p?.nextScanAt ?? null,
           found: p?.opportunitiesFound ?? 0,
           placed: p?.opportunitiesPlaced ?? 0,
           activeTrades,
-          paused: json.circuitBreaker?.paused ?? false,
-          pauseReason: json.circuitBreaker?.reason ?? null,
+          paused: circuitBreaker?.paused ?? false,
+          pauseReason: circuitBreaker?.reason ?? null,
           error: p?.phase === "error",
         })
       } catch {

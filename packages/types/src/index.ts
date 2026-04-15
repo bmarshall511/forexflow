@@ -3022,6 +3022,19 @@ export interface AiTraderManagementConfig {
   /** Pip amount added to the current SL during news protection. */
   newsProtectionTightenPips: number
   reEvaluationEnabled: boolean // Periodic AI re-evaluation of open trades
+  /**
+   * How EdgeFinder's AI re-evaluator handles suggested actions.
+   *   - `"off"`       : re-evaluator does not run
+   *   - `"suggest"`   : log suggestion, never execute
+   *   - `"auto"`      : auto-execute any action with confidence ≥ minConfidence
+   */
+  reEvaluationMode: "off" | "suggest" | "auto"
+  /** Minimum confidence (0-100) an AI re-evaluation must meet to auto-execute. */
+  reEvaluationMinConfidence: number
+  /** Hours between re-evaluations of the same open trade. Default 2. */
+  reEvaluationIntervalHours: number
+  /** Minutes of grace period after a fill before AI re-evaluation can fire. Default 15. */
+  reEvaluationGraceMinutes: number
   scaleInEnabled: boolean // Allow adding to winning positions
 }
 
@@ -3370,7 +3383,11 @@ export const AI_TRADER_DEFAULT_MANAGEMENT: AiTraderManagementConfig = {
   newsProtectionEnabled: true,
   newsProtectionBufferMinutes: 30,
   newsProtectionTightenPips: 5,
-  reEvaluationEnabled: true,
+  reEvaluationEnabled: false, // opt-in: costs API budget
+  reEvaluationMode: "suggest",
+  reEvaluationMinConfidence: 75,
+  reEvaluationIntervalHours: 2,
+  reEvaluationGraceMinutes: 15,
   scaleInEnabled: false,
 }
 

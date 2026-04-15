@@ -191,12 +191,22 @@ export class SmartFlowAiMonitor {
       const prompt = this.buildPrompt(trade, config)
       const model = config.aiModel || "claude-haiku-4-5-20251001"
 
-      // Call Claude
+      // Call Claude. The system prompt is passed as a cacheable content
+      // block so Anthropic gives us the ~90% discount on cached input
+      // tokens when the same prompt is reused within the 5-minute cache
+      // window. See apps/daemons/src/ai/analysis-executor.ts for the same
+      // pattern applied to AI Analysis.
       const anthropic = new Anthropic({ apiKey })
       const response = await anthropic.messages.create({
         model,
         max_tokens: MAX_TOKENS,
-        system: SYSTEM_PROMPT,
+        system: [
+          {
+            type: "text" as const,
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" as const },
+          },
+        ],
         messages: [{ role: "user" as const, content: prompt }],
       })
 
@@ -206,7 +216,19 @@ export class SmartFlowAiMonitor {
 
       const inputTokens = response.usage.input_tokens
       const outputTokens = response.usage.output_tokens
+      const usageWithCache = response.usage as typeof response.usage & {
+        cache_read_input_tokens?: number
+        cache_creation_input_tokens?: number
+      }
+      const cacheReadTokens = usageWithCache.cache_read_input_tokens ?? 0
+      const cacheWriteTokens = usageWithCache.cache_creation_input_tokens ?? 0
       const cost = calculateCost(model, inputTokens, outputTokens)
+      if (cacheReadTokens > 0 || cacheWriteTokens > 0) {
+        console.log(
+          LOG_TAG,
+          `cache: ${cacheReadTokens} read / ${cacheWriteTokens} write tokens for ${config.instrument}`,
+        )
+      }
 
       // Track cost
       await incrementAiCost(smartFlowTradeId, cost, inputTokens, outputTokens)

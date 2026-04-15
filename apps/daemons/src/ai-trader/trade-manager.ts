@@ -24,6 +24,8 @@ import type { PositionManager } from "../positions/position-manager.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
 import type { DataAggregator } from "./data-aggregator.js"
 import type { PerformanceTracker } from "./performance-tracker.js"
+import type { CostTracker } from "./cost-tracker.js"
+import { AiReEvaluator } from "./re-evaluator.js"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,8 @@ interface ManagedTrade {
   openedAt: number // timestamp ms
   atr: number // real ATR from Tier 1 analysis
   profile: AiTraderProfile
+  /** Epoch ms of last AI re-evaluation call for this trade, 0 if never. */
+  lastReEvalAt: number
 }
 
 // ─── Trade Manager ───────────────────────────────────────────────────────────
@@ -53,6 +57,7 @@ export class TradeManager {
   private managedTrades = new Map<string, ManagedTrade>()
   private checkTimer: ReturnType<typeof setInterval> | null = null
   private priceMap: Record<string, number> = {}
+  private aiReEvaluator: AiReEvaluator | null = null
 
   constructor(
     private tradeSyncer: OandaTradeSyncer,
@@ -62,6 +67,11 @@ export class TradeManager {
     private dataAggregator: DataAggregator,
     private performanceTracker: PerformanceTracker,
   ) {}
+
+  /** Called from the scanner at construction time to enable AI re-evaluation. */
+  setCostTracker(costTracker: CostTracker): void {
+    this.aiReEvaluator = new AiReEvaluator(this.tradeSyncer, costTracker, this.broadcast)
+  }
 
   async start(): Promise<void> {
     // Load existing managed opportunities from DB
@@ -128,6 +138,7 @@ export class TradeManager {
       openedAt: opp.filledAt ? new Date(opp.filledAt).getTime() : Date.now(),
       atr,
       profile: opp.profile,
+      lastReEvalAt: 0,
     })
   }
 
@@ -218,6 +229,7 @@ export class TradeManager {
         await this.checkTrailingStop(managed, currentPrice, mgmt)
         await this.checkTimeExit(managed, mgmt)
         await this.checkNewsProtection(managed, mgmt)
+        await this.checkAiReEvaluation(managed, currentPrice, mgmt)
       } catch (err) {
         console.error(`[ai-trader] Management error for ${tradeId}:`, (err as Error).message)
       }
@@ -368,6 +380,50 @@ export class TradeManager {
         managed.currentSL,
         newSL,
       )
+    }
+  }
+
+  /**
+   * Optional AI re-evaluation using the existing buildReEvalPrompt pipeline.
+   * Gated by mgmt.reEvaluationEnabled + reEvaluationMode (off/suggest/auto),
+   * an interval per trade, and a grace period after fill. Uses the shared
+   * EdgeFinder budget (CostTracker) so runaway re-eval costs can't happen.
+   */
+  private async checkAiReEvaluation(
+    managed: ManagedTrade,
+    currentPrice: number,
+    mgmt: AiTraderManagementConfig,
+  ): Promise<void> {
+    if (!this.aiReEvaluator) return
+    if (!mgmt.reEvaluationEnabled || mgmt.reEvaluationMode === "off") return
+
+    const opp = await findOpportunityByResultTradeId(managed.tradeId)
+    if (!opp) return
+
+    const ref = {
+      opportunityId: managed.opportunityId,
+      tradeId: managed.tradeId,
+      sourceTradeId: managed.sourceTradeId,
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      currentSL: managed.currentSL,
+      currentTP: managed.currentTP,
+      openedAt: managed.openedAt,
+      atr: managed.atr,
+      lastReEvalAt: managed.lastReEvalAt,
+    }
+    const ran = await this.aiReEvaluator.maybeReEvaluate(
+      ref,
+      currentPrice,
+      opp.managementLog,
+      mgmt,
+      opp,
+    )
+    if (ran) {
+      managed.lastReEvalAt = ref.lastReEvalAt
+      managed.currentSL = ref.currentSL
+      managed.currentTP = ref.currentTP
     }
   }
 

@@ -172,6 +172,9 @@ export class AiTraderScanner {
       this.dataAggregator,
       this.performanceTracker,
     )
+    // Enable AI re-evaluation. Disabled by default in config — harmless to
+    // wire up here since the evaluator short-circuits on disabled mode.
+    this.tradeManager.setCostTracker(this.costTracker)
   }
 
   setNotificationEmitter(emitter: NotificationEmitter): void {
@@ -184,6 +187,7 @@ export class AiTraderScanner {
       this.dataAggregator,
       this.performanceTracker,
     )
+    this.tradeManager.setCostTracker(this.costTracker)
   }
 
   setPriceTracker(tracker: PositionPriceTracker): void {
@@ -968,10 +972,21 @@ export class AiTraderScanner {
     const apiKey = await getDecryptedClaudeKey()
     if (!apiKey) throw new Error("Claude API key not configured — set it in Settings > AI")
     const anthropic = new Anthropic({ apiKey })
+    // Tier 2 with prompt caching. The TIER2 system prompt is stable across
+    // every scan (only the user message varies per candidate), so marking it
+    // as a cacheable content block gives ~90% discount on cached input.
+    // Within a single scan we call Tier 2 many times back-to-back — the
+    // second and later calls should hit the cache.
     const tier2Response = await anthropic.messages.create({
       model: config.scanModel || "claude-haiku-4-5-20251001",
       max_tokens: 500,
-      system: tier2Prompt.system,
+      system: [
+        {
+          type: "text" as const,
+          text: tier2Prompt.system,
+          cache_control: { type: "ephemeral" as const },
+        },
+      ],
       messages: [{ role: "user", content: tier2Prompt.user }],
     })
 
@@ -982,6 +997,12 @@ export class AiTraderScanner {
 
     const tier2InputTokens = tier2Response.usage.input_tokens
     const tier2OutputTokens = tier2Response.usage.output_tokens
+    const tier2UsageWithCache = tier2Response.usage as typeof tier2Response.usage & {
+      cache_read_input_tokens?: number
+      cache_creation_input_tokens?: number
+    }
+    const tier2CacheRead = tier2UsageWithCache.cache_read_input_tokens ?? 0
+    const tier2CacheWrite = tier2UsageWithCache.cache_creation_input_tokens ?? 0
     const tier2Model = config.scanModel || "claude-haiku-4-5-20251001"
     const tier2Cost = getModelCost(tier2Model, tier2InputTokens, tier2OutputTokens)
 
@@ -1185,10 +1206,17 @@ export class AiTraderScanner {
 
     const tier3Prompt = buildTier3Prompt(tier3Ctx)
 
+    // Tier 3 with prompt caching — same pattern as Tier 2.
     const tier3Response = await anthropic.messages.create({
       model: config.decisionModel || "claude-sonnet-4-6",
       max_tokens: 1500,
-      system: tier3Prompt.system,
+      system: [
+        {
+          type: "text" as const,
+          text: tier3Prompt.system,
+          cache_control: { type: "ephemeral" as const },
+        },
+      ],
       messages: [{ role: "user", content: tier3Prompt.user }],
     })
 
@@ -1199,7 +1227,19 @@ export class AiTraderScanner {
 
     const tier3InputTokens = tier3Response.usage.input_tokens
     const tier3OutputTokens = tier3Response.usage.output_tokens
+    const tier3UsageWithCache = tier3Response.usage as typeof tier3Response.usage & {
+      cache_read_input_tokens?: number
+      cache_creation_input_tokens?: number
+    }
+    const tier3CacheRead = tier3UsageWithCache.cache_read_input_tokens ?? 0
+    const tier3CacheWrite = tier3UsageWithCache.cache_creation_input_tokens ?? 0
     const tier3Model = config.decisionModel || "claude-sonnet-4-6"
+    if (tier2CacheRead > 0 || tier3CacheRead > 0) {
+      this.addLogEntry(
+        "tier3_pass",
+        `${pairLabel}: cache hits — T2 ${tier2CacheRead}r/${tier2CacheWrite}w, T3 ${tier3CacheRead}r/${tier3CacheWrite}w tokens`,
+      )
+    }
     const tier3Cost = getModelCost(tier3Model, tier3InputTokens, tier3OutputTokens)
 
     this.costTracker.invalidateCache()
