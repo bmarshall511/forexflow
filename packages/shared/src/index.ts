@@ -227,3 +227,43 @@ export {
 } from "./condition-matching"
 
 export { calculatePipValueUsd, derivePipValueUsdFromUnrealizedPL } from "./pip-value"
+
+// ─── Trading core primitives (shared guards, validators, sizers) ─────────────
+export {
+  // types
+  type TradeDirection,
+  type CorrelationPosition,
+  type GateResult,
+  pass,
+  fail,
+  // correlation
+  countSharedCurrencyExposure,
+  checkCorrelation,
+  filterCorrelatedCandidates,
+  // circuit breaker
+  CircuitBreaker,
+  type CircuitBreakerConfig,
+  type CircuitBreakerState,
+  // spread
+  checkSpread,
+  spreadImpactPercent,
+  spreadAdjustedRR,
+  type CheckSpreadOpts,
+  // risk sizing
+  calculatePositionSize,
+  type PositionSizeMode,
+  type PositionSizeInput,
+  type RiskPercentSizeOpts,
+  type FixedUnitsSizeOpts,
+  type FixedLotsSizeOpts,
+  type KellySizeOpts,
+  // R:R multipliers
+  getAdaptiveMinRR,
+  getSessionRRMultiplier,
+  getRegimeRRMultiplier,
+  // news gate
+  checkNewsGate,
+  type NewsCalendarSource,
+  type ImminentEvent,
+  type CheckNewsGateOpts,
+} from "./trading-core"

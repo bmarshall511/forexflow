@@ -31,7 +31,11 @@ import {
   getTodaySmartFlowAiCost,
   getMonthlySmartFlowAiCost,
 } from "@fxflow/db"
-import { computeATR, getPipSize } from "@fxflow/shared"
+import {
+  computeATR,
+  getPipSize,
+  calculatePositionSize as sharedCalculatePositionSize,
+} from "@fxflow/shared"
 import { getPresetDefaults } from "./preset-defaults.js"
 import { evaluateConfigHealth } from "./config-health.js"
 import { getAdaptiveMinRR, checkCorrelation } from "./entry-filters.js"
@@ -728,19 +732,38 @@ export class SmartFlowManager {
     const preset = getPresetDefaults(config.preset)
     switch (config.positionSizeMode) {
       case "risk_percent": {
-        const risk = balance * (config.positionSizeValue / 100)
         const slAtrMultiple = config.stopLossAtrMultiple ?? preset.slAtrMultiple ?? 1.5
         const slPips = config.stopLossPips ?? slAtrMultiple * (atr / pip)
-        return Math.max(Math.floor(risk / (slPips * pip)), 1)
+        return sharedCalculatePositionSize({
+          mode: "risk_percent",
+          riskPercent: config.positionSizeValue,
+          accountBalance: balance,
+          instrument: config.instrument,
+          riskPips: slPips,
+        })
       }
       case "fixed_units":
-        return Math.max(Math.floor(config.positionSizeValue), 1)
+        return sharedCalculatePositionSize({
+          mode: "fixed_units",
+          units: config.positionSizeValue,
+        })
       case "fixed_lots":
-        return Math.max(Math.floor(config.positionSizeValue * 100_000), 1)
+        return sharedCalculatePositionSize({
+          mode: "fixed_lots",
+          lots: config.positionSizeValue,
+        })
       case "kelly":
-        return Math.max(Math.floor((balance * 0.01) / (atr * 1.5)), 1)
+        return sharedCalculatePositionSize({
+          mode: "kelly",
+          accountBalance: balance,
+          atr,
+          instrument: config.instrument,
+        })
       default:
-        return Math.max(Math.floor(config.positionSizeValue), 1)
+        return sharedCalculatePositionSize({
+          mode: "fixed_units",
+          units: config.positionSizeValue,
+        })
     }
   }
 

@@ -1,72 +1,53 @@
-import { isAutoTradeSession, isKillZone } from "@fxflow/shared"
+/**
+ * SmartFlow entry filters.
+ *
+ * Thin orchestration layer on top of `@fxflow/shared/trading-core`. The
+ * cross-system primitives (correlation, spread, news, R:R multipliers) live
+ * in trading-core so EdgeFinder and Trade Finder can share the same logic.
+ * Only SmartFlow-specific filters (regime-to-scan-mode matching, RSI extreme,
+ * session restriction, concurrent/daily caps) live here.
+ */
+import { isAutoTradeSession } from "@fxflow/shared"
 import { hasImminentHighImpactEvent } from "@fxflow/db"
 import type {
   SmartFlowSettingsData,
   SmartFlowSessionRestriction,
   SmartFlowScanMode,
 } from "@fxflow/types"
+import {
+  checkCorrelation as checkCorrelationShared,
+  checkSpread as checkSpreadShared,
+  checkNewsGate,
+  getAdaptiveMinRR as getAdaptiveMinRRShared,
+  type GateResult,
+  type NewsCalendarSource,
+} from "@fxflow/shared"
 
-// ─── Adaptive R:R Multipliers ───────────────────────────────────────────────
+// Re-export the shared R:R helper under SmartFlow's existing import name.
+export const getAdaptiveMinRR = getAdaptiveMinRRShared
 
-/**
- * Session-based R:R multiplier:
- * - Kill zones (London/NY): standard (1.0x) — momentum carries, targets achievable
- * - Extended session (06-21 UTC): slightly relaxed (0.85x)
- * - Off-session (Asian/overnight): more selective (1.2x) — wider spreads, less follow-through
- */
-function getSessionRRMultiplier(): number {
-  if (isKillZone()) return 1.0
-  const hour = new Date().getUTCHours()
-  if (hour >= 6 && hour < 21) return 0.85 // Extended session
-  return 1.2 // Off-session
-}
-
-/**
- * Regime-based R:R multiplier:
- * - Trending: standard (1.0x) — momentum carries
- * - Ranging: lower (0.75x) — mean-reversion wins more often with smaller targets
- * - Volatile: slightly relaxed (0.9x) — big moves both ways
- * - Low volatility: very selective (1.3x) — barely moves, need high conviction
- */
-function getRegimeRRMultiplier(regime: string | null): number {
-  if (!regime) return 1.0
-  switch (regime) {
-    case "trending":
-      return 1.0
-    case "ranging":
-      return 0.75
-    case "volatile":
-      return 0.9
-    case "low_volatility":
-      return 1.3
-    default:
-      return 1.0
-  }
-}
-
-/**
- * Returns the effective minimum R:R for this scan context,
- * adjusted by session and regime multipliers.
- */
-export function getAdaptiveMinRR(baseMinRR: number, regime: string | null): number {
-  const sessionMultiplier = getSessionRRMultiplier()
-  const regimeMultiplier = getRegimeRRMultiplier(regime)
-  const effective = baseMinRR * sessionMultiplier * regimeMultiplier
-  // Floor at 1.0 — below 1:1 R:R is never acceptable
-  return Math.max(1.0, Math.round(effective * 100) / 100)
-}
+// Re-export the shared correlation guard for backwards compatibility with
+// existing SmartFlow callers (manager.placeMarketEntry imports checkCorrelation).
+export const checkCorrelation = checkCorrelationShared
 
 export interface FilterResult {
   passed: boolean
   reason?: string
 }
-
 export interface FilterResults {
   [filterName: string]: FilterResult
 }
 
 const pass = (): FilterResult => ({ passed: true })
 const fail = (reason: string): FilterResult => ({ passed: false, reason })
+
+// Adapter: the DB news source into the shared NewsCalendarSource contract.
+const dbNewsSource: NewsCalendarSource = {
+  async hasImminentEvent(instrument, bufferHours) {
+    const result = await hasImminentHighImpactEvent(instrument, Math.ceil(bufferHours))
+    return { imminent: result.imminent, event: result.event ?? null }
+  },
+}
 
 export function checkSession(
   instrument: string,
@@ -85,62 +66,18 @@ export function checkSession(
   return fail("Outside extended session hours (07:00–21:00 UTC)")
 }
 
+/** Legacy wrapper — delegates to shared `checkSpread`. */
 export function checkSpread(
-  instrument: string,
+  _instrument: string,
   spreadPips: number,
   riskPips: number,
   maxSpreadPercent = 0.2,
 ): FilterResult {
-  const maxSpread = riskPips * maxSpreadPercent
-  if (spreadPips > maxSpread) {
-    return fail(
-      `Spread ${spreadPips.toFixed(1)} pips exceeds ${(maxSpreadPercent * 100).toFixed(0)}% of SL (${maxSpread.toFixed(1)} pips)`,
-    )
-  }
-  return pass()
+  return checkSpreadShared({ spreadPips, riskPips, maxPercent: maxSpreadPercent })
 }
 
-export function checkCorrelation(
-  instrument: string,
-  direction: "long" | "short",
-  openPositions: { instrument: string; direction: string }[],
-  maxPerCurrency: number,
-): FilterResult {
-  const [base, quote] = instrument.split("_")
-  if (!base || !quote) return pass()
-
-  let sameDirectionCount = 0
-
-  for (const pos of openPositions) {
-    const [posBase, posQuote] = pos.instrument.split("_")
-    if (!posBase || !posQuote) continue
-
-    const sharesCurrency =
-      posBase === base || posBase === quote || posQuote === base || posQuote === quote
-    if (!sharesCurrency) continue
-
-    // Same directional exposure: buying EUR_USD and buying EUR_GBP both expose long EUR
-    const sameExposure =
-      (posBase === base && pos.direction === direction) ||
-      (posQuote === quote && pos.direction === direction) ||
-      (posBase === quote && pos.direction !== direction) ||
-      (posQuote === base && pos.direction !== direction)
-
-    if (sameExposure) sameDirectionCount++
-  }
-
-  if (sameDirectionCount >= maxPerCurrency) {
-    return fail(`${sameDirectionCount} correlated positions already open (max ${maxPerCurrency})`)
-  }
-  return pass()
-}
-
-export async function checkNews(instrument: string, bufferMinutes: number): Promise<FilterResult> {
-  const result = await hasImminentHighImpactEvent(instrument, Math.ceil(bufferMinutes / 60))
-  if (result.imminent) {
-    return fail(`High-impact news imminent${result.event ? `: ${result.event}` : ""}`)
-  }
-  return pass()
+export async function checkNews(instrument: string, bufferMinutes: number): Promise<GateResult> {
+  return checkNewsGate({ instrument, bufferMinutes, source: dbNewsSource })
 }
 
 type RegimeRating = "best" | "ok" | "bad"
@@ -212,7 +149,7 @@ export async function runAllFilters(
   const results: FilterResults = {
     session: checkSession(instrument, settings.sessionRestriction),
     spread: checkSpread(instrument, spreadPips, riskPips),
-    correlation: checkCorrelation(
+    correlation: checkCorrelationShared(
       instrument,
       direction,
       openPositions,

@@ -34,6 +34,9 @@ import {
   getTypicalSpread,
   priceToPips,
   classifyAiError,
+  CircuitBreaker,
+  filterCorrelatedCandidates,
+  calculatePositionSize,
 } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
@@ -56,33 +59,6 @@ import {
 import { buildTier2Prompt, buildTier3Prompt, type Tier3Context } from "./prompt-builder.js"
 
 const MAX_SCAN_LOG_ENTRIES = 100
-
-/**
- * Limit correlated signals: max N positions with the same currency in the same direction.
- * E.g., EUR_USD long + EUR_GBP long = 2 EUR long exposure. Prevents over-concentration.
- */
-function filterCorrelatedSignals(signals: Tier1Signal[], maxPerCurrency: number): Tier1Signal[] {
-  const exposure = new Map<string, number>() // "EUR_long" → count
-  const result: Tier1Signal[] = []
-
-  for (const sig of signals) {
-    const [base, quote] = sig.instrument.split("_") as [string, string]
-    // Long EUR_USD = long EUR, short USD
-    const baseKey = `${base}_${sig.direction}`
-    const quoteKey = `${quote}_${sig.direction === "long" ? "short" : "long"}`
-
-    const baseCount = exposure.get(baseKey) ?? 0
-    const quoteCount = exposure.get(quoteKey) ?? 0
-
-    if (baseCount >= maxPerCurrency || quoteCount >= maxPerCurrency) continue
-
-    exposure.set(baseKey, baseCount + 1)
-    exposure.set(quoteKey, quoteCount + 1)
-    result.push(sig)
-  }
-
-  return result
-}
 
 /** Extract JSON from a model response that may be wrapped in markdown code blocks.
  *  Also handles truncated responses where the closing brace/fence is missing. */
@@ -150,14 +126,17 @@ export class AiTraderScanner {
   private lastError: string | null = null
   private paused = false
 
-  // Cool-down after consecutive losses
-  private consecutiveLosses = 0
-  private cooldownUntil: number | null = null
-
-  // Daily loss circuit breaker
-  private dailyLosses = 0
-  private dailyDrawdownPercent = 0
-  private dailyPausedUntil: number | null = null
+  /**
+   * Shared circuit breaker. EdgeFinder historically used tighter thresholds
+   * than SmartFlow (2 consecutive losses / 30 min pause vs. 3 / 120 min)
+   * because it's more aggressive per scan. Thresholds preserved as-is.
+   */
+  private readonly circuitBreaker = new CircuitBreaker({
+    maxConsecLosses: 2,
+    consecPauseMinutes: 30,
+    maxDailyLosses: 4,
+    maxDailyDrawdownPercent: 3.0,
+  })
 
   // Scan progress tracking
   private scanProgress: AiTraderScanProgressData | null = null
@@ -401,74 +380,18 @@ export class AiTraderScanner {
     // Only track consecutive losses for AI Trader trades (not Trade Finder, TV Alerts, etc.)
     if (!isAi) return
 
-    // Reset daily counters at midnight UTC
-    this.checkDailyReset()
+    const overview = this.stateManager.getAccountOverview()
+    const balance = overview?.summary.balance ?? 0
+    if (balance > 0) this.circuitBreaker.setStartingBalance(balance)
 
-    if (realizedPL < 0) {
-      this.consecutiveLosses++
-      this.dailyLosses++
+    const before = this.circuitBreaker.getState()
+    this.circuitBreaker.recordOutcome(realizedPL)
+    const after = this.circuitBreaker.getState()
 
-      // Calculate drawdown % against account balance
-      const overview = this.stateManager.getAccountOverview()
-      const balance = overview?.summary.balance ?? 0
-      if (balance > 0) {
-        this.dailyDrawdownPercent += (Math.abs(realizedPL) / balance) * 100
-      }
-
-      // Consecutive loss cooldown: 2+ losses → 30 min pause
-      if (this.consecutiveLosses >= 2 && !this.cooldownUntil) {
-        const COOLDOWN_MS = 30 * 60_000
-        this.cooldownUntil = Date.now() + COOLDOWN_MS
-        this.addLogEntry(
-          "scan_skip",
-          `Cooldown activated: ${this.consecutiveLosses} consecutive EdgeFinder losses — pausing for 30 minutes`,
-        )
-      }
-
-      // Daily circuit breaker: 4+ daily losses → pause until midnight UTC
-      if (this.dailyLosses >= 4 && !this.dailyPausedUntil) {
-        const now = new Date()
-        const midnight = new Date(now)
-        midnight.setUTCDate(midnight.getUTCDate() + 1)
-        midnight.setUTCHours(0, 0, 0, 0)
-        this.dailyPausedUntil = midnight.getTime()
-        this.addLogEntry(
-          "scan_skip",
-          `Daily circuit breaker: ${this.dailyLosses} EdgeFinder losses today — paused until midnight UTC`,
-        )
-      }
-
-      // Daily drawdown > 3% → pause until midnight UTC
-      if (this.dailyDrawdownPercent > 3 && !this.dailyPausedUntil) {
-        const now = new Date()
-        const midnight = new Date(now)
-        midnight.setUTCDate(midnight.getUTCDate() + 1)
-        midnight.setUTCHours(0, 0, 0, 0)
-        this.dailyPausedUntil = midnight.getTime()
-        this.addLogEntry(
-          "scan_skip",
-          `Daily drawdown circuit breaker: ${this.dailyDrawdownPercent.toFixed(1)}% daily loss — paused until midnight UTC`,
-        )
-      }
-    } else if (realizedPL > 0) {
-      this.consecutiveLosses = 0
-      this.cooldownUntil = null
-    }
-  }
-
-  /** Reset daily counters at midnight UTC */
-  private checkDailyReset(): void {
-    const now = new Date()
-    if (this.dailyPausedUntil && Date.now() >= this.dailyPausedUntil) {
-      this.dailyLosses = 0
-      this.dailyDrawdownPercent = 0
-      this.dailyPausedUntil = null
-      console.log("[ai-trader] Daily circuit breaker counters reset")
-    }
-    // Also reset at midnight UTC even without pause
-    if (now.getUTCHours() === 0 && now.getUTCMinutes() === 0 && this.dailyLosses > 0) {
-      this.dailyLosses = 0
-      this.dailyDrawdownPercent = 0
+    // Narrate state transitions into the scan log. Only log when a new pause
+    // was activated or when the consecutive-loss count crosses the threshold.
+    if (!before.paused && after.paused && after.reason) {
+      this.addLogEntry("scan_skip", `EdgeFinder circuit breaker: ${after.reason}`)
     }
   }
 
@@ -614,28 +537,16 @@ export class AiTraderScanner {
   private async runScan(): Promise<void> {
     if (this.scanning || this.paused) return
 
-    // Daily circuit breaker check
-    this.checkDailyReset()
-    if (this.dailyPausedUntil && Date.now() < this.dailyPausedUntil) {
-      const remaining = Math.ceil((this.dailyPausedUntil - Date.now()) / 60_000)
-      this.addLogEntry("scan_skip", `Daily circuit breaker active (${remaining} min until reset)`)
-      this.scheduleScan(60_000)
-      return
-    }
-
-    // Cool-down check after consecutive losses
-    if (this.cooldownUntil && Date.now() < this.cooldownUntil) {
-      const remaining = Math.ceil((this.cooldownUntil - Date.now()) / 60_000)
+    // Shared circuit breaker check (covers consecutive losses, daily losses,
+    // and daily drawdown — with automatic reset at UTC midnight).
+    const cbCheck = this.circuitBreaker.isAllowed()
+    if (!cbCheck.allowed) {
       this.addLogEntry(
         "scan_skip",
-        `Cooling down after ${this.consecutiveLosses} consecutive losses (${remaining} min remaining)`,
+        `EdgeFinder paused by circuit breaker: ${cbCheck.reason ?? "unknown"}`,
       )
       this.scheduleScan(60_000)
       return
-    }
-    // Clear expired cooldown
-    if (this.cooldownUntil && Date.now() >= this.cooldownUntil) {
-      this.cooldownUntil = null
     }
 
     const startedAt = new Date().toISOString()
@@ -909,7 +820,7 @@ export class AiTraderScanner {
       allSignals.sort((a, b) => b.confidence - a.confidence)
 
       // ─── Correlation guard: limit same-currency same-direction ──
-      const filtered = filterCorrelatedSignals(allSignals, 2)
+      const filtered = filterCorrelatedCandidates(allSignals, 2)
       const topCandidates = filtered.slice(0, 10)
 
       // ─── Analyze candidates with AI ─────────────────────────
@@ -1268,7 +1179,7 @@ export class AiTraderScanner {
       accountBalance,
       openTradeCount,
       riskPercent,
-      consecutiveLosses: this.consecutiveLosses,
+      consecutiveLosses: this.circuitBreaker.getState().consecutiveLosses,
       pairProfileWinRate,
     }
 
@@ -1391,26 +1302,21 @@ export class AiTraderScanner {
       return "tier3_fail"
     }
 
-    // Deterministic position sizing — calculated from account settings, never from LLM
-    // For non-USD-quoted pairs (e.g. EUR_GBP, GBP_CAD), the pip value in USD differs
-    // from the raw pipSize. We approximate by dividing pipSize by the entry price ratio,
-    // which converts quote-currency pip value to USD. For USD-quoted pairs this is ~1.
+    // Deterministic position sizing — shared helper from @fxflow/shared/trading-core.
+    // Handles USD-quoted + non-USD-quoted pip value conversion uniformly.
     const pipSize = getPipSize(signal.instrument)
     const riskPipsForSizing = Math.abs(entryPrice - stopLoss) / pipSize
-    const riskAmount = accountBalance * (riskPercent / 100)
-    const [, quoteCcy] = signal.instrument.split("_")
-    const isUsdQuote = quoteCcy === "USD"
-    // pipValuePerUnit in account currency (USD assumed):
-    // USD-quoted: pipSize (1 pip of 1 unit = pipSize USD)
-    // Non-USD-quoted: pipSize / midPrice approximates the USD value per pip per unit
-    const pipValuePerUnit = isUsdQuote ? pipSize : pipSize / Math.max(entryPrice, 0.0001)
-    const positionSize =
-      riskPipsForSizing > 0 && pipValuePerUnit > 0
-        ? Math.max(1, Math.floor(riskAmount / (riskPipsForSizing * pipValuePerUnit)))
-        : 0
+    const positionSize = calculatePositionSize({
+      mode: "risk_percent",
+      riskPercent,
+      accountBalance,
+      instrument: signal.instrument,
+      riskPips: riskPipsForSizing,
+      entryPrice,
+    })
 
-    if (positionSize <= 0) {
-      console.warn(`[ai-trader] Position size calculated as 0 for ${signal.instrument} — skipping`)
+    if (positionSize <= 1) {
+      console.warn(`[ai-trader] Position size at floor for ${signal.instrument} — skipping`)
       this.addLogEntry("gate_blocked", `${pairLabel}: Position size is 0 (risk calculation issue)`)
       return "gate_blocked"
     }

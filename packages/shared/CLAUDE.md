@@ -57,6 +57,34 @@ src/
 - `pip-utils.ts` — pip calculations vary by pair (JPY pairs = 0.01, others = 0.0001).
 - Pip value, pip distance, and position sizing helpers.
 
+### Condition Matching
+
+- `condition-matching.ts` — `conditionsMatch(a, b, { instrument })` and `findMatchingCondition(candidate, existing, opts)` for parameter-based fuzzy dedup of trade conditions. Compares `triggerType`/`actionType` exactly and `triggerValue`/`actionParams` with key-aware numeric tolerance (2 pips for price keys — pip-aware via instrument — 0.1 pts for percent keys, 3 pips for distance keys, etc.). Labels are ignored.
+- Used by both the daemon (analysis-executor auto-apply dedup) AND the web UI (trade-conditions-panel suggestion state) so the two sides can never drift. This is the fix for the "AI re-suggests conditions that already exist" bug caused by label-based matching.
+
+### Trading Core (shared guards, validators, sizers)
+
+- `trading-core/` subdirectory — primitives shared across SmartFlow, EdgeFinder, Trade Finder, and TV Alerts so the four trading systems never silently diverge on common logic. All exports are re-surfaced via the top-level `@fxflow/shared` barrel.
+- `trading-core/types.ts` — `TradeDirection`, `CorrelationPosition`, `GateResult`, `pass()`, `fail()`.
+- `trading-core/correlation.ts` — `countSharedCurrencyExposure()`, `checkCorrelation()` (guard form), `filterCorrelatedCandidates()` (filter form). Replaces SmartFlow's `checkCorrelation` and EdgeFinder's `filterCorrelatedSignals`.
+- `trading-core/circuit-breaker.ts` — `CircuitBreaker` class with injectable clock, parameterised by `CircuitBreakerConfig` (max consecutive losses, consec pause minutes, max daily losses, max daily drawdown percent). Handles day rollover at UTC midnight and pause-until-midnight semantics. Replaces SmartFlow's `scanner-circuit-breaker.ts` (kept as a thin adapter) and EdgeFinder's inline fields in `scanner.ts`.
+- `trading-core/spread.ts` — `checkSpread({ spreadPips, riskPips, maxPercent })`, `spreadImpactPercent()`, `spreadAdjustedRR()`. Each caller picks its own `maxPercent` (SmartFlow 20%, EdgeFinder 50%, Trade Finder 15%) while the math stays canonical.
+- `trading-core/risk-sizing.ts` — `calculatePositionSize()` supports `risk_percent | fixed_units | fixed_lots | kelly` modes. Handles USD-quoted vs non-USD-quoted pairs via the entryPrice approximation, with an explicit `pipValuePerUnitOverride` escape hatch for cross-pair USD conversion using `calculatePipValueUsd`.
+- `trading-core/rr-multiplier.ts` — `getAdaptiveMinRR(baseMinRR, regime, date?)`, `getSessionRRMultiplier()`, `getRegimeRRMultiplier()`. Kill-zone = 1.0×, extended = 0.85×, off-session = 1.2×. Ranging regime = 0.75×, low-vol = 1.3×. Floored at 1.0.
+- `trading-core/news-gate.ts` — `checkNewsGate({ instrument, bufferMinutes, source })` with dependency-injected `NewsCalendarSource` interface (the daemon wires a DB-backed source; `packages/shared` can't import `@fxflow/db`). Fails open on source error.
+- All primitives have unit test coverage in `trading-core/trading-core.test.ts` (34 tests).
+
+### Pip Value in Account Currency (CRITICAL — currency conversion)
+
+- `pip-value.ts` — `calculatePipValueUsd({ instrument, units, currentPrice?, usdQuoteRates? })` and `derivePipValueUsdFromUnrealizedPL(trade)`. These are the ONLY correct way to convert pip distances into account-currency dollar amounts.
+- **Do NOT** use `units × pips × pipSize` directly — that gives a value in the QUOTE currency, which for EUR/JPY is JPY (wrong by ~160x when displayed as USD). This bug caused a $259 "profit" display on a trade actually worth $1.62.
+- Three pair structures are handled:
+  1. **Quote = USD** (EUR/USD etc): pip is already USD, exact.
+  2. **Base = USD** (USD/JPY etc): `pipSize / currentPrice`, exact when a current price is provided.
+  3. **Cross** (EUR/JPY etc): returns `null` unless an explicit `usdQuoteRates` lookup is supplied. Callers MUST respect null and show pip distance instead of fabricating a dollar value.
+- `derivePipValueUsdFromUnrealizedPL` is the preferred path whenever a trade has an OANDA-reported `unrealizedPL` — it inverts OANDA's own settlement math to get exactly the rate OANDA used, so it's always correct regardless of pair structure. Falls through to `calculatePipValueUsd` near breakeven where the ratio is unstable.
+- Consumed by: `use-positions.ts` (live P/L override), `trade-card.tsx`/`trade-card-mobile.tsx` (R:R bar), `setup-card-utils.ts` (Trade Finder dollar projections), `condition-monitor.ts` (`pnl_currency` trigger evaluation).
+
 ### Technical Analysis
 
 - `zone-detector.ts` — `detectZones()` identifies supply/demand zones from candle data.
