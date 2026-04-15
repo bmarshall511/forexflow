@@ -3,6 +3,13 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useDaemonStatus } from "./use-daemon-status"
 
+// Temporary diagnostic flag on window for the SmartFlow sidebar log (see below).
+declare global {
+  interface Window {
+    __fxflowSfDebugLogged?: boolean
+  }
+}
+
 export interface SidebarStatus {
   /** Primary status line */
   line1: string
@@ -41,16 +48,26 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
       let line2: string | undefined
       let variant: SidebarStatus["variant"] = "default"
 
-      // Label ladder — note: "scanner disabled" means the SCANNER sub-toggle
-      // is off, not SmartFlow as a whole. "SmartFlow off" is the top-level
-      // toggle. Both were conflated historically and the user rightly
-      // complained when a running-but-idle scanner reported "Scanner off".
+      // If the scanner has ANY runtime evidence of being active, trust that
+      // over the stored config flags. This prevents the sidebar from ever
+      // saying "SmartFlow off" when the daemon is actively scanning,
+      // counting down to the next scan, or holds any scan history.
+      const hasRuntimeActivity =
+        scanning || paused || nextScanAt != null || lastScanAt != null || activeTrades > 0
+
+      // Label ladder:
+      //   1. error                            → "Something went wrong"
+      //   2. runtime: paused                  → pauseReason
+      //   3. runtime: scanning                → "Scanning markets..."
+      //   4. runtime: nextScanAt              → "Scans again in Xm"
+      //   5. runtime: lastScanAt              → "Scanned Xm ago"
+      //   6. config: !smartFlowEnabled        → "SmartFlow off"
+      //   7. config: !scannerEnabled          → "Manual placements only"
+      //   8. fresh mount, no data             → "Starting scanner..."
+      //   9. default                          → "Waiting for next scan"
       if (error) {
         line1 = "Something went wrong"
         variant = "error"
-      } else if (!smartFlowEnabled) {
-        line1 = "SmartFlow off"
-        variant = "default"
       } else if (paused) {
         line1 = pauseReason ?? "Paused"
         variant = "warning"
@@ -61,11 +78,10 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
         line1 = `Scans again in ${formatCountdown(nextScanAt)}`
       } else if (lastScanAt) {
         line1 = `Scanned ${formatTimeAgo(lastScanAt)}`
-      } else if (!scannerEnabled) {
-        // SmartFlow is on, but the autonomous scanner sub-toggle is off.
-        // Only surfaced AFTER the runtime-based labels because any recent
-        // scan activity (lastScanAt / nextScanAt) is a better signal that
-        // the scanner is in fact doing work despite the stale flag.
+      } else if (!hasRuntimeActivity && !smartFlowEnabled) {
+        line1 = "SmartFlow off"
+        variant = "default"
+      } else if (!hasRuntimeActivity && !scannerEnabled) {
         line1 = "Manual placements only"
         variant = "default"
       } else if (!hasScanHistory) {
@@ -342,6 +358,18 @@ function useSmartFlowNavData() {
           if (json.ok && json.data) {
             if (json.data.enabled != null) smartFlowEnabled = json.data.enabled
             if (json.data.scannerEnabled != null) scannerEnabled = json.data.scannerEnabled
+          }
+          // TEMP DIAGNOSTIC — remove once sidebar status is confirmed stable.
+          // Drop a one-shot console log so we can see what the API is
+          // actually returning in the user's browser (debugging a report
+          // that the sidebar shows "SmartFlow off" even with enabled=true).
+          if (typeof window !== "undefined" && !window.__fxflowSfDebugLogged) {
+            window.__fxflowSfDebugLogged = true
+            // eslint-disable-next-line no-console
+            console.log("[smart-flow-sidebar] settings fetch:", {
+              smartFlowEnabled,
+              scannerEnabled,
+            })
           }
         }
 
