@@ -36,7 +36,7 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @fxflow/db db:generate
         env:
-          DATABASE_URL: "file:./dev.db"
+          DATABASE_URL: "file:/tmp/fxflow-ci-prisma.db"
 
       - name: Generate TypeDoc API docs
         run: pnpm docs:api
@@ -44,7 +44,7 @@ jobs:
       - name: Build Astro site
         run: pnpm --filter @fxflow/site build
         env:
-          DATABASE_URL: "file:./dev.db"
+          DATABASE_URL: "file:/tmp/fxflow-ci-prisma.db"
 
       - name: Copy TypeDoc output into site
         run: |

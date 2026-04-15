@@ -15,7 +15,10 @@ permissions:
   pull-requests: write
 
 env:
-  DATABASE_URL: file:./dev.db
+  # Throwaway path under /tmp so prisma generate / migrate diff never create
+  # or touch a .db file inside the repo. Prisma only needs the URL to parse;
+  # `generate` and `migrate diff --to-schema` don't connect to the DB.
+  DATABASE_URL: file:/tmp/fxflow-ci-prisma.db
 
 jobs:
   lint-format:

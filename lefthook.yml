@@ -13,8 +13,13 @@ commit-msg:
 pre-push:
   piped: true
   commands:
+    # Both prisma hooks use a throwaway DB path under /tmp so they never
+    # create or touch .db files inside the repo. `prisma generate` and
+    # `prisma migrate diff --from-migrations --to-schema` need DATABASE_URL
+    # to parse but don't actually connect to any live database — the path
+    # just has to be valid.
     prisma-generate:
-      run: DATABASE_URL=file:./dev.db pnpm --filter @fxflow/db db:generate
+      run: DATABASE_URL="file:${TMPDIR:-/tmp}/fxflow-prisma-hook.db" pnpm --filter @fxflow/db db:generate
       priority: 1
     format-check:
       run: pnpm format:check
@@ -29,5 +34,5 @@ pre-push:
       run: pnpm turbo test
       priority: 2
     prisma-drift:
-      run: cd packages/db && DATABASE_URL=file:./dev.db pnpm prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code
+      run: cd packages/db && DATABASE_URL="file:${TMPDIR:-/tmp}/fxflow-prisma-hook.db" pnpm prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code
       priority: 3

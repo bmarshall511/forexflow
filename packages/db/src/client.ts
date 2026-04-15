@@ -11,6 +11,7 @@
  *
  * @module client
  */
+import * as path from "node:path"
 import { PrismaLibSql } from "@prisma/adapter-libsql"
 import { PrismaClient } from "./generated/prisma/client"
 
@@ -19,6 +20,18 @@ const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient }
 /** Check if a DATABASE_URL points to a remote Turso/LibSQL instance. */
 function isRemoteUrl(url: string): boolean {
   return url.startsWith("libsql://") || url.startsWith("https://")
+}
+
+/**
+ * Resolve a `file:...` DATABASE_URL to an absolute path so startup logging
+ * and diagnostics show *exactly* which SQLite file is in use. Returns the
+ * input unchanged for remote URLs.
+ */
+function resolveDbPath(url: string): string {
+  if (isRemoteUrl(url)) return url
+  if (!url.startsWith("file:")) return url
+  const rel = url.slice("file:".length)
+  return path.resolve(process.cwd(), rel)
 }
 
 /**
@@ -32,10 +45,23 @@ function isRemoteUrl(url: string): boolean {
  */
 function createPrismaClient(): PrismaClient {
   const url = process.env.DATABASE_URL
-  if (!url) throw new Error("DATABASE_URL environment variable is required")
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL environment variable is required — no silent fallback. " +
+        "Set it in apps/daemons/.env.local and apps/web/.env.local, typically " +
+        "`file:../../data/fxflow.db`. See apps/daemons/.env.example for the canonical value.",
+    )
+  }
 
   const isRemote = isRemoteUrl(url)
   const authToken = process.env.TURSO_AUTH_TOKEN
+
+  // Log the resolved absolute DB path on first client creation so stale
+  // orphan DB files can't hide. If daemon and web log different paths,
+  // someone has a misconfigured .env.local.
+  const resolved = resolveDbPath(url)
+  // eslint-disable-next-line no-console
+  console.log(`[@fxflow/db] DATABASE_URL → ${resolved}${isRemote ? " (remote)" : " (sqlite)"}`)
 
   const adapter = new PrismaLibSql({
     url,

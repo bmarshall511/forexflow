@@ -365,7 +365,6 @@ function useSmartFlowNavData() {
           // that the sidebar shows "SmartFlow off" even with enabled=true).
           if (typeof window !== "undefined" && !window.__fxflowSfDebugLogged) {
             window.__fxflowSfDebugLogged = true
-            // eslint-disable-next-line no-console
             console.log("[smart-flow-sidebar] settings fetch:", {
               smartFlowEnabled,
               scannerEnabled,

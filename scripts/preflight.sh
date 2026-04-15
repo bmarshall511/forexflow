@@ -172,7 +172,7 @@ fi
 # ── Step 2: Prisma generate ─────────────────────────────────────────────────
 
 step_header "Prisma generate"
-if run_step "DATABASE_URL=file:./dev.db pnpm --filter @fxflow/db db:generate"; then
+if run_step "DATABASE_URL=file:\${TMPDIR:-/tmp}/fxflow-prisma-hook.db pnpm --filter @fxflow/db db:generate"; then
   step_pass
 else
   step_fail "Prisma client generation failed."
@@ -235,7 +235,7 @@ fi
 # ── Step 8: Prisma drift ────────────────────────────────────────────────────
 
 step_header "Prisma drift"
-if run_step "cd packages/db && DATABASE_URL=file:./dev.db pnpm prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code"; then
+if run_step "cd packages/db && DATABASE_URL=file:\${TMPDIR:-/tmp}/fxflow-prisma-hook.db pnpm prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code"; then
   step_pass
 else
   step_fail "Schema is out of sync with migrations. Run 'pnpm prisma migrate dev'."

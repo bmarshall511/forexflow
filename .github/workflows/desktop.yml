@@ -35,7 +35,10 @@ jobs:
     runs-on: macos-latest
 
     env:
-      DATABASE_URL: "file:./dev.db"
+      # Throwaway path under /tmp — prisma generate/migrate don't need a
+      # real DB, and keeping this out of the repo prevents orphan dev.db
+      # files from ending up in CI artifacts.
+      DATABASE_URL: "file:/tmp/fxflow-ci-prisma.db"
 
     steps:
       - uses: actions/checkout@v4
