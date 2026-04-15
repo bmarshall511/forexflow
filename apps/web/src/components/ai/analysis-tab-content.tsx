@@ -19,9 +19,13 @@ import {
   ChevronDown,
   ChevronRight,
   CheckCircle2,
+  PauseCircle,
+  X,
 } from "lucide-react"
 import { AnalysisProgressDisplay } from "./analysis-progress"
 import { AnalysisResults } from "./analysis-results"
+import { AnalysisDiffView } from "./analysis-diff-view"
+import { TruncationBanner } from "./truncation-banner"
 import { toast } from "sonner"
 import type { PositionPriceTick } from "@fxflow/types"
 
@@ -33,6 +37,14 @@ interface AnalysisTabContentProps {
   isLoading: boolean
   isTransitioning: boolean
   activeAnalysis: AiAnalysisData | null
+  /**
+   * Set when the hook has detected an interrupted analysis (daemon crashed,
+   * watchdog hard-cleared a stuck spinner, or DB row flipped to failed/cancelled
+   * without a completion WS message). Renders a recovery card above everything
+   * else so the user isn't stuck staring at a dead spinner.
+   */
+  interruptedAnalysis: AiAnalysisData | null
+  onDismissInterruption: () => void
   trade: TradeUnion | null
   tradeStatus: "open" | "pending" | "closed"
   liveTick: PositionPriceTick | null
@@ -53,6 +65,8 @@ export function AnalysisTabContent({
   isLoading,
   isTransitioning,
   activeAnalysis,
+  interruptedAnalysis,
+  onDismissInterruption,
   trade,
   tradeStatus,
   liveTick,
@@ -68,6 +82,17 @@ export function AnalysisTabContent({
 }: AnalysisTabContentProps) {
   return (
     <div className="space-y-4 px-6 py-4">
+      {/* Interrupted recovery card — highest priority so the user sees it */}
+      {interruptedAnalysis && !progress && (
+        <AnalysisInterruptedCard
+          interrupted={interruptedAnalysis}
+          tradeStatus={tradeStatus}
+          isTriggeringAnalysis={isTriggeringAnalysis}
+          onRetry={onTrigger}
+          onDismiss={onDismissInterruption}
+        />
+      )}
+
       {/* Progress / Completion transition */}
       {progress && !isTransitioning && (
         <AnalysisProgressDisplay
@@ -86,6 +111,8 @@ export function AnalysisTabContent({
           <div className="flex items-center gap-2 text-sm font-medium">
             {progress.stage === "Analysis failed" ? (
               <AlertCircle className="text-destructive size-4" />
+            ) : progress.stage.includes("truncated") ? (
+              <AlertTriangle className="size-4 text-amber-500" />
             ) : (
               <CheckCircle2 className="size-4 text-emerald-500" />
             )}
@@ -104,11 +131,21 @@ export function AnalysisTabContent({
         </div>
       )}
 
-      {/* Results — with fade-in animation */}
+      {/* Results — with fade-in animation. Renders for both `completed`
+          AND `partial` statuses; a partial analysis has parsed-but-incomplete
+          sections and a visible TruncationBanner above the content. */}
       {!progress && !isLoading && displayAnalysis?.sections && (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in space-y-4">
+          {displayAnalysis.status === "partial" && (
+            <TruncationBanner
+              stopReason={displayAnalysis.stopReason}
+              tradeClosed={tradeStatus === "closed"}
+              isTriggeringAnalysis={isTriggeringAnalysis}
+              onRetry={onTrigger}
+            />
+          )}
           {displayAnalysis !== history[0] && viewedAnalysis && (
-            <div className="text-muted-foreground bg-muted mb-4 flex items-center justify-between rounded px-3 py-1.5 text-xs">
+            <div className="text-muted-foreground bg-muted flex items-center justify-between rounded px-3 py-1.5 text-xs">
               <span>
                 Viewing historical analysis from{" "}
                 {new Date(displayAnalysis.createdAt).toLocaleDateString()}
@@ -123,6 +160,14 @@ export function AnalysisTabContent({
               </Button>
             </div>
           )}
+          {/* v2 re-run reconciliation summary — only shown when the analysis
+              has structured conditionChanges and a non-empty log. Legacy
+              analyses skip this and go straight to results. */}
+          {displayAnalysis.schemaVersion === 2 &&
+            displayAnalysis.reconciliationLog &&
+            displayAnalysis.reconciliationLog.length > 0 && (
+              <AnalysisDiffView analysis={displayAnalysis} />
+            )}
           <AnalysisResults
             sections={displayAnalysis.sections}
             lastTick={liveTick}
@@ -215,6 +260,109 @@ export function AnalysisTabContent({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Interrupted analysis recovery card.
+ *
+ * Rendered above all other analysis UI when the hook has detected that the
+ * most-recent active analysis was interrupted — daemon crash, watchdog
+ * hard-clear (no stream updates in 4+ minutes), or DB row flipped to
+ * failed/cancelled without a completion WS message ever arriving.
+ *
+ * Gives the user two clear actions: Retry (re-triggers with same settings)
+ * or Dismiss (clears the card and lets them continue looking at history).
+ */
+function AnalysisInterruptedCard({
+  interrupted,
+  tradeStatus,
+  isTriggeringAnalysis,
+  onRetry,
+  onDismiss,
+}: {
+  interrupted: AiAnalysisData
+  tradeStatus: string
+  isTriggeringAnalysis: boolean
+  onRetry: () => void
+  onDismiss: () => void
+}) {
+  // Classify the cause so the message is specific — users trust "daemon restart"
+  // more than a generic "failed".
+  const msg = interrupted.errorMessage ?? ""
+  let reason: { label: string; detail: string }
+  if (/daemon restarted|interrupted/i.test(msg)) {
+    reason = {
+      label: "Analysis interrupted",
+      detail:
+        "The daemon restarted while this analysis was running. No data was lost — you can retry when ready.",
+    }
+  } else if (/timed? ?out/i.test(msg)) {
+    reason = {
+      label: "Analysis timed out",
+      detail: "The AI took longer than expected to respond. This usually resolves on retry.",
+    }
+  } else if (interrupted.status === "running" || interrupted.status === "pending") {
+    reason = {
+      label: "Analysis stalled",
+      detail:
+        "No updates from the daemon for several minutes. The stream may have dropped — retry or dismiss to continue.",
+    }
+  } else {
+    reason = {
+      label: "Analysis did not complete",
+      detail: msg || "The previous analysis ended without a result.",
+    }
+  }
+
+  return (
+    <div
+      className="flex items-start gap-2 rounded-lg border border-orange-500/30 bg-orange-500/5 p-4"
+      role="alert"
+    >
+      <PauseCircle className="mt-0.5 size-4 shrink-0 text-orange-500" aria-hidden />
+      <div className="min-w-0 flex-1 space-y-2">
+        <p className="text-sm font-medium text-orange-600 dark:text-orange-400">{reason.label}</p>
+        <p className="text-muted-foreground text-xs">{reason.detail}</p>
+        <div className="text-muted-foreground flex flex-wrap gap-1.5 text-[10px]">
+          <span>{new Date(interrupted.createdAt).toLocaleString()}</span>
+          <span>·</span>
+          <span className="capitalize">{interrupted.depth}</span>
+          <span>·</span>
+          <span>
+            {interrupted.model.includes("haiku")
+              ? "Haiku"
+              : interrupted.model.includes("sonnet")
+                ? "Sonnet"
+                : "Opus"}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {tradeStatus !== "closed" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="min-h-9 gap-1.5 text-xs"
+              onClick={onRetry}
+              disabled={isTriggeringAnalysis}
+            >
+              <RefreshCw className="size-3" />
+              Retry Analysis
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="min-h-9 gap-1.5 text-xs"
+            onClick={onDismiss}
+            aria-label="Dismiss interrupted analysis"
+          >
+            <X className="size-3" />
+            Dismiss
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

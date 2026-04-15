@@ -274,6 +274,14 @@ async function main() {
   }
   tradeSyncer.onTradeClosing = (sourceTradeId) =>
     positionPriceTracker.persistMfeMaeForTrade(sourceTradeId)
+  // Cache-bust the ConditionMonitor snapshot whenever a trade's fields change
+  // (SL/TP modified, partial close). The monitor evaluates every price tick
+  // against a snapshot and a stale `currentUnits` / `stopLoss` can silently
+  // suppress triggers. Short-TTL cache + this push signal keeps staleness
+  // bounded to a single tick in practice.
+  tradeSyncer.onTradeModified = (tradeId) => {
+    conditionMonitor.invalidateTradeCache(tradeId)
+  }
   tradeSyncer.onTradeClosed = (tradeId) => {
     void autoAnalyzer.onTradeClosed(tradeId)
     // Expire all in-memory + DB conditions for the closed trade (prevents race condition)
@@ -387,7 +395,8 @@ async function main() {
   const tradeFinderTradeManager = new TradeFinderTradeManager(broadcast)
   tradeFinderTradeManager.setCallbacks(
     (sourceTradeId, sl, tp) => tradeSyncer.modifyTradeSLTP(sourceTradeId, sl, tp),
-    (sourceTradeId, units, reason) => tradeSyncer.closeTrade(sourceTradeId, units, reason),
+    (sourceTradeId, units, reason, attribution) =>
+      tradeSyncer.closeTrade(sourceTradeId, units, reason, attribution),
     () => positionManager.getPositions().open,
   )
   await tradeFinderTradeManager.initialize()

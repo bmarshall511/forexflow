@@ -23,7 +23,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
-import { Sparkles, History, Target, AlertTriangle, Settings, RefreshCw, Zap } from "lucide-react"
+import {
+  Sparkles,
+  History,
+  Target,
+  AlertTriangle,
+  Settings,
+  RefreshCw,
+  Zap,
+  Square,
+} from "lucide-react"
 import { AnalysisModelSelector } from "./analysis-model-selector"
 import { AnalysisTabContent } from "./analysis-tab-content"
 import { AnalysisHistory } from "./analysis-history"
@@ -69,6 +78,8 @@ export function AiAnalysisSheet({ trade, tradeStatus, open, onOpenChange }: AiAn
     history,
     progress,
     activeAnalysis,
+    interruptedAnalysis,
+    dismissInterruption,
     isLoading,
     isTransitioning,
     isTriggeringAnalysis,
@@ -77,12 +88,16 @@ export function AiAnalysisSheet({ trade, tradeStatus, open, onOpenChange }: AiAn
   } = useAiAnalysis(tradeId)
   const conditionHooks = useTradeConditions(tradeId)
 
-  // The analysis to display: viewed from history OR the latest completed/failed/stuck
+  // The analysis to display: viewed from history OR the latest terminal /
+  // in-flight analysis. `partial` must be in the allow-list so truncated
+  // analyses surface their parsed sections + TruncationBanner instead of
+  // falling through to the empty state.
   const displayAnalysis =
     viewedAnalysis ??
     history.find(
       (a) =>
         a.status === "completed" ||
+        a.status === "partial" ||
         a.status === "failed" ||
         a.status === "pending" ||
         a.status === "running",
@@ -200,17 +215,33 @@ export function AiAnalysisSheet({ trade, tradeStatus, open, onOpenChange }: AiAn
                   onDepthChange={setSelectedDepth}
                   disabled={isTriggeringAnalysis || !!progress}
                 />
-                <Button
-                  size="sm"
-                  className="h-8 gap-1.5 text-xs"
-                  onClick={() => void handleTrigger()}
-                  disabled={isTriggeringAnalysis || !!progress || !tradeId}
-                  aria-label="Analyze trade with AI"
-                  aria-busy={!!progress}
-                >
-                  <Sparkles className="size-3" />
-                  {progress ? "Analyzing…" : isTriggeringAnalysis ? "Starting…" : "Analyze"}
-                </Button>
+                {progress && activeAnalysis ? (
+                  // Persistent Stop button: visible from the sheet header whenever
+                  // an analysis is running, so it stays reachable even when the
+                  // user has scrolled the progress area off-screen.
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60 min-h-9 gap-1.5 text-xs"
+                    onClick={() => void cancelAnalysis(activeAnalysis.id)}
+                    aria-label="Stop analysis"
+                  >
+                    <Square className="size-3 fill-current" />
+                    Stop
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="min-h-9 gap-1.5 text-xs"
+                    onClick={() => void handleTrigger()}
+                    disabled={isTriggeringAnalysis || !!progress || !tradeId}
+                    aria-label="Analyze trade with AI"
+                    aria-busy={!!progress}
+                  >
+                    <Sparkles className="size-3" />
+                    {isTriggeringAnalysis ? "Starting…" : "Analyze"}
+                  </Button>
+                )}
               </div>
             )}
           </SheetHeader>
@@ -272,6 +303,8 @@ export function AiAnalysisSheet({ trade, tradeStatus, open, onOpenChange }: AiAn
                   isLoading={isLoading}
                   isTransitioning={isTransitioning}
                   activeAnalysis={activeAnalysis}
+                  interruptedAnalysis={interruptedAnalysis}
+                  onDismissInterruption={dismissInterruption}
                   trade={trade}
                   tradeStatus={tradeStatus}
                   liveTick={liveTick}

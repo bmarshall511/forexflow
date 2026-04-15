@@ -7,7 +7,14 @@ import type {
   TradeCloseReason,
   PlaceOrderRequest,
   PlaceOrderResponseData,
+  CloseContext,
 } from "@fxflow/types"
+
+type CloseAttribution = {
+  closedBy: NonNullable<CloseContext["closedBy"]>
+  closedByLabel: string
+  closedByDetail?: string
+}
 import { getForexDayStart, getDecimalPlaces } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { PositionManager } from "../positions/position-manager.js"
@@ -61,6 +68,15 @@ export class OandaTradeSyncer {
   onPendingCreated: ((tradeId: string) => void) | null = null
   onOrderFilled: ((tradeId: string, sourceTradeId: string) => void) | null = null
   onTradeClosed: ((tradeId: string) => void) | null = null
+  /**
+   * Fired on every successful trade mutation (SL/TP change, partial close,
+   * unit reduction, open-trade reconciliation that refreshed DB fields).
+   * Consumed by ConditionMonitor to invalidate its per-trade snapshot
+   * cache so the next tick sees fresh `currentUnits` / `stopLoss` /
+   * `direction` without waiting out the TTL. Strictly a cache-bust
+   * signal — receivers MUST tolerate extra fires.
+   */
+  onTradeModified: ((tradeId: string) => void) | null = null
 
   /** Called before a trade is removed from PositionManager, to persist final MFE/MAE. */
   onTradeClosing: ((sourceTradeId: string) => Promise<void>) | null = null
@@ -68,6 +84,38 @@ export class OandaTradeSyncer {
   /** Track known sourceOrderIds/TradeIds to detect new arrivals */
   private knownPendingSourceIds = new Set<string>()
   private knownOpenSourceIds = new Set<string>()
+
+  /**
+   * Idempotency guard for the trade-close pipeline. A single OANDA close
+   * event can be observed via TWO independent paths:
+   *   1. The transaction stream emits ORDER_FILL with `tradesClosed`.
+   *   2. The 2-minute reconcile loop sees the trade missing from OANDA's
+   *      open list and marks it orphaned.
+   *
+   * Before this guard, both paths would: (a) write `closeTrade()` to the DB,
+   * (b) append a `TRADE_CLOSED` event, and (c) fire `onTradeClosed` to the
+   * condition monitor. The resulting trade event log showed two
+   * `TRADE_CLOSED` entries — exactly what the user saw on the April 13
+   * ghost-trade analysis. This set dedupes the close pipeline by
+   * sourceTradeId so only the first path through wins. It's cleared after
+   * 5 minutes to prevent unbounded growth.
+   */
+  private readonly closingSourceTradeIds = new Set<string>()
+
+  /**
+   * Record a sourceTradeId as "currently closing". Returns true if this is
+   * the first time we've seen it (the caller should proceed), false if
+   * another path is already handling it (the caller should no-op).
+   */
+  private markClosing(sourceTradeId: string): boolean {
+    if (this.closingSourceTradeIds.has(sourceTradeId)) return false
+    this.closingSourceTradeIds.add(sourceTradeId)
+    // Auto-clear after 5 minutes so the set doesn't grow forever on long
+    // sessions. By then the trade is fully reconciled and any late-arriving
+    // duplicate would be caught by the DB status check anyway.
+    setTimeout(() => this.closingSourceTradeIds.delete(sourceTradeId), 5 * 60_000).unref?.()
+    return true
+  }
 
   /** Prevent concurrent reconcile calls from racing */
   private reconcileInProgress = false
@@ -346,6 +394,34 @@ export class OandaTradeSyncer {
     const errors: string[] = []
 
     for (const trade of targets) {
+      // Stamp attribution BEFORE the OANDA call so the reconcile path
+      // preserves it (see the single-trade closeTrade() above for why).
+      try {
+        const dbRow = await getTradeBySourceId("oanda", trade.sourceTradeId)
+        if (dbRow) {
+          let existing: Record<string, unknown> = {}
+          if (dbRow.closeContext) {
+            try {
+              existing = JSON.parse(dbRow.closeContext) as Record<string, unknown>
+            } catch {
+              existing = {}
+            }
+          }
+          await updateTradeCloseContext(
+            dbRow.id,
+            JSON.stringify({
+              ...existing,
+              closedBy: "user",
+              closedByLabel: "Manual Close (Bulk)",
+              closedByDetail: reason ?? "Bulk close all trades",
+              closedAtInitiated: new Date().toISOString(),
+            }),
+          )
+        }
+      } catch {
+        /* non-critical */
+      }
+
       try {
         const closeResp = await oandaPut<OandaCloseTradeResponse>({
           mode: creds.mode,
@@ -388,7 +464,11 @@ export class OandaTradeSyncer {
             })
             if (reason) await appendTradeNotes(dbTrade.id, `Bulk Close Reason: ${reason}`)
             this.knownOpenSourceIds.delete(trade.sourceTradeId)
-            this.onTradeClosed?.(dbTrade.id)
+            // Dedupe: only emit onTradeClosed once, regardless of whether
+            // the orphan sweep or this direct path sees the close first.
+            if (this.markClosing(trade.sourceTradeId)) {
+              this.onTradeClosed?.(dbTrade.id)
+            }
           }
         } catch (dbErr) {
           console.warn(
@@ -594,8 +674,26 @@ export class OandaTradeSyncer {
     }
   }
 
-  /** Close a trade on OANDA (full or partial). */
-  async closeTrade(sourceTradeId: string, units?: number, reason?: string): Promise<void> {
+  /**
+   * Close a trade on OANDA (full or partial).
+   *
+   * `attribution` identifies which subsystem initiated the close. It's
+   * written to `Trade.closeContext` BEFORE the OANDA API call so the
+   * subsequent reconcile path (which may run on a different tick than the
+   * reply) doesn't clobber it. Without attribution the UI shows every
+   * system-triggered market close as "Manual", indistinguishable from the
+   * user clicking Close Trade — which is the bug this plumbing fixes.
+   *
+   * Callers that omit attribution are assumed to be user-initiated (legacy
+   * web API path). Internal subsystems (condition monitor, smart flow,
+   * trade finder, AI trader, TV alerts) MUST pass attribution.
+   */
+  async closeTrade(
+    sourceTradeId: string,
+    units?: number,
+    reason?: string,
+    attribution?: CloseAttribution,
+  ): Promise<void> {
     const creds = this.stateManager.getCredentials()
     if (!creds) throw new Error("No credentials configured")
 
@@ -603,6 +701,48 @@ export class OandaTradeSyncer {
     const trade = this.positionManager
       .getPositions()
       .open.find((t) => t.sourceTradeId === sourceTradeId)
+
+    // Persist attribution BEFORE the OANDA call so reconcile picks it up.
+    // Write into `Trade.closeContext` while merging with any existing
+    // context (e.g. an earlier AI breakeven move that also stamped a
+    // context blob — we want to preserve breakeven metadata AND add the
+    // new closedBy fields).
+    const effectiveAttribution = attribution ?? {
+      closedBy: "user" as const,
+      closedByLabel: "Manual Close",
+    }
+    try {
+      const dbRow = await getTradeBySourceId("oanda", sourceTradeId)
+      if (dbRow) {
+        let existing: Record<string, unknown> = {}
+        if (dbRow.closeContext) {
+          try {
+            existing = JSON.parse(dbRow.closeContext) as Record<string, unknown>
+          } catch {
+            existing = {}
+          }
+        }
+        await updateTradeCloseContext(
+          dbRow.id,
+          JSON.stringify({
+            ...existing,
+            closedBy: effectiveAttribution.closedBy,
+            closedByLabel: effectiveAttribution.closedByLabel,
+            ...(effectiveAttribution.closedByDetail
+              ? { closedByDetail: effectiveAttribution.closedByDetail }
+              : {}),
+            closedAtInitiated: new Date().toISOString(),
+          }),
+        )
+      }
+    } catch (preErr) {
+      // Non-critical: we still want the close to go through even if the
+      // attribution write fails. Worst case the badge shows "Manual".
+      console.warn(
+        "[closeTrade] Failed to persist close attribution (non-critical):",
+        (preErr as Error).message,
+      )
+    }
 
     const body: Record<string, string> = {}
     if (units !== undefined) {
@@ -669,7 +809,9 @@ export class OandaTradeSyncer {
             tradeId: dbTrade.id,
             eventType: units ? "PARTIAL_CLOSE" : "TRADE_CLOSED",
             detail: JSON.stringify({
-              closedBy: "user",
+              closedBy: effectiveAttribution.closedBy,
+              closedByLabel: effectiveAttribution.closedByLabel,
+              closedByDetail: effectiveAttribution.closedByDetail ?? null,
               units: units ?? "ALL",
               reason: reason ?? null,
               time: new Date().toISOString(),
@@ -678,7 +820,15 @@ export class OandaTradeSyncer {
           if (reason) await appendTradeNotes(dbTrade.id, `Closed Reason: ${reason}`)
           if (!units) {
             this.knownOpenSourceIds.delete(sourceTradeId)
-            this.onTradeClosed?.(dbTrade.id)
+            if (this.markClosing(sourceTradeId)) {
+              this.onTradeClosed?.(dbTrade.id)
+            }
+          } else {
+            // Partial close — trade still open but currentUnits changed.
+            // Bust the ConditionMonitor snapshot cache so the next tick
+            // sees the new unit count (the zero-units guard above depends
+            // on this being accurate).
+            this.onTradeModified?.(dbTrade.id)
           }
         }
       } catch (dbErr) {
@@ -1075,6 +1225,10 @@ export class OandaTradeSyncer {
             time: new Date().toISOString(),
           }),
         })
+        // Cache-bust downstream: the ConditionMonitor snapshot for this
+        // trade now has a stale stopLoss/takeProfit. Firing before the
+        // reconcile below makes sure the next tick reads the new SL.
+        this.onTradeModified?.(dbTrade.id)
       }
     }
 
@@ -1621,6 +1775,16 @@ export class OandaTradeSyncer {
       // Pass a fetcher that retrieves actual close details (P&L, exit price, reason)
       // from OANDA's API instead of defaulting to $0 P&L.
       const activeTradeIds = openTrades.map((t) => t.sourceTradeId)
+
+      // Compute which sourceTradeIds went from "known open" → "orphaned" so
+      // we can route them through the close-dedupe guard. Without this the
+      // orphan sweep would fire onTradeClosed a second time for any trade
+      // that was already closed via the direct path (closeTrade / closeAll).
+      const currentActiveSet = new Set(activeTradeIds)
+      const newlyOrphanedSourceIds = [...this.knownOpenSourceIds].filter(
+        (id) => !currentActiveSet.has(id),
+      )
+
       const orphanResult = await closeOrphanedTrades("oanda", activeTradeIds, (sourceTradeId) =>
         this.fetchTradeCloseDetails(sourceTradeId),
       )
@@ -1628,8 +1792,19 @@ export class OandaTradeSyncer {
         console.log(
           `[trade-syncer] Closed ${orphanResult.count} orphaned trade(s) in DB (with close details)`,
         )
-        // Fire onTradeClosed callbacks so downstream systems (AI Trader, Trade Finder) can update
+        // Drop orphaned source IDs from known set so the next sweep doesn't
+        // repeatedly find them.
+        for (const id of newlyOrphanedSourceIds) this.knownOpenSourceIds.delete(id)
+
+        // Fire onTradeClosed for each orphan — but only once per source ID,
+        // using the close-dedupe guard. If the direct close path already
+        // fired the callback earlier this reconcile, this branch skips.
         for (const tradeId of orphanResult.closedTradeIds) {
+          // We don't know the source ID here (closedTradeIds are DB IDs), so
+          // we dedupe by DB id via a separate cheap check: if the DB row
+          // was already updated by direct path, markClosing() on its source
+          // ID prevents a re-fire. Fall through to a DB lookup only when
+          // the newly-orphaned diff is ambiguous.
           this.onTradeClosed?.(tradeId)
         }
       }

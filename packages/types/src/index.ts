@@ -429,6 +429,37 @@ export interface CloseContext {
   cancelReason?: string
   /** ISO timestamp when the cancellation was detected or executed. */
   cancelledAt?: string
+  // ── System-initiated close attribution ──
+  /**
+   * Identifies the subsystem that initiated a MARKET close on an open trade.
+   * Set BEFORE the close is sent to OANDA so the subsequent reconcile path
+   * preserves it. Without this, every system-triggered market close shows
+   * up as "Manual" in the UI — indistinguishable from a user clicking
+   * "Close Trade" in the drawer.
+   */
+  closedBy?:
+    | "user"
+    | "ai_condition"
+    | "ai_trader"
+    | "trade_finder"
+    | "smart_flow"
+    | "smart_flow_ai"
+    | "tv_alert_reversal"
+    | "system"
+  /**
+   * Short human-readable label for the close source, used directly by the
+   * OutcomeBadge (e.g. "AI Condition", "EdgeFinder", "SmartFlow"). Falls
+   * back to a derived label from `closedBy` when absent.
+   */
+  closedByLabel?: string
+  /**
+   * Additional freeform detail about the close — e.g. the condition label
+   * that fired, or the SmartFlow rule that triggered. Surfaced in the
+   * trade drawer's details section.
+   */
+  closedByDetail?: string
+  /** ISO timestamp when the close was initiated (not necessarily filled). */
+  closedAtInitiated?: string
 }
 
 // ─── Aggregate Positions Payload ───────────────────────────────────────────
@@ -905,6 +936,13 @@ export interface AiAnalysisCompletedMessage extends DaemonMessage<{
   error?: string
   /** Whether the streamed response was truncated due to size limits */
   streamTruncated?: boolean
+  /**
+   * True when the Anthropic response was cut off by `max_tokens`. Paired with
+   * `status: "partial"` on the persisted row and surfaces a banner in the UI.
+   */
+  truncated?: boolean
+  /** Anthropic `stop_reason` from the final message event. */
+  stopReason?: string | null
   /** Errors that occurred during auto-apply of actions */
   autoApplyErrors?: Array<{ actionId: string; label: string; error: string }>
 }> {
@@ -1574,8 +1612,24 @@ export const ANALYSIS_STUCK_THRESHOLD_MS = 2 * 60 * 1000 // 2 minutes
 /** Threshold for ignoring old running analyses on page load (too old to restore spinner) */
 export const ANALYSIS_STALE_THRESHOLD_MS = 10 * 60 * 1000 // 10 minutes
 
-/** Lifecycle status of an AI analysis request. */
-export type AiAnalysisStatus = "pending" | "running" | "completed" | "failed" | "cancelled"
+/**
+ * Lifecycle status of an AI analysis request.
+ *
+ * - `pending` / `running` — in flight
+ * - `completed` — finished with a fully-populated `sections` payload
+ * - `partial` — finished but truncated by the model's `max_tokens` cap. Sections
+ *   that parsed cleanly are available; missing fields are rendered as "not
+ *   generated" placeholders with a visible banner + regenerate CTA.
+ * - `failed` — error before or during the stream (API error, parse failure)
+ * - `cancelled` — user aborted mid-stream
+ */
+export type AiAnalysisStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "cancelled"
 
 /** Analysis depth preset — controls prompt complexity and context window usage. */
 export type AiAnalysisDepth = "quick" | "standard" | "deep"
@@ -1803,6 +1857,19 @@ export interface AiAnalysisSections {
   immediateActions: AiActionButton[]
   /** Suggested trade conditions for automated management. */
   conditionSuggestions: AiConditionSuggestion[]
+  /**
+   * Re-run reconciliation — present on v2 analyses when the trade already
+   * has existing conditions the AI was asked to reconcile against. Each
+   * entry is an explicit op: keep (do nothing), update (mutate params),
+   * remove (soft-delete), or add (create new). Omitted on first-run
+   * analyses; readers should fall back to `conditionSuggestions` when absent.
+   */
+  conditionChanges?: AiConditionChange[]
+  /**
+   * Re-run reconciliation for immediate (one-shot) actions proposed by
+   * prior analyses. Same op model as conditionChanges.
+   */
+  immediateActionChanges?: AiImmediateActionChange[]
   /** Post-mortem analysis for closed trades (lessons learned). */
   postMortem?: string
   /** Action IDs that were auto-executed by the daemon (set post-analysis, not by AI) */
@@ -1810,6 +1877,78 @@ export interface AiAnalysisSections {
   /** Errors that occurred during auto-apply of actions (set post-analysis, not by AI) */
   autoApplyErrors?: Array<{ actionId: string; label: string; error: string }>
 }
+
+/**
+ * One reconciliation op against an existing trade condition (or a proposal
+ * to add a new one). Emitted by the AI on re-runs so the daemon can apply
+ * structured updates rather than blindly re-creating rules. Shape is a
+ * discriminated union on `op`.
+ */
+export type AiConditionChange =
+  | {
+      /** No change — keep the existing condition exactly as-is. */
+      op: "keep"
+      /** ID of the existing TradeCondition row to keep. */
+      existingConditionId: string
+      /** Reason the rule is still valid (shown in diff view). */
+      reason: string
+    }
+  | {
+      /** Mutate an existing condition's parameters (label/trigger/action params). */
+      op: "update"
+      /** ID of the existing TradeCondition row to update. */
+      existingConditionId: string
+      /** New trigger value JSON (replaces existing). */
+      newTriggerValue?: Record<string, unknown>
+      /** New action params JSON (replaces existing). */
+      newActionParams?: Record<string, unknown>
+      /** New human-readable label. */
+      newLabel?: string
+      /** Reason for the update (shown in diff view). */
+      reason: string
+    }
+  | {
+      /** Soft-delete the existing condition — the thesis is invalidated. */
+      op: "remove"
+      existingConditionId: string
+      reason: string
+    }
+  | {
+      /** Propose a genuinely new condition not covered by any existing rule. */
+      op: "add"
+      condition: AiConditionSuggestion
+      reason: string
+    }
+
+/**
+ * One reconciliation op against an immediate (one-shot) action proposed by
+ * a prior analysis. Used for AiImmediateActionLog rows so re-runs can
+ * clarify whether a prior recommendation is still standing, outdated, or
+ * replaced by a new one.
+ */
+export type AiImmediateActionChange =
+  | {
+      op: "keep"
+      existingActionId: string
+      reason: string
+    }
+  | {
+      op: "update"
+      existingActionId: string
+      newParams?: Record<string, unknown>
+      newLabel?: string
+      reason: string
+    }
+  | {
+      op: "remove"
+      existingActionId: string
+      reason: string
+    }
+  | {
+      op: "add"
+      action: AiActionButton
+      reason: string
+    }
 
 /** Complete AI analysis record, persisted in the database and returned by the analysis API. */
 export interface AiAnalysisData {
@@ -1833,16 +1972,61 @@ export interface AiAnalysisData {
   inputTokens: number
   /** Total output tokens generated. */
   outputTokens: number
+  /** Prompt-cache read tokens (billed at discount) — optional, 0 when caching wasn't used. */
+  cacheReadTokens?: number
+  /** Prompt-cache write tokens — optional, 0 when caching wasn't used. */
+  cacheWriteTokens?: number
   /** Total cost in USD. */
   costUsd: number
   /** Execution duration in milliseconds. */
   durationMs: number
   /** Error message if the analysis failed. */
   errorMessage: string | null
+  /** Partial stream text captured when cancelled mid-run; null otherwise. */
+  partialStreamText?: string | null
+  /** ISO timestamp when the analysis was cancelled; null if it wasn't. */
+  cancelledAt?: string | null
+  /**
+   * True when the Claude response was cut off by the model's `max_tokens` cap.
+   * Paired with `status: "partial"` — sections that parsed cleanly are present,
+   * but at least one expected section is missing or incomplete.
+   */
+  truncated?: boolean
+  /**
+   * Anthropic API `stop_reason` from the final message event. `"end_turn"` on
+   * normal completion, `"max_tokens"` on truncation. Null for older rows and
+   * runs that errored before streaming finished.
+   */
+  stopReason?: string | null
+  /** Sections JSON schema version (1 = legacy, 2 = includes reconciliation diff). */
+  schemaVersion?: number
+  /** Structured reconciliation log of ops applied on re-runs; null for non-reruns. */
+  reconciliationLog?: AiReconciliationLogEntry[] | null
   /** ISO timestamp when the analysis was created. */
   createdAt: string
   /** ISO timestamp of the last status update. */
   updatedAt: string
+}
+
+/**
+ * One structured row in `AiAnalysis.reconciliationLog` — what a re-run
+ * analysis did to an existing condition or immediate action.
+ */
+export interface AiReconciliationLogEntry {
+  /** What kind of entity was affected. */
+  target: "condition" | "immediate_action"
+  /** What was done: keep (no-op), update (params changed), remove, or add. */
+  op: "keep" | "update" | "remove" | "add"
+  /** For keep/update/remove: the existing ID the op referred to. */
+  existingId?: string
+  /** For add/update: the ID of the new/updated row (when applicable). */
+  resultId?: string
+  /** Human-readable label of the condition/action at the time of the op. */
+  label: string
+  /** AI's reason for the op ("support still holding", "new FVG formed", etc). */
+  reason: string
+  /** ISO timestamp when the op was executed. */
+  at: string
 }
 
 /** Aggregate AI usage statistics displayed on the AI settings page. */
@@ -1882,6 +2066,8 @@ export interface AiUsageStats {
   /** Count of analyses by status. */
   statusCounts: {
     completed: number
+    /** Truncated-but-usable analyses — Claude hit `max_tokens` mid-response. */
+    partial: number
     failed: number
     cancelled: number
     running: number
@@ -1969,6 +2155,42 @@ export interface AiSettingsData {
   defaultModel: AiClaudeModel
   /** Auto-analysis configuration. */
   autoAnalysis: AiAutoAnalysisSettings
+  /**
+   * When true, the client auto-retries an interrupted analysis once after a
+   * 3s cancelable toast. Default off — the user is always in control.
+   */
+  autoRetryInterrupted: boolean
+  /** Soft monthly cost cap (USD). Null = no cap. */
+  monthlyBudgetCapUsd: number | null
+  /** Guardrail on per-analysis reconciliation ops (add/update/remove). Default 20. */
+  maxReconciliationOps: number
+  /** Re-analysis schedule config. */
+  reanalysisSchedule: AiReanalysisScheduleConfig
+}
+
+/**
+ * Re-analysis schedule configuration. When `mode` is anything other than
+ * "off", the daemon's auto-analyzer will periodically re-run analyses on
+ * open trades according to the rules below.
+ */
+export interface AiReanalysisScheduleConfig {
+  /**
+   * Trigger mode:
+   *  - `"off"`: disabled (default)
+   *  - `"time"`: re-run every N hours while the trade is open
+   *  - `"price"`: re-run when price moves by `pipThreshold` pips from the last analysis
+   *  - `"event"`: re-run on named events (economic calendar, TV signal, R:R milestone)
+   *  - `"sl_approach"`: re-run urgently when price is within N pips of the stop
+   */
+  mode: "off" | "time" | "price" | "event" | "sl_approach"
+  /** For `"time"` mode: interval in hours between auto re-runs. */
+  intervalHours?: number
+  /** For `"price"` mode: pip distance from the last analysis that triggers a re-run. */
+  pipThreshold?: number
+  /** For `"event"` mode: which event types should trigger a re-run. */
+  events?: Array<"tv_signal" | "calendar" | "rr_milestone">
+  /** For `"sl_approach"` mode: pips from SL that trigger an urgent re-run. */
+  slApproachPips?: number
 }
 
 // ─── AI Accuracy & Digest ────────────────────────────────────────────────────
@@ -2117,6 +2339,12 @@ export interface TradeConditionData {
   expiresAt: string | null
   /** ISO timestamp when this condition was triggered; null if not yet triggered. */
   triggeredAt: string | null
+  /** ISO timestamp of the last modification (update/reconciliation); null if never modified. */
+  lastModifiedAt?: string | null
+  /** ISO timestamp when the condition was soft-deleted; null if still active. */
+  deletedAt?: string | null
+  /** True once the expiry-approaching / expired notification has been sent. */
+  expiredNotified?: boolean
   /** ISO timestamp when the condition was created. */
   createdAt: string
   /** ISO timestamp of the last status update. */

@@ -8,7 +8,8 @@ import type {
   TradeConditionTriggerType,
   TradeConditionActionType,
 } from "@fxflow/types"
-import { classifyAiError } from "@fxflow/shared"
+import { classifyAiError, conditionsMatch } from "@fxflow/shared"
+import type { AiReconciliationLogEntry } from "@fxflow/types"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { ConditionMonitor } from "./condition-monitor.js"
@@ -127,6 +128,31 @@ CRITICAL: You MUST respond with ONLY a valid JSON object that exactly matches th
       "rationale": "string"
     }
   ],
+  "conditionChanges": [
+    // OMIT this field entirely on first-run analyses. On re-runs when the
+    // trade already has active conditions, emit one entry per existing
+    // condition (keep | update | remove) and any genuinely new ideas as
+    // "add". See "Re-analysis Reconciliation Instructions" below for rules.
+    {
+      "op": "keep",
+      "existingConditionId": "string (the ID from the Active Trade Conditions list)",
+      "reason": "string (why the rule is still valid)"
+    }
+    // OR:
+    // { "op": "update", "existingConditionId": "...", "newTriggerValue": {...}, "newActionParams": {...}, "newLabel": "...", "reason": "..." }
+    // { "op": "remove", "existingConditionId": "...", "reason": "thesis invalidated because..." }
+    // { "op": "add", "condition": { ...AiConditionSuggestion... }, "reason": "new idea because..." }
+  ],
+  "immediateActionChanges": [
+    // OMIT on first-run analyses. On re-runs, reconcile against the
+    // "Previously suggested immediate actions" list. Same op model:
+    // keep | update | remove | add.
+    {
+      "op": "keep",
+      "existingActionId": "string (ID from the Previously suggested immediate actions list)",
+      "reason": "string"
+    }
+  ],
   "postMortem": "string | null (only for CLOSED trades: honest assessment of what went right/wrong)"
 }
 
@@ -210,80 +236,71 @@ export function cancelAllActiveAnalyses(): number {
 // ─── JSON Extraction ─────────────────────────────────────────────────────────
 
 /**
- * Robustly extract a JSON object from a Claude response.
- * Handles: raw JSON, code-fenced JSON, preamble/trailing text around JSON,
- * and truncated responses (attempts to close open braces).
+ * Strict JSON extraction from a Claude response.
+ *
+ * Strategy:
+ *   1. Strip optional code fences.
+ *   2. `JSON.parse` the remaining text.
+ *   3. If that fails, take the substring between the first `{` and last `}`
+ *      and try once more.
+ *
+ * Critically we do NOT attempt to repair truncated JSON by closing dangling
+ * braces. The prior "repair" path silently promoted truncated responses to
+ * `status: "completed"` with missing recommendations — the user never saw
+ * the truncation warning and thought the analysis was complete. Truncation
+ * is now detected via the Anthropic `stop_reason` field on `message_delta`
+ * and surfaced as `status: "partial"` + a UI banner.
+ *
+ * Returns `null` when parsing fails entirely — the caller decides whether to
+ * mark the analysis as `"failed"` (unparseable) or `"partial"` (truncated but
+ * the stream itself was healthy).
  */
-function extractJsonFromResponse<T>(raw: string): T {
+function tryExtractJson<T>(raw: string): T | null {
   const trimmed = raw.trim()
+  if (!trimmed) return null
 
-  // 1. Strip code fences if present
   const fenceStripped = trimmed.startsWith("```")
     ? trimmed.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?\s*```\s*$/, "")
     : trimmed
 
-  // 2. Try direct parse first (happy path)
   try {
     return JSON.parse(fenceStripped) as T
   } catch {
-    // continue to more robust extraction
+    // Fall through to substring extraction.
   }
 
-  // 3. Extract JSON by finding first '{' and last '}'
   const firstBrace = fenceStripped.indexOf("{")
   const lastBrace = fenceStripped.lastIndexOf("}")
   if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const extracted = fenceStripped.slice(firstBrace, lastBrace + 1)
     try {
-      return JSON.parse(extracted) as T
+      return JSON.parse(fenceStripped.slice(firstBrace, lastBrace + 1)) as T
     } catch {
-      // continue to truncation repair
+      // Fall through.
     }
   }
 
-  // 4. Handle truncated JSON (response cut off by max_tokens)
-  // Find the first '{' and try to close unclosed braces/brackets
-  if (firstBrace !== -1) {
-    let candidate = fenceStripped.slice(firstBrace)
-    // Remove any trailing incomplete string (e.g., `"text that was cut o`)
-    candidate = candidate.replace(/,?\s*"[^"]*$/, "")
-    // Remove trailing comma if present
-    candidate = candidate.replace(/,\s*$/, "")
-    // Count unclosed braces and brackets
-    let openBraces = 0
-    let openBrackets = 0
-    let inString = false
-    let escaped = false
-    for (const ch of candidate) {
-      if (escaped) {
-        escaped = false
-        continue
-      }
-      if (ch === "\\") {
-        escaped = true
-        continue
-      }
-      if (ch === '"') {
-        inString = !inString
-        continue
-      }
-      if (inString) continue
-      if (ch === "{") openBraces++
-      else if (ch === "}") openBraces--
-      else if (ch === "[") openBrackets++
-      else if (ch === "]") openBrackets--
-    }
-    // Close any open brackets then braces
-    candidate += "]".repeat(Math.max(0, openBrackets))
-    candidate += "}".repeat(Math.max(0, openBraces))
-    try {
-      return JSON.parse(candidate) as T
-    } catch {
-      // final fallback failed
-    }
-  }
+  return null
+}
 
-  throw new Error(`Could not extract valid JSON from response (length=${raw.length})`)
+/**
+ * Inspect a parsed analysis object for semantic completeness. Returns the
+ * names of fields that are missing or empty so the UI can render
+ * "not generated — response truncated" placeholders and the caller can
+ * decide whether to flag the analysis as partial even when JSON parsed.
+ *
+ * A completely successful analysis returns an empty array.
+ */
+function findMissingSections(sections: AiAnalysisSections | null): string[] {
+  if (!sections) return ["all"]
+  const missing: string[] = []
+  if (!sections.summary?.trim()) missing.push("summary")
+  if (sections.winProbability == null) missing.push("winProbability")
+  if (sections.tradeQualityScore == null) missing.push("tradeQualityScore")
+  if (!sections.technical?.trend) missing.push("technical")
+  if (!sections.risk?.factors || sections.risk.factors.length === 0) missing.push("risk.factors")
+  // Recommendations / actions are optional for closed trades (post-mortem)
+  // so we don't require them here — the UI decides based on tradeStatus.
+  return missing
 }
 
 // ─── Main Executor ───────────────────────────────────────────────────────────
@@ -337,6 +354,51 @@ export async function executeAnalysis(opts: {
   }
 
   try {
+    // ─── Budget cap enforcement ────────────────────────────────────────
+    //
+    // Before spending any tokens, check the month-to-date AI cost against
+    // the user's configured monthly cap. Hard stop (not just a warn) when
+    // exceeded — the user can always raise the cap in Settings or delete
+    // this guard for a single run via the override toggle (future work).
+    //
+    // Scheduled/auto-triggered analyses enforce the cap strictly. Manual
+    // user-triggered runs still block but the UI surfaces a specific
+    // "monthly budget cap reached" error so the user can take action.
+    try {
+      const { getAiSettings, getUsageStats } = await import("@fxflow/db")
+      const settings = await getAiSettings()
+      const cap = settings.monthlyBudgetCapUsd
+      if (cap != null && cap > 0) {
+        const stats = await getUsageStats()
+        const monthSpend = stats.byPeriod.thisMonth.costUsd ?? 0
+        if (monthSpend >= cap) {
+          const msg = `Monthly AI budget cap reached ($${monthSpend.toFixed(2)} / $${cap.toFixed(2)}). Raise the cap in Settings → AI or wait until next month.`
+          console.warn(`[ai-executor] ${msg}`)
+          await updateAnalysisStatus(analysisId, "failed", msg)
+          broadcast({
+            type: "ai_analysis_completed",
+            timestamp: new Date().toISOString(),
+            data: {
+              analysisId,
+              tradeId,
+              sections: null,
+              inputTokens: 0,
+              outputTokens: 0,
+              costUsd: 0,
+              durationMs: 0,
+              error: msg,
+            },
+          })
+          activeControllers.delete(analysisId)
+          return
+        }
+      }
+    } catch (capErr) {
+      // Fail open: if the budget check itself errors, don't block the
+      // analysis. Better to spend than to silently block on a DB hiccup.
+      console.warn("[ai-executor] Budget cap check failed:", (capErr as Error).message)
+    }
+
     await updateAnalysisStatus(analysisId, "running")
 
     broadcast({
@@ -344,6 +406,57 @@ export async function executeAnalysis(opts: {
       timestamp: new Date().toISOString(),
       data: { analysisId, tradeId, model, depth },
     })
+
+    // ─── Preflight: refresh trade state from OANDA ─────────────────────
+    //
+    // Before spending tokens, force a reconcile so we're guaranteed to see
+    // the OANDA truth for this trade. This closes the race where a trade
+    // was closed externally (SL/TP/manual-close-on-phone) between the last
+    // background reconcile and the moment the user clicked Analyze. Without
+    // this step, the executor could feed Claude stale `status: "open"` data
+    // and produce nonsensical "hold" recommendations on a trade that no
+    // longer exists — exactly the failure mode the April 13 ghost-trade
+    // analysis demonstrated.
+    //
+    // After the refresh we re-read the trade from the DB and abort with a
+    // specific error if it's no longer open/pending. Failing open (on
+    // refresh errors) is fine — context gathering will catch stale state
+    // via its own DB read, and we still save tokens for the common path.
+    try {
+      await tradeSyncer.refreshPositions()
+      const { db: preflightDb } = await import("@fxflow/db")
+      const freshTrade = await preflightDb.trade.findUnique({
+        where: { id: tradeId },
+        select: { status: true, instrument: true },
+      })
+      if (freshTrade && freshTrade.status === "closed" && tradeStatus !== "closed") {
+        // Trade was closed since the analysis was requested — abort cleanly.
+        const pair = freshTrade.instrument.replace("_", "/")
+        const msg = `Trade was closed on OANDA before analysis could run (${pair}). Run a post-mortem analysis instead.`
+        await updateAnalysisStatus(analysisId, "failed", msg)
+        broadcast({
+          type: "ai_analysis_completed",
+          timestamp: new Date().toISOString(),
+          data: {
+            analysisId,
+            tradeId,
+            sections: null,
+            inputTokens: 0,
+            outputTokens: 0,
+            costUsd: 0,
+            durationMs: Date.now() - startTime,
+            error: msg,
+          },
+        })
+        activeControllers.delete(analysisId)
+        return
+      }
+    } catch (preflightErr) {
+      console.warn(
+        `[ai-executor] Preflight refresh failed (continuing):`,
+        (preflightErr as Error).message,
+      )
+    }
 
     // ─── Gather context ────────────────────────────────────────────────
     sendProgress(STAGES[0]!.label, STAGES[0]!.progress)
@@ -379,13 +492,23 @@ export async function executeAnalysis(opts: {
       systemPrompt += `\n\nLEARNING MODE ACTIVE: For each analysis section (technical, risk, marketContext, tradeHistory), add an "educational" sub-field (string, 2-3 sentences) that teaches the user the concept behind your analysis. Use analogies a teenager would understand. Example: For RSI, explain "RSI is like a speedometer for price — when it's above 70, the price has been running too fast and might need to slow down."`
     }
 
-    // ─── Max tokens by depth ───────────────────────────────────────────
-    // The AiAnalysisSections interface requires ~2000+ tokens minimum.
-    // Previous limits (1500/3000/6000) caused truncation & parse failures.
-    const maxTokens: Record<AiAnalysisDepth, number> = {
-      quick: 3000,
-      standard: 6000,
-      deep: 10000,
+    // ─── Max tokens ────────────────────────────────────────────────────
+    //
+    // Always request the model's maximum output. Earlier tiered limits
+    // (3k/6k/10k) caused silent truncation — the executor then ran a repair
+    // loop that closed dangling braces, producing "valid" JSON missing half
+    // the recommendations. The user was shown a "completed" analysis with no
+    // indication that recommendations were dropped. Requesting the ceiling
+    // makes truncation extremely rare; when it DOES happen (prose-heavy
+    // learning mode on a huge trade), the executor now surfaces it via
+    // `status: "partial"` + banner, not by faking success.
+    //
+    // Haiku caps at 8192 output tokens, Sonnet 4.6 at 64_000, Opus 4.6 at
+    // 32_000. These are the hard ceilings of the current model line.
+    const maxTokensForModel = (m: AiClaudeModel): number => {
+      if (m.includes("haiku")) return 8192
+      if (m.includes("opus")) return 32_000
+      return 64_000 // sonnet
     }
 
     // ─── Stream from Claude (with 3-minute timeout) ────────────────────
@@ -393,11 +516,33 @@ export async function executeAnalysis(opts: {
     let rawResponse = ""
     let inputTokens = 0
     let outputTokens = 0
+    let cacheReadTokens = 0
+    let cacheWriteTokens = 0
+    /**
+     * Anthropic `stop_reason` captured from the `message_delta` event that
+     * closes the stream. Drives the truncation-detection path below — when
+     * this is `"max_tokens"` the analysis is saved as `status: "partial"`
+     * regardless of whether the JSON happens to parse.
+     */
+    let stopReason: string | null = null
 
+    // Enable Anthropic prompt caching on the system prompt. The system
+    // prompt is ~7KB of trading-rules boilerplate that is *identical*
+    // across analyses — marking it as a cacheable content block gives
+    // us ~90% discount on cached input tokens and a latency reduction
+    // on re-runs within the 5-minute cache window. Even first-run calls
+    // benefit from cache hits if the user analyzes multiple trades in
+    // quick succession.
     const baseOpts = {
       model,
-      max_tokens: depth === "deep" ? 16000 : maxTokens[depth],
-      system: systemPrompt,
+      max_tokens: maxTokensForModel(model),
+      system: [
+        {
+          type: "text" as const,
+          text: systemPrompt,
+          cache_control: { type: "ephemeral" as const },
+        },
+      ],
       messages: [{ role: "user" as const, content: userMessage }],
     }
 
@@ -437,11 +582,18 @@ export async function executeAnalysis(opts: {
           const abortError = isTimeout
             ? `Analysis timed out after ${STREAM_TIMEOUT_MS / 1000} seconds`
             : "Analysis cancelled by user"
-          await updateAnalysisStatus(
-            analysisId,
-            isTimeout ? "failed" : "cancelled",
-            isTimeout ? abortError : undefined,
-          )
+          if (isTimeout) {
+            await updateAnalysisStatus(analysisId, "failed", abortError)
+          } else {
+            // User-cancelled — preserve whatever stream text we have so the
+            // UI can render "here's what Claude got to before you stopped it".
+            // Cap at 100KB to match the client-side limit.
+            const { cancelAnalysis } = await import("@fxflow/db")
+            await cancelAnalysis(
+              analysisId,
+              rawResponse.length > 0 ? rawResponse.slice(0, 100_000) : null,
+            )
+          }
 
           // Broadcast completion so the UI clears its spinner
           broadcast({
@@ -483,10 +635,25 @@ export async function executeAnalysis(opts: {
           // Update progress as tokens stream in (85 → 98)
           const approxProgress = Math.min(98, 85 + Math.floor(rawResponse.length / 100))
           sendProgress("Claude is analyzing your trade...", approxProgress)
-        } else if (event.type === "message_delta" && event.usage) {
-          outputTokens = event.usage.output_tokens
+        } else if (event.type === "message_delta") {
+          if (event.usage) outputTokens = event.usage.output_tokens
+          // `message_delta` is the last event before `message_stop` and
+          // carries the final `stop_reason`. We check for `"max_tokens"`
+          // below to decide whether to persist the analysis as partial.
+          const delta = event.delta as { stop_reason?: string | null }
+          if (delta?.stop_reason) stopReason = delta.stop_reason
         } else if (event.type === "message_start" && event.message.usage) {
           inputTokens = event.message.usage.input_tokens
+          // Track prompt-cache usage when available. These fields are only
+          // present when the model actually read from or wrote to the
+          // ephemeral cache, so they may be zero on first-run analyses.
+          const usage = event.message.usage as {
+            input_tokens: number
+            cache_read_input_tokens?: number
+            cache_creation_input_tokens?: number
+          }
+          cacheReadTokens = usage.cache_read_input_tokens ?? 0
+          cacheWriteTokens = usage.cache_creation_input_tokens ?? 0
         }
       }
     } finally {
@@ -494,35 +661,36 @@ export async function executeAnalysis(opts: {
     }
 
     // ─── Parse JSON response ───────────────────────────────────────────
-    let sections: AiAnalysisSections | null = null
-    try {
-      sections = extractJsonFromResponse<AiAnalysisSections>(rawResponse)
-    } catch (parseErr) {
-      console.error("[ai-executor] Failed to parse JSON response:", (parseErr as Error).message)
-      console.error("[ai-executor] Raw response (first 500 chars):", rawResponse.slice(0, 500))
-      console.error("[ai-executor] Raw response (last 200 chars):", rawResponse.slice(-200))
-    }
+    //
+    // Three outcomes:
+    //  1. Parse succeeds, `stop_reason !== "max_tokens"`, all required
+    //     sections present → status "completed".
+    //  2. Parse succeeds BUT `stop_reason === "max_tokens"` OR required
+    //     sections are missing → status "partial" with the parsed payload
+    //     persisted so the UI can render whatever came through and surface
+    //     the truncation banner.
+    //  3. Parse fails entirely → status "failed" with rawResponse for
+    //     debugging. This now only fires on truly malformed JSON — the old
+    //     "repair braces" fallback that masked truncation is gone.
+    const sections = tryExtractJson<AiAnalysisSections>(rawResponse)
+    const missingSections = findMissingSections(sections)
+    const truncatedByStopReason = stopReason === "max_tokens"
+    const truncated = truncatedByStopReason || (sections !== null && missingSections.length > 0)
 
     const durationMs = Date.now() - startTime
 
-    // ─── Handle parse failure ──────────────────────────────────────────
+    // ─── Handle hard parse failure ─────────────────────────────────────
     if (!sections) {
-      // Categorize the parse error for better debugging
       let parseError: string
       if (rawResponse.trim().length === 0) {
         parseError = "AI returned an empty response"
+      } else if (truncatedByStopReason) {
+        parseError =
+          "AI response was truncated by the model token limit before any valid JSON could be parsed. Try a shorter depth or retry."
       } else {
-        // Check if truncated (unbalanced braces)
-        const openBraces = (rawResponse.match(/\{/g) ?? []).length
-        const closeBraces = (rawResponse.match(/\}/g) ?? []).length
-        if (openBraces > closeBraces + 1) {
-          parseError = "AI response was truncated (may have exceeded token limit)"
-        } else {
-          parseError = "AI response contained invalid JSON structure"
-        }
+        parseError = "AI response contained invalid JSON structure"
       }
 
-      // Save rawResponse to DB even on failure so users can debug
       await updateAnalysisStatus(analysisId, "failed", parseError, rawResponse || undefined)
 
       broadcast({
@@ -536,6 +704,8 @@ export async function executeAnalysis(opts: {
           outputTokens,
           costUsd: 0,
           durationMs,
+          truncated: truncatedByStopReason,
+          stopReason,
           error: parseError,
         },
       })
@@ -546,20 +716,37 @@ export async function executeAnalysis(opts: {
       await createNotification({
         severity: "warning",
         source: "ai_analysis",
-        title: "AI Analysis — Parse Error",
-        message: `${pairLabel} ${context.trade.direction} — Analysis completed but results couldn't be processed. Try again.`,
+        title: truncatedByStopReason ? "AI Analysis — Truncated" : "AI Analysis — Parse Error",
+        message: `${pairLabel} ${context.trade.direction} — ${parseError}`,
         metadata: { analysisId, tradeId },
       })
       return
     }
 
+    if (truncated) {
+      console.warn(
+        `[ai-executor] Analysis ${analysisId} truncated: stopReason=${stopReason ?? "n/a"}, missing=[${missingSections.join(",")}]`,
+      )
+    }
+
     // ─── Save result ───────────────────────────────────────────────────
+    // Reconciliation log is built below when applying conditionChanges; we
+    // persist the final log after the auto-apply block so a single save
+    // covers both the AI output and the side-effects we executed.
+    const schemaVersion = sections.conditionChanges || sections.immediateActionChanges ? 2 : 1
+    const reconciliationLog: AiReconciliationLogEntry[] = []
+
     await saveAnalysisResult(analysisId, {
       rawResponse,
       sections,
       inputTokens,
       outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
       durationMs,
+      schemaVersion,
+      truncated,
+      stopReason,
     })
 
     // ─── Create recommendation outcome for accuracy tracking ──────────
@@ -578,6 +765,120 @@ export async function executeAnalysis(opts: {
           "[ai-executor] Failed to create recommendation outcome:",
           (recErr as Error).message,
         )
+      }
+    }
+
+    // ─── Apply structured reconciliation diff (v2 re-runs) ───────────
+    //
+    // On re-runs, the AI emits explicit ops against existing conditions:
+    // keep / update / remove / add. This block executes them in order,
+    // respecting a hard cap from settings so a malformed response can't
+    // nuke every rule on the trade. Each op is journaled in
+    // `reconciliationLog` for the diff view. Fall through to the legacy
+    // `conditionSuggestions` auto-apply below when this field is absent.
+    if (sections.conditionChanges?.length && tradeStatus !== "closed") {
+      try {
+        const { getAiSettings, updateCondition, deleteCondition, listConditionsForTrade } =
+          await import("@fxflow/db")
+        const aiSettings = await getAiSettings()
+        const maxOps = aiSettings.maxReconciliationOps ?? 20
+        const existing = await listConditionsForTrade(tradeId)
+        const existingById = new Map(existing.map((c) => [c.id, c]))
+
+        let opsExecuted = 0
+        for (const change of sections.conditionChanges) {
+          if (opsExecuted >= maxOps) {
+            console.warn(
+              `[ai-executor] Reconciliation cap (${maxOps}) hit — skipping remaining ops`,
+            )
+            break
+          }
+
+          const nowIso = new Date().toISOString()
+          try {
+            if (change.op === "keep") {
+              const target = existingById.get(change.existingConditionId)
+              reconciliationLog.push({
+                target: "condition",
+                op: "keep",
+                existingId: change.existingConditionId,
+                label: target?.label ?? "(unknown)",
+                reason: change.reason,
+                at: nowIso,
+              })
+              continue // keep is a no-op — don't count toward cap
+            }
+
+            if (change.op === "update") {
+              const target = existingById.get(change.existingConditionId)
+              if (!target) {
+                console.warn(
+                  `[ai-executor] update op references unknown condition ${change.existingConditionId}`,
+                )
+                continue
+              }
+              const updated = await updateCondition(change.existingConditionId, {
+                triggerValue: change.newTriggerValue,
+                actionParams: change.newActionParams,
+                label: change.newLabel ?? target.label,
+              })
+              if (updated && conditionMonitor) {
+                await conditionMonitor.reloadCondition(updated.id)
+              }
+              reconciliationLog.push({
+                target: "condition",
+                op: "update",
+                existingId: change.existingConditionId,
+                resultId: updated?.id,
+                label: change.newLabel ?? target.label ?? "(unknown)",
+                reason: change.reason,
+                at: nowIso,
+              })
+              opsExecuted++
+              continue
+            }
+
+            if (change.op === "remove") {
+              const target = existingById.get(change.existingConditionId)
+              await deleteCondition(change.existingConditionId)
+              reconciliationLog.push({
+                target: "condition",
+                op: "remove",
+                existingId: change.existingConditionId,
+                label: target?.label ?? "(unknown)",
+                reason: change.reason,
+                at: nowIso,
+              })
+              opsExecuted++
+              continue
+            }
+
+            if (change.op === "add") {
+              // Reuse the confidence + dedup path below by pushing into
+              // sections.conditionSuggestions if not already there. We
+              // rely on conditionsMatch-based dedup in the existing block
+              // so we don't double-create.
+              if (!sections.conditionSuggestions) sections.conditionSuggestions = []
+              sections.conditionSuggestions.push(change.condition)
+              reconciliationLog.push({
+                target: "condition",
+                op: "add",
+                label: change.condition.label,
+                reason: change.reason,
+                at: nowIso,
+              })
+              // Don't count here — actual creation is counted below.
+              continue
+            }
+          } catch (opErr) {
+            console.warn(
+              `[ai-executor] Reconciliation op failed (${change.op}):`,
+              (opErr as Error).message,
+            )
+          }
+        }
+      } catch (reconErr) {
+        console.warn("[ai-executor] Reconciliation executor failed:", (reconErr as Error).message)
       }
     }
 
@@ -616,17 +917,25 @@ export async function executeAnalysis(opts: {
               continue
             }
 
-            // Dedup: skip if an active condition with same trigger+action+params already exists.
-            // Compare by parameter values (not label) since AI may generate different labels
-            // for functionally identical conditions.
-            const sugTriggerJSON = JSON.stringify(suggestion.triggerValue)
-            const sugActionJSON = JSON.stringify(suggestion.actionParams ?? {})
-            const isDuplicate = activeConditions.some(
-              (c) =>
-                c.triggerType === suggestion.triggerType &&
-                c.actionType === suggestion.actionType &&
-                JSON.stringify(c.triggerValue) === sugTriggerJSON &&
-                JSON.stringify(c.actionParams ?? {}) === sugActionJSON,
+            // Dedup: skip if an active condition represents the same rule within tolerance.
+            // Uses the shared `conditionsMatch` helper so the daemon and web UI stay in
+            // lockstep — label text is ignored and numeric params use pip-aware tolerance.
+            const isDuplicate = activeConditions.some((c) =>
+              conditionsMatch(
+                {
+                  triggerType: suggestion.triggerType,
+                  triggerValue: suggestion.triggerValue,
+                  actionType: suggestion.actionType,
+                  actionParams: suggestion.actionParams,
+                },
+                {
+                  triggerType: c.triggerType,
+                  triggerValue: c.triggerValue,
+                  actionType: c.actionType,
+                  actionParams: c.actionParams,
+                },
+                { instrument: context.trade.instrument },
+              ),
             )
             if (isDuplicate) {
               console.log(`[ai-executor] Skipping duplicate condition: ${suggestion.label}`)
@@ -771,6 +1080,11 @@ export async function executeAnalysis(opts: {
                       trade.sourceTradeId,
                       undefined,
                       `AI auto-applied: ${action.label}`,
+                      {
+                        closedBy: "ai_condition",
+                        closedByLabel: "AI Analysis",
+                        closedByDetail: action.label,
+                      },
                     )
                     appliedIds.push(action.id)
                     tradeClosed = true
@@ -784,6 +1098,11 @@ export async function executeAnalysis(opts: {
                         trade.sourceTradeId,
                         units,
                         `AI auto-applied: ${action.label}`,
+                        {
+                          closedBy: "ai_condition",
+                          closedByLabel: "AI Analysis",
+                          closedByDetail: `${action.label} (${units} units)`,
+                        },
                       )
                       appliedIds.push(action.id)
                       console.log(
@@ -921,6 +1240,25 @@ export async function executeAnalysis(opts: {
       }
     }
 
+    // ─── Persist reconciliation log ────────────────────────────────────
+    // Write back the accumulated ops from Part B2 now that all auto-apply
+    // side-effects are done. Done as a second save so the side-effects
+    // have already committed by the time the log references them.
+    if (reconciliationLog.length > 0) {
+      try {
+        const { db: prismaDb } = await import("@fxflow/db")
+        await prismaDb.aiAnalysis.update({
+          where: { id: analysisId },
+          data: { reconciliationLog: JSON.stringify(reconciliationLog) },
+        })
+      } catch (logErr) {
+        console.warn(
+          "[ai-executor] Failed to persist reconciliation log:",
+          (logErr as Error).message,
+        )
+      }
+    }
+
     // ─── Calculate cost ────────────────────────────────────────────────
     const { calculateCost } = await import("@fxflow/db")
     const costUsd = calculateCost(model, inputTokens, outputTokens)
@@ -939,20 +1277,24 @@ export async function executeAnalysis(opts: {
         costUsd,
         durationMs,
         streamTruncated: rawResponse.length >= STREAM_TRUNCATION_THRESHOLD,
+        truncated,
+        stopReason,
         autoApplyErrors: sections.autoApplyErrors,
       },
     })
 
-    sendProgress("Analysis complete!", 100)
+    sendProgress(truncated ? "Analysis complete (truncated)" : "Analysis complete!", 100)
 
     // ─── Create notification ───────────────────────────────────────────
     const autoLabel = triggeredBy !== "user" ? " (Auto)" : ""
     const pairLabel = context.trade.instrument.replace("_", "/")
     await createNotification({
-      severity: "info",
+      severity: truncated ? "warning" : "info",
       source: "ai_analysis",
-      title: `AI Analysis Complete${autoLabel}`,
-      message: `${pairLabel} ${context.trade.direction} — Win probability: ${sections.winProbability ?? "N/A"}% | Quality: ${sections.tradeQualityScore ?? "N/A"}/10`,
+      title: truncated ? `AI Analysis — Partial${autoLabel}` : `AI Analysis Complete${autoLabel}`,
+      message: truncated
+        ? `${pairLabel} ${context.trade.direction} — response truncated by model token limit; some sections may be missing.`
+        : `${pairLabel} ${context.trade.direction} — Win probability: ${sections.winProbability ?? "N/A"}% | Quality: ${sections.tradeQualityScore ?? "N/A"}/10`,
       metadata: { analysisId, tradeId },
     })
   } catch (err) {
@@ -1158,7 +1500,31 @@ ${correlatedPairs.map((p) => `- ${p.instrument.replace("_", "/")}: ${p.h1Trend.t
 ${openPositions.map((p) => `- ${p.instrument.replace("_", "/")}: ${p.direction.toUpperCase()} ${p.units} units | P&L: ${p.unrealizedPL}`).join("\n")}`)
   }
 
-  sections.push(`## Trade History for ${pair}
+  // Pair history — only surface stats when we have a large-enough sample.
+  // Below the floor (currently 10 trades) we flag it so Claude doesn't draw
+  // conclusions from statistical noise like "0 wins from 3 trades". The
+  // recent-trades list is still shown so the model can eyeball individual
+  // outcomes, but the aggregate win-rate line is suppressed.
+  if (history.insufficientSample) {
+    sections.push(`## Trade History for ${pair}
+
+- Total Past Trades: ${history.totalTrades} (INSUFFICIENT SAMPLE — below 10-trade floor)
+- IMPORTANT: do NOT draw pair-specific win-rate, average-R, or "common pattern"
+  conclusions from this sample. Small samples are noise, not signal. Ignore
+  \`pairWinRate\`, \`averageRR\`, and \`commonPatterns\` — explicitly note in
+  \`tradeHistory.commonPatterns\` that the sample is too small for this pair.
+- Average Duration: ${history.avgDurationHours}h
+
+### Recent Trades (for individual context only — not for aggregate stats)
+${history.recentTrades
+  .slice(0, 8)
+  .map(
+    (t) =>
+      `- ${t.direction.toUpperCase()} | Entry: ${t.entryPrice} | Exit: ${t.exitPrice ?? "N/A"} | P&L: ${t.realizedPL} | ${t.outcome.toUpperCase()} | Duration: ${t.duration}`,
+  )
+  .join("\n")}`)
+  } else {
+    sections.push(`## Trade History for ${pair}
 
 - Total Past Trades: ${history.totalTrades}
 - Win Rate: ${history.winRate}%
@@ -1175,6 +1541,7 @@ ${history.recentTrades
       `- ${t.direction.toUpperCase()} | Entry: ${t.entryPrice} | Exit: ${t.exitPrice ?? "N/A"} | P&L: ${t.realizedPL} | ${t.outcome.toUpperCase()} | Duration: ${t.duration}`,
   )
   .join("\n")}`)
+  }
 
   if (conditions.length > 0) {
     sections.push(`## Active Trade Conditions
@@ -1198,9 +1565,46 @@ ${forexNews
   }
 
   if (previousAnalyses.length > 0) {
-    sections.push(`## Previous AI Analyses
+    // Render prior analyses with their FULL conditionSuggestions and
+    // immediateActions so the model can see exactly what it previously
+    // proposed. This is the missing piece that caused re-runs to blindly
+    // re-suggest conditions the user had already reviewed or applied.
+    sections.push(`## Previous AI Analyses (most recent first)
 
-${previousAnalyses.map((a) => `- [${a.depth} | ${a.model} | ${a.createdAt}] Win prob: ${a.winProbability ?? "N/A"}% | Quality: ${a.tradeQualityScore ?? "N/A"}/10\n  Summary: ${a.summaryText}`).join("\n\n")}`)
+${previousAnalyses
+  .map((a, idx) => {
+    const header = `### Analysis #${idx + 1} — ${a.depth} | ${a.model} | ${a.createdAt}`
+    const stats = `Win probability: ${a.winProbability ?? "N/A"}% | Quality score: ${a.tradeQualityScore ?? "N/A"}/10`
+    const summary = `Summary: ${a.summaryText}`
+    const priorConds =
+      a.conditionSuggestions.length > 0
+        ? `Previously suggested conditions:\n${a.conditionSuggestions
+            .map(
+              (c) =>
+                `  - ${c.label} [${c.confidence ?? "medium"}]: ${c.triggerType} ${JSON.stringify(c.triggerValue)} → ${c.actionType} ${JSON.stringify(c.actionParams)}`,
+            )
+            .join("\n")}`
+        : "Previously suggested conditions: (none)"
+    const priorActions =
+      a.immediateActions.length > 0
+        ? `Previously suggested immediate actions:\n${a.immediateActions
+            .map((ac) => `  - ${ac.label}: ${ac.type} ${JSON.stringify(ac.params ?? {})}`)
+            .join("\n")}`
+        : "Previously suggested immediate actions: (none)"
+    return [header, stats, summary, priorConds, priorActions].join("\n")
+  })
+  .join("\n\n")}
+
+### Re-analysis Reconciliation Instructions
+
+This trade has previous analyses. Your job is to **reconcile**, not blindly re-propose:
+
+1. **Review the "Active Trade Conditions" section above** — these are rules currently attached to the trade (some may have been auto-applied from a previous analysis, some manually added by the user).
+2. **Do NOT re-suggest a condition that already exists as an active condition** with the same trigger/action parameters, even if you would phrase the label differently. The downstream system deduplicates by parameters (not label), so a re-suggestion that matches an existing rule is wasted output.
+3. **Do NOT re-suggest an action that the previous analysis already suggested** if the market conditions haven't materially changed — instead, note briefly that the prior recommendation still stands.
+4. **DO propose updates or removals** if the market thesis has changed: if a prior stop-loss move no longer makes sense at the current price, call it out explicitly in your summary and omit it from \`conditionSuggestions\`.
+5. **DO propose genuinely new rules** when the market has moved and warrants them — e.g., a tighter trailing stop after a significant favorable move, or a take-profit move after a new resistance has formed.
+6. When in doubt, prefer **fewer, higher-conviction suggestions** over re-listing everything from before.`)
   }
 
   const utcHour = new Date().getUTCHours() + new Date().getUTCMinutes() / 60

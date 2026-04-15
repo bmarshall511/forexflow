@@ -79,6 +79,9 @@ Every feature page follows this structure:
 - Return typed objects (not arrays).
 - Data hooks handle loading/error states internally.
 - Examples: `use-positions.ts`, `use-ai-analysis.ts`, `use-trade-finder.ts`.
+- **`use-ai-analysis.ts` lifecycle guarantees**: watchdog + reconciliation poll keep the spinner honest. If no progress update arrives in 60s the progress is flagged `isStale` (UI shows "still working…"). If no update in 240s the spinner hard-clears and the analysis is surfaced via `interruptedAnalysis` so the user can Retry/Dismiss. A 10s reconciliation poll refetches history while an analysis is active so a daemon-side crash that flips the row to `failed`/`cancelled` is detected without a WS completion message. Return fields: `interruptedAnalysis`, `dismissInterruption`. **Partial status**: when the daemon reports `truncated: true` via WS (Anthropic `stop_reason === "max_tokens"`), the hook builds the immediate display row with `status: "partial"` and surfaces `stopReason` for `TruncationBanner` to render.
+- **Partial analysis rendering**: `components/ai/truncation-banner.tsx` renders above results whenever `displayAnalysis.status === "partial"` — offers a Regenerate CTA and tailors copy based on `stopReason`. `analysis-history.tsx` shows a Partial badge; `ai-stats-bar.tsx` counts partial analyses in its status pills. The completion-transition icon in `analysis-tab-content.tsx` branches on `progress.stage.includes("truncated")` to show an amber `AlertTriangle` instead of the green check.
+- **`use-chart-trade-editor.ts` validates SL/TP context-aware**: pending orders compare against entry; open trades compare against current bid/ask (so breakeven and trailing stops past entry are legitimate). Pass `tradeStatus`, `currentBid`, `currentAsk` from the consumer. If bid/ask are null, directional check is skipped — daemon is still authoritative on save.
 
 ## Authentication
 

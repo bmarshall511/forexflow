@@ -40,6 +40,9 @@ function toConditionData(row: {
   parentConditionId: string | null
   expiresAt: Date | null
   triggeredAt: Date | null
+  lastModifiedAt?: Date | null
+  deletedAt?: Date | null
+  expiredNotified?: boolean
   createdAt: Date
   updatedAt: Date
 }): TradeConditionData {
@@ -66,6 +69,9 @@ function toConditionData(row: {
     parentConditionId: row.parentConditionId ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     triggeredAt: row.triggeredAt?.toISOString() ?? null,
+    lastModifiedAt: row.lastModifiedAt?.toISOString() ?? null,
+    deletedAt: row.deletedAt?.toISOString() ?? null,
+    expiredNotified: row.expiredNotified ?? false,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -154,6 +160,10 @@ export async function updateCondition(
         ...(updates.expiresAt !== undefined
           ? { expiresAt: updates.expiresAt ? new Date(updates.expiresAt) : null }
           : {}),
+        // Always stamp lastModifiedAt when updateCondition is called — the
+        // re-run context gatherer uses this to distinguish "user refined an
+        // AI-created rule" from "AI created and nobody touched it".
+        lastModifiedAt: new Date(),
       },
     })
     return toConditionData(row)
@@ -182,19 +192,63 @@ export async function updateConditionStatus(
 }
 
 /**
- * Delete a condition by ID. Returns false if the condition was not found.
+ * Soft-delete a condition by ID. The row is retained (with `status="cancelled"`
+ * and `deletedAt` set) so re-run context can see what the user (or AI
+ * reconciliation) rejected and avoid re-proposing it. Returns false if the
+ * condition was not found.
  *
- * @param id - Condition ID to delete
- * @returns True if deleted, false if not found or deletion failed
+ * Use {@link hardDeleteCondition} only for GDPR-style wipes — never for
+ * normal "user clicked trash" flows.
  */
 export async function deleteCondition(id: string): Promise<boolean> {
   try {
-    await db.tradeCondition.delete({ where: { id } })
+    await db.tradeCondition.update({
+      where: { id },
+      data: {
+        status: "cancelled",
+        deletedAt: new Date(),
+      },
+    })
     return true
   } catch (err) {
     console.warn("[trade-condition-service] deleteCondition failed:", (err as Error).message)
     return false
   }
+}
+
+/**
+ * Hard-delete a condition — bypasses soft-delete. Reserved for cleanup and
+ * privacy-wipe flows; regular user "delete" should use {@link deleteCondition}.
+ */
+export async function hardDeleteCondition(id: string): Promise<boolean> {
+  try {
+    await db.tradeCondition.delete({ where: { id } })
+    return true
+  } catch (err) {
+    console.warn("[trade-condition-service] hardDeleteCondition failed:", (err as Error).message)
+    return false
+  }
+}
+
+/**
+ * List recently-deleted conditions for a trade. Used by the re-run context
+ * gatherer as a "don't re-propose these" signal — if the user rejected an
+ * idea once, the AI should take that into account rather than re-suggesting
+ * the same rule.
+ */
+export async function listRecentlyDeletedForTrade(
+  tradeId: string,
+  sinceDays = 7,
+): Promise<TradeConditionData[]> {
+  const cutoff = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000)
+  const rows = await db.tradeCondition.findMany({
+    where: {
+      tradeId,
+      deletedAt: { gte: cutoff },
+    },
+    orderBy: { deletedAt: "desc" },
+  })
+  return rows.map(toConditionData)
 }
 
 /**
@@ -205,7 +259,7 @@ export async function deleteCondition(id: string): Promise<boolean> {
  */
 export async function listConditionsForTrade(tradeId: string): Promise<TradeConditionData[]> {
   const rows = await db.tradeCondition.findMany({
-    where: { tradeId },
+    where: { tradeId, deletedAt: null },
     orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
   })
   return rows.map(toConditionData)
@@ -216,6 +270,7 @@ export async function listActiveConditions(): Promise<TradeConditionData[]> {
   const rows = await db.tradeCondition.findMany({
     where: {
       status: "active",
+      deletedAt: null,
       // Exclude conditions for already-closed trades to avoid wasting evaluation cycles
       trade: { status: { not: "closed" } },
     },
@@ -232,6 +287,35 @@ export async function expireOldConditions(): Promise<number> {
       expiresAt: { lt: new Date() },
     },
     data: { status: "expired" },
+  })
+  return result.count
+}
+
+/**
+ * Soft-delete terminal conditions older than `olderThanHours`. "Terminal"
+ * means `expired`, `triggered`, `cancelled` — anything that the monitor
+ * no longer needs to evaluate.
+ *
+ * Why this exists: before this sweep, expired conditions lingered on closed
+ * trades and polluted the re-run AI prompt ("You have 14 expired conditions
+ * on this trade..."). The AI would then waste output tokens proposing
+ * `op: "remove"` for each one — exactly the behavior the user reported.
+ * A rolling 24-hour soft-delete window keeps recent history available for
+ * audit while cleaning up long-dead rules.
+ *
+ * Uses `deletedAt` (soft-delete) rather than a hard delete so the
+ * condition-history tab can still render recently-ended rules for audit.
+ * Hard cleanup happens via separate retention jobs if needed.
+ */
+export async function pruneTerminalConditions(olderThanHours = 24): Promise<number> {
+  const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000)
+  const result = await db.tradeCondition.updateMany({
+    where: {
+      status: { in: ["expired", "triggered", "cancelled"] },
+      deletedAt: null,
+      updatedAt: { lt: cutoff },
+    },
+    data: { deletedAt: new Date() },
   })
   return result.count
 }

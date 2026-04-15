@@ -141,9 +141,12 @@ export {
   updateCondition,
   updateConditionStatus,
   deleteCondition,
+  hardDeleteCondition,
   listConditionsForTrade,
   listActiveConditions,
+  listRecentlyDeletedForTrade,
   expireOldConditions,
+  pruneTerminalConditions,
   cancelConditionsForTrade,
   cancelAllActiveConditions,
   expireConditionsForTrade,
@@ -153,6 +156,16 @@ export {
   type CreateConditionInput,
   type ConditionSummary,
 } from "./trade-condition-service"
+
+export {
+  logProposedAction as logProposedImmediateAction,
+  resolveAction as resolveImmediateAction,
+  listActionsForTrade as listImmediateActionsForTrade,
+  listActionsForAnalysis as listImmediateActionsForAnalysis,
+  cleanupOldActionLogs as cleanupOldImmediateActionLogs,
+  type AiImmediateActionLogData,
+  type AiImmediateActionStatus,
+} from "./ai-immediate-action-log-service"
 
 export {
   createRecommendationOutcome,

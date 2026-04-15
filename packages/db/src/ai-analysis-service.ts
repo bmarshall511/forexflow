@@ -17,8 +17,17 @@ import type {
   AiAnalysisSections,
   AiClaudeModel,
   AiUsageStats,
+  AiReconciliationLogEntry,
 } from "@fxflow/types"
 import { AI_MODEL_OPTIONS } from "@fxflow/types"
+
+/**
+ * Statuses that represent a finished analysis with parseable sections (fully
+ * complete OR truncated with a partial payload). Used by stats queries, history
+ * filters, and "latest completed" lookups so a truncated-but-usable analysis is
+ * still surfaced to the UI instead of being treated as a failure.
+ */
+const COMPLETED_OR_PARTIAL = ["completed", "partial"] as const
 
 // ─── Cost (derived from canonical AI_MODEL_OPTIONS in @fxflow/types) ─────────
 
@@ -61,9 +70,17 @@ function toAnalysisData(row: {
   sections: string | null
   inputTokens: number
   outputTokens: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
   costUsd: number
   durationMs: number
   errorMessage: string | null
+  partialStreamText?: string | null
+  cancelledAt?: Date | null
+  truncated?: boolean
+  stopReason?: string | null
+  schemaVersion?: number
+  reconciliationLog?: string | null
   createdAt: Date
   updatedAt: Date
 }): AiAnalysisData {
@@ -82,9 +99,23 @@ function toAnalysisData(row: {
     ),
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
+    cacheReadTokens: row.cacheReadTokens ?? 0,
+    cacheWriteTokens: row.cacheWriteTokens ?? 0,
     costUsd: row.costUsd,
     durationMs: row.durationMs,
     errorMessage: row.errorMessage,
+    partialStreamText: row.partialStreamText ?? null,
+    cancelledAt: row.cancelledAt ? row.cancelledAt.toISOString() : null,
+    truncated: row.truncated ?? false,
+    stopReason: row.stopReason ?? null,
+    schemaVersion: row.schemaVersion ?? 1,
+    reconciliationLog: row.reconciliationLog
+      ? safeJsonParse<AiReconciliationLogEntry[] | null>(
+          row.reconciliationLog,
+          null,
+          `analysis ${row.id} reconciliationLog`,
+        )
+      : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -171,7 +202,23 @@ export async function saveAnalysisResult(
     sections: AiAnalysisSections | null
     inputTokens: number
     outputTokens: number
+    /** Prompt-cache read tokens billed at discount; 0 when caching wasn't used. */
+    cacheReadTokens?: number
+    /** Prompt-cache write tokens; 0 when caching wasn't used. */
+    cacheWriteTokens?: number
     durationMs: number
+    /** v2 analyses carry `conditionChanges`/`immediateActionChanges` in sections. */
+    schemaVersion?: number
+    /** Reconciliation log for re-runs — persisted as JSON. */
+    reconciliationLog?: AiReconciliationLogEntry[] | null
+    /**
+     * True when the response was cut off by `max_tokens`. Status is saved as
+     * `"partial"` instead of `"completed"` so the UI can render a banner and
+     * offer a regenerate CTA. Sections that parsed cleanly are still persisted.
+     */
+    truncated?: boolean
+    /** Anthropic `stop_reason` from the final message event. */
+    stopReason?: string | null
   },
 ): Promise<AiAnalysisData> {
   const costUsd = calculateCost(
@@ -183,13 +230,22 @@ export async function saveAnalysisResult(
   const row = await db.aiAnalysis.update({
     where: { id },
     data: {
-      status: "completed",
+      status: result.truncated ? "partial" : "completed",
       rawResponse: result.rawResponse,
       sections: result.sections ? JSON.stringify(result.sections) : null,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
+      cacheReadTokens: result.cacheReadTokens ?? 0,
+      cacheWriteTokens: result.cacheWriteTokens ?? 0,
       costUsd,
       durationMs: result.durationMs,
+      truncated: result.truncated ?? false,
+      stopReason: result.stopReason ?? null,
+      schemaVersion: result.schemaVersion ?? 1,
+      reconciliationLog:
+        result.reconciliationLog && result.reconciliationLog.length > 0
+          ? JSON.stringify(result.reconciliationLog)
+          : null,
     },
   })
   return toAnalysisData(row)
@@ -231,7 +287,7 @@ export async function getAnalysisHistory(tradeId: string, limit = 20): Promise<A
  */
 export async function getLatestCompletedAnalysis(tradeId: string): Promise<AiAnalysisData | null> {
   const row = await db.aiAnalysis.findFirst({
-    where: { tradeId, status: "completed" },
+    where: { tradeId, status: { in: COMPLETED_OR_PARTIAL as unknown as string[] } },
     orderBy: { createdAt: "desc" },
   })
   if (!row) return null
@@ -239,14 +295,21 @@ export async function getLatestCompletedAnalysis(tradeId: string): Promise<AiAna
 }
 
 /**
- * Mark an analysis as cancelled.
+ * Mark an analysis as cancelled and optionally persist the partial stream
+ * text that Claude produced before the abort. Preserving the partial stream
+ * lets the UI show "what the AI got to" even when the user stops early.
  *
  * @param id - Analysis ID to cancel
+ * @param partialStreamText - Accumulated stream text up to the abort point
  */
-export async function cancelAnalysis(id: string): Promise<void> {
+export async function cancelAnalysis(id: string, partialStreamText?: string | null): Promise<void> {
   await db.aiAnalysis.update({
     where: { id },
-    data: { status: "cancelled" },
+    data: {
+      status: "cancelled",
+      cancelledAt: new Date(),
+      ...(partialStreamText != null ? { partialStreamText } : {}),
+    },
   })
 }
 
@@ -267,7 +330,7 @@ export async function getRecentAnalysisForTrade(
     where: {
       tradeId,
       createdAt: { gte: cutoff },
-      status: { in: ["pending", "running", "completed"] },
+      status: { in: ["pending", "running", "completed", "partial"] },
     },
     orderBy: { createdAt: "desc" },
   })
@@ -311,7 +374,7 @@ export async function getUsageStats(): Promise<AiUsageStats> {
   ] = await Promise.all([
     // Total aggregates for completed analyses
     db.aiAnalysis.aggregate({
-      where: { status: "completed" },
+      where: { status: { in: COMPLETED_OR_PARTIAL as unknown as string[] } },
       _sum: { inputTokens: true, outputTokens: true, costUsd: true },
       _count: { _all: true },
     }),
@@ -323,38 +386,56 @@ export async function getUsageStats(): Promise<AiUsageStats> {
     // By model breakdown
     db.aiAnalysis.groupBy({
       by: ["model"],
-      where: { status: "completed" },
+      where: { status: { in: COMPLETED_OR_PARTIAL as unknown as string[] } },
       _sum: { inputTokens: true, outputTokens: true, costUsd: true },
       _count: { _all: true },
     }),
     // Period aggregates
     db.aiAnalysis.aggregate({
-      where: { status: "completed", createdAt: { gte: todayStart } },
+      where: {
+        status: { in: COMPLETED_OR_PARTIAL as unknown as string[] },
+        createdAt: { gte: todayStart },
+      },
       _count: { _all: true },
       _sum: { costUsd: true },
     }),
     db.aiAnalysis.aggregate({
-      where: { status: "completed", createdAt: { gte: weekStart } },
+      where: {
+        status: { in: COMPLETED_OR_PARTIAL as unknown as string[] },
+        createdAt: { gte: weekStart },
+      },
       _count: { _all: true },
       _sum: { costUsd: true },
     }),
     db.aiAnalysis.aggregate({
-      where: { status: "completed", createdAt: { gte: monthStart } },
+      where: {
+        status: { in: COMPLETED_OR_PARTIAL as unknown as string[] },
+        createdAt: { gte: monthStart },
+      },
       _count: { _all: true },
       _sum: { costUsd: true },
     }),
     db.aiAnalysis.aggregate({
-      where: { status: "completed", createdAt: { gte: yearStart } },
+      where: {
+        status: { in: COMPLETED_OR_PARTIAL as unknown as string[] },
+        createdAt: { gte: yearStart },
+      },
       _count: { _all: true },
       _sum: { costUsd: true },
     }),
     // Auto vs manual count
     db.aiAnalysis.count({
-      where: { status: "completed", triggeredBy: { in: AUTO_TRIGGERS } },
+      where: {
+        status: { in: COMPLETED_OR_PARTIAL as unknown as string[] },
+        triggeredBy: { in: AUTO_TRIGGERS },
+      },
     }),
     // Recent sections for avg win probability / quality score (limited to prevent memory issues)
     db.aiAnalysis.findMany({
-      where: { status: "completed", sections: { not: null } },
+      where: {
+        status: { in: COMPLETED_OR_PARTIAL as unknown as string[] },
+        sections: { not: null },
+      },
       select: { sections: true },
       orderBy: { createdAt: "desc" },
       take: 200,
@@ -411,6 +492,7 @@ export async function getUsageStats(): Promise<AiUsageStats> {
     },
     statusCounts: {
       completed: statusMap.get("completed") ?? 0,
+      partial: statusMap.get("partial") ?? 0,
       failed: statusMap.get("failed") ?? 0,
       cancelled: statusMap.get("cancelled") ?? 0,
       running: statusMap.get("running") ?? 0,
@@ -457,7 +539,10 @@ export async function getAnalysisCountsByTradeIds(
   if (tradeIds.length === 0) return {}
   const groups = await db.aiAnalysis.groupBy({
     by: ["tradeId"],
-    where: { tradeId: { in: tradeIds }, status: "completed" },
+    where: {
+      tradeId: { in: tradeIds },
+      status: { in: COMPLETED_OR_PARTIAL as unknown as string[] },
+    },
     _count: { id: true },
   })
   const result: Record<string, number> = {}

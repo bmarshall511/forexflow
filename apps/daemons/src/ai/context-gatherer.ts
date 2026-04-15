@@ -1,6 +1,22 @@
-import type { AiAnalysisDepth, TradeConditionData } from "@fxflow/types"
+import type {
+  AiAnalysisDepth,
+  TradeConditionData,
+  AiConditionSuggestion,
+  AiActionButton,
+} from "@fxflow/types"
+import { getPipSize, priceToPips } from "@fxflow/shared"
 import type { StateManager } from "../state-manager.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
+
+/**
+ * Minimum number of historical trades required before pair-specific win-rate
+ * and average-pip statistics are forwarded to the model. Fewer than this and
+ * the numbers are statistical noise — the AI would over-index on a 3-sample
+ * "0% win rate" as if it were a trend. When below the floor we send a single
+ * `insufficient` flag so the prompt can tell Claude to avoid pair-history
+ * conclusions for this trade.
+ */
+const MIN_PAIR_HISTORY_SAMPLE = 10
 
 const CANDLE_COUNTS: Record<AiAnalysisDepth, { M15: number; H1: number; H4: number }> = {
   quick: { M15: 30, H1: 20, H4: 10 },
@@ -138,6 +154,12 @@ interface TradeHistorySummary {
   avgWinPips: number
   avgLossPips: number
   avgDurationHours: number
+  /**
+   * True when `totalTrades < MIN_PAIR_HISTORY_SAMPLE`. The prompt uses this
+   * to tell Claude to skip pair-specific conclusions ("0/3 losing trades"
+   * is noise, not a pattern).
+   */
+  insufficientSample: boolean
   recentTrades: Array<{
     direction: string
     entryPrice: number
@@ -174,6 +196,18 @@ interface PreviousAnalysisSummary {
   winProbability: number | null
   tradeQualityScore: number | null
   summaryText: string
+  /**
+   * Condition suggestions that the previous analysis returned. Included so
+   * Claude can reconcile on re-runs — keep the ones still valid, propose
+   * removals when the thesis changed, avoid re-suggesting functionally
+   * identical rules.
+   */
+  conditionSuggestions: AiConditionSuggestion[]
+  /**
+   * One-time actions the previous analysis recommended. Same reconciliation
+   * purpose as conditionSuggestions.
+   */
+  immediateActions: AiActionButton[]
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -183,9 +217,25 @@ function getCurrenciesFromPair(instrument: string): string[] {
   return parts.filter(Boolean)
 }
 
-function getPipSize(instrument: string): number {
-  if (instrument.includes("JPY")) return 0.01
-  return 0.0001
+/**
+ * Compute signed pip move for a closed trade using entry/exit prices (not
+ * realized P&L, which is in account currency and cannot be converted to pips
+ * without the pip value). Returns positive when the trade captured favorable
+ * movement, negative when it moved against the direction.
+ */
+function tradePnlPips(
+  instrument: string,
+  direction: "long" | "short",
+  entryPrice: number,
+  exitPrice: number | null,
+): number | null {
+  if (exitPrice == null) return null
+  const priceDiff = direction === "long" ? exitPrice - entryPrice : entryPrice - exitPrice
+  // priceToPips returns an absolute magnitude — we want the sign so losses
+  // and wins can be averaged separately without flipping. Recompute the sign
+  // from the raw diff.
+  const magnitude = priceToPips(instrument, priceDiff)
+  return priceDiff < 0 ? -magnitude : magnitude
 }
 
 function calcRSI(closes: number[], period = 14): number | null {
@@ -636,14 +686,30 @@ async function gatherTradeContextInner(opts: {
   const wins = historicalTrades.filter((t) => t.realizedPL > 0).length
   const losses = historicalTrades.filter((t) => t.realizedPL < 0).length
   const breakeven = historicalTrades.length - wins - losses
-  const pip = getPipSize(tradeInfo.instrument)
 
-  const winPLs = historicalTrades
-    .filter((t) => t.realizedPL > 0)
-    .map((t) => Math.abs(t.realizedPL) / pip)
-  const lossPLs = historicalTrades
-    .filter((t) => t.realizedPL < 0)
-    .map((t) => Math.abs(t.realizedPL) / pip)
+  // Pip math uses ENTRY/EXIT PRICES — never `realizedPL / pipSize`, which was
+  // the long-standing bug that produced "4338 pips loss" on trades that
+  // actually lost $43. `realizedPL` is in account currency (USD), and dividing
+  // a dollar amount by pipSize (0.0001 or 0.01) just gives a number that looks
+  // like pips but is actually dollars×10000. We compute pips from price deltas
+  // and keep dollar P&L separate.
+  const winPipsSamples: number[] = []
+  const lossPipsSamples: number[] = []
+  for (const t of historicalTrades) {
+    const pips = tradePnlPips(
+      tradeInfo.instrument,
+      t.direction as "long" | "short",
+      t.entryPrice,
+      t.exitPrice,
+    )
+    if (pips == null) continue
+    if (pips > 0) winPipsSamples.push(pips)
+    else if (pips < 0) lossPipsSamples.push(-pips) // store as positive magnitude
+  }
+
+  // Sample-size guard: below the floor, return zeroed averages. The AI prompt
+  // keys off `totalTrades` to decide whether to draw pair-specific conclusions.
+  const hasSufficientSample = historicalTrades.length >= MIN_PAIR_HISTORY_SAMPLE
 
   const tradeHistorySummary: TradeHistorySummary = {
     totalTrades: historicalTrades.length,
@@ -651,10 +717,14 @@ async function gatherTradeContextInner(opts: {
     losses,
     breakeven,
     winRate: historicalTrades.length > 0 ? Math.round((wins / historicalTrades.length) * 100) : 0,
-    avgWinPips: winPLs.length ? Math.round(winPLs.reduce((a, b) => a + b, 0) / winPLs.length) : 0,
-    avgLossPips: lossPLs.length
-      ? Math.round(lossPLs.reduce((a, b) => a + b, 0) / lossPLs.length)
-      : 0,
+    avgWinPips:
+      hasSufficientSample && winPipsSamples.length
+        ? Math.round(winPipsSamples.reduce((a, b) => a + b, 0) / winPipsSamples.length)
+        : 0,
+    avgLossPips:
+      hasSufficientSample && lossPipsSamples.length
+        ? Math.round(lossPipsSamples.reduce((a, b) => a + b, 0) / lossPipsSamples.length)
+        : 0,
     avgDurationHours:
       historicalTrades.length > 0
         ? Math.round(
@@ -668,6 +738,7 @@ async function gatherTradeContextInner(opts: {
               ) / historicalTrades.filter((t) => t.closedAt).length,
           )
         : 0,
+    insufficientSample: !hasSufficientSample,
     recentTrades: historicalTrades.slice(0, 10).map((t) => ({
       direction: t.direction,
       entryPrice: t.entryPrice,
@@ -699,7 +770,9 @@ async function gatherTradeContextInner(opts: {
   if (!finnhubKey) errors.push("FinnHub API key not configured — no news/calendar data")
 
   // ─── 8. Previous Analyses ──────────────────────────────────────────────
-  const prevAnalyses = await getAnalysisHistory(tradeId, 3)
+  // Pull the last 5 (not 3) — Claude needs enough history to see what it
+  // previously suggested so it can reconcile rather than blindly re-propose.
+  const prevAnalyses = await getAnalysisHistory(tradeId, 5)
   const previousAnalyses: PreviousAnalysisSummary[] = prevAnalyses
     .filter((a) => a.status === "completed" && a.sections)
     .map((a) => ({
@@ -709,6 +782,8 @@ async function gatherTradeContextInner(opts: {
       winProbability: a.sections?.winProbability ?? null,
       tradeQualityScore: a.sections?.tradeQualityScore ?? null,
       summaryText: a.sections?.summary ?? "",
+      conditionSuggestions: a.sections?.conditionSuggestions ?? [],
+      immediateActions: a.sections?.immediateActions ?? [],
     }))
 
   // ─── 9. Market Session ────────────────────────────────────────────────

@@ -167,36 +167,100 @@ model TVAlertsQualityConfig {
 }
 
 model AiSettings {
-  id               Int      @id @default(1)
-  claudeApiKey     String? // AES-256-GCM encrypted
-  finnhubApiKey    String? // AES-256-GCM encrypted
-  defaultModel     String   @default("claude-sonnet-4-6")
-  autoAnalysisJson String   @default("{}") // JSON: AiAutoAnalysisSettings
-  updatedAt        DateTime @updatedAt
+  id                     Int      @id @default(1)
+  claudeApiKey           String? // AES-256-GCM encrypted
+  finnhubApiKey          String? // AES-256-GCM encrypted
+  defaultModel           String   @default("claude-sonnet-4-6")
+  autoAnalysisJson       String   @default("{}") // JSON: AiAutoAnalysisSettings
+  /**
+   * When true, the client auto-retries an interrupted analysis once after a
+   * 3s cancelable toast (daemon restart, stream stall, timeout). Default off
+   * so the user is always in control of retries.
+   */
+  autoRetryInterrupted   Boolean  @default(false)
+  /**
+   * Soft monthly cost cap (USD) across all AI analyses. UI warns at 80%,
+   * blocks at 100% with override. Null = no cap.
+   */
+  monthlyBudgetCapUsd    Float?
+  /**
+   * Max reconciliation ops a single re-run analysis may execute (add/update/
+   * remove on existing conditions + immediate actions). Guardrail against a
+   * malformed AI response nuking every rule on a trade.
+   */
+  maxReconciliationOps   Int      @default(20)
+  /**
+   * JSON payload for re-analysis schedule configuration:
+   * { mode, intervalHours?, pipThreshold?, events?, slApproachPips? }
+   * See AiReanalysisScheduleConfig in @fxflow/types.
+   */
+  reanalysisScheduleJson String   @default("{}")
+  updatedAt              DateTime @updatedAt
 }
 
 model AiAnalysis {
-  id              String   @id @default(uuid())
-  tradeId         String
-  trade           Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
-  status          String // "pending" | "running" | "completed" | "failed" | "cancelled"
-  depth           String // "quick" | "standard" | "deep"
-  model           String // claude model ID
-  tradeStatus     String // snapshot of trade status at analysis time
-  triggeredBy     String   @default("user") // "user" | "auto_pending" | "auto_fill" | "auto_close" | "auto_interval"
-  contextSnapshot String   @default("{}") // JSON: full context sent to Claude
-  rawResponse     String? // full streamed Claude text
-  sections        String? // JSON: AiAnalysisSections (parsed structured response)
-  inputTokens     Int      @default(0)
-  outputTokens    Int      @default(0)
-  costUsd         Float    @default(0)
-  durationMs      Int      @default(0)
-  errorMessage    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  tradeId            String
+  trade              Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  status             String // "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
+  depth              String // "quick" | "standard" | "deep"
+  model              String // claude model ID
+  tradeStatus        String // snapshot of trade status at analysis time
+  triggeredBy        String   @default("user") // "user" | "auto_pending" | "auto_fill" | "auto_close" | "auto_interval" | "schedule_time" | "schedule_price" | "schedule_event" | "schedule_sl_approach"
+  contextSnapshot    String   @default("{}") // JSON: full context sent to Claude
+  rawResponse        String? // full streamed Claude text
+  sections           String? // JSON: AiAnalysisSections (parsed structured response)
+  inputTokens        Int      @default(0)
+  outputTokens       Int      @default(0)
+  cacheReadTokens    Int      @default(0)
+  cacheWriteTokens   Int      @default(0)
+  costUsd            Float    @default(0)
+  durationMs         Int      @default(0)
+  errorMessage       String?
+  /**
+   * Partial stream text captured when the analysis was cancelled mid-run so
+   * the user can see "what Claude got to" before stopping. Null when the
+   * analysis completed normally or wasn't cancelled.
+   */
+  partialStreamText  String?
+  /**
+   * Set when an analysis was cancelled. Distinct from `updatedAt` because
+   * a status transition to `cancelled` may be followed by background writes
+   * (e.g., persistence of partial stream).
+   */
+  cancelledAt        DateTime?
+  /**
+   * True when Claude's response was cut off by the model's `max_tokens` cap.
+   * Analyses with `truncated=true` are saved with status `"partial"` so the UI
+   * can surface a banner and offer regeneration. Whatever sections parsed cleanly
+   * are persisted; missing sections are rendered as "not generated" placeholders.
+   */
+  truncated          Boolean  @default(false)
+  /**
+   * The Anthropic API `stop_reason` field from the final `message_stop` event.
+   * Values: `"end_turn"` (normal), `"max_tokens"` (hit cap → truncated),
+   * `"stop_sequence"`, `"tool_use"`. Null for older rows and errored runs.
+   */
+  stopReason         String?
+  /**
+   * Sections JSON schema version. v1 = flat conditionSuggestions/immediateActions.
+   * v2 = includes conditionChanges/immediateActionChanges diff arrays. The
+   * UI uses this to pick between legacy and diff-view rendering. Legacy
+   * analyses stay at v1; new analyses are written as v2.
+   */
+  schemaVersion      Int      @default(1)
+  /**
+   * JSON log of every reconciliation op executed by this analysis on
+   * existing conditions and immediate actions: `{ op, target, reason }`.
+   * Surfaced in the "Applied automatically" section of the diff view.
+   */
+  reconciliationLog  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([tradeId, createdAt])
   @@index([status, createdAt])
+  @@index([status, updatedAt])
   @@index([createdAt])
 }
 
@@ -218,6 +282,23 @@ model TradeCondition {
   childConditions   TradeCondition[] @relation("ConditionChain")
   expiresAt         DateTime?
   triggeredAt       DateTime?
+  /**
+   * Set when a user (or re-run reconciliation) has modified this condition
+   * after creation. Used by re-run context to tell the AI "the user kept
+   * the idea but refined the params" so it can preserve intent.
+   */
+  lastModifiedAt    DateTime?
+  /**
+   * Soft-delete timestamp. A condition is removed from active monitoring
+   * when this is set, but the row is retained so re-runs can see what the
+   * user (or AI reconciliation) rejected and avoid re-proposing it.
+   */
+  deletedAt         DateTime?
+  /**
+   * True once the expiry-approaching / expired notification has been
+   * emitted for this condition. Prevents duplicate notifications.
+   */
+  expiredNotified   Boolean          @default(false)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -226,6 +307,31 @@ model TradeCondition {
   @@index([triggerType, status])
   @@index([parentConditionId])
   @@index([expiresAt])
+  @@index([tradeId, deletedAt])
+}
+
+/**
+ * Lifecycle log for `immediateActions` returned by AI analyses. Unlike
+ * `TradeCondition` (which has its own row once applied), immediate actions
+ * live inside the analysis JSON — this log tracks whether the user applied,
+ * dismissed, or ignored each one so re-runs can reconcile them too.
+ */
+model AiImmediateActionLog {
+  id           String    @id @default(uuid())
+  tradeId      String
+  analysisId   String
+  actionType   String // e.g. "adjust_sl" | "adjust_tp" | "close_trade" | "partial_close"
+  actionParams String    @default("{}") // JSON: action-specific params
+  status       String    @default("proposed") // "proposed" | "applied" | "dismissed" | "ignored"
+  /** Set when the user (or auto-apply) resolved the action. */
+  resolvedAt   DateTime?
+  /** Short note explaining why (e.g. "auto-applied: confidence=high"). */
+  resolvedNote String?
+  createdAt    DateTime  @default(now())
+
+  @@index([tradeId, analysisId])
+  @@index([tradeId, status])
+  @@index([analysisId])
 }
 
 // ─── AI Recommendation Tracking ─────────────────────────────────────────────

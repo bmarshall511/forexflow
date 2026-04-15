@@ -1,5 +1,6 @@
 import type { TradeConditionData, PositionPriceTick, AnyDaemonMessage } from "@fxflow/types"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
+import { derivePipValueUsdFromUnrealizedPL, getPipSize } from "@fxflow/shared"
 
 /** Thrown when a destructive action is blocked by the grace period — condition should retry later */
 class GracePeriodError extends Error {
@@ -33,10 +34,28 @@ interface CachedTradeData {
   stopLoss: number | null
   openedAt: number // epoch ms
   status: string
+  /**
+   * Last reconciled unrealized P&L in account currency. Used to derive a
+   * per-pip USD rate for `pnl_currency` trigger evaluation — without this,
+   * the evaluator cannot safely convert pip distances to USD on cross pairs.
+   */
+  unrealizedPL: number
   fetchedAt: number
 }
 
-const TRADE_CACHE_TTL_MS = 60_000 // 60 seconds
+/**
+ * Cache TTL for trade snapshot data. Dropped from 60s → 5s because the old
+ * 60s window was the root cause of the "expired condition never fired"
+ * class of bugs: if OANDA modified the trade (partial close, SL move,
+ * external close) during the window, we'd evaluate incoming ticks against
+ * a stale `currentUnits` / `direction` / `stopLoss` snapshot. With a 5s
+ * cache the worst-case staleness is 5s, and the trade-closed callback now
+ * invalidates it synchronously so closes are observed immediately.
+ *
+ * Price ticks land at ~2-5 Hz per instrument, so a 5s cache still
+ * deduplicates ~10-25 DB reads per instrument per refresh — plenty cheap.
+ */
+const TRADE_CACHE_TTL_MS = 5_000
 /** Minimum time a pnl_pips trigger must sustain before firing a move_stop_loss action */
 const PNL_SUSTAIN_MS = 30_000 // 30 seconds
 /** Grace period for SL modification actions after trade open / condition creation */
@@ -257,6 +276,29 @@ export class ConditionMonitor {
       void this.evaluateTimeConditions()
       void this.expireOldConditions()
     }, 60_000)
+
+    // Soft-delete terminal (expired/triggered/cancelled) conditions older
+    // than 24 hours on an hourly tick. Without this, expired conditions
+    // accumulate on long-lived trades and pollute the re-run AI prompt —
+    // the model then wastes output tokens proposing `op: "remove"` for
+    // every dead row, which was exactly the behaviour that showed up in
+    // the April 15 analysis the user reported. The 24h window leaves
+    // recent history visible in the condition-history tab for audit.
+    const HOURLY_PRUNE_MS = 60 * 60 * 1000
+    const runPrune = async () => {
+      try {
+        const { pruneTerminalConditions } = await import("@fxflow/db")
+        const pruned = await pruneTerminalConditions(24)
+        if (pruned > 0) {
+          console.log(`[condition-monitor] Pruned ${pruned} terminal condition(s) older than 24h`)
+        }
+      } catch (err) {
+        console.warn("[condition-monitor] Prune sweep failed:", (err as Error).message)
+      }
+    }
+    // Run one immediately on startup (don't block start())
+    void runPrune()
+    setInterval(() => void runPrune(), HOURLY_PRUNE_MS).unref?.()
   }
 
   private async evaluatePriceConditions(instrument: string, currentPrice: number): Promise<void> {
@@ -291,6 +333,15 @@ export class ConditionMonitor {
 
       const tradeData = await this.getTradeData(condition.tradeId)
       if (!tradeData || tradeData.instrument !== instrument) continue
+
+      // Zero-units guard: if a partial close reduced the trade to 0 units,
+      // the snapshot can transiently report currentUnits=0 before the next
+      // reconcile tips it into `status: "closed"`. Evaluating conditions
+      // against a 0-unit "open" trade is meaningless and would fire wrong
+      // actions, so skip and let the reconcile sweep close it cleanly.
+      if (tradeData.currentUnits === 0 || tradeData.status !== "open") {
+        continue
+      }
 
       // Trailing stop is a persistent condition — handle separately
       if (condition.triggerType === "trailing_stop") {
@@ -381,7 +432,7 @@ export class ConditionMonitor {
     tradeData?: CachedTradeData,
   ): boolean {
     const val = condition.triggerValue
-    const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+    const pip = getPipSize(instrument)
 
     switch (condition.triggerType) {
       case "price_reaches": {
@@ -428,16 +479,38 @@ export class ConditionMonitor {
         const targetCurrency = (val.amount ?? val.currency) as number | undefined
         if (targetCurrency === undefined) return false
 
-        // Calculate approximate unrealized P&L in account currency
-        // P&L = (currentPrice - entryPrice) * units for long, inverse for short
+        // Compute unrealized P&L in ACCOUNT currency. The naive
+        // `priceDiff × units` formula gives a value in the QUOTE currency
+        // (JPY for EUR/JPY etc.), so for cross and JPY pairs it was wrong
+        // by the USD/quote rate (often 100x+). We use the shared
+        // `derivePipValueUsdFromUnrealizedPL` helper which inverts OANDA's
+        // own math to get an exact per-pip USD value for this trade, then
+        // multiplies by the signed pip delta.
+        //
+        // When no ground truth is available (early in the trade before
+        // any reconcile), we fall back to the structural pip-value calc.
+        // Cross pairs with no rate info fall through to "cannot evaluate"
+        // and return false rather than firing on a wrong number.
+        const pipSize = getPipSize(tradeData.instrument)
         const priceDiff =
           tradeData.direction === "long"
             ? currentPrice - tradeData.entryPrice
             : tradeData.entryPrice - currentPrice
-        const units = Math.abs(tradeData.currentUnits)
-        // For most USD-quoted pairs, P&L ≈ priceDiff * units
-        // For cross pairs, this is an approximation (exact conversion needs live rates)
-        const estimatedPnl = priceDiff * units
+        const pipsDelta = priceDiff / pipSize
+
+        const pipValueUsd = derivePipValueUsdFromUnrealizedPL({
+          instrument: tradeData.instrument,
+          direction: tradeData.direction,
+          entryPrice: tradeData.entryPrice,
+          currentPrice,
+          currentUnits: tradeData.currentUnits,
+          unrealizedPL: tradeData.unrealizedPL,
+        })
+        if (pipValueUsd === null) {
+          // Cannot safely compute — don't fire on a wrong number.
+          return false
+        }
+        const estimatedPnl = pipsDelta * pipValueUsd
 
         const direction = (val.direction as string) ?? "profit"
         if (direction === "loss") {
@@ -483,7 +556,52 @@ export class ConditionMonitor {
 
   private async expireOldConditions(): Promise<void> {
     try {
-      const { expireOldConditions } = await import("@fxflow/db")
+      const { expireOldConditions, db } = await import("@fxflow/db")
+
+      // Before the actual expiry pass, emit a one-time "approaching expiry"
+      // notification for AI-created conditions within 24h of expiring. This
+      // gives the user a chance to extend the rule before automation stops.
+      //
+      // Uses `expiredNotified` as an idempotency flag so we never double-send.
+      const now = Date.now()
+      const warningCutoff = new Date(now + 24 * 60 * 60 * 1000)
+      const approaching = await db.tradeCondition.findMany({
+        where: {
+          status: "active",
+          createdBy: "ai",
+          deletedAt: null,
+          expiredNotified: false,
+          expiresAt: { not: null, lt: warningCutoff, gt: new Date(now) },
+        },
+        include: { trade: { select: { instrument: true } } },
+        take: 25,
+      })
+      for (const cond of approaching) {
+        try {
+          const { createNotification } = await import("@fxflow/db")
+          const pair = cond.trade.instrument.replace("_", "/")
+          const hoursLeft = cond.expiresAt
+            ? Math.max(1, Math.round((cond.expiresAt.getTime() - now) / 3_600_000))
+            : 0
+          await createNotification({
+            severity: "info",
+            source: "trade_condition",
+            title: "AI condition expiring soon",
+            message: `${pair}: "${cond.label ?? "Unlabeled rule"}" expires in ${hoursLeft}h`,
+            metadata: { conditionId: cond.id, tradeId: cond.tradeId },
+          })
+          await db.tradeCondition.update({
+            where: { id: cond.id },
+            data: { expiredNotified: true },
+          })
+        } catch (warnErr) {
+          console.warn(
+            `[condition-monitor] Failed to emit approaching-expiry notification for ${cond.id}:`,
+            (warnErr as Error).message,
+          )
+        }
+      }
+
       const count = await expireOldConditions()
       if (count > 0) {
         // Remove expired from in-memory map
@@ -678,12 +796,19 @@ export class ConditionMonitor {
 
     const params = condition.actionParams
 
+    const attribution = {
+      closedBy: "ai_condition" as const,
+      closedByLabel: "AI Condition",
+      closedByDetail: condition.label ?? undefined,
+    }
+
     switch (condition.actionType) {
       case "close_trade":
         await this.tradeSyncer.closeTrade(
           trade.sourceTradeId,
           undefined,
           `Condition triggered: ${condition.label ?? "automated condition"}`,
+          attribution,
         )
         break
 
@@ -694,6 +819,7 @@ export class ConditionMonitor {
           trade.sourceTradeId,
           units,
           `Partial close condition: ${condition.label ?? "automated"}`,
+          attribution,
         )
         break
       }
@@ -708,7 +834,7 @@ export class ConditionMonitor {
         // below entry even though mid price is still above.
         if (trade.status === "open") {
           const instrument = await this.getTradeInstrument(condition.tradeId)
-          const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+          const pip = getPipSize(instrument)
           const originalSL = stopLoss
           const isBreakevenMove = Math.abs(stopLoss - trade.entryPrice) < pip * 1.5
           if (isBreakevenMove) {
@@ -796,7 +922,7 @@ export class ConditionMonitor {
     direction: "long" | "short",
     instrument: string,
   ): number {
-    const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+    const pip = getPipSize(instrument)
     const spread = this.spreadMap[instrument] ?? pip * 1.5 // fallback: 1.5 pip spread
     // Buffer = current spread + small ATR factor (ATR_BUFFER_FACTOR is 0.05)
     // We use spread as the primary buffer (it's the minimum distance needed)
@@ -823,7 +949,7 @@ export class ConditionMonitor {
     const stepPips = (triggerValue.step_pips ?? distancePips) as number
     const instrument = tradeData.instrument
     const direction = tradeData.direction
-    const pip = instrument.includes("JPY") ? 0.01 : 0.0001
+    const pip = getPipSize(instrument)
     const distance = distancePips * pip
     const step = stepPips * pip
 
@@ -873,6 +999,7 @@ export class ConditionMonitor {
           stopLoss: true,
           openedAt: true,
           status: true,
+          unrealizedPL: true,
         },
       })
       if (trade) {
@@ -885,6 +1012,7 @@ export class ConditionMonitor {
           stopLoss: trade.stopLoss,
           openedAt: trade.openedAt.getTime(),
           status: trade.status,
+          unrealizedPL: trade.unrealizedPL ?? 0,
           fetchedAt: Date.now(),
         }
         this.tradeDataCache.set(tradeId, data)

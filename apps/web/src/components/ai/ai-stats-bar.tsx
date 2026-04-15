@@ -15,6 +15,7 @@ import {
   CalendarDays,
   CalendarRange,
   Clock,
+  AlertTriangle,
 } from "lucide-react"
 
 function fmt(n: number) {
@@ -114,6 +115,13 @@ export function AiStatsBar({ refreshKey }: { refreshKey?: number }) {
             <Loader2 className="size-3" />
             <span className="font-medium">{stats.statusCounts.pending}</span>
             <span className="text-amber-600/70">pending</span>
+          </div>
+        )}
+        {stats.statusCounts.partial > 0 && (
+          <div className="flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-600">
+            <AlertTriangle className="size-3" />
+            <span className="font-medium">{stats.statusCounts.partial}</span>
+            <span className="text-amber-600/70">partial</span>
           </div>
         )}
         {stats.statusCounts.failed > 0 && (

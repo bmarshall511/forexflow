@@ -64,6 +64,16 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 
 - `calculateCost()` uses `AI_MODEL_OPTIONS` pricing from `@fxflow/types`.
 
+### AI Analysis v2 Schema
+
+- `AiAnalysis` added columns: `partialStreamText` (preserved on cancel), `cancelledAt`, `schemaVersion` (1 = legacy, 2 = includes `conditionChanges`), `reconciliationLog` (JSON array of `AiReconciliationLogEntry`), `cacheReadTokens`/`cacheWriteTokens` (prompt caching accounting), `truncated` + `stopReason` (response cut off by `max_tokens` → row is saved with `status: "partial"` and UI renders `TruncationBanner`).
+- `saveAnalysisResult(id, { truncated, stopReason, ... })` persists truncation state and flips status to `"partial"` when `truncated=true`. All stats aggregations (`getUsageStats`, `getLatestCompletedAnalysis`, `getAnalysisCountsByTradeIds`) treat `completed` and `partial` as equivalent — partial analyses have usable sections, just incomplete.
+- Added `pruneTerminalConditions(olderThanHours = 24)` which soft-deletes expired/triggered/cancelled conditions older than the window. Runs hourly from `ConditionMonitor.startTimeBasedChecks` to keep the re-run AI prompt clean of dead rules.
+- `TradeCondition` added: `lastModifiedAt` (stamped by `updateCondition`), `deletedAt` (soft-delete — `deleteCondition` now soft-deletes so re-runs can see rejected ideas; `hardDeleteCondition` for GDPR), `expiredNotified` (idempotency flag for expiry notifications). `listConditionsForTrade`/`listActiveConditions` filter out soft-deleted rows; `listRecentlyDeletedForTrade(tradeId, sinceDays=7)` exposes them for the re-run context gatherer.
+- `AiSettings` added: `autoRetryInterrupted`, `monthlyBudgetCapUsd`, `maxReconciliationOps` (default 20 — hard cap on re-run ops), `reanalysisScheduleJson`.
+- New model `AiImmediateActionLog` tracks lifecycle of immediate (one-shot) actions proposed by analyses. Service at `ai-immediate-action-log-service.ts` — `logProposedAction`, `resolveAction`, `listActionsForTrade`, `listActionsForAnalysis`.
+- `cancelAnalysis(id, partialStreamText?)` now accepts optional partial stream text which is persisted so the UI can render what Claude got to before being stopped.
+
 ### Reset
 
 - `reset-service.ts` — selective, trading data, factory, and fresh install resets.

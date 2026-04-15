@@ -197,6 +197,8 @@ export {
 export {
   getAnalysisStatusConfig,
   isStuckAnalysis,
+  isInterruptedError,
+  isTerminalAnalysisStatus,
   MODEL_LABELS,
   DEPTH_LABELS,
   type AnalysisStatusConfig,
@@ -216,3 +218,12 @@ export { parseFrontmatter, slugify, type DocFrontmatter } from "./markdown"
 export { classifyAiError, type AiErrorCategory, type ClassifiedAiError } from "./ai-errors"
 
 export { findNearbyKeyLevels, scoreKeyLevels, type KeyLevel } from "./key-levels"
+
+export {
+  conditionsMatch,
+  findMatchingCondition,
+  type ConditionLike,
+  type ConditionMatchOptions,
+} from "./condition-matching"
+
+export { calculatePipValueUsd, derivePipValueUsdFromUnrealizedPL } from "./pip-value"
