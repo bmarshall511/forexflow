@@ -49,6 +49,8 @@ interface SmartFlowTradeRow {
   financingAccumulated: number
   entrySpread: number | null
   avgSpread: number | null
+  atrAtPlacement: number | null
+  regimeAtPlacement: string | null
   aiActionsToday: number
   aiLastActionAt: Date | null
   aiTotalCost: number
@@ -113,6 +115,8 @@ function toTradeData(row: SmartFlowTradeRow): SmartFlowTradeData {
     financingAccumulated: row.financingAccumulated,
     entrySpread: row.entrySpread,
     avgSpread: row.avgSpread,
+    atrAtPlacement: row.atrAtPlacement,
+    regimeAtPlacement: row.regimeAtPlacement,
     aiActionsToday: row.aiActionsToday,
     aiTotalCost: row.aiTotalCost,
     aiSuggestions: safeJsonParse<SmartFlowAiSuggestion[]>(row.aiSuggestionsLogJson, []),
@@ -161,6 +165,13 @@ export interface CreateSmartFlowTradeInput {
   estimatedLow?: number
   estimatedHigh?: number
   entrySpread?: number
+  /**
+   * ATR (in price units) captured at the moment the order was placed. Used
+   * for per-regime / per-volatility performance analysis in post-mortems.
+   */
+  atrAtPlacement?: number
+  /** Market regime captured at placement. `"trending" | "ranging" | ...`. */
+  regimeAtPlacement?: string
 }
 
 /**
@@ -184,6 +195,8 @@ export async function createSmartFlowTrade(
       estimatedLow: input.estimatedLow ?? null,
       estimatedHigh: input.estimatedHigh ?? null,
       entrySpread: input.entrySpread ?? null,
+      atrAtPlacement: input.atrAtPlacement ?? null,
+      regimeAtPlacement: input.regimeAtPlacement ?? null,
     },
     include: CONFIG_INCLUDE,
   })

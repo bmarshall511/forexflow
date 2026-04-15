@@ -216,6 +216,10 @@ export async function updateOpportunityStatus(
     tier2InputTokens: number
     tier2OutputTokens: number
     tier2Cost: number
+    /** Tier 2's own confidence (0-100) BEFORE the Tier 3 decision. */
+    tier2Confidence: number
+    tier2Passed: boolean
+    tier2DecidedAt: Date
     tier3Response: string
     tier3Model: string
     tier3InputTokens: number
@@ -536,6 +540,55 @@ export async function cleanupOldOpportunities(days = 90): Promise<number> {
       status: { in: HISTORY_STATUSES },
       updatedAt: { lt: cutoff },
     },
+  })
+  return result.count
+}
+
+// ─── Near-miss persistence ───────────────────────────────────────────────────
+
+/**
+ * Persist a Tier 1 near-miss for post-mortem threshold tuning. Called from
+ * the scanner for each signal that almost passed the filter breakdown but
+ * got blocked. Fire-and-forget from the caller's perspective — errors are
+ * swallowed because near-miss logging must never block a scan cycle.
+ */
+export interface CreateNearMissInput {
+  instrument: string
+  direction: "long" | "short"
+  profile: string
+  confidence: number
+  blockingFilter: string
+  reason?: string | null
+  /** Serialised Tier1NearMiss-shaped metadata. */
+  metadata?: unknown
+}
+
+export async function createNearMiss(input: CreateNearMissInput): Promise<void> {
+  try {
+    await db.aiTraderNearMiss.create({
+      data: {
+        instrument: input.instrument,
+        direction: input.direction,
+        profile: input.profile,
+        confidence: Math.round(input.confidence),
+        blockingFilter: input.blockingFilter,
+        reason: input.reason ?? null,
+        metadata: JSON.stringify(input.metadata ?? {}),
+      },
+    })
+  } catch (err) {
+    console.warn("[ai-trader-opportunity-service] createNearMiss failed:", (err as Error).message)
+  }
+}
+
+/**
+ * Delete old near-miss rows beyond the retention period. Called from the
+ * scanner's periodic cleanup cycle so we don't accumulate forever.
+ */
+export async function cleanupOldNearMisses(days = 30): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const result = await db.aiTraderNearMiss.deleteMany({
+    where: { detectedAt: { lt: cutoff } },
   })
   return result.count
 }

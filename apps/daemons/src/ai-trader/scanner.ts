@@ -27,6 +27,7 @@ import {
   findOpportunityByResultTradeId,
   getTradeBySourceId,
   getRiskPercent,
+  createNearMiss,
 } from "@fxflow/db"
 import {
   ALL_FOREX_PAIRS,
@@ -821,6 +822,29 @@ export class AiTraderScanner {
       )
       console.log(`[ai-trader] Tier 1 found ${allSignals.length} candidates`)
 
+      // Persist the top-20 near-misses (closest to passing by raw R:R) to
+      // AiTraderNearMiss so we can tune thresholds from historical data
+      // instead of the in-memory ring buffer that evaporates on restart.
+      // Fire-and-forget — never blocks the scan cycle.
+      const topNearMisses = [...allNearMisses].sort((a, b) => b.rawRR - a.rawRR).slice(0, 20)
+      if (topNearMisses.length > 0) {
+        void (async () => {
+          for (const nm of topNearMisses) {
+            await createNearMiss({
+              instrument: nm.instrument,
+              direction: nm.direction,
+              profile: nm.profile,
+              confidence: nm.confidence,
+              blockingFilter: nm.reason,
+              reason: `${nm.reason} (R:R ${nm.rawRR.toFixed(2)}, spread ${nm.spreadPips.toFixed(1)}p)`,
+              metadata: nm,
+            })
+          }
+        })().catch((err) =>
+          console.warn("[ai-trader] near-miss persistence failed:", (err as Error).message),
+        )
+      }
+
       allSignals.sort((a, b) => b.confidence - a.confidence)
 
       // ─── Correlation guard: limit same-currency same-direction ──
@@ -1011,7 +1035,15 @@ export class AiTraderScanner {
     // Helper to persist tier2 cost on any exit path. Every rejection row MUST
     // carry an `entryRationale` explaining WHY so post-mortem analysis can
     // distinguish prompt-bias rejections from legitimate filter blocks.
-    const recordTier2Only = async (status: "rejected" | "detected", rationale: string) => {
+    //
+    // `tier2Confidence` / `tier2Passed` come from the parsed Tier 2 response
+    // when available. The parse-error path has neither (Haiku returned garbage),
+    // so both are undefined there.
+    const recordTier2Only = async (
+      status: "rejected" | "detected",
+      rationale: string,
+      tier2Info?: { confidence: number; passed: boolean },
+    ) => {
       const opp = await createOpportunity({
         instrument: signal.instrument,
         direction: signal.direction,
@@ -1044,6 +1076,9 @@ export class AiTraderScanner {
         tier2InputTokens,
         tier2OutputTokens,
         tier2Cost,
+        tier2Confidence: tier2Info?.confidence,
+        tier2Passed: tier2Info?.passed,
+        tier2DecidedAt: new Date(),
       })
     }
 
@@ -1083,6 +1118,7 @@ export class AiTraderScanner {
       await recordTier2Only(
         "rejected",
         `Tier 2 rejected (${tier2Result.confidence}%): ${tier2Result.reason}`,
+        { confidence: tier2Result.confidence, passed: false },
       )
       return "tier2_fail"
     }
@@ -1159,13 +1195,17 @@ export class AiTraderScanner {
         entryRationale: preTier3.reason ?? "Pre-Tier-3 gate blocked (unspecified)",
         technicalSnapshot: signal.technicalSnapshot,
       })
-      // Record tier2 cost on gate-blocked opportunities
+      // Record tier2 cost on gate-blocked opportunities. Note that Tier 2
+      // itself passed here — it's only the Pre-Tier-3 risk gate that blocked.
       await updateOpportunityStatus(gateOpp.id, "rejected", {
         tier2Response: tier2Text,
         tier2Model,
         tier2InputTokens,
         tier2OutputTokens,
         tier2Cost,
+        tier2Confidence: tier2Result.confidence,
+        tier2Passed: true,
+        tier2DecidedAt: new Date(),
       })
       return "gate_blocked"
     }
@@ -1383,13 +1423,17 @@ export class AiTraderScanner {
       sentimentSnapshot: fundamentalData.sentiment,
     })
 
-    // Update with tier data and final status
+    // Update with tier data and final status. Tier 2 passed (otherwise we
+    // wouldn't have gotten here), so `tier2Passed: true` is always correct.
     await updateOpportunityStatus(opportunity.id, tier3Result.execute ? "suggested" : "rejected", {
       tier2Response: tier2Text,
       tier2Model: tier2Model,
       tier2InputTokens,
       tier2OutputTokens,
       tier2Cost,
+      tier2Confidence: tier2Result.confidence,
+      tier2Passed: true,
+      tier2DecidedAt: new Date(),
       tier3Response: tier3Text,
       tier3Model: config.decisionModel || "claude-sonnet-4-6",
       tier3InputTokens,

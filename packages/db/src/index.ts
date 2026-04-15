@@ -309,9 +309,12 @@ export {
   expireOldOpportunities,
   reconcileStaleOpportunities,
   cleanupOldOpportunities,
+  createNearMiss,
+  cleanupOldNearMisses,
   getOpportunitiesByProfile,
   getAllOpportunities,
   type CreateOpportunityInput,
+  type CreateNearMissInput,
   type OpportunityListFilters,
 } from "./ai-trader-opportunity-service"
 

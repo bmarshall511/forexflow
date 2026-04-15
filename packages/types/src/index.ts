@@ -4058,6 +4058,10 @@ export interface SmartFlowTradeData {
   financingAccumulated: number
   entrySpread: number | null
   avgSpread: number | null
+  /** ATR in price units captured at placement. Phase 4a feedback loop. */
+  atrAtPlacement: number | null
+  /** Market regime captured at placement. Phase 4a feedback loop. */
+  regimeAtPlacement: string | null
   aiActionsToday: number
   aiTotalCost: number
   aiSuggestions: SmartFlowAiSuggestion[]

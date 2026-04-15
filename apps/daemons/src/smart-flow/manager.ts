@@ -34,6 +34,7 @@ import {
 import {
   computeATR,
   getPipSize,
+  detectRegime,
   calculatePositionSize as sharedCalculatePositionSize,
 } from "@fxflow/shared"
 import { getPresetDefaults } from "./preset-defaults.js"
@@ -362,6 +363,31 @@ export class SmartFlowManager {
         targetPips,
       ).catch(() => null)
 
+      // Capture the market regime at placement by re-using the candles
+      // already cached by calculateAtr above. Zero extra network calls.
+      // Falls back silently if the cache lookup fails — regime is optional
+      // diagnostic data, never load-bearing for the placement itself.
+      let regimeAtPlacement: string | undefined
+      try {
+        const cached = this.candleCache.get(config.instrument, ATR_TF, ATR_COUNT)
+        if (cached && cached.length >= 50) {
+          const mapped = cached.map((c) => ({
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: 0,
+          }))
+          regimeAtPlacement = detectRegime(mapped).regime ?? undefined
+        }
+      } catch (err) {
+        console.warn(
+          `[smart-flow] regime detection at placement failed for ${config.instrument}:`,
+          (err as Error).message,
+        )
+      }
+
       const trade = await createSmartFlowTrade({
         configId: config.id,
         sourceTradeId: result.sourceId,
@@ -371,6 +397,8 @@ export class SmartFlowManager {
         estimatedHours: estimate?.estimatedHours,
         estimatedLow: estimate?.low,
         estimatedHigh: estimate?.high,
+        atrAtPlacement: atr,
+        regimeAtPlacement,
       })
 
       this.activeInstruments.add(config.instrument)

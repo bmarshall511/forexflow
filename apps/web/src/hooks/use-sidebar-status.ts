@@ -3,13 +3,6 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useDaemonStatus } from "./use-daemon-status"
 
-// Temporary diagnostic flag on window for the SmartFlow sidebar log (see below).
-declare global {
-  interface Window {
-    __fxflowSfDebugLogged?: boolean
-  }
-}
-
 export interface SidebarStatus {
   /** Primary status line */
   line1: string
@@ -358,17 +351,6 @@ function useSmartFlowNavData() {
           if (json.ok && json.data) {
             if (json.data.enabled != null) smartFlowEnabled = json.data.enabled
             if (json.data.scannerEnabled != null) scannerEnabled = json.data.scannerEnabled
-          }
-          // TEMP DIAGNOSTIC — remove once sidebar status is confirmed stable.
-          // Drop a one-shot console log so we can see what the API is
-          // actually returning in the user's browser (debugging a report
-          // that the sidebar shows "SmartFlow off" even with enabled=true).
-          if (typeof window !== "undefined" && !window.__fxflowSfDebugLogged) {
-            window.__fxflowSfDebugLogged = true
-            console.log("[smart-flow-sidebar] settings fetch:", {
-              smartFlowEnabled,
-              scannerEnabled,
-            })
           }
         }
 

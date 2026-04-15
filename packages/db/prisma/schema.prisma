@@ -647,10 +647,20 @@ model AiTraderOpportunity {
   fundamentalSnapshot String    @default("{}") // JSON: macro, calendar, COT
   sentimentSnapshot   String    @default("{}") // JSON: news sentiment
   tier2Response       String?   // Haiku scan response
-  tier2Model          String?   // Claude model used for scan
-  tier2InputTokens    Int       @default(0)
-  tier2OutputTokens   Int       @default(0)
-  tier2Cost           Float     @default(0)
+  tier2Model           String?   // Claude model used for scan
+  tier2InputTokens     Int       @default(0)
+  tier2OutputTokens    Int       @default(0)
+  tier2Cost            Float     @default(0)
+  /// Tier 2's own confidence score (0-100) BEFORE Tier 3 gets involved.
+  /// Distinct from `confidence` which holds the final Tier 3 score. Used to
+  /// audit Haiku's quick-filter accuracy separately from Sonnet's decision.
+  tier2Confidence      Int?
+  /// Whether Tier 2 returned `pass: true` (i.e. forwarded to Tier 3).
+  tier2Passed          Boolean?
+  /// Timestamp Tier 2 completed (not Tier 3). Helpful for per-tier latency
+  /// breakdowns and for distinguishing Tier 2 rejections from Tier 3 ones
+  /// in post-mortem queries.
+  tier2DecidedAt       DateTime?
   tier3Response       String?   // Deep analysis response
   tier3Model          String?   // Claude model used for decision
   tier3InputTokens    Int       @default(0)
@@ -688,6 +698,34 @@ model AiTraderMarketData {
 
   @@index([dataType, dataKey, expiresAt])
   @@index([dataType, expiresAt])
+}
+
+/// Tier 1 signals that almost passed the filter but didn't. Persisted so we
+/// can tune Tier 1 thresholds from real data instead of the scanner's
+/// in-memory ring buffer (which evaporates on daemon restart). Fills the gap
+/// flagged in the original SmartFlow + EdgeFinder audit — near-miss data was
+/// previously only surfaced in the `ai_trader_scan_progress` WS broadcast
+/// and lost at the end of each scan.
+model AiTraderNearMiss {
+  id             String   @id @default(uuid())
+  instrument     String
+  direction      String   // "long" | "short"
+  profile        String   // "scalper" | "intraday" | "swing" | "news"
+  /// Tier 1 confluence score (0-100) of the would-be signal.
+  confidence     Int
+  /// Which filter blocked the signal ("spread", "rr", "htf", "rsi", "low_vol",
+  /// "no_signal", "low_confluence", ...).
+  blockingFilter String
+  /// Human-readable reason from the filter breakdown.
+  reason         String?
+  /// Full Tier1NearMiss payload as captured during the scan, for post-mortem.
+  metadata       String   @default("{}")
+  detectedAt     DateTime @default(now())
+
+  @@index([detectedAt])
+  @@index([instrument, detectedAt])
+  @@index([profile, detectedAt])
+  @@index([blockingFilter, detectedAt])
 }
 
 // ─── Price Alerts ────────────────────────────────────────────────────────────
@@ -872,6 +910,12 @@ model SmartFlowTrade {
   // Spread tracking
   entrySpread            Float?    // spread at time of entry
   avgSpread              Float?    // rolling avg spread for this instrument
+  // Market context at placement — captured ONCE, at entry, for post-mortem
+  // feedback loops ("did SmartFlow trades perform better in trending vs
+  // ranging regimes?"). Distinct from `SmartFlowOpportunity.regime` which
+  // is captured during scanning BEFORE placement.
+  atrAtPlacement         Float?
+  regimeAtPlacement      String?   // "trending" | "ranging" | "volatile" | "low_volatility"
   // AI assist
   aiActionsToday         Int       @default(0)
   aiLastActionAt         DateTime?
