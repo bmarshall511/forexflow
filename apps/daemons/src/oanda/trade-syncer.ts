@@ -54,6 +54,8 @@ import {
   getTradeBySourceId,
   updateTradeCloseContext,
   type OrphanCloseDetails,
+  type OrphanVerifiedOpen,
+  ORPHAN_VERIFIED_OPEN,
 } from "@fxflow/db"
 
 export class OandaTradeSyncer {
@@ -1276,7 +1278,11 @@ export class OandaTradeSyncer {
 
       let repaired = 0
       for (const orphan of orphans) {
-        const details = await this.fetchTradeCloseDetails(orphan.sourceTradeId)
+        const result = await this.fetchTradeCloseDetails(orphan.sourceTradeId)
+        // Skip if OANDA says it's still open — repair path only handles
+        // confirmed-closed trades. Narrow the union to OrphanCloseDetails.
+        if (result === null || result === ORPHAN_VERIFIED_OPEN) continue
+        const details = result
         if (details) {
           await prisma.trade.update({
             where: { id: orphan.id },
@@ -1871,7 +1877,9 @@ export class OandaTradeSyncer {
    * Used when a trade disappears from the open list (orphaned) to recover
    * the real P&L, exit price, and close reason instead of defaulting to $0.
    */
-  private async fetchTradeCloseDetails(sourceTradeId: string): Promise<OrphanCloseDetails | null> {
+  private async fetchTradeCloseDetails(
+    sourceTradeId: string,
+  ): Promise<OrphanCloseDetails | OrphanVerifiedOpen | null> {
     const creds = this.stateManager.getCredentials()
     if (!creds) return null
 
@@ -1900,10 +1908,15 @@ export class OandaTradeSyncer {
         })
         const retryTrade = retryResponse.trade
         if (!retryTrade || retryTrade.state === "OPEN") {
+          // OANDA positively confirmed the trade is still open. Return the
+          // verified-open sentinel so `closeOrphanedTrades` skips it entirely
+          // instead of falling through to the "UNKNOWN close" path, which
+          // was the bug that produced the stale `closedAt` + ghost
+          // TRADE_CLOSED events the Apr 15 analysis hallucinated from.
           console.warn(
-            `[trade-syncer] Trade ${sourceTradeId} still OPEN after retry — skipping orphan close`,
+            `[trade-syncer] Trade ${sourceTradeId} still OPEN after retry — verified-open, skip orphan close`,
           )
-          return null
+          return ORPHAN_VERIFIED_OPEN
         }
         // Use the retry result
         Object.assign(trade, retryTrade)

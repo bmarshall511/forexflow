@@ -83,6 +83,8 @@ export {
   type CreateTradeEventInput,
   type OrphanCloseDetails,
   type FetchOrphanCloseDetails,
+  type OrphanVerifiedOpen,
+  ORPHAN_VERIFIED_OPEN,
 } from "./trade-service"
 
 export {

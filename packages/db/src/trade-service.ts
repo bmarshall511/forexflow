@@ -234,6 +234,21 @@ export async function upsertTrade(input: UpsertTradeInput) {
     currentUnits: input.currentUnits,
     openedAt: input.openedAt,
   }
+
+  // Re-opening an orphaned-then-restored trade: if the reconcile is writing
+  // an active status (`open` or `pending`) AND the caller didn't explicitly
+  // provide close fields, clear any residual close state. Without this, a
+  // transient OANDA API glitch that briefly dropped the trade from the open
+  // list triggers `closeOrphanedTrades` → writes `closedAt` + `closeReason`,
+  // then the next reconcile re-sees the trade and upserts `status: "open"`
+  // but leaves `closedAt` intact. The AI analysis then reads the stale
+  // closedAt from context and tells the user the trade is closed — which is
+  // exactly the hallucination the April 15 GBP/USD analysis produced.
+  if (input.status === "open" || input.status === "pending") {
+    if (input.closedAt === undefined) update.closedAt = null
+    if (input.closeReason === undefined) update.closeReason = null
+    if (input.exitPrice === undefined) update.exitPrice = null
+  }
   if (input.orderType !== undefined) update.orderType = input.orderType
   if (input.exitPrice !== undefined) update.exitPrice = input.exitPrice
   if (input.stopLoss !== undefined) update.stopLoss = input.stopLoss
@@ -430,8 +445,28 @@ export interface OrphanCloseDetails {
   closedAt: Date
 }
 
-/** Callback type for fetching actual close details from OANDA before orphan close. */
-export type FetchOrphanCloseDetails = (sourceTradeId: string) => Promise<OrphanCloseDetails | null>
+/**
+ * Sentinel the fetcher returns when OANDA's trade-detail endpoint confirms
+ * the trade is STILL OPEN despite being absent from the paged open-trades
+ * list. This indicates a transient API inconsistency (paging race, caching,
+ * in-flight fill) and the orphan sweep MUST skip the close — otherwise we
+ * corrupt the DB row (closedAt set, status eventually flipped back to open
+ * by the next reconcile) and downstream AI analyses hallucinate from the
+ * stale close state.
+ */
+export const ORPHAN_VERIFIED_OPEN = Symbol("orphan-verified-open")
+export type OrphanVerifiedOpen = typeof ORPHAN_VERIFIED_OPEN
+
+/**
+ * Callback type for fetching actual close details from OANDA before orphan
+ * close. Returns:
+ *   - OrphanCloseDetails when OANDA confirms the trade is closed
+ *   - ORPHAN_VERIFIED_OPEN when OANDA says the trade is still open (skip close)
+ *   - null when details couldn't be retrieved at all (fall through to UNKNOWN)
+ */
+export type FetchOrphanCloseDetails = (
+  sourceTradeId: string,
+) => Promise<OrphanCloseDetails | OrphanVerifiedOpen | null>
 
 /**
  * Mark orphaned "open" trades as closed (they disappeared from OANDA).
@@ -448,17 +483,23 @@ export async function closeOrphanedTrades(
   const now = new Date()
   const orphans = await db.trade.findMany({
     where: { source, status: "open", sourceTradeId: { notIn: activeSourceIds } },
-    select: { id: true, sourceTradeId: true },
+    // Pull the existing closeContext so we can MERGE rather than overwrite.
+    // A subsystem (condition-monitor, smart-flow, trade-finder, etc.) may
+    // have stamped `closedBy`/`closedByLabel` fields pre-close to attribute
+    // the action correctly — if we clobber them here with a generic
+    // "system" context, the UI falls back to "Manual" and the user can't
+    // tell system-triggered closes apart from their own manual closes.
+    select: { id: true, sourceTradeId: true, closeContext: true },
   })
   if (orphans.length === 0) return { count: 0, closedTradeIds: [] }
 
   const closedTradeIds: string[] = []
   for (const trade of orphans) {
     // Try to fetch actual close details from OANDA
-    let details: OrphanCloseDetails | null = null
+    let fetchResult: OrphanCloseDetails | OrphanVerifiedOpen | null = null
     if (fetchCloseDetails) {
       try {
-        details = await fetchCloseDetails(trade.sourceTradeId)
+        fetchResult = await fetchCloseDetails(trade.sourceTradeId)
       } catch (err) {
         console.warn(
           `[closeOrphanedTrades] Failed to fetch close details for ${trade.sourceTradeId}:`,
@@ -467,8 +508,36 @@ export async function closeOrphanedTrades(
       }
     }
 
+    // Hard abort: OANDA positively confirmed the trade is still open. This
+    // is a transient inconsistency in OANDA's paged trades endpoint (we saw
+    // this on Apr 13: trade disappeared from the open-trades list for a
+    // single reconcile cycle, then came back). Closing it here would write
+    // a bogus `closedAt` that the next reconcile cannot clear without the
+    // re-open guard in upsertTrade — and a stale TRADE_CLOSED event would
+    // then feed the AI hallucination loop. Skip this trade entirely.
+    if (fetchResult === ORPHAN_VERIFIED_OPEN) {
+      console.warn(
+        `[closeOrphanedTrades] Skipping ${trade.sourceTradeId}: OANDA confirms still OPEN (transient paging inconsistency)`,
+      )
+      continue
+    }
+    const details = fetchResult
+
+    // Preserve any pre-set close attribution (e.g. from condition-monitor's
+    // closeTrade call a few ticks ago). Only add generic "system" fallback
+    // fields if NOTHING has been set yet — never overwrite a real attribution.
+    const existing = parseCloseContext(trade.closeContext) ?? {}
+    const hasAttribution = existing.closedBy != null || existing.cancelledBy != null
+
     if (details) {
-      // Use actual close data from OANDA
+      const mergedContext = hasAttribution
+        ? existing
+        : {
+            ...existing,
+            cancelledBy: "system",
+            cancelReason: "Trade closed on OANDA — details recovered",
+            cancelledAt: details.closedAt.toISOString(),
+          }
       await db.trade.update({
         where: { id: trade.id },
         data: {
@@ -478,26 +547,25 @@ export async function closeOrphanedTrades(
           realizedPL: details.realizedPL,
           financing: details.financing,
           closedAt: details.closedAt,
-          closeContext: JSON.stringify({
-            cancelledBy: "system",
-            cancelReason: "Trade closed on OANDA — details recovered",
-            cancelledAt: details.closedAt.toISOString(),
-          }),
+          closeContext: JSON.stringify(mergedContext),
         },
       })
     } else {
-      // Fallback: no details available
+      const mergedContext = hasAttribution
+        ? existing
+        : {
+            ...existing,
+            cancelledBy: "system",
+            cancelReason: "Trade disappeared from OANDA — closed externally (details unavailable)",
+            cancelledAt: now.toISOString(),
+          }
       await db.trade.update({
         where: { id: trade.id },
         data: {
           status: "closed",
           closeReason: "UNKNOWN",
           closedAt: now,
-          closeContext: JSON.stringify({
-            cancelledBy: "system",
-            cancelReason: "Trade disappeared from OANDA — closed externally (details unavailable)",
-            cancelledAt: now.toISOString(),
-          }),
+          closeContext: JSON.stringify(mergedContext),
         },
       })
     }
