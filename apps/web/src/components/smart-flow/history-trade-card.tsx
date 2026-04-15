@@ -4,42 +4,33 @@ import type { SmartFlowTradeData } from "@fxflow/types"
 import { formatInstrument } from "@fxflow/shared"
 import { DirectionBadge } from "@/components/positions/direction-badge"
 import { Badge } from "@/components/ui/badge"
-import { ShieldAlert, Target } from "lucide-react"
+import { ShieldAlert, Target, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-const PRESET_LABELS: Record<string, string> = {
-  momentum_catch: "Momentum Catch",
-  steady_growth: "Steady Growth",
-  swing_capture: "Swing Capture",
-  trend_rider: "Trend Rider",
-  recovery: "Recovery Mode",
-  custom: "Custom",
-}
+import {
+  PRESET_LABELS,
+  SAFETY_NET_LABELS,
+  formatDurationMs,
+  formatMoney,
+  formatPips,
+} from "./trade-review-utils"
 
 interface HistoryTradeCardProps {
   trade: SmartFlowTradeData
+  onSelect?: (trade: SmartFlowTradeData) => void
 }
 
-export function HistoryTradeCard({ trade }: HistoryTradeCardProps) {
+export function HistoryTradeCard({ trade, onSelect }: HistoryTradeCardProps) {
   const instrument = trade.instrument ? formatInstrument(trade.instrument) : "Unknown"
   const direction = trade.direction ?? "long"
   const preset = PRESET_LABELS[trade.preset ?? ""] ?? trade.preset ?? "Custom"
   const wasSafetyNet = trade.safetyNetTriggered != null
 
-  // Duration
   const durationMs =
     trade.closedAt && trade.createdAt
       ? new Date(trade.closedAt).getTime() - new Date(trade.createdAt).getTime()
       : 0
-  const durationHrs = durationMs / 3_600_000
-  const durationStr =
-    durationHrs < 1
-      ? `${Math.round(durationHrs * 60)}m`
-      : durationHrs < 24
-        ? `${durationHrs.toFixed(1)}h`
-        : `${Math.round(durationHrs / 24)}d`
+  const durationStr = formatDurationMs(durationMs)
 
-  // Date
   const closedDate = trade.closedAt
     ? new Date(trade.closedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
     : "--"
@@ -52,15 +43,42 @@ export function HistoryTradeCard({ trade }: HistoryTradeCardProps) {
     actions.push(
       `${trade.partialCloseLog.length} partial${trade.partialCloseLog.length > 1 ? "s" : ""}`,
     )
-  if (wasSafetyNet) actions.push(formatSafetyNet(trade.safetyNetTriggered!))
+  if (wasSafetyNet)
+    actions.push(SAFETY_NET_LABELS[trade.safetyNetTriggered!] ?? trade.safetyNetTriggered!)
 
   // Outcome
   const outcomeLabel = wasSafetyNet ? "Safety exit" : "Target reached"
   const outcomeColor = wasSafetyNet ? "text-amber-500" : "text-emerald-500"
   const OutcomeIcon = wasSafetyNet ? ShieldAlert : Target
 
+  // Realised P&L — populated via the Trade join when available.
+  const plValue = trade.realizedPL
+  const plColor =
+    plValue == null
+      ? "text-muted-foreground"
+      : plValue > 0
+        ? "text-emerald-500"
+        : plValue < 0
+          ? "text-red-500"
+          : "text-muted-foreground"
+  const plText = formatMoney(plValue)
+  const pipsText = trade.realizedPips == null ? null : formatPips(trade.realizedPips)
+
+  const clickable = typeof onSelect === "function"
+
   return (
-    <div className="hover:bg-muted/50 flex items-start gap-3 rounded-lg px-3 py-3 transition-colors">
+    <button
+      type="button"
+      onClick={clickable ? () => onSelect?.(trade) : undefined}
+      disabled={!clickable}
+      aria-label={`Review closed trade on ${instrument}, ${outcomeLabel}, ${plText}`}
+      className={cn(
+        "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors",
+        clickable &&
+          "hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-primary/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2",
+        !clickable && "cursor-default",
+      )}
+    >
       {/* Outcome indicator */}
       <div
         className={cn(
@@ -109,16 +127,17 @@ export function HistoryTradeCard({ trade }: HistoryTradeCardProps) {
           </p>
         )}
       </div>
-    </div>
-  )
-}
 
-function formatSafetyNet(net: string): string {
-  const map: Record<string, string> = {
-    max_drawdown: "Max loss protection",
-    max_hold: "Time limit reached",
-    max_financing: "Fee limit reached",
-    margin_warning: "Margin warning",
-  }
-  return map[net] ?? net
+      {/* Realised P&L + chevron */}
+      <div className="flex shrink-0 items-start gap-1">
+        <div className="text-right">
+          <p className={cn("text-sm font-semibold tabular-nums", plColor)}>{plText}</p>
+          {pipsText && (
+            <p className={cn("text-[10px] tabular-nums opacity-80", plColor)}>{pipsText}</p>
+          )}
+        </div>
+        {clickable && <ChevronRight className="text-muted-foreground mt-1 size-4" />}
+      </div>
+    </button>
+  )
 }

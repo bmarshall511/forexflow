@@ -102,6 +102,18 @@ Every feature page follows this structure:
 - PWA manifest + service worker for installable mobile experience.
 - See `docs/dev/06-remote-access.md` for full architecture.
 
+## SmartFlow UI
+
+- **Trade Review drawer (Phase 5a)**: `components/smart-flow/trade-review-drawer.tsx` is a thin shadcn `Sheet` wrapper; the body/timeline/presentation parts live in sibling files so each is under the ≤150-LOC component rule:
+  - `trade-review-drawer.tsx` — Sheet wrapper
+  - `trade-review-body.tsx` — header + headline tiles + entry context + sections
+  - `trade-review-timeline.tsx` — merge-sorted event list (management actions, partial closes, AI suggestions)
+  - `trade-review-parts.tsx` — `SectionHeader`, `ContextRow`, `Tile` presentation helpers
+  - `trade-review-utils.ts` — pure formatters (`formatMoney`, `formatPips`, `formatDurationMs`, `formatPrice`, `formatCloseReason`, `humaniseAction`, `formatTimeShort`), shared label maps (`PRESET_LABELS`, `SAFETY_NET_LABELS`, `REGIME_LABELS`), and the `buildTimeline(trade)` merge-sort helper.
+- `HistoryTradeCard` accepts an optional `onSelect?: (trade) => void` and renders as a keyboard-accessible `<button>` with an aria-label, focus-visible ring, realized P&L column (dollars + pips), and a chevron when clickable. Backwards-compatible for future consumers that don't need the drawer.
+- The card's duration/P&L/safety-net formatters are imported from `trade-review-utils.ts` — no duplication with the drawer body.
+- `HistoryTab` owns the drawer state (`selected`, `drawerOpen`), mounts `TradeReviewDrawer` once, and wires the callback. The summary bar now shows real total P&L using `SmartFlowTradeData.realizedPL` (from the Trade join added in Phase 0), with a "partial" hint when any trade lacks the link.
+
 ## AI Trader (EdgeFinder) UI
 
 - **Manual approval workflow**: `OpportunityList` renders `OpportunityCard` (with Approve/Reject buttons) for opportunities with status `"suggested"`. All other statuses use `OpportunityCompactCard`. The list receives `operatingMode`, `confidenceThreshold`, and `onAction` props from the dashboard.
