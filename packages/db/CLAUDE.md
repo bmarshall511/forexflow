@@ -74,6 +74,14 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 - New model `AiImmediateActionLog` tracks lifecycle of immediate (one-shot) actions proposed by analyses. Service at `ai-immediate-action-log-service.ts` — `logProposedAction`, `resolveAction`, `listActionsForTrade`, `listActionsForAnalysis`.
 - `cancelAnalysis(id, partialStreamText?)` now accepts optional partial stream text which is persisted so the UI can render what Claude got to before being stopped.
 
+### SmartFlow Trade Service
+
+- `SmartFlowTrade` now has a nullable Prisma relation to `Trade` via the existing `tradeId` column. `getActiveSmartFlowTrades` / `getSmartFlowTradeHistory` / `getSmartFlowTrade` all include the joined Trade (entryPrice, exitPrice, realizedPL, closeReason, direction, instrument). `toTradeData()` computes `realizedPips` from the join using `getPipSize()` from `@fxflow/shared` (JPY-aware).
+- `SmartFlowTradeData` exposes: `realizedPL`, `realizedPips`, `exitPrice`, `closeReason`, `avgSpread`, `lastManagementAction`. All nullable.
+- `lastManagementAction` column (TEXT, nullable) is stamped automatically by `appendManagementLog` (from the log entry's `action`), `appendPartialCloseLog` (`"partial_close"`), and `closeSmartFlowTrade` (`"safety_net:<reason>"` or `"trade_closed"`). Consumers never write it directly.
+- `estimateHoldTime(instrument, preset, direction, targetPips)` returns `{ estimatedHours, low, high } | null` by computing a per-sample hours-per-pip rate from `SmartFlowTimeEstimate` (excluding `safety_net` outcomes), clipping outliers past 4× median, and scaling by the new target. Returns null when there's no usable history. Called by `SmartFlowManager.placeMarketEntry` to pre-populate the trade's estimate fields.
+- **Schema drift note**: The live SQLite DB carries ~46 MB of production data and is currently out of sync with `prisma/schema.prisma` on several fields from prior WIP. Phase 0 added `lastManagementAction` via manual `ALTER TABLE` (see commit message) rather than `prisma migrate dev` which would have reset the DB. A proper baseline reset is planned for Phase 1 of the SmartFlow/EdgeFinder audit.
+
 ### Reset
 
 - `reset-service.ts` — selective, trading data, factory, and fresh install resets.

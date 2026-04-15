@@ -72,6 +72,7 @@ model Trade {
   tags                 TradeTag[]
   analyses             AiAnalysis[]
   conditions           TradeCondition[]
+  smartFlowTrades      SmartFlowTrade[]
 
   @@unique([source, sourceTradeId])
   @@index([status, openedAt])
@@ -847,6 +848,7 @@ model SmartFlowTrade {
   configId               String
   config                 SmartFlowConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
   tradeId                String?   // FK to Trade.id once placed
+  trade                  Trade?    @relation(fields: [tradeId], references: [id], onDelete: SetNull)
   sourceTradeId          String?   // OANDA trade ID
   status                 String    @default("waiting_entry") // "waiting_entry" | "pending" | "open" | "managing" | "closing" | "closed"
   entryPrice             Float?
@@ -858,6 +860,8 @@ model SmartFlowTrade {
   managementLogJson      String    @default("[]") // JSON: SmartFlowManagementEntry[]
   recoveryLevel          Int       @default(0)    // current DCA level (0 = initial only)
   recoveryTradeIds       String    @default("[]") // JSON: string[] of additional OANDA trade IDs
+  /// Last management rule that fired (breakeven, trailing_moved, partial_close, safety_net, etc.)
+  lastManagementAction   String?
   // Time estimation
   estimatedHours         Float?
   estimatedLow           Float?

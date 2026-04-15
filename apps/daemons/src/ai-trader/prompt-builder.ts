@@ -6,36 +6,69 @@ import type {
 } from "@fxflow/types"
 import type { Tier1Signal, TechnicalSnapshot } from "./strategy-engine.js"
 
-// ─── System Prompt ───────────────────────────────────────────────────────────
+// ─── System Prompts ──────────────────────────────────────────────────────────
+//
+// Two separate system prompts: Tier 2 (liberal triage) and Tier 3 (conservative
+// final decision). A single "be conservative" prompt used to bias both tiers
+// toward rejection, killing 99.86% of signals before Tier 3 ever ran.
 
-const SYSTEM_PROMPT = `You are a forex trading AI that analyzes currency pair setups.
+const TIER2_SYSTEM_PROMPT = `You are a forex trading AI performing TRIAGE on trade candidates.
+
+Your job is to decide which candidates deserve deeper analysis by a more expensive model. You are NOT making the final decision — that happens in Tier 3. Your role is to filter out obvious junk and forward everything else.
+
+DEFAULT TO PASS. Only reject when there is a concrete, specific red flag that would make the trade clearly unprofitable. When in doubt, pass.
+
+RESPOND ONLY WITH VALID JSON matching the schema. No markdown fences, no prose outside JSON.
+
+ANTI-PATTERNS — do NOT use these as reasons to reject:
+- Being in a kill zone (London 07-10 UTC, NY 12-15 UTC). Kill zones are PEAK LIQUIDITY and are generally favorable, not harmful.
+- RSI in the 30-70 range. That is normal. Overbought is RSI > 70; oversold is RSI < 30. RSI 63 is just mildly bullish momentum, not overbought.
+- Stochastic in the 20-80 range. 80+ is overbought; 20- is oversold. Stochastic 70 is mid-range.
+- Williams %R between -80 and -20. That is normal.
+- Secondary timeframe in a ranging regime while primary is trending. That is often a healthy pullback or consolidation — a good entry opportunity, not a conflict.
+- "Volatility is high" during kill zones. High volatility is the reason pros trade kill zones.
+- Missing indicators when other confluence is strong. Not every setup needs all 14 techniques present.
+
+LEGITIMATE RED FLAGS — these ARE reasons to reject:
+- Raw R:R below profile minimum (Scalper 1.3, Intraday 1.8, Swing 2.0, News 1.3).
+- R:R after spread degrades by more than 40% AND spread-adjusted R:R is below 1.5.
+- Direction directly opposite to a strong HTF trend AND no structural reversal reason present.
+- Low volatility regime (ATR is effectively dead).
+- Tier 1 confluence score below 40 (genuine lack of evidence).
+- Multiple core confluence signals missing (e.g. no trend, no structure, no zone, no momentum).
+
+Plain English only in the "reason" field. No jargon.`
+
+const TIER3_SYSTEM_PROMPT = `You are a forex trading AI making the FINAL decision on whether to execute a trade.
 
 You must respond ONLY with valid JSON matching the schema provided. No markdown, no explanation outside JSON.
 
 CRITICAL RULES:
-1. Be conservative — never inflate confidence. A 70+ confidence trade should have 3+ strong confluent reasons.
-2. Always consider the current market regime and session when scoring.
-3. Factor in upcoming high-impact news events as risk.
+1. Be honest about confidence — do not inflate, do not deflate. A 70+ confidence trade should have multiple supporting reasons and no disqualifying red flags.
+2. Consider the current market regime and session when scoring, but remember that kill zones (peak liquidity) are generally favorable, not unfavorable.
+3. Factor in upcoming high-impact news events as risk only when they fall within the expected hold time.
 4. Consider historical performance for similar setups when available.
 5. Entry rationale must be specific with exact price levels.
-6. IMPORTANT: All "reason" and "entryRationale" fields must be written in plain English that a beginner could understand. Avoid jargon and acronyms. Instead of "ADX at 16.0 confirms weak ranging regime", say "The market isn't trending strongly enough." Instead of "FVG confluence with OTE zone", say "Price is at a good entry level with multiple supporting signals."`
+6. All "reason" and "entryRationale" fields must be written in plain English that a beginner could understand. Avoid jargon and acronyms. Instead of "ADX at 16.0 confirms weak ranging regime", say "The market isn't trending strongly enough." Instead of "FVG confluence with OTE zone", say "Price is at a good entry level with multiple supporting signals."`
 
 // ─── Tier 2: Quick Filter ────────────────────────────────────────────────────
 
 export function buildTier2Prompt(signal: Tier1Signal): { system: string; user: string } {
   return {
-    system: SYSTEM_PROMPT,
-    user: `## Tier 2 Quick Assessment
+    system: TIER2_SYSTEM_PROMPT,
+    user: `## Tier 2 Triage
 
-Assess this trade candidate and respond with JSON:
+Decide whether this candidate deserves deeper Tier 3 analysis. Respond with JSON:
 
 \`\`\`json
 {
-  "pass": boolean,        // true if worth deeper analysis
+  "pass": boolean,        // true = forward to Tier 3; false = obvious red flag, skip deep analysis
   "confidence": number,   // 0-100 quick confidence estimate
-  "reason": string        // 1-2 plain English sentences a beginner would understand. No jargon or acronyms.
+  "reason": string        // 1-2 plain English sentences explaining the decision. No jargon or acronyms.
 }
 \`\`\`
+
+DEFAULT TO PASS. Only return false when you can cite a specific red flag from the system prompt's "legitimate red flags" list.
 
 ### Candidate
 - **Instrument**: ${signal.instrument}
@@ -101,7 +134,7 @@ export function buildTier3Prompt(ctx: Tier3Context): { system: string; user: str
   const riskAmount = accountBalance * (riskPercent / 100)
 
   return {
-    system: SYSTEM_PROMPT,
+    system: TIER3_SYSTEM_PROMPT,
     user: `## Tier 3 Deep Analysis — Final Trade Decision
 
 You are making the FINAL decision on whether to execute this trade. Respond with JSON:
@@ -194,7 +227,7 @@ export interface ReEvalContext {
 
 export function buildReEvalPrompt(ctx: ReEvalContext): { system: string; user: string } {
   return {
-    system: SYSTEM_PROMPT,
+    system: TIER3_SYSTEM_PROMPT,
     user: `## Trade Re-Evaluation
 
 Evaluate this open AI trade and respond with JSON:

@@ -19,6 +19,7 @@ import type {
   SmartFlowAiSuggestion,
   SmartFlowPreset,
 } from "@fxflow/types"
+import { getPipSize } from "@fxflow/shared"
 
 import { safeIso, safeJsonParse } from "./utils"
 
@@ -55,6 +56,7 @@ interface SmartFlowTradeRow {
   aiTotalOutputTokens: number
   aiSuggestionsLogJson: string
   lastManualOverrideAt: Date | null
+  lastManagementAction: string | null
   createdAt: Date
   closedAt: Date | null
   updatedAt: Date
@@ -64,6 +66,14 @@ interface SmartFlowTradeRow {
     preset: string
     name: string
   }
+  trade?: {
+    entryPrice: number
+    exitPrice: number | null
+    realizedPL: number
+    closeReason: string | null
+    direction: string
+    instrument: string
+  } | null
 }
 
 /**
@@ -71,6 +81,18 @@ interface SmartFlowTradeRow {
  * parsing all JSON fields with safe fallbacks.
  */
 function toTradeData(row: SmartFlowTradeRow): SmartFlowTradeData {
+  const trade = row.trade ?? null
+  const instrument = trade?.instrument ?? row.config?.instrument
+  // Derive pip P&L from entry/exit when we have the join. Uses shared pip-utils
+  // so JPY pairs (0.01) vs non-JPY (0.0001) are handled correctly.
+  let realizedPips: number | null = null
+  if (trade && trade.exitPrice != null && instrument) {
+    const pipSize = getPipSize(instrument)
+    const delta = trade.exitPrice - trade.entryPrice
+    const signed = trade.direction === "long" ? delta : -delta
+    realizedPips = signed / pipSize
+  }
+
   return {
     id: row.id,
     configId: row.configId,
@@ -90,22 +112,39 @@ function toTradeData(row: SmartFlowTradeRow): SmartFlowTradeData {
     safetyNetTriggered: (row.safetyNetTriggered as SmartFlowSafetyNet | null) ?? null,
     financingAccumulated: row.financingAccumulated,
     entrySpread: row.entrySpread,
+    avgSpread: row.avgSpread,
     aiActionsToday: row.aiActionsToday,
     aiTotalCost: row.aiTotalCost,
     aiSuggestions: safeJsonParse<SmartFlowAiSuggestion[]>(row.aiSuggestionsLogJson, []),
+    lastManagementAction: row.lastManagementAction,
     createdAt: safeIso(row.createdAt),
     closedAt: row.closedAt ? safeIso(row.closedAt) : null,
     // Merged from config for display convenience
-    instrument: row.config?.instrument,
-    direction: row.config?.direction,
+    instrument,
+    direction: trade?.direction ?? row.config?.direction,
     preset: row.config?.preset as SmartFlowPreset | undefined,
     configName: row.config?.name,
+    // Joined from linked Trade
+    realizedPL: trade ? trade.realizedPL : null,
+    realizedPips,
+    exitPrice: trade?.exitPrice ?? null,
+    closeReason: trade?.closeReason ?? null,
   }
 }
 
-/** Standard include for config fields merged into trade data. */
+/** Standard include for config + linked Trade fields merged into trade data. */
 const CONFIG_INCLUDE = {
   config: { select: { instrument: true, direction: true, preset: true, name: true } },
+  trade: {
+    select: {
+      entryPrice: true,
+      exitPrice: true,
+      realizedPL: true,
+      closeReason: true,
+      direction: true,
+      instrument: true,
+    },
+  },
 } as const
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
@@ -242,6 +281,8 @@ export async function updateSmartFlowTradeStatus(
 /**
  * Append an entry to the management log JSON array.
  * Reads the current log, appends the entry, and writes back.
+ * Also stamps `lastManagementAction` with the action name so the dashboard
+ * can show which rule last fired without having to parse the log JSON.
  */
 export async function appendManagementLog(
   id: string,
@@ -258,13 +299,18 @@ export async function appendManagementLog(
 
   await db.smartFlowTrade.update({
     where: { id },
-    data: { managementLogJson: JSON.stringify(log), updatedAt: new Date() },
+    data: {
+      managementLogJson: JSON.stringify(log),
+      lastManagementAction: entry.action,
+      updatedAt: new Date(),
+    },
   })
 }
 
 /**
  * Append an entry to the partial close log JSON array.
  * Reads the current log, appends the entry, and writes back.
+ * Also stamps `lastManagementAction = "partial_close"` for dashboard display.
  */
 export async function appendPartialCloseLog(
   id: string,
@@ -281,7 +327,11 @@ export async function appendPartialCloseLog(
 
   await db.smartFlowTrade.update({
     where: { id },
-    data: { partialCloseLogJson: JSON.stringify(log), updatedAt: new Date() },
+    data: {
+      partialCloseLogJson: JSON.stringify(log),
+      lastManagementAction: "partial_close",
+      updatedAt: new Date(),
+    },
   })
 }
 
@@ -400,6 +450,9 @@ export async function closeSmartFlowTrade(
   }
   if (safetyNet) {
     data.safetyNetTriggered = safetyNet
+    data.lastManagementAction = `safety_net:${safetyNet}`
+  } else {
+    data.lastManagementAction = "trade_closed"
   }
   await db.smartFlowTrade.update({ where: { id }, data })
 }
@@ -493,4 +546,52 @@ export async function getTimeEstimates(
     outcome: r.outcome,
     closedAt: safeIso(r.closedAt),
   }))
+}
+
+/**
+ * Estimate the expected hold time in hours for a new trade, based on historical
+ * SmartFlowTimeEstimate rows for the same instrument/preset/direction.
+ *
+ * Uses winning outcomes only (wins + breakevens) and scales by the ratio of
+ * target pips so a 40-pip target is priced off prior 40-pip targets, not 10-pip.
+ * Returns null when there's no usable history.
+ */
+export async function estimateHoldTime(
+  instrument: string,
+  preset: string,
+  direction: string,
+  targetPips: number,
+  limit = 40,
+): Promise<{ estimatedHours: number; low: number; high: number } | null> {
+  if (targetPips <= 0) return null
+  const rows = await db.smartFlowTimeEstimate.findMany({
+    where: {
+      instrument,
+      preset,
+      direction,
+      outcome: { not: "safety_net" },
+      targetPips: { gt: 0 },
+    },
+    orderBy: { closedAt: "desc" },
+    take: limit,
+    select: { targetPips: true, actualHours: true },
+  })
+  if (rows.length === 0) return null
+
+  // Per-sample hours-per-pip rate, scaled by our new target. Ignore outliers
+  // past 4x the median rate so one stuck trade doesn't skew the estimate.
+  const rates = rows.map((r) => r.actualHours / r.targetPips).sort((a, b) => a - b)
+  const median = rates[Math.floor(rates.length / 2)] ?? 0
+  if (median <= 0) return null
+  const filtered = rates.filter((r) => r <= median * 4)
+  const scaled = filtered.map((r) => r * targetPips).sort((a, b) => a - b)
+
+  const estimatedHours = scaled[Math.floor(scaled.length / 2)] ?? median * targetPips
+  const low = scaled[Math.floor(scaled.length * 0.2)] ?? estimatedHours * 0.5
+  const high = scaled[Math.floor(scaled.length * 0.8)] ?? estimatedHours * 2
+  return {
+    estimatedHours: Math.round(estimatedHours * 100) / 100,
+    low: Math.round(low * 100) / 100,
+    high: Math.round(high * 100) / 100,
+  }
 }

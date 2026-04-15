@@ -29,6 +29,7 @@ import type {
   SmartFlowTradeUpdateData,
   SmartFlowPhase,
   SmartFlowActivityType,
+  CloseContext,
 } from "@fxflow/types"
 import type { PositionManager } from "../positions/position-manager.js"
 import { emitActivity } from "./activity-feed.js"
@@ -38,7 +39,16 @@ import { emitActivity } from "./activity-feed.js"
 /** Minimal trade syncer interface (late-bound via setter). */
 interface TradeSyncerLike {
   modifyTradeSLTP(sourceTradeId: string, stopLoss?: number, takeProfit?: number): Promise<unknown>
-  closeTrade(sourceTradeId: string, units?: number, reason?: string): Promise<void>
+  closeTrade(
+    sourceTradeId: string,
+    units?: number,
+    reason?: string,
+    attribution?: {
+      closedBy: NonNullable<CloseContext["closedBy"]>
+      closedByLabel: string
+      closedByDetail?: string
+    },
+  ): Promise<void>
 }
 
 /** In-memory state tracked per waiting smart entry. */
@@ -79,6 +89,10 @@ interface SmartFlowTradeState {
   currentSL: number | null
   /** Current take profit price from OANDA. */
   currentTP: number | null
+  /** Rolling exponential moving average of spread (in pips). Updated per tick. */
+  emaSpreadPips: number | null
+  /** Epoch ms of last avgSpread flush to DB. */
+  lastSpreadFlushAt: number
 }
 
 type BroadcastFn = (type: string, data: unknown) => void
@@ -87,6 +101,12 @@ type BroadcastFn = (type: string, data: unknown) => void
 
 /** Minimum milliseconds between modifyTradeSLTP calls per trade. */
 const DEBOUNCE_MS = 30_000
+
+/** EMA alpha for rolling spread average (≈ last 30 ticks weighted). */
+const SPREAD_EMA_ALPHA = 0.1
+
+/** Minimum ms between DB flushes of the rolling avgSpread per trade. */
+const SPREAD_FLUSH_INTERVAL_MS = 60_000
 
 /** Session multipliers for pip-based thresholds. */
 const SESSION_MULTIPLIERS: Record<string, number> = {
@@ -169,6 +189,8 @@ export class ManagementEngine {
           openedAt: new Date(trade.createdAt).getTime(),
           currentSL: oandaTrade?.stopLoss ?? null,
           currentTP: oandaTrade?.takeProfit ?? null,
+          emaSpreadPips: null,
+          lastSpreadFlushAt: 0,
         })
       }
 
@@ -227,6 +249,8 @@ export class ManagementEngine {
         openedAt: new Date(trade.createdAt).getTime(),
         currentSL: oandaTrade?.stopLoss ?? null,
         currentTP: oandaTrade?.takeProfit ?? null,
+        emaSpreadPips: null,
+        lastSpreadFlushAt: 0,
       })
     }
 
@@ -276,6 +300,8 @@ export class ManagementEngine {
       openedAt: new Date(trade.createdAt).getTime(),
       currentSL: oandaTrade?.stopLoss ?? null,
       currentTP: oandaTrade?.takeProfit ?? null,
+      emaSpreadPips: null,
+      lastSpreadFlushAt: 0,
     })
   }
 
@@ -353,12 +379,37 @@ export class ManagementEngine {
     const pipSize = getPipSize(instrument)
     const sessionMultiplier = this.getSessionMultiplier(instrument)
 
+    // Current-tick spread in pips. Shared across all trades on this instrument.
+    const spreadPips = Math.max(0, (ask - bid) / pipSize)
+    const now = Date.now()
+
     for (const state of this.states.values()) {
       if (state.instrument !== instrument) continue
       if (state.currentUnits <= 0) continue
 
       const config = this.configCache.get(state.configId)
       if (!config) continue
+
+      // Rolling exponential moving average of spread. Flushed to DB at most
+      // once per SPREAD_FLUSH_INTERVAL_MS per trade to keep write load low.
+      state.emaSpreadPips =
+        state.emaSpreadPips == null
+          ? spreadPips
+          : SPREAD_EMA_ALPHA * spreadPips + (1 - SPREAD_EMA_ALPHA) * state.emaSpreadPips
+      if (now - state.lastSpreadFlushAt >= SPREAD_FLUSH_INTERVAL_MS) {
+        state.lastSpreadFlushAt = now
+        const flushValue = state.emaSpreadPips
+        void import("@fxflow/db")
+          .then(({ updateSmartFlowTrade }) =>
+            updateSmartFlowTrade(state.smartFlowTradeId, { avgSpread: flushValue }),
+          )
+          .catch((err) =>
+            console.warn(
+              `[smart-flow-engine] avgSpread flush failed for ${state.smartFlowTradeId}:`,
+              (err as Error).message,
+            ),
+          )
+      }
 
       const currentPrice = state.direction === "long" ? bid : ask
       const profitPips = this.computeProfitPips(state, currentPrice, pipSize)
@@ -473,6 +524,11 @@ export class ManagementEngine {
         state.sourceTradeId,
         undefined,
         `SmartFlow safety net: ${safetyNet}`,
+        {
+          closedBy: "smart_flow",
+          closedByLabel: "SmartFlow",
+          closedByDetail: `Safety net: ${safetyNet}`,
+        },
       )
     } catch (err) {
       console.error(
@@ -711,6 +767,11 @@ export class ManagementEngine {
           state.sourceTradeId,
           unitsToClose,
           `SmartFlow partial close (${rule.closePercent}% at ${rule.atAtrMultiple}x ATR)`,
+          {
+            closedBy: "smart_flow",
+            closedByLabel: "SmartFlow",
+            closedByDetail: `Partial close (${rule.closePercent}% at ${rule.atAtrMultiple}x ATR)`,
+          },
         )
 
         state.firedPartialCloseIndices.add(i)

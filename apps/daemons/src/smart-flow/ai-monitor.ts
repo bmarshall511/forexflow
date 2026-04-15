@@ -17,6 +17,7 @@ import type {
   SmartFlowAiConfidenceThresholds,
   SmartFlowAiMode,
   AnyDaemonMessage,
+  CloseContext,
 } from "@fxflow/types"
 import {
   getDecryptedClaudeKey,
@@ -35,7 +36,16 @@ import type { StateManager } from "../state-manager.js"
 
 interface TradeSyncerLike {
   modifyTradeSLTP(sourceTradeId: string, stopLoss?: number, takeProfit?: number): Promise<unknown>
-  closeTrade(sourceTradeId: string, units?: number, reason?: string): Promise<void>
+  closeTrade(
+    sourceTradeId: string,
+    units?: number,
+    reason?: string,
+    attribution?: {
+      closedBy: NonNullable<CloseContext["closedBy"]>
+      closedByLabel: string
+      closedByDetail?: string
+    },
+  ): Promise<void>
 }
 
 interface AiResponse {
@@ -120,14 +130,14 @@ export class SmartFlowAiMonitor {
     if (config.aiMode === "off") return
     if (this.timers.has(trade.id)) return
 
-    const intervalMs = (config.aiMonitorIntervalHours || 1) * 60 * 60 * 1000
+    const intervalMs = (config.aiMonitorIntervalHours ?? 1) * 60 * 60 * 1000
     const timer = setInterval(() => {
       void this.evaluateTrade(trade.id)
     }, intervalMs)
     this.timers.set(trade.id, timer)
 
     // First evaluation after grace period
-    const gracePeriodMs = (config.aiGracePeriodMins || 5) * 60 * 1000
+    const gracePeriodMs = (config.aiGracePeriodMins ?? 5) * 60 * 1000
     setTimeout(() => {
       if (this.timers.has(trade.id)) void this.evaluateTrade(trade.id)
     }, gracePeriodMs)
@@ -401,11 +411,19 @@ export class SmartFlowAiMonitor {
       }
       case "closeProfit":
       case "preemptiveSafetyClose":
-        await this.tradeSyncer.closeTrade(srcId, undefined, `AI: ${action}`)
+        await this.tradeSyncer.closeTrade(srcId, undefined, `AI: ${action}`, {
+          closedBy: "smart_flow_ai",
+          closedByLabel: "SmartFlow AI",
+          closedByDetail: action === "closeProfit" ? "Locked profit" : "Preemptive safety close",
+        })
         break
       case "cancelEntry":
         // Cancel is handled by closing the pending order
-        await this.tradeSyncer.closeTrade(srcId, undefined, "AI: cancelEntry")
+        await this.tradeSyncer.closeTrade(srcId, undefined, "AI: cancelEntry", {
+          closedBy: "smart_flow_ai",
+          closedByLabel: "SmartFlow AI",
+          closedByDetail: "Cancelled pending entry",
+        })
         break
     }
   }
@@ -413,7 +431,7 @@ export class SmartFlowAiMonitor {
   // ─── Guard Checks ─────────────────────────────────────────────────────
 
   private isInGracePeriod(trade: SmartFlowTradeData, config: SmartFlowConfigData): boolean {
-    const graceMs = (config.aiGracePeriodMins || 5) * 60 * 1000
+    const graceMs = (config.aiGracePeriodMins ?? 5) * 60 * 1000
     const tradeAge = Date.now() - new Date(trade.createdAt).getTime()
     return tradeAge < graceMs
   }
@@ -423,12 +441,12 @@ export class SmartFlowAiMonitor {
     if (trade.managementLog.length === 0) return false
     const lastManual = [...trade.managementLog].reverse().find((e) => e.source === "user")
     if (!lastManual) return false
-    const cooldownMs = (config.aiCooldownAfterManualMins || 30) * 60 * 1000
+    const cooldownMs = (config.aiCooldownAfterManualMins ?? 30) * 60 * 1000
     return Date.now() - new Date(lastManual.at).getTime() < cooldownMs
   }
 
   private isDailyCapReached(trade: SmartFlowTradeData, config: SmartFlowConfigData): boolean {
-    return trade.aiActionsToday >= (config.aiMaxActionsPerDay || 5)
+    return trade.aiActionsToday >= (config.aiMaxActionsPerDay ?? 5)
   }
 
   private async isBudgetExhausted(): Promise<boolean> {

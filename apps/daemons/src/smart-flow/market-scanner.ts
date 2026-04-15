@@ -1,6 +1,8 @@
 import type {
   SmartFlowScanProgress,
   SmartFlowScanLogEntry,
+  SmartFlowScanDiagnostics,
+  SmartFlowNearMiss,
   SmartFlowSettingsData,
   SmartFlowPreset,
   AnyDaemonMessage,
@@ -52,6 +54,7 @@ export class SmartFlowMarketScanner {
   private scanCount = 0
   private lastScanAt: string | null = null
   private nextScanAt: string | null = null
+  private lastDiagnostics: SmartFlowScanDiagnostics | null = null
   private progress: SmartFlowScanProgress = {
     phase: "idle",
     message: "Scanner not started",
@@ -123,7 +126,9 @@ export class SmartFlowMarketScanner {
     }
 
     if (!this.enabled) {
-      console.log(LOG, "Scanner disabled — skipping startup")
+      console.log(LOG, "Scanner disabled — will check periodically for re-enable")
+      // Still schedule periodic checks so scanner auto-starts when enabled in settings
+      this.scheduleScan(60_000)
       return
     }
 
@@ -179,6 +184,9 @@ export class SmartFlowMarketScanner {
   getScanLog(): SmartFlowScanLogEntry[] {
     return [...this.scanLog]
   }
+  getDiagnostics(): SmartFlowScanDiagnostics | null {
+    return this.lastDiagnostics
+  }
   getCircuitBreakerState() {
     return this.circuitBreaker.getState()
   }
@@ -204,11 +212,20 @@ export class SmartFlowMarketScanner {
       if (!settings.scannerEnabled) {
         this.enabled = false
         this.updateProgress("idle", "Scanner disabled")
+        // Still check periodically in case user enables scanner
+        this.scheduleScan(60_000)
         return
       }
 
       // Shadow mode check
       const isShadow = settings.shadowMode
+
+      // Credentials check — prevent scanning when OANDA is not connected
+      if (!this.apiUrl || !this.token) {
+        this.updateProgress("idle", "Waiting for OANDA connection")
+        this.scheduleScan(30_000)
+        return
+      }
 
       // Market check
       if (!isMarketExpectedOpen(new Date())) {
@@ -244,12 +261,27 @@ export class SmartFlowMarketScanner {
         pairsTotal: pairs.length,
       })
       this.addScanLog("scan_start", `Scan #${this.scanCount} started — ${pairs.length} pairs`)
+      emitActivity(
+        "scan_started",
+        `Scanner: scan #${this.scanCount} started — ${pairs.length} pairs`,
+        {
+          severity: "info",
+          detail: `Modes: ${Object.entries(enabledModes)
+            .filter(([, v]) => v)
+            .map(([k]) => k)
+            .join(", ")}`,
+        },
+      )
 
       const allSignals: Array<{
         signal: ReturnType<typeof analyzeAllModes>[number]
         regime: string | null
         rsi: number | null
       }> = []
+
+      // Error & diagnostic tracking
+      let scanErrors = 0
+      let insufficientData = 0
 
       // Scan each pair
       for (let i = 0; i < pairs.length; i++) {
@@ -287,7 +319,10 @@ export class SmartFlowMarketScanner {
             ),
           ])
 
-          if (primary.length < 30 || secondary.length < 30) continue
+          if (primary.length < 30 || secondary.length < 30) {
+            insufficientData++
+            continue
+          }
 
           // Detect regime for entry filter
           // ZoneCandle lacks volume — map to Candle with volume: 0 for indicator functions
@@ -309,7 +344,14 @@ export class SmartFlowMarketScanner {
             allSignals.push({ signal, regime, rsi })
           }
         } catch (err) {
-          console.warn(LOG, `Error scanning ${instrument}:`, (err as Error).message)
+          scanErrors++
+          const errMsg = (err as Error).message
+          console.warn(LOG, `Error scanning ${instrument}:`, errMsg)
+          emitActivity("scan_error", `Scanner error on ${instrument.replace("_", "/")}`, {
+            instrument,
+            severity: "warning",
+            detail: errMsg,
+          })
         }
       }
 
@@ -326,6 +368,9 @@ export class SmartFlowMarketScanner {
       const openCount = this.getOpenTradeCount?.() ?? 0
       let todayCount = await countTodaySmartFlowOpportunities()
       let placedCount = 0
+      let filteredCount = 0
+      const filterBreakdown: Record<string, number> = {}
+      const nearMisses: SmartFlowNearMiss[] = []
 
       for (const { signal, regime, rsi } of candidates) {
         // Get live spread
@@ -369,14 +414,50 @@ export class SmartFlowMarketScanner {
           filterResults: results,
         })
 
+        emitActivity(
+          "opportunity_detected",
+          `Scanner found ${signal.instrument.replace("_", "/")} ${signal.direction} (${signal.scanMode.replace("_", " ")}, score ${signal.score})`,
+          {
+            instrument: signal.instrument,
+            severity: "info",
+            detail: `R:R ${signal.riskRewardRatio.toFixed(1)}:1 — ${signal.reasons.slice(0, 2).join("; ")}`,
+          },
+        )
+
         if (!allPassed) {
+          filteredCount++
           await updateSmartFlowOpportunityStatus(opportunity.id, "filtered")
           const failedFilter = Object.entries(results).find(([, r]) => !r.passed)
+          const filterName = failedFilter?.[0] ?? "unknown"
+          const filterReason = failedFilter?.[1]?.reason ?? "unknown"
+          filterBreakdown[filterName] = (filterBreakdown[filterName] ?? 0) + 1
           this.addScanLog(
             "opportunity_filtered",
-            `${signal.instrument} ${signal.direction} filtered: ${failedFilter?.[1]?.reason ?? "unknown"}`,
+            `${signal.instrument} ${signal.direction} filtered: ${filterReason}`,
             { instrument: signal.instrument, score: signal.score, scanMode: signal.scanMode },
           )
+          emitActivity(
+            "opportunity_filtered",
+            `${signal.instrument.replace("_", "/")} filtered: ${filterName}`,
+            {
+              instrument: signal.instrument,
+              severity: "info",
+              detail: filterReason,
+            },
+          )
+
+          // Track as near-miss for diagnostics
+          nearMisses.push({
+            instrument: signal.instrument,
+            direction: signal.direction,
+            scanMode: signal.scanMode,
+            score: signal.score,
+            requiredScore: settings.autoTradeMinScore,
+            riskRewardRatio: signal.riskRewardRatio,
+            requiredRR: 0,
+            blockingFilter: filterName,
+            reasons: signal.reasons,
+          })
           continue
         }
 
@@ -464,21 +545,23 @@ export class SmartFlowMarketScanner {
           placedCount++
           todayCount++
 
-          emitActivity(
-            "entry_placed",
-            `Scanner placed: ${signal.instrument.replace("_", "/")} ${signal.direction} (${signal.scanMode.replace("_", " ")}, score: ${signal.score})`,
-            {
-              instrument: signal.instrument,
-              configId: config.id,
-              severity: "success",
-              detail: `R:R ${signal.riskRewardRatio.toFixed(1)}:1 — ${signal.reasons.slice(0, 3).join("; ")}`,
-            },
-          )
-
           this.addScanLog(
             "opportunity_placed",
             `${signal.instrument} ${signal.direction} placed (${signal.scanMode}, score ${signal.score})`,
             { instrument: signal.instrument, score: signal.score, configId: config.id },
+          )
+          // Single "opportunity_placed" event — the `entry_placed` event is
+          // reserved for the manual + autoPlaceActiveConfigs flows to avoid
+          // double-emission on scanner-driven placements.
+          emitActivity(
+            "opportunity_placed",
+            `Scanner placed ${signal.instrument.replace("_", "/")} ${signal.direction}`,
+            {
+              instrument: signal.instrument,
+              configId: config.id,
+              severity: "success",
+              detail: `${signal.scanMode.replace("_", " ")} · score ${signal.score} · R:R ${signal.riskRewardRatio.toFixed(1)}:1· reasons: ${signal.reasons.slice(0, 3).join("; ")}`,
+            },
           )
         } catch (err) {
           console.error(LOG, `Failed to place ${signal.instrument}:`, (err as Error).message)
@@ -492,18 +575,65 @@ export class SmartFlowMarketScanner {
 
       // Complete
       const elapsedMs = Date.now() - startTime
+      const pairsAnalyzed = pairs.length - scanErrors - insufficientData
       this.lastScanAt = new Date().toISOString()
-      this.updateProgress(
-        "complete",
-        `Scan complete: ${candidates.length} found, ${placedCount} placed (${elapsedMs}ms)`,
-        { opportunitiesPlaced: placedCount, elapsedMs },
-      )
+
+      const summaryParts = [`${candidates.length} found`, `${placedCount} placed`]
+      if (scanErrors > 0) summaryParts.push(`${scanErrors} errors`)
+      if (insufficientData > 0) summaryParts.push(`${insufficientData} insufficient data`)
+      const summaryMsg = `Scan complete: ${summaryParts.join(", ")} (${elapsedMs}ms)`
+
+      this.updateProgress("complete", summaryMsg, {
+        opportunitiesPlaced: placedCount,
+        elapsedMs,
+      })
 
       this.addScanLog(
-        "scan_complete",
-        `Scan #${this.scanCount} complete: ${pairs.length} pairs, ${allSignals.length} signals, ${candidates.length} candidates, ${placedCount} placed`,
-        { elapsed: elapsedMs, signals: allSignals.length, placed: placedCount },
+        scanErrors > 0 && pairsAnalyzed === 0 ? "error" : "scan_complete",
+        `Scan #${this.scanCount} complete: ${pairs.length} pairs (${pairsAnalyzed} analyzed, ${scanErrors} errors, ${insufficientData} insufficient data), ${allSignals.length} signals, ${candidates.length} candidates, ${placedCount} placed`,
+        {
+          elapsed: elapsedMs,
+          signals: allSignals.length,
+          placed: placedCount,
+          pairsAnalyzed,
+          scanErrors,
+          insufficientData,
+        },
       )
+
+      // Persist scan-completion telemetry so empty-scan regressions are visible in the DB.
+      const allFailed = scanErrors > 0 && pairsAnalyzed === 0
+      emitActivity(
+        allFailed ? "scan_error" : "scan_completed",
+        `Scan #${this.scanCount} complete — ${allSignals.length} signals, ${candidates.length} candidates, ${placedCount} placed`,
+        {
+          severity: allFailed ? "error" : allSignals.length === 0 ? "warning" : "info",
+          detail: [
+            `${pairs.length} pairs · ${pairsAnalyzed} analyzed · ${scanErrors} errors · ${insufficientData} insufficient data`,
+            `${filteredCount} filtered · ${placedCount} placed · ${elapsedMs}ms`,
+          ].join(" • "),
+        },
+      )
+
+      // Store diagnostics for the REST endpoint / UI
+      this.lastDiagnostics = {
+        pairsAnalyzed,
+        scanErrors,
+        insufficientData,
+        signalsFound: allSignals.length,
+        candidatesFiltered: filteredCount,
+        candidatesPlaced: placedCount,
+        filterBreakdown,
+        nearMisses: nearMisses.slice(0, 10), // Keep top 10
+      }
+
+      // Warn if all pairs failed — likely a credentials or connectivity issue
+      if (allFailed) {
+        console.error(
+          LOG,
+          `All ${pairs.length} pairs failed to scan — check OANDA credentials and connectivity`,
+        )
+      }
 
       // Schedule next scan
       this.scheduleScan(settings.scanIntervalMinutes * 60_000)

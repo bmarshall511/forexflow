@@ -445,6 +445,7 @@ export {
   getSmartFlowTradeHistory,
   createTimeEstimate,
   getTimeEstimates,
+  estimateHoldTime,
   getTodaySmartFlowAiCost,
   getMonthlySmartFlowAiCost,
 } from "./smart-flow-trade-service"

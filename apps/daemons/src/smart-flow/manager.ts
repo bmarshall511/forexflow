@@ -11,6 +11,7 @@ import type {
   SmartFlowHealthData,
   SmartFlowConfigRuntimeStatus,
   TradeDirection,
+  CloseContext,
 } from "@fxflow/types"
 import {
   getSmartFlowSettings,
@@ -24,12 +25,16 @@ import {
   getSmartFlowTradeByTradeId,
   getSmartFlowTradeBySourceId,
   createTimeEstimate,
+  estimateHoldTime,
   countActiveConfigs,
   getSmartFlowConfigs,
   getTodaySmartFlowAiCost,
   getMonthlySmartFlowAiCost,
 } from "@fxflow/db"
 import { computeATR, getPipSize } from "@fxflow/shared"
+import { getPresetDefaults } from "./preset-defaults.js"
+import { evaluateConfigHealth } from "./config-health.js"
+import { getAdaptiveMinRR, checkCorrelation } from "./entry-filters.js"
 import { emitActivity, setActivityBroadcast } from "./activity-feed.js"
 import type { StateManager } from "../state-manager.js"
 import { getRestUrl } from "../oanda/api-client.js"
@@ -45,7 +50,16 @@ interface TradeSyncerRef {
     takeProfit: number | null
     placedVia: "smart_flow"
   }): Promise<{ sourceId: string; filled: boolean; fillPrice?: number }>
-  closeTrade(sourceTradeId: string, units?: number, reason?: string): Promise<void>
+  closeTrade(
+    sourceTradeId: string,
+    units?: number,
+    reason?: string,
+    attribution?: {
+      closedBy: NonNullable<CloseContext["closedBy"]>
+      closedByLabel: string
+      closedByDetail?: string
+    },
+  ): Promise<void>
   cancelOrder(sourceOrderId: string, reason?: string, cancelledBy?: string): Promise<void>
 }
 
@@ -80,6 +94,7 @@ interface SmartFlowMarketScannerRef {
   triggerManualScan(): Promise<void>
   getProgress(): unknown
   getScanLog(): unknown[]
+  getDiagnostics(): unknown
   getCircuitBreakerState(): unknown
   resetCircuitBreaker(): void
 }
@@ -119,6 +134,9 @@ export class SmartFlowManager {
   private tickCount = 0
   private tickWindowStart = Date.now()
   private monitoringInterval: ReturnType<typeof setInterval> | null = null
+  /** Tracks how long each config has been blocked (configId → first-blocked timestamp) */
+  private blockedSince = new Map<string, number>()
+  private readonly BLOCK_ALERT_THRESHOLD_MS = 2 * 60 * 60 * 1000 // 2 hours
 
   constructor(stateManager: StateManager, broadcast: (msg: AnyDaemonMessage) => void) {
     this.stateManager = stateManager
@@ -219,6 +237,9 @@ export class SmartFlowManager {
       }
     }
 
+    // Repair configs with missing ATR multiples (pre-populate from preset defaults)
+    await this.repairMissingAtrMultiples()
+
     // Migrate existing configs: ensure AI is enabled (was defaulting to "off")
     await this.migrateAiDefaults()
 
@@ -270,6 +291,31 @@ export class SmartFlowManager {
     }
 
     try {
+      // Currency correlation guard: max 2 same-currency same-direction
+      const activeTrades = await getActiveSmartFlowTrades()
+      const openPositions = activeTrades
+        .filter((t) => t.status !== "waiting_entry" && t.status !== "closed" && t.instrument)
+        .map((t) => ({ instrument: t.instrument!, direction: t.direction ?? "long" }))
+      const corrCheck = checkCorrelation(
+        config.instrument,
+        config.direction as "long" | "short",
+        openPositions,
+        2,
+      )
+      if (!corrCheck.passed) {
+        this.unlock(config.instrument)
+        emitActivity(
+          "entry_blocked",
+          `${config.instrument.replace("_", "/")} — ${corrCheck.reason}`,
+          {
+            instrument: config.instrument,
+            severity: "warning",
+            configId: config.id,
+          },
+        )
+        return { success: false, error: corrCheck.reason ?? "Correlation limit exceeded" }
+      }
+
       const atr = await this.calculateAtr(config.instrument)
       if (atr === null) {
         this.unlock(config.instrument)
@@ -299,12 +345,28 @@ export class SmartFlowManager {
         placedVia: "smart_flow",
       })
 
+      // Estimate expected hold time from historical SmartFlowTimeEstimate rows.
+      // Uses the TP pip distance (from config or derived from ATR) as the target.
+      const pipSize = getPipSize(config.instrument)
+      const preset = getPresetDefaults(config.preset)
+      const tpAtrMultiple = config.takeProfitAtrMultiple ?? preset.tpAtrMultiple ?? 2.0
+      const targetPips = config.takeProfitPips ?? (atr > 0 ? (tpAtrMultiple * atr) / pipSize : 0)
+      const estimate = await estimateHoldTime(
+        config.instrument,
+        config.preset,
+        config.direction,
+        targetPips,
+      ).catch(() => null)
+
       const trade = await createSmartFlowTrade({
         configId: config.id,
         sourceTradeId: result.sourceId,
         status: result.filled ? "open" : "pending",
         entryPrice: result.fillPrice ?? undefined,
         currentPhase: result.filled ? "entry" : "entry",
+        estimatedHours: estimate?.estimatedHours,
+        estimatedLow: estimate?.low,
+        estimatedHigh: estimate?.high,
       })
 
       this.activeInstruments.add(config.instrument)
@@ -389,13 +451,26 @@ export class SmartFlowManager {
 
     if (sf.instrument && sf.preset && sf.direction && sf.entryPrice) {
       const hours = (Date.now() - new Date(sf.createdAt).getTime()) / 3_600_000
+      const config = await getSmartFlowConfig(sf.configId).catch(() => null)
+      // Prefer the explicit pip target from config, else infer from realized pips.
+      const targetPips =
+        config?.takeProfitPips ??
+        (sf.realizedPips != null && sf.realizedPips > 0 ? sf.realizedPips : 0)
+      // Outcome from the Trade join when present; fall back to safetyNet / pip sign.
+      const outcome: "win" | "loss" | "safety_net" = sf.safetyNetTriggered
+        ? "safety_net"
+        : sf.realizedPL != null
+          ? sf.realizedPL > 0
+            ? "win"
+            : "loss"
+          : "loss"
       createTimeEstimate({
         instrument: sf.instrument,
         preset: sf.preset,
         direction: sf.direction,
-        targetPips: 0,
+        targetPips,
         actualHours: Math.round(hours * 100) / 100,
-        outcome: "closed",
+        outcome,
       }).catch((e) => console.warn("[smart-flow] Time estimate failed:", (e as Error).message))
     }
 
@@ -433,7 +508,13 @@ export class SmartFlowManager {
         await this.tradeSyncer.cancelOrder(sf.sourceTradeId, "SmartFlow cancelled by user")
         await closeSmartFlowTrade(sf.id)
       } else if (sf.sourceTradeId) {
-        await this.tradeSyncer.closeTrade(sf.sourceTradeId, undefined, "SmartFlow cancelled")
+        // User-initiated cancellation from the SmartFlow UI — attribute to user
+        // explicitly so the close badge doesn't degrade to the generic "Manual".
+        await this.tradeSyncer.closeTrade(sf.sourceTradeId, undefined, "SmartFlow cancelled", {
+          closedBy: "user",
+          closedByLabel: "Manual Close",
+          closedByDetail: "SmartFlow cancelled from UI",
+        })
         await closeSmartFlowTrade(sf.id)
       }
       if (sf.instrument) this.unlock(sf.instrument)
@@ -535,17 +616,41 @@ export class SmartFlowManager {
         } else {
           const result = await this.placeMarketEntry(config.id)
           if (result.success) {
+            this.blockedSince.delete(config.id) // Clear block tracker on success
             emitActivity(
               "entry_placed",
               `${config.instrument.replace("_", "/")} — trade placed! SmartFlow is now managing it`,
               { instrument: config.instrument, configId: config.id, severity: "success" },
             )
-          } else if (!silent) {
-            emitActivity(
-              "entry_blocked",
-              `${config.instrument.replace("_", "/")} — couldn't place trade: ${result.error}`,
-              { instrument: config.instrument, configId: config.id, severity: "warning" },
-            )
+          } else {
+            // Track block duration for prolonged-block notifications
+            if (!this.blockedSince.has(config.id)) {
+              this.blockedSince.set(config.id, Date.now())
+            }
+            const blockedMs = Date.now() - this.blockedSince.get(config.id)!
+            const blockedHours = Math.floor(blockedMs / 3_600_000)
+
+            if (!silent) {
+              emitActivity(
+                "entry_blocked",
+                `${config.instrument.replace("_", "/")} — couldn't place trade: ${result.error}`,
+                { instrument: config.instrument, configId: config.id, severity: "warning" },
+              )
+            } else if (blockedMs > this.BLOCK_ALERT_THRESHOLD_MS && blockedHours > 0) {
+              // Emit a periodic alert for prolonged blocks (every 2 hours after first 2 hours)
+              if (blockedMs % (2 * 3_600_000) < 2 * 60_000) {
+                emitActivity(
+                  "entry_blocked",
+                  `${config.instrument.replace("_", "/")} has been blocked for ${blockedHours}h: ${result.error}`,
+                  {
+                    instrument: config.instrument,
+                    configId: config.id,
+                    severity: "error",
+                    detail: "Consider reviewing the trade plan settings or market conditions",
+                  },
+                )
+              }
+            }
           }
         }
       }
@@ -620,10 +725,12 @@ export class SmartFlowManager {
 
   calculatePositionSize(config: SmartFlowConfigData, balance: number, atr: number): number {
     const pip = getPipSize(config.instrument)
+    const preset = getPresetDefaults(config.preset)
     switch (config.positionSizeMode) {
       case "risk_percent": {
         const risk = balance * (config.positionSizeValue / 100)
-        const slPips = config.stopLossPips ?? (config.stopLossAtrMultiple ?? 1.5) * (atr / pip)
+        const slAtrMultiple = config.stopLossAtrMultiple ?? preset.slAtrMultiple ?? 1.5
+        const slPips = config.stopLossPips ?? slAtrMultiple * (atr / pip)
         return Math.max(Math.floor(risk / (slPips * pip)), 1)
       }
       case "fixed_units":
@@ -641,37 +748,53 @@ export class SmartFlowManager {
     config: SmartFlowConfigData,
     entry: number | null,
     atr: number,
+    regime?: string | null,
   ): { stopLoss: number | null; takeProfit: number | null; error?: string } {
     const pip = getPipSize(config.instrument)
     const long = config.direction === "long"
-    const sl =
-      config.stopLossPips != null
-        ? config.stopLossPips * pip
-        : (config.stopLossAtrMultiple ?? 1.5) * atr
-    const tp =
-      config.takeProfitPips != null
-        ? config.takeProfitPips * pip
-        : (config.takeProfitAtrMultiple ?? 2.0) * atr
-    if (sl > 0 && tp / sl < config.minRiskReward)
+
+    // Resolve ATR multiples: config → preset defaults → hardcoded fallback
+    const preset = getPresetDefaults(config.preset)
+    const slAtrMultiple = config.stopLossAtrMultiple ?? preset.slAtrMultiple ?? 1.5
+    const tpAtrMultiple = config.takeProfitAtrMultiple ?? preset.tpAtrMultiple ?? 2.0
+
+    const sl = config.stopLossPips != null ? config.stopLossPips * pip : slAtrMultiple * atr
+    const tp = config.takeProfitPips != null ? config.takeProfitPips * pip : tpAtrMultiple * atr
+
+    // Adaptive R:R: adjust minRiskReward based on session and market regime
+    const effectiveMinRR = getAdaptiveMinRR(config.minRiskReward, regime ?? null)
+
+    // trend_rider has tpAtrMultiple=0 (no fixed TP, trailing only) — skip R:R check
+    if (sl > 0 && tp > 0 && tp / sl < effectiveMinRR)
       return {
         stopLoss: null,
         takeProfit: null,
-        error: `R:R ${(tp / sl).toFixed(2)} below min ${config.minRiskReward}`,
+        error: `R:R ${(tp / sl).toFixed(2)} below adaptive min ${effectiveMinRR.toFixed(2)} (base: ${config.minRiskReward})`,
       }
     if (entry == null) return { stopLoss: null, takeProfit: null }
-    return { stopLoss: long ? entry - sl : entry + sl, takeProfit: long ? entry + tp : entry - tp }
+    return {
+      stopLoss: long ? entry - sl : entry + sl,
+      takeProfit: tp > 0 ? (long ? entry + tp : entry - tp) : null,
+    }
   }
 
   async getHealthData(): Promise<SmartFlowHealthData> {
-    const [openTrades, activeConfigCount] = await Promise.all([
+    const [openTrades, activeConfigCount, activeTrades] = await Promise.all([
       countOpenSmartFlowTrades(),
       countActiveConfigs(),
+      getActiveSmartFlowTrades(),
     ])
     const atrEntries = [...this.atrCache.entries()].map(([key, v]) => ({
       instrument: key.split(":")[0] ?? key,
       atr: v.atr,
       fetchedAt: new Date(v.at).toISOString(),
     }))
+    // Surface the most recent management action across active trades. Uses the
+    // freshly-wired lastManagementAction column stamped by appendManagementLog /
+    // appendPartialCloseLog / closeSmartFlowTrade.
+    const latestAction = activeTrades
+      .filter((t) => t.lastManagementAction)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
     return {
       engineRunning: this.enabled,
       enabled: this.enabled,
@@ -679,8 +802,8 @@ export class SmartFlowManager {
       activeRuleCount: this.activeInstruments.size * 5, // 5 rule types per instrument
       activeTrades: openTrades,
       activeConfigs: activeConfigCount,
-      lastManagementAction: null, // TODO: wire from management engine
-      lastManagementActionAt: null,
+      lastManagementAction: latestAction?.lastManagementAction ?? null,
+      lastManagementActionAt: latestAction?.createdAt ?? null,
       lastTickAt: this.lastTickAt ? new Date(this.lastTickAt).toISOString() : null,
       ticksPerSecond:
         this.tickCount > 0
@@ -696,26 +819,62 @@ export class SmartFlowManager {
   }
 
   async getConfigRuntimeStatuses(): Promise<SmartFlowConfigRuntimeStatus[]> {
-    const configs = await getSmartFlowConfigs()
-    return configs.map((c) => {
-      const atrKey = `${c.instrument}:H1`
-      const atrEntry = this.atrCache.get(atrKey)
-      const hasActiveTrade = this.activeInstruments.has(c.instrument)
-      return {
-        configId: c.id,
-        receiving_ticks: hasActiveTrade,
-        lastTickAt:
-          this.lastTickAt && hasActiveTrade ? new Date(this.lastTickAt).toISOString() : null,
-        currentAtr: atrEntry?.atr ?? null,
-        currentSpread: null,
-        averageSpread: null,
-        spreadMultiple: null,
-        spreadStatus: "normal" as const,
-        activeTradeId: null,
-        managementPhase: null,
-        nextAiCheck: null,
-      }
-    })
+    const [configs, activeTrades, settings] = await Promise.all([
+      getSmartFlowConfigs(),
+      getActiveSmartFlowTrades(),
+      getSmartFlowSettings(),
+    ])
+    const configsWithTrades = new Set(activeTrades.map((t) => t.configId).filter(Boolean))
+    const waitingEntries = new Set(
+      activeTrades.filter((t) => t.status === "waiting_entry").map((t) => t.configId),
+    )
+    const balance = this.stateManager.getSnapshot().accountOverview?.summary.balance ?? 0
+
+    return Promise.all(
+      configs.map(async (c) => {
+        const atrKey = `${c.instrument}:H1`
+        const atrEntry = this.atrCache.get(atrKey)
+        const hasActiveTrade = configsWithTrades.has(c.id)
+
+        // Check source priority for health evaluation
+        let sourcePriorityBlocked = false
+        let sourcePriorityReason: string | null = null
+        if (this.spm && !hasActiveTrade) {
+          const check = await this.spm.canPlace(c.instrument, "smart_flow")
+          if (!check.allowed) {
+            sourcePriorityBlocked = true
+            sourcePriorityReason = check.reason
+          }
+        }
+
+        const health = evaluateConfigHealth(c, {
+          atr: atrEntry?.atr ?? null,
+          hasActiveTrade,
+          isWaitingEntry: waitingEntries.has(c.id),
+          balance,
+          sourcePriorityBlocked,
+          sourcePriorityReason,
+          spreadPips: null,
+          scannerEnabled: settings.scannerEnabled,
+        })
+
+        return {
+          configId: c.id,
+          receiving_ticks: hasActiveTrade,
+          lastTickAt:
+            this.lastTickAt && hasActiveTrade ? new Date(this.lastTickAt).toISOString() : null,
+          currentAtr: atrEntry?.atr ?? null,
+          currentSpread: null,
+          averageSpread: null,
+          spreadMultiple: null,
+          spreadStatus: "normal" as const,
+          activeTradeId: null,
+          managementPhase: null,
+          nextAiCheck: null,
+          health,
+        }
+      }),
+    )
   }
 
   private startMonitoringUpdates(): void {
@@ -760,6 +919,35 @@ export class SmartFlowManager {
 
   private unlock(instrument: string): void {
     this.spm?.releaseLock(instrument, "smart_flow")
+  }
+
+  /** Startup repair: populate missing ATR multiples from preset defaults so R:R checks pass. */
+  private async repairMissingAtrMultiples(): Promise<void> {
+    try {
+      const configs = await getSmartFlowConfigs()
+      let repaired = 0
+      for (const c of configs) {
+        if (c.stopLossAtrMultiple == null || c.takeProfitAtrMultiple == null) {
+          const defaults = getPresetDefaults(c.preset)
+          const { updateSmartFlowConfig } = await import("@fxflow/db")
+          await updateSmartFlowConfig(c.id, {
+            stopLossAtrMultiple: c.stopLossAtrMultiple ?? defaults.slAtrMultiple,
+            takeProfitAtrMultiple: c.takeProfitAtrMultiple ?? defaults.tpAtrMultiple,
+          })
+          repaired++
+        }
+      }
+      if (repaired > 0) {
+        console.log(`[smart-flow] Repaired ${repaired} configs: applied preset ATR multiples`)
+        emitActivity(
+          "monitoring_update",
+          `Repaired ${repaired} trade plan${repaired > 1 ? "s" : ""} with missing SL/TP settings`,
+          { severity: "warning" },
+        )
+      }
+    } catch (err) {
+      console.error("[smart-flow] ATR multiples repair failed:", (err as Error).message)
+    }
   }
 
   /** One-time migration: enable AI on configs that still have aiMode="off" from old defaults. */

@@ -58,18 +58,19 @@ export function SmartFlowDashboard() {
   const activeConfigCount = configs.filter((c) => c.isActive).length
   const hasConfigs = configs.length > 0
 
-  // Calculate today's P&L from closed trades
+  // Calculate today's P&L from closed trades using the Trade join surfaced on each row.
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
   const todayTrades = closedTrades.filter((t) => t.closedAt && new Date(t.closedAt) >= todayStart)
-  const todayPL = todayTrades.reduce((sum) => {
-    // TODO: wire actual P&L from linked Trade records
-    return sum
-  }, 0)
+  const todayPL = todayTrades.reduce((sum, t) => sum + (t.realizedPL ?? 0), 0)
+  const todayPLMissing = todayTrades.some((t) => t.realizedPL == null)
 
-  // Calculate success rate from closed trades
+  // Success rate counts trades with positive realized P&L when we have the join,
+  // falling back to "no safety-net triggered" when the trade link is missing.
   const recentTrades = closedTrades.slice(0, 30)
-  const wins = recentTrades.filter((t) => t.safetyNetTriggered == null).length
+  const wins = recentTrades.filter((t) =>
+    t.realizedPL != null ? t.realizedPL > 0 : t.safetyNetTriggered == null,
+  ).length
   const successRate = recentTrades.length > 0 ? Math.round((wins / recentTrades.length) * 100) : 0
 
   const activeSummary =
@@ -115,10 +116,12 @@ export function SmartFlowDashboard() {
           />
           <DataTile
             label="Today's P&L"
-            value={todayPL === 0 ? "--" : `$${todayPL.toFixed(2)}`}
+            value={
+              todayTrades.length === 0 ? "--" : `${todayPL >= 0 ? "+" : ""}$${todayPL.toFixed(2)}`
+            }
             subtitle={
               todayTrades.length > 0
-                ? `${todayTrades.length} trade${todayTrades.length > 1 ? "s" : ""} today`
+                ? `${todayTrades.length} trade${todayTrades.length > 1 ? "s" : ""} today${todayPLMissing ? " · partial" : ""}`
                 : undefined
             }
             icon={<DollarSign className="size-3" />}

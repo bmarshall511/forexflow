@@ -4023,9 +4023,12 @@ export interface SmartFlowTradeData {
   safetyNetTriggered: SmartFlowSafetyNet | null
   financingAccumulated: number
   entrySpread: number | null
+  avgSpread: number | null
   aiActionsToday: number
   aiTotalCost: number
   aiSuggestions: SmartFlowAiSuggestion[]
+  /** Last management rule that fired (breakeven, trailing_moved, partial_close, etc.). */
+  lastManagementAction: string | null
   createdAt: string
   closedAt: string | null
   /** Merged from config for display convenience */
@@ -4033,6 +4036,14 @@ export interface SmartFlowTradeData {
   direction?: string
   preset?: SmartFlowPreset
   configName?: string
+  /** Realized P&L in account currency — joined from the linked Trade on close. */
+  realizedPL: number | null
+  /** Realized P&L in pips — joined from the linked Trade on close. */
+  realizedPips: number | null
+  /** Exit price — joined from the linked Trade on close. */
+  exitPrice: number | null
+  /** Close reason from OANDA (stop_loss_order, take_profit_order, manual, etc.). */
+  closeReason: string | null
 }
 
 /** Pair safety score for the ranking display. */
@@ -4198,6 +4209,14 @@ export type SmartFlowActivityType =
   | "entry_expired"
   | "monitoring_update"
   | "market_status"
+  // Scanner lifecycle (persisted for diagnosis of empty-scan regressions)
+  | "scan_started"
+  | "scan_completed"
+  | "scan_skipped"
+  | "scan_error"
+  | "opportunity_detected"
+  | "opportunity_filtered"
+  | "opportunity_placed"
 
 /** Structured metadata for rich activity event rendering. */
 export interface SmartFlowActivityContext {

@@ -1076,8 +1076,10 @@ export class AiTraderScanner {
 
     this.costTracker.invalidateCache()
 
-    // Helper to persist tier2 cost on any exit path
-    const recordTier2Only = async (status: "rejected" | "detected") => {
+    // Helper to persist tier2 cost on any exit path. Every rejection row MUST
+    // carry an `entryRationale` explaining WHY so post-mortem analysis can
+    // distinguish prompt-bias rejections from legitimate filter blocks.
+    const recordTier2Only = async (status: "rejected" | "detected", rationale: string) => {
       const opp = await createOpportunity({
         instrument: signal.instrument,
         direction: signal.direction,
@@ -1101,6 +1103,7 @@ export class AiTraderScanner {
         regime: castRegime(signal.technicalSnapshot.regime),
         session: castSession(signal.technicalSnapshot.session),
         primaryTechnique: signal.primaryTechnique,
+        entryRationale: rationale,
         technicalSnapshot: signal.technicalSnapshot,
       })
       await updateOpportunityStatus(opp.id, status, {
@@ -1127,7 +1130,7 @@ export class AiTraderScanner {
         error: `Could not parse response: ${tier2Text.slice(0, 150)}`,
         tier: 1,
       })
-      await recordTier2Only("rejected")
+      await recordTier2Only("rejected", `Tier 2 returned invalid JSON: ${tier2Text.slice(0, 150)}`)
       return "tier2_fail"
     }
 
@@ -1145,7 +1148,10 @@ export class AiTraderScanner {
           tier: 2,
         },
       )
-      await recordTier2Only("rejected")
+      await recordTier2Only(
+        "rejected",
+        `Tier 2 rejected (${tier2Result.confidence}%): ${tier2Result.reason}`,
+      )
       return "tier2_fail"
     }
 
@@ -1218,7 +1224,7 @@ export class AiTraderScanner {
         regime: castRegime(signal.technicalSnapshot.regime),
         session: castSession(signal.technicalSnapshot.session),
         primaryTechnique: signal.primaryTechnique,
-        entryRationale: preTier3.reason ?? undefined,
+        entryRationale: preTier3.reason ?? "Pre-Tier-3 gate blocked (unspecified)",
         technicalSnapshot: signal.technicalSnapshot,
       })
       // Record tier2 cost on gate-blocked opportunities
