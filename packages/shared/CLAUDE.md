@@ -74,6 +74,15 @@ src/
 - `trading-core/news-gate.ts` — `checkNewsGate({ instrument, bufferMinutes, source })` with dependency-injected `NewsCalendarSource` interface (the daemon wires a DB-backed source; `packages/shared` can't import `@fxflow/db`). Fails open on source error.
 - All primitives have unit test coverage in `trading-core/trading-core.test.ts` (34 tests).
 
+#### `trading-core/management/` — rule decision math
+
+- `management/profit.ts` — `computeProfitPips()`, `computeRiskPips()`, `isBetterSL()`. Single source of truth for signed pip deltas, risk-in-pips, and the ratchet rule ("new SL must be strictly tighter than current SL for the direction").
+- `management/breakeven.ts` — `evaluateBreakeven()` returns `{ shouldFire, newSL, reason }` given entry / current SL / profit in pips / threshold in pips / buffer in pips / already-applied flag. Callers compute the threshold however they want (SmartFlow uses `breakevenAtrMultiple × ATR × session`, EdgeFinder uses `riskPips × breakevenTriggerRR`) then pass the resulting number in.
+- `management/trailing.ts` — `evaluateTrailing()` returns `{ shouldFire, newSL, reason }` given current price, trail distance in price units, and current SL. Rounds the new SL to pip precision. Callers gate activation externally via the `activated` flag.
+- `management/time-exit.ts` — `evaluateTimeExit()` returns `{ shouldFire, hoursOpen, reason }` given `openedAt` ms timestamp and `maxHours`. Accepts an injected clock for tests.
+- Test coverage lives in `management/management.test.ts` (25 tests covering profit/risk/SL ratchet math, breakeven threshold + ratchet guards, trailing ratchet + activation gate, and time-exit + injected clock).
+- **All side effects stay in the caller**: OANDA modifications, DB writes, activity log emission, broadcast, and debounce tracking. The shared module is pure decision math only. This keeps SmartFlow's richer orchestration (session multipliers, debounce, safety nets, recovery/DCA, trend-rider TP) local while EdgeFinder reuses the same math in its simpler flow.
+
 ### Pip Value in Account Currency (CRITICAL — currency conversion)
 
 - `pip-value.ts` — `calculatePipValueUsd({ instrument, units, currentPrice?, usdQuoteRates? })` and `derivePipValueUsdFromUnrealizedPL(trade)`. These are the ONLY correct way to convert pip distances into account-currency dollar amounts.

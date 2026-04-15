@@ -17,8 +17,14 @@
  * @module management-engine
  */
 
-import { getPipSize } from "@fxflow/shared"
-import { getCurrentSession } from "@fxflow/shared"
+import {
+  getPipSize,
+  getCurrentSession,
+  computeProfitPips as sharedComputeProfitPips,
+  evaluateBreakeven,
+  evaluateTrailing,
+  isBetterSL as sharedIsBetterSL,
+} from "@fxflow/shared"
 import type {
   SmartFlowTradeData,
   SmartFlowConfigData,
@@ -565,20 +571,22 @@ export class ManagementEngine {
     sessionMultiplier: number,
   ): Promise<void> {
     if (!config.breakevenEnabled) return
-    if (state.breakevenTriggered) return
     if (!this.tradeSyncer) return
     if (!this.canModify(state)) return
 
     const thresholdPips = ((config.breakevenAtrMultiple * atr) / pipSize) * sessionMultiplier
-    if (profitPips < thresholdPips) return
-
-    // Calculate new SL at entry + buffer
-    const bufferPrice = config.breakevenBufferPips * pipSize
-    const newSL =
-      state.direction === "long" ? state.entryPrice + bufferPrice : state.entryPrice - bufferPrice
-
-    // Ensure new SL is better than current SL (ratchet)
-    if (!this.isBetterSL(state, newSL)) return
+    const decision = evaluateBreakeven({
+      instrument: state.instrument,
+      direction: state.direction,
+      entryPrice: state.entryPrice,
+      currentSL: state.currentSL,
+      profitPips,
+      thresholdPips,
+      bufferPips: config.breakevenBufferPips,
+      alreadyApplied: state.breakevenTriggered,
+    })
+    if (!decision.shouldFire || decision.newSL == null) return
+    const newSL = decision.newSL
 
     try {
       await this.tradeSyncer.modifyTradeSLTP(state.sourceTradeId, newSL, undefined)
@@ -695,16 +703,18 @@ export class ManagementEngine {
       }
     }
 
-    // Calculate trailing SL
-    const trailDistance = config.trailingAtrMultiple * atr * sessionMultiplier
-    const trailSL =
-      state.direction === "long" ? currentPrice - trailDistance : currentPrice + trailDistance
-
-    // Round to pip precision
-    const roundedTrailSL = Math.round(trailSL / pipSize) * pipSize
-
-    // Only ratchet — never widen the stop
-    if (!this.isBetterSL(state, roundedTrailSL)) return
+    // Delegate trailing SL math to shared evaluator. We pass `activated: true`
+    // because we've already verified `state.trailingActivated` above.
+    const decision = evaluateTrailing({
+      instrument: state.instrument,
+      direction: state.direction,
+      currentPrice,
+      currentSL: state.currentSL,
+      trailDistancePrice: config.trailingAtrMultiple * atr * sessionMultiplier,
+      activated: true,
+    })
+    if (!decision.shouldFire || decision.newSL == null) return
+    const roundedTrailSL = decision.newSL
 
     try {
       await this.tradeSyncer.modifyTradeSLTP(state.sourceTradeId, roundedTrailSL, undefined)
@@ -949,15 +959,18 @@ export class ManagementEngine {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
-  /** Compute profit in pips for the current direction. */
+  /** Compute profit in pips — delegates to shared trading-core helper. */
   private computeProfitPips(
     state: SmartFlowTradeState,
     currentPrice: number,
-    pipSize: number,
+    _pipSize: number,
   ): number {
-    const distance =
-      state.direction === "long" ? currentPrice - state.entryPrice : state.entryPrice - currentPrice
-    return distance / pipSize
+    return sharedComputeProfitPips({
+      instrument: state.instrument,
+      direction: state.direction,
+      entryPrice: state.entryPrice,
+      currentPrice,
+    })
   }
 
   /** Check debounce — returns true if enough time has passed since last modify. */
@@ -967,12 +980,10 @@ export class ManagementEngine {
 
   /**
    * Returns true if the proposed SL is strictly better (tighter / more favorable)
-   * than the current SL. For longs, "better" = higher SL. For shorts, "better" = lower SL.
-   * If there is no current SL, any value is considered better.
+   * than the current SL. Delegates to shared trading-core ratchet helper.
    */
   private isBetterSL(state: SmartFlowTradeState, proposedSL: number): boolean {
-    if (state.currentSL == null) return true
-    return state.direction === "long" ? proposedSL > state.currentSL : proposedSL < state.currentSL
+    return sharedIsBetterSL(state.direction, state.currentSL, proposedSL)
   }
 
   /**

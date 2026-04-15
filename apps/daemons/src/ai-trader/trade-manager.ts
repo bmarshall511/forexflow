@@ -11,7 +11,14 @@ import {
   appendManagementAction,
   findOpportunityByResultTradeId,
 } from "@fxflow/db"
-import { getPipSize, priceToPips } from "@fxflow/shared"
+import {
+  getPipSize,
+  computeProfitPips,
+  computeRiskPips,
+  evaluateBreakeven,
+  evaluateTrailing,
+  evaluateTimeExit,
+} from "@fxflow/shared"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { PositionManager } from "../positions/position-manager.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
@@ -31,18 +38,9 @@ interface ManagedTrade {
   currentTP: number
   units: number
   breakevenApplied: boolean
-  partialCloseApplied: boolean
   openedAt: number // timestamp ms
   atr: number // real ATR from Tier 1 analysis
   profile: AiTraderProfile
-}
-
-/** Profile-specific maximum hold time in hours */
-const PROFILE_TIME_LIMITS: Record<AiTraderProfile, number> = {
-  scalper: 8,
-  intraday: 48,
-  swing: 168,
-  news: 4,
 }
 
 // ─── Trade Manager ───────────────────────────────────────────────────────────
@@ -127,7 +125,6 @@ export class TradeManager {
       currentTP: opp.takeProfit,
       units: opp.positionSize,
       breakevenApplied: opp.managementLog.some((a) => a.action === "breakeven"),
-      partialCloseApplied: opp.managementLog.some((a) => a.action === "partial_close"),
       openedAt: opp.filledAt ? new Date(opp.filledAt).getTime() : Date.now(),
       atr,
       profile: opp.profile,
@@ -232,37 +229,44 @@ export class TradeManager {
     currentPrice: number,
     mgmt: AiTraderManagementConfig,
   ): Promise<void> {
-    if (!mgmt.breakevenEnabled || managed.breakevenApplied) return
+    if (!mgmt.breakevenEnabled) return
 
-    const riskPips = priceToPips(
-      managed.instrument,
-      Math.abs(managed.entryPrice - managed.currentSL),
+    const riskPips = computeRiskPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      stopLoss: managed.currentSL,
+    })
+    const profitPips = computeProfitPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      currentPrice,
+    })
+
+    const decision = evaluateBreakeven({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      currentSL: managed.currentSL,
+      profitPips,
+      thresholdPips: riskPips * mgmt.breakevenTriggerRR,
+      bufferPips: 2,
+      alreadyApplied: managed.breakevenApplied,
+    })
+
+    if (!decision.shouldFire || decision.newSL == null) return
+
+    await this.modifyTradeAndLog(
+      managed,
+      "breakeven",
+      decision.newSL,
+      managed.currentTP,
+      `Moved SL to breakeven at ${decision.newSL.toFixed(5)} (trade reached ${mgmt.breakevenTriggerRR}R)`,
+      managed.currentSL,
+      decision.newSL,
     )
-    const profitPips =
-      managed.direction === "long"
-        ? priceToPips(managed.instrument, currentPrice - managed.entryPrice)
-        : priceToPips(managed.instrument, managed.entryPrice - currentPrice)
-
-    const triggerPips = riskPips * mgmt.breakevenTriggerRR
-
-    if (profitPips >= triggerPips) {
-      // Move SL to breakeven (entry price + small buffer)
-      const pipSize = getPipSize(managed.instrument)
-      const buffer = pipSize * 2 // 2 pip buffer
-      const newSL =
-        managed.direction === "long" ? managed.entryPrice + buffer : managed.entryPrice - buffer
-
-      await this.modifyTradeAndLog(
-        managed,
-        "breakeven",
-        newSL,
-        managed.currentTP,
-        `Moved SL to breakeven at ${newSL.toFixed(5)} (trade reached ${mgmt.breakevenTriggerRR}R)`,
-        managed.currentSL,
-        newSL,
-      )
-      managed.breakevenApplied = true
-    }
+    managed.breakevenApplied = true
   }
 
   private async checkTrailingStop(
@@ -270,28 +274,27 @@ export class TradeManager {
     currentPrice: number,
     mgmt: AiTraderManagementConfig,
   ): Promise<void> {
-    if (!mgmt.trailingStopEnabled || !managed.breakevenApplied) return
+    if (!mgmt.trailingStopEnabled) return
 
-    // Only trail after breakeven is applied — use real ATR from Tier 1 analysis
-    const trailDistance = managed.atr * mgmt.trailingStopAtrMultiplier
-
-    let newSL: number
-    if (managed.direction === "long") {
-      newSL = currentPrice - trailDistance
-      if (newSL <= managed.currentSL) return // Only tighten, never widen
-    } else {
-      newSL = currentPrice + trailDistance
-      if (newSL >= managed.currentSL) return
-    }
+    const decision = evaluateTrailing({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      currentPrice,
+      currentSL: managed.currentSL,
+      trailDistancePrice: managed.atr * mgmt.trailingStopAtrMultiplier,
+      // EdgeFinder only trails after breakeven is applied.
+      activated: managed.breakevenApplied,
+    })
+    if (!decision.shouldFire || decision.newSL == null) return
 
     await this.modifyTradeAndLog(
       managed,
       "trailing_update",
-      newSL,
+      decision.newSL,
       managed.currentTP,
-      `Trailing stop updated to ${newSL.toFixed(5)}`,
+      `Trailing stop updated to ${decision.newSL.toFixed(5)}`,
       managed.currentSL,
-      newSL,
+      decision.newSL,
     )
   }
 
@@ -301,23 +304,32 @@ export class TradeManager {
   ): Promise<void> {
     if (!mgmt.timeExitEnabled) return
 
-    const hoursOpen = (Date.now() - managed.openedAt) / 3_600_000
-    const maxHours = PROFILE_TIME_LIMITS[managed.profile] ?? mgmt.timeExitHours
-    if (hoursOpen >= maxHours) {
-      // Close the trade
-      try {
-        await this.tradeSyncer.closeTrade(managed.sourceTradeId)
-        await this.logAction(
-          managed,
-          "close",
-          `Time exit after ${hoursOpen.toFixed(1)} hours (limit: ${mgmt.timeExitHours}h)`,
-        )
-      } catch (err) {
-        console.warn(
-          `[ai-trader] Time exit failed for ${managed.instrument}:`,
-          (err as Error).message,
-        )
-      }
+    // Prefer a per-profile override from config; fall back to the generic timeExitHours.
+    const maxHours = mgmt.profileTimeLimits?.[managed.profile] ?? mgmt.timeExitHours
+    const decision = evaluateTimeExit({ openedAt: managed.openedAt, maxHours })
+    if (!decision.shouldFire) return
+
+    try {
+      await this.tradeSyncer.closeTrade(
+        managed.sourceTradeId,
+        undefined,
+        `EdgeFinder time exit (${decision.hoursOpen.toFixed(1)}h)`,
+        {
+          closedBy: "ai_trader",
+          closedByLabel: "EdgeFinder",
+          closedByDetail: `Time exit after ${decision.hoursOpen.toFixed(1)}h (limit ${maxHours}h)`,
+        },
+      )
+      await this.logAction(
+        managed,
+        "close",
+        `Time exit after ${decision.hoursOpen.toFixed(1)} hours (limit: ${maxHours}h)`,
+      )
+    } catch (err) {
+      console.warn(
+        `[ai-trader] Time exit failed for ${managed.instrument}:`,
+        (err as Error).message,
+      )
     }
   }
 
@@ -327,15 +339,16 @@ export class TradeManager {
   ): Promise<void> {
     if (!mgmt.newsProtectionEnabled) return
 
+    const bufferMinutes = mgmt.newsProtectionBufferMinutes ?? 30
     const [base, quote] = managed.instrument.split("_") as [string, string]
     const hasUpcoming =
-      (await this.dataAggregator.hasUpcomingHighImpact(base, 30)) ||
-      (await this.dataAggregator.hasUpcomingHighImpact(quote, 30))
+      (await this.dataAggregator.hasUpcomingHighImpact(base, bufferMinutes)) ||
+      (await this.dataAggregator.hasUpcomingHighImpact(quote, bufferMinutes))
 
     if (hasUpcoming) {
       // Tighten SL to reduce risk before news
       const pipSize = getPipSize(managed.instrument)
-      const tightenAmount = pipSize * 5
+      const tightenAmount = pipSize * (mgmt.newsProtectionTightenPips ?? 5)
 
       let newSL: number
       if (managed.direction === "long") {

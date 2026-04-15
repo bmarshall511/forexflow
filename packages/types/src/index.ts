@@ -3006,14 +3006,21 @@ export interface AiTraderConfigData {
 export interface AiTraderManagementConfig {
   breakevenEnabled: boolean
   breakevenTriggerRR: number // Move to BE when trade moves this many R in favor (e.g., 1.0)
+  breakevenBufferPips: number // Buffer beyond entry when SL moves to breakeven
   trailingStopEnabled: boolean
   trailingStopAtrMultiplier: number // Trail by N x ATR
   partialCloseEnabled: boolean
   partialClosePercent: number // % to close at first target
   partialCloseTargetRR: number // R:R level for first partial
   timeExitEnabled: boolean
-  timeExitHours: number // Close if no movement after N hours
+  timeExitHours: number // Close if no movement after N hours (fallback when profile limit not set)
+  /** Per-profile max hold time in hours. Previously hardcoded in trade-manager.ts. */
+  profileTimeLimits: Partial<Record<AiTraderProfile, number>>
   newsProtectionEnabled: boolean // Tighten/close before high-impact events
+  /** Minutes before a high-impact event that news protection starts tightening. */
+  newsProtectionBufferMinutes: number
+  /** Pip amount added to the current SL during news protection. */
+  newsProtectionTightenPips: number
   reEvaluationEnabled: boolean // Periodic AI re-evaluation of open trades
   scaleInEnabled: boolean // Allow adding to winning positions
 }
@@ -3345,6 +3352,7 @@ export interface AiTraderConfigResponse {
 export const AI_TRADER_DEFAULT_MANAGEMENT: AiTraderManagementConfig = {
   breakevenEnabled: true,
   breakevenTriggerRR: 1.0,
+  breakevenBufferPips: 2,
   trailingStopEnabled: true,
   trailingStopAtrMultiplier: 2.0,
   partialCloseEnabled: true,
@@ -3352,7 +3360,16 @@ export const AI_TRADER_DEFAULT_MANAGEMENT: AiTraderManagementConfig = {
   partialCloseTargetRR: 1.5,
   timeExitEnabled: true,
   timeExitHours: 24,
+  // Previous hardcoded values from ai-trader/trade-manager.ts
+  profileTimeLimits: {
+    scalper: 8,
+    intraday: 48,
+    swing: 168,
+    news: 4,
+  },
   newsProtectionEnabled: true,
+  newsProtectionBufferMinutes: 30,
+  newsProtectionTightenPips: 5,
   reEvaluationEnabled: true,
   scaleInEnabled: false,
 }

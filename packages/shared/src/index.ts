@@ -266,4 +266,17 @@ export {
   type NewsCalendarSource,
   type ImminentEvent,
   type CheckNewsGateOpts,
+  // management primitives (pure decision math)
+  computeProfitPips,
+  computeRiskPips,
+  isBetterSL,
+  evaluateBreakeven,
+  evaluateTrailing,
+  evaluateTimeExit,
+  type BreakevenDecision,
+  type BreakevenEvalOpts,
+  type TrailingDecision,
+  type TrailingEvalOpts,
+  type TimeExitDecision,
+  type TimeExitEvalOpts,
 } from "./trading-core"
