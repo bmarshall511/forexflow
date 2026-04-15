@@ -24,6 +24,7 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
     // ─── SmartFlow status ─────────────────────────────────────────────
     if (smartFlowNavData) {
       const {
+        smartFlowEnabled,
         scannerEnabled,
         scanning,
         hasScanHistory,
@@ -40,20 +41,15 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
       let line2: string | undefined
       let variant: SidebarStatus["variant"] = "default"
 
-      // Label ladder:
-      //   1. error            → "Something went wrong"
-      //   2. scanner disabled → "Scanner disabled" (user explicitly turned it off)
-      //   3. circuit breaker  → pauseReason
-      //   4. scanning now     → "Scanning markets..."
-      //   5. countdown        → "Scans again in Xm"
-      //   6. last scan        → "Scanned Xm ago"
-      //   7. no history yet   → "Starting scanner..."
-      //   8. default          → "Ready"
+      // Label ladder — note: "scanner disabled" means the SCANNER sub-toggle
+      // is off, not SmartFlow as a whole. "SmartFlow off" is the top-level
+      // toggle. Both were conflated historically and the user rightly
+      // complained when a running-but-idle scanner reported "Scanner off".
       if (error) {
         line1 = "Something went wrong"
         variant = "error"
-      } else if (!scannerEnabled) {
-        line1 = "Scanner disabled"
+      } else if (!smartFlowEnabled) {
+        line1 = "SmartFlow off"
         variant = "default"
       } else if (paused) {
         line1 = pauseReason ?? "Paused"
@@ -65,6 +61,13 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
         line1 = `Scans again in ${formatCountdown(nextScanAt)}`
       } else if (lastScanAt) {
         line1 = `Scanned ${formatTimeAgo(lastScanAt)}`
+      } else if (!scannerEnabled) {
+        // SmartFlow is on, but the autonomous scanner sub-toggle is off.
+        // Only surfaced AFTER the runtime-based labels because any recent
+        // scan activity (lastScanAt / nextScanAt) is a better signal that
+        // the scanner is in fact doing work despite the stale flag.
+        line1 = "Manual placements only"
+        variant = "default"
       } else if (!hasScanHistory) {
         line1 = "Starting scanner..."
       } else {
@@ -75,7 +78,7 @@ export function useSidebarStatus(): Record<string, SidebarStatus> {
         line2 = `${activeTrades} trade${activeTrades !== 1 ? "s" : ""} active`
       } else if (found > 0) {
         line2 = `${found} found, ${placed} placed`
-      } else if (scannerEnabled && lastScanAt) {
+      } else if (smartFlowEnabled && scannerEnabled && lastScanAt) {
         line2 = "No opportunities right now"
       }
 
@@ -264,10 +267,11 @@ function useTradeFinderNavData() {
 /** Gathers SmartFlow scanner data for the sidebar nav status. */
 function useSmartFlowNavData() {
   const [data, setData] = useState<{
+    /** Top-level `SmartFlowSettings.enabled` — the sidebar automation toggle. */
+    smartFlowEnabled: boolean
     /**
-     * User-configured scanner toggle from `SmartFlowSettings.scannerEnabled`.
-     * Distinct from transient scan activity — the scanner can be enabled
-     * and simply idle between scan cycles.
+     * Sub-toggle `SmartFlowSettings.scannerEnabled` — controls the autonomous
+     * market scanner specifically. Independent from `smartFlowEnabled`.
      */
     scannerEnabled: boolean
     /** Whether the scanner is actively working right now. */
@@ -323,14 +327,21 @@ function useSmartFlowNavData() {
           }
         }
 
-        let userEnabled = false
+        // Read BOTH user-facing toggles. `enabled` is the big sidebar switch,
+        // `scannerEnabled` is the sub-toggle specifically for the autonomous
+        // market scanner. We default both to TRUE when the settings fetch
+        // fails (e.g. middleware auth race on first mount) so we never flash
+        // "SmartFlow is off" at a user who has it turned on.
+        let smartFlowEnabled = true
+        let scannerEnabled = true
         if (settingsRes.ok) {
           const json = (await settingsRes.json()) as {
             ok: boolean
-            data?: { scannerEnabled?: boolean }
+            data?: { enabled?: boolean; scannerEnabled?: boolean }
           }
-          if (json.ok && json.data?.scannerEnabled != null) {
-            userEnabled = json.data.scannerEnabled
+          if (json.ok && json.data) {
+            if (json.data.enabled != null) smartFlowEnabled = json.data.enabled
+            if (json.data.scannerEnabled != null) scannerEnabled = json.data.scannerEnabled
           }
         }
 
@@ -352,7 +363,8 @@ function useSmartFlowNavData() {
         const scanning =
           p?.phase === "scanning" || p?.phase === "analyzing" || p?.phase === "placing"
         setData({
-          scannerEnabled: userEnabled,
+          smartFlowEnabled,
+          scannerEnabled,
           scanning: scanning ?? false,
           hasScanHistory: p != null,
           lastScanAt: p?.lastScanAt ?? null,
