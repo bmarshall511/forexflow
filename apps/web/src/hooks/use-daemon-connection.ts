@@ -412,6 +412,9 @@ export function useDaemonConnection(): DaemonConnectionState {
               })
               break
             }
+            case "trade_finder_management_action":
+              // Management action happened — the setup was also broadcast as updated
+              break
             case "trade_finder_cap_utilization":
               setTradeFinderCapUtilization(msg.data as TradeFinderCapUtilization)
               break

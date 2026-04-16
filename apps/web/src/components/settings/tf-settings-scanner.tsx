@@ -97,6 +97,56 @@ export function TFSettingsScanner({ config, onUpdate, saving }: TFSettingsProps)
 
         <Separator />
 
+        {/* Entry depth */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Entry Depth</Label>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              How deep into the zone to set entry (0% = edge, 25% = quarter depth)
+            </p>
+          </div>
+          <select
+            value={config.entryDepthPercent ?? 25}
+            onChange={(e) => void onUpdate({ entryDepthPercent: Number(e.target.value) })}
+            disabled={saving}
+            className="bg-background h-8 rounded border px-2 text-sm"
+            aria-label="Entry depth percentage"
+          >
+            <option value={0}>0% (Zone edge)</option>
+            <option value={25}>25% (Recommended)</option>
+            <option value={50}>50% (Deep)</option>
+          </select>
+        </div>
+
+        <Separator />
+
+        {/* Session preference */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Session Preference</Label>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              When the scanner should look for trades
+            </p>
+          </div>
+          <select
+            value={config.sessionPreference ?? "kill_zones"}
+            onChange={(e) =>
+              void onUpdate({
+                sessionPreference: e.target.value as "kill_zones" | "all_sessions" | "conservative",
+              })
+            }
+            disabled={saving}
+            className="bg-background h-8 rounded border px-2 text-sm"
+            aria-label="Session preference"
+          >
+            <option value="kill_zones">Kill Zones (Best)</option>
+            <option value="all_sessions">All Sessions</option>
+            <option value="conservative">Conservative</option>
+          </select>
+        </div>
+
+        <Separator />
+
         {/* Risk per trade (read-only) */}
         <div className="flex items-center justify-between">
           <div>

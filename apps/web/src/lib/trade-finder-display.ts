@@ -100,6 +100,8 @@ export const TF_MGMT_ACTION_LABELS: Record<TradeFinderManagementAction["action"]
   partial_close: "Partial Close",
   thirds_partial: "2nd Partial",
   time_exit: "Time Exit",
+  ai_handoff: "AI Managing",
+  adaptive_partial: "Adaptive Partial",
 }
 
 // ─── Confidence framing ────────────────────────────────────────────────────

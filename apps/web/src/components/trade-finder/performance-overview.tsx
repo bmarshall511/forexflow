@@ -109,8 +109,16 @@ function DimensionTable({ title, data }: { title: string; data: TradeFinderPerfo
 }
 
 export function PerformanceOverview() {
-  const { overall, byTimeframe, byInstrument, byScoreRange, period, setPeriod, isLoading } =
-    useTradeFinderPerformance()
+  const {
+    overall,
+    byTimeframe,
+    byInstrument,
+    byScoreRange,
+    bySession,
+    period,
+    setPeriod,
+    isLoading,
+  } = useTradeFinderPerformance()
 
   if (isLoading) {
     return (
@@ -181,6 +189,7 @@ export function PerformanceOverview() {
       {/* Breakdown tables */}
       <div className="space-y-6">
         <DimensionTable title="By Score Range" data={byScoreRange} />
+        <DimensionTable title="By Session" data={bySession} />
         <DimensionTable title="By Timeframe" data={byTimeframe} />
         <DimensionTable title="By Instrument" data={byInstrument} />
       </div>

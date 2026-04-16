@@ -235,6 +235,23 @@ function AutoTradeFields({ config, onUpdate, saving }: TFSettingsProps) {
           disabled={saving}
         />
       </div>
+
+      <Separator />
+
+      {/* AI-managed trades */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>AI-Managed Trades</Label>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Let AI analysis manage open trades when available (breakeven, trailing, exits)
+          </p>
+        </div>
+        <ToggleSwitch
+          checked={config.aiManagedEnabled ?? true}
+          onChange={(v) => void onUpdate({ aiManagedEnabled: v })}
+          disabled={saving}
+        />
+      </div>
     </div>
   )
 }

@@ -228,6 +228,22 @@ export {
 
 export { calculatePipValueUsd, derivePipValueUsdFromUnrealizedPL } from "./pip-value"
 
+// ─── Trade Finder algorithm extensions ────────────────────────────────────────
+
+export {
+  classifySession,
+  getSessionQuality,
+  evaluateSessionForAutoTrade,
+} from "./session-classifier"
+
+export { scoreMomentumConfluence } from "./momentum-scorer"
+
+export { scoreSmcConfluence, type SmcScoringContext } from "./smc-scorer"
+
+export { checkStructuralConfirmation, type StructuralConfirmation } from "./structural-breakeven"
+
+export { classifyArrivalSpeed } from "./arrival-speed"
+
 // ─── Trading core primitives (shared guards, validators, sizers) ─────────────
 export {
   // types

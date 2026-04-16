@@ -531,7 +531,11 @@ model TradeFinderConfig {
   timeExitCandles               Int      @default(20) // Max candles before time-based exit
   partialExitStrategy           String   @default("standard") // "standard" | "thirds"
   shadowMode                    Boolean  @default(false) // Shadow mode: run logic but don't place real orders
+  entryDepthPercent             Float    @default(25) // How deep into zone body (0=proximal, 25=25%, 50=50%)
+  sessionPreference             String   @default("kill_zones") // "kill_zones" | "all_sessions" | "conservative"
+  aiManagedEnabled              Boolean  @default(true) // Defer to AI conditions when available for filled trades
   pairsJson                     String   @default("[]") // JSON: TradeFinderPairConfig[]
+  dimensionWeightsJson          String?  // JSON: TradeFinderDimensionWeights (adaptive learning)
   updatedAt                     DateTime @updatedAt
 }
 
@@ -563,6 +567,9 @@ model TradeFinderSetup {
   breakevenMoved     Boolean  @default(false) // SL moved to breakeven
   partialTaken       Boolean  @default(false) // Partial profit taken
   managementLog      String?  // JSON array of management actions taken
+  arrivalSpeed       String?  // "controlled" | "displacement" | "sweep"
+  theoreticalOutcomeJson String? // JSON: TradeFinderTheoreticalOutcome
+  detectionSession   String?  // Trading session at detection: "london_open" | "ny_open" | etc
   detectedAt       DateTime @default(now())
   lastUpdatedAt    DateTime @default(now())
   expiredAt        DateTime?

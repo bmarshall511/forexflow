@@ -15,7 +15,8 @@ import type {
   PlaceOrderResponseData,
   Timeframe,
 } from "@fxflow/types"
-import { TIMEFRAME_SET_MAP, SCAN_INTERVAL_MAP } from "@fxflow/types"
+import { SCAN_INTERVAL_MAP, getTimeframeSetMap } from "@fxflow/types"
+import type { TradeFinderTimeframeSpeed } from "@fxflow/types"
 import {
   detectZones,
   detectTrend,
@@ -26,9 +27,14 @@ import {
   getPipSize,
   getCurrentSession,
   getSessionScore,
-  isAutoTradeSession,
   scoreKeyLevels,
   detectRegime,
+  // New Trade Finder algorithm extensions
+  classifySession,
+  evaluateSessionForAutoTrade,
+  scoreMomentumConfluence,
+  scoreSmcConfluence,
+  classifyArrivalSpeed,
 } from "@fxflow/shared"
 import {
   getTradeFinderConfig,
@@ -343,7 +349,9 @@ export class TradeFinderScanner {
     riskPercent: number,
     accountBalance: number,
   ): Promise<void> {
-    const { htf, mtf, ltf } = TIMEFRAME_SET_MAP[pair.timeframeSet]
+    const speed: TradeFinderTimeframeSpeed = pair.timeframeSpeed ?? "standard"
+    const tfMap = getTimeframeSetMap(speed)
+    const { htf, mtf, ltf } = tfMap[pair.timeframeSet]
     const instrument = pair.instrument
     const zoneConfig = getPresetConfig("standard")
 
@@ -449,12 +457,15 @@ export class TradeFinderScanner {
       )
       if (extendedScores.total < config.minScore) continue
 
-      // Compute entry with spread buffer (shorts fill at ask, longs fill at bid)
+      // Compute entry with spread buffer + configurable zone depth
+      // entryDepthPercent: 0 = proximal line, 25 = 25% into zone body, 50 = 50%
       const entryBuffer = spread * 0.5
+      const zoneDepth = Math.abs(zone.proximalLine - zone.distalLine)
+      const depthOffset = zoneDepth * ((config.entryDepthPercent ?? 0) / 100)
       const entryPrice =
         zone.type === "demand"
-          ? zone.proximalLine - entryBuffer // Longs: enter slightly below proximal (bid side)
-          : zone.proximalLine + entryBuffer // Shorts: enter slightly above proximal (ask side)
+          ? zone.proximalLine - entryBuffer - depthOffset // Longs: deeper into demand zone
+          : zone.proximalLine + entryBuffer + depthOffset // Shorts: deeper into supply zone
 
       // Compute SL/TP
       const slBuffer = atr * 0.15 + spread
@@ -506,8 +517,28 @@ export class TradeFinderScanner {
         }
       }
 
+      // Fallback #2: try tested opposing zones with 0.75x R:R credit
       if (takeProfit === null) {
-        // Fallback: place TP at min R:R distance
+        const testedOpposing = ltfResult.zones
+          .filter((z) => z.type === opposingType && z.status === "active" && z.testCount > 0)
+          .sort((a, b) => {
+            if (zone.type === "demand") return a.proximalLine - b.proximalLine
+            return b.proximalLine - a.proximalLine
+          })
+        for (const oz of testedOpposing) {
+          const candidateTP =
+            zone.type === "demand" ? oz.proximalLine - spread : oz.proximalLine + spread
+          const candidateReward = Math.abs(candidateTP - entryPrice) / pipSize
+          // Accept at 75% of min R:R for tested zones (weaker but still valid targets)
+          if (candidateReward / riskPips >= minRRMultiplier * 0.75) {
+            takeProfit = candidateTP
+            break
+          }
+        }
+      }
+
+      // Fallback #3: place TP at min R:R distance
+      if (takeProfit === null) {
         const riskDistance = Math.abs(entryPrice - stopLoss)
         takeProfit =
           zone.type === "demand"
@@ -542,6 +573,23 @@ export class TradeFinderScanner {
 
       const distanceToEntry = Math.abs(currentPrice - entryPrice) / pipSize
 
+      // Classify arrival speed and detection session
+      const ltfCandlesForArrival = ltfCandles.slice(-8).map((c) => ({ ...c, volume: 0 }))
+      const arrivalSpeed = classifyArrivalSpeed(
+        zone.type as "demand" | "supply",
+        zone.proximalLine,
+        zone.distalLine,
+        ltfCandlesForArrival,
+        atr,
+      )
+
+      // Reject displacement arrivals (aggressive momentum into zone — zone likely to break)
+      if (arrivalSpeed === "displacement") {
+        continue
+      }
+
+      const detectionSession = classifySession()
+
       const setupInput: CreateSetupInput = {
         instrument,
         direction,
@@ -558,6 +606,8 @@ export class TradeFinderScanner {
         trendData,
         curveData,
         distanceToEntryPips: distanceToEntry,
+        arrivalSpeed,
+        detectionSession,
       }
 
       const setup = await createSetup(setupInput)
@@ -597,8 +647,11 @@ export class TradeFinderScanner {
       return
     }
 
-    // 2. Session gate — only trade during institutional kill zones
-    const sessionCheck = isAutoTradeSession(setup.instrument)
+    // 2. Session gate — use configurable session preference
+    const sessionCheck = evaluateSessionForAutoTrade(
+      setup.instrument,
+      config.sessionPreference ?? "kill_zones",
+    )
     if (!sessionCheck.allowed) {
       await this.skipAutoTrade(setup, `Session: ${sessionCheck.reason}`)
       return
@@ -752,8 +805,8 @@ export class TradeFinderScanner {
     }
 
     try {
-      const tfMap = TIMEFRAME_SET_MAP[setup.timeframeSet]
-      const ltfTimeframe = (tfMap?.ltf ?? null) as Timeframe | null
+      const tfMapForSetup = getTimeframeSetMap("standard")[setup.timeframeSet]
+      const ltfTimeframe = (tfMapForSetup?.ltf ?? null) as Timeframe | null
       const effectiveOrderType = useMarketOrder ? ("MARKET" as const) : ("LIMIT" as const)
 
       const orderRequest = {
@@ -833,7 +886,7 @@ export class TradeFinderScanner {
       const dir = setup.direction === "long" ? "Long" : "Short"
       void this.notificationEmitter?.emitTradeFinder(
         "Auto-Trade Placed",
-        `${pair} ${dir} ${effectiveOrderType} @ ${setup.entryPrice.toFixed(5)} (score ${setup.scores.total}/16)`,
+        `${pair} ${dir} ${effectiveOrderType} @ ${setup.entryPrice.toFixed(5)} (score ${setup.scores.total}/${setup.scores.maxPossible})`,
       )
     } catch (err) {
       const reason = `Placement failed: ${(err as Error).message}`
@@ -1036,6 +1089,25 @@ export class TradeFinderScanner {
       }
     }
 
+    // Momentum confluence scoring (RSI at zone + divergence)
+    let momentumConfluence = { value: 0, max: 1, label: "Poor", explanation: "No momentum data" }
+    if (context && context.ltfCandles.length >= 15) {
+      const candles = context.ltfCandles.map((c) => ({ ...c, volume: c.volume ?? 0 }))
+      momentumConfluence = scoreMomentumConfluence(zone.type as "demand" | "supply", candles)
+    }
+
+    // SMC confluence scoring (order blocks, FVGs, BOS)
+    let smcConfluence = { value: 0, max: 2, label: "Poor", explanation: "No SMC data" }
+    if (context && context.ltfCandles.length >= 10) {
+      const candles = context.ltfCandles.map((c) => ({ ...c, volume: c.volume ?? 0 }))
+      smcConfluence = scoreSmcConfluence(
+        zone.type as "demand" | "supply",
+        zone.proximalLine,
+        zone.distalLine,
+        candles,
+      )
+    }
+
     const total =
       strength.value +
       time.value +
@@ -1047,7 +1119,9 @@ export class TradeFinderScanner {
       session.value +
       keyLevel.value +
       volatilityRegime.value +
-      htfConfluence.value
+      htfConfluence.value +
+      momentumConfluence.value +
+      smcConfluence.value
 
     return {
       strength,
@@ -1061,8 +1135,10 @@ export class TradeFinderScanner {
       keyLevel,
       volatilityRegime,
       htfConfluence,
+      momentumConfluence,
+      smcConfluence,
       total,
-      maxPossible: 18,
+      maxPossible: 21,
     }
   }
 
@@ -1264,7 +1340,7 @@ export class TradeFinderScanner {
     const setups = await getActiveSetups()
 
     for (const setup of setups) {
-      const { ltf } = TIMEFRAME_SET_MAP[setup.timeframeSet]
+      const { ltf } = getTimeframeSetMap("standard")[setup.timeframeSet]
       const candles = await fetchOandaCandles(
         setup.instrument,
         ltf,

@@ -37,6 +37,8 @@ export interface RecordOutcomeInput {
   actualRR: number
   realizedPL: number
   outcome: "win" | "loss" | "breakeven"
+  /** Trading session at time of entry (for session dimension tracking) */
+  session?: string | null
 }
 
 function toData(row: {
@@ -152,13 +154,16 @@ export async function recordTradeFinderOutcome(input: RecordOutcomeInput): Promi
   const scorePct = input.maxPossible > 0 ? input.scoreTotal / input.maxPossible : 0
   const scoreRange = scorePct >= 0.81 ? "13-16" : scorePct >= 0.63 ? "10-12" : "7-9"
 
-  // Record into 4 dimension combos
-  const dimensions = [
+  // Record into 4-5 dimension combos (session is optional)
+  const dimensions: { dimension: string; dimensionKey: string | null }[] = [
     { dimension: "overall", dimensionKey: null },
     { dimension: "timeframe", dimensionKey: input.timeframeSet },
     { dimension: "instrument", dimensionKey: input.instrument },
     { dimension: "score_range", dimensionKey: scoreRange },
   ]
+  if (input.session) {
+    dimensions.push({ dimension: "session", dimensionKey: input.session })
+  }
 
   await Promise.all(
     dimensions.map(({ dimension, dimensionKey }) =>

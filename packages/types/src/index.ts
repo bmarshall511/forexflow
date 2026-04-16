@@ -807,6 +807,7 @@ export type DaemonMessageType =
   | "trade_finder_auto_trade_skipped"
   | "trade_finder_cap_utilization"
   | "trade_finder_circuit_breaker"
+  | "trade_finder_management_action"
   // Price Alerts
   | "price_alert_triggered"
   // AI Trader
@@ -1053,6 +1054,16 @@ export interface TradeFinderCircuitBreakerMessage extends DaemonMessage<TradeFin
   type: "trade_finder_circuit_breaker"
 }
 
+/** Broadcast when a trade management action fires on a filled Trade Finder setup. */
+export interface TradeFinderManagementActionMessage extends DaemonMessage<{
+  setupId: string
+  instrument: string
+  direction: TradeDirection
+  action: TradeFinderManagementAction
+}> {
+  type: "trade_finder_management_action"
+}
+
 /** Auto-trade activity event for the activity log */
 export interface TradeFinderAutoTradeEvent {
   type: "placed" | "filled" | "skipped" | "cancelled" | "failed"
@@ -1064,6 +1075,47 @@ export interface TradeFinderAutoTradeEvent {
   sourceId?: string
   entryPrice?: number
   timestamp: string
+}
+
+/** Comparison between Trade Finder scoring and AI analysis scoring for calibration */
+export interface TradeFinderAiComparison {
+  setupId: string
+  instrument: string
+  /** Trade Finder total score (0-21) */
+  tfScoreTotal: number
+  /** Trade Finder max possible */
+  tfMaxPossible: number
+  /** AI tradeQualityScore (0-10) */
+  aiQualityScore: number | null
+  /** AI winProbability (0-100) */
+  aiWinProbability: number | null
+  /** AI entryQuality.score (0-10) */
+  aiEntryScore: number | null
+  /** Normalized discrepancy between TF and AI (0-1, lower = more aligned) */
+  discrepancy: number
+  /** ISO timestamp */
+  recordedAt: string
+}
+
+/** Dimension weight overrides from adaptive learning (multipliers on base scores) */
+export interface TradeFinderDimensionWeights {
+  strength: number
+  time: number
+  freshness: number
+  trend: number
+  curve: number
+  profitZone: number
+  commodityCorrelation: number
+  session: number
+  keyLevel: number
+  volatilityRegime: number
+  htfConfluence: number
+  momentumConfluence: number
+  smcConfluence: number
+  /** Sample size used to compute these weights */
+  sampleSize: number
+  /** ISO timestamp when weights were last computed */
+  computedAt: string
 }
 
 /** Broadcast when an AI system (analysis, trader, smart flow) encounters a classified API error. */
@@ -1110,6 +1162,7 @@ export type AnyDaemonMessage =
   | TradeFinderAutoTradeSkippedMessage
   | TradeFinderCapUtilizationMessage
   | TradeFinderCircuitBreakerMessage
+  | TradeFinderManagementActionMessage
   | AiTraderOpportunityFoundMessage
   | AiTraderOpportunityUpdatedMessage
   | AiTraderOpportunityRemovedMessage
@@ -2707,8 +2760,22 @@ export interface TrendSettingsResponse {
 /** Timeframe set defining HTF/MTF/LTF for multi-timeframe analysis */
 export type TradeFinderTimeframeSet = "hourly" | "daily" | "weekly" | "monthly"
 
-/** Mapping of TF set → HTF/MTF/LTF */
+/** Timeframe speed setting for per-pair LTF resolution */
+export type TradeFinderTimeframeSpeed = "standard" | "fast"
+
+/** Mapping of TF set → HTF/MTF/LTF (standard speed — wider zones, more fills) */
 export const TIMEFRAME_SET_MAP: Record<
+  TradeFinderTimeframeSet,
+  { htf: string; mtf: string; ltf: string }
+> = {
+  hourly: { htf: "H4", mtf: "H1", ltf: "M15" },
+  daily: { htf: "D", mtf: "H4", ltf: "H1" },
+  weekly: { htf: "W", mtf: "D", ltf: "H4" },
+  monthly: { htf: "M", mtf: "W", ltf: "D" },
+}
+
+/** Mapping of TF set → HTF/MTF/LTF (fast speed — tighter zones, faster signals) */
+export const TIMEFRAME_SET_MAP_FAST: Record<
   TradeFinderTimeframeSet,
   { htf: string; mtf: string; ltf: string }
 > = {
@@ -2716,6 +2783,13 @@ export const TIMEFRAME_SET_MAP: Record<
   daily: { htf: "D", mtf: "H1", ltf: "M15" },
   weekly: { htf: "W", mtf: "D", ltf: "H1" },
   monthly: { htf: "M", mtf: "W", ltf: "D" },
+}
+
+/** Get the TF map for a given speed setting */
+export function getTimeframeSetMap(
+  speed: TradeFinderTimeframeSpeed = "standard",
+): Record<TradeFinderTimeframeSet, { htf: string; mtf: string; ltf: string }> {
+  return speed === "fast" ? TIMEFRAME_SET_MAP_FAST : TIMEFRAME_SET_MAP
 }
 
 /** Scan interval per TF set (in minutes) */
@@ -2742,6 +2816,8 @@ export interface TradeFinderPairConfig {
   timeframeSet: TradeFinderTimeframeSet
   /** Per-pair auto-trade override (only active when global autoTradeEnabled is true) */
   autoTradeEnabled?: boolean
+  /** Per-pair timeframe speed: "standard" (wider zones) or "fast" (tighter zones) */
+  timeframeSpeed?: TradeFinderTimeframeSpeed
 }
 
 /** Global Trade Finder settings (persisted in DB) */
@@ -2793,8 +2869,17 @@ export interface TradeFinderConfigData {
   partialExitStrategy: "standard" | "thirds"
   /** Shadow mode: run all logic but don't place real orders */
   shadowMode: boolean
+  /** How deep into the zone body to set entry (0 = proximal line, 25 = 25% depth, 50 = 50% depth) */
+  entryDepthPercent: number
+  /** Session preference for auto-trade timing */
+  sessionPreference: TradeFinderSessionPreference
+  /** Defer to AI condition management when AI analysis is available for a filled trade */
+  aiManagedEnabled: boolean
   updatedAt: string
 }
+
+/** Session preference for auto-trade timing */
+export type TradeFinderSessionPreference = "kill_zones" | "all_sessions" | "conservative"
 
 /** Score breakdown for a Trade Finder setup */
 export interface TradeFinderScoreBreakdown {
@@ -2813,6 +2898,10 @@ export interface TradeFinderScoreBreakdown {
   volatilityRegime: OddsEnhancerScore
   /** HTF zone confluence (0-2): does an HTF zone of the same type overlap or sit nearby? */
   htfConfluence?: OddsEnhancerScore
+  /** Momentum confluence (0-1): RSI oversold/overbought at zone, divergence */
+  momentumConfluence?: OddsEnhancerScore
+  /** SMC confluence (0-2): order block overlap, unfilled FVG, recent BOS in direction */
+  smcConfluence?: OddsEnhancerScore
   total: number
   maxPossible: number
 }
@@ -2872,11 +2961,44 @@ export interface TradeFinderSetupData {
   managementLog: TradeFinderManagementAction[]
   /** Queue position when eligible but capped (null = not queued, 1 = next to be placed) */
   queuePosition: number | null
+  /** Arrival speed classification when price approached the zone */
+  arrivalSpeed: TradeFinderArrivalSpeed | null
+  /** Theoretical outcome tracking (filled after trade closes) */
+  theoreticalOutcome: TradeFinderTheoreticalOutcome | null
+  /** Session at time of detection */
+  detectionSession: TradeFinderSession | null
 }
+
+/** How price approached the zone */
+export type TradeFinderArrivalSpeed = "controlled" | "displacement" | "sweep"
+
+/** Theoretical outcome — what would have happened without management intervention */
+export interface TradeFinderTheoreticalOutcome {
+  /** Did price eventually reach the original TP? */
+  reachedTP: boolean
+  /** Did price eventually reach the original SL? */
+  reachedSL: boolean
+  /** Max favorable excursion after trade close (pips) */
+  maxFavorableAfterClose: number
+  /** Max adverse excursion after trade close (pips) */
+  maxAdverseAfterClose: number
+  /** Hours monitored after close */
+  monitoredHours: number
+}
+
+/** Trading session classification */
+export type TradeFinderSession = "london_open" | "london" | "ny_open" | "ny" | "asian" | "off_hours"
 
 /** A single management action taken by the Trade Finder trade manager */
 export interface TradeFinderManagementAction {
-  action: "breakeven" | "partial_close" | "trailing_update" | "time_exit" | "thirds_partial"
+  action:
+    | "breakeven"
+    | "partial_close"
+    | "trailing_update"
+    | "time_exit"
+    | "thirds_partial"
+    | "ai_handoff"
+    | "adaptive_partial"
   /** Human-readable description of the action */
   detail: string
   /** Previous SL value (if action moved the stop loss) */

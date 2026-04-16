@@ -51,6 +51,7 @@ export async function recordTradeFinderClose(
     actualRR,
     realizedPL,
     outcome,
+    session: setup.detectionSession ?? null,
   })
 
   console.log(

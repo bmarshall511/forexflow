@@ -247,7 +247,12 @@ export {
   cleanupOldCurveSnapshots,
 } from "./curve-snapshot-service"
 
-export { getTradeFinderConfig, updateTradeFinderConfig } from "./trade-finder-config-service"
+export {
+  getTradeFinderConfig,
+  updateTradeFinderConfig,
+  getDimensionWeights,
+  saveDimensionWeights,
+} from "./trade-finder-config-service"
 
 export {
   getActiveSetups,
@@ -274,6 +279,10 @@ export {
   updateSetupConfirmation,
   updateSetupConfirmationWait,
   updateSetupSkipReason,
+  updateSetupArrivalSpeed,
+  updateSetupTheoreticalOutcome,
+  getFilledSetupsWithoutTheoreticalOutcome,
+  getSetupsWithOutcomes,
   type CreateSetupInput,
 } from "./trade-finder-service"
 

@@ -1,6 +1,10 @@
 "use client"
 
-import type { TradeFinderPairConfig, TradeFinderTimeframeSet } from "@fxflow/types"
+import type {
+  TradeFinderPairConfig,
+  TradeFinderTimeframeSet,
+  TradeFinderTimeframeSpeed,
+} from "@fxflow/types"
 import type { TFSettingsProps } from "./tf-settings-scanner"
 import { FOREX_PAIR_GROUPS } from "@fxflow/shared"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -63,6 +67,13 @@ export function TFSettingsPairs({ config, onUpdate, saving, autoTradeEnabledPair
     await onUpdate({ pairs: newPairs })
   }
 
+  const changeSpeed = async (instrument: string, speed: TradeFinderTimeframeSpeed) => {
+    const newPairs = pairs.map((p) =>
+      p.instrument === instrument ? { ...p, timeframeSpeed: speed } : p,
+    )
+    await onUpdate({ pairs: newPairs })
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -87,6 +98,7 @@ export function TFSettingsPairs({ config, onUpdate, saving, autoTradeEnabledPair
             onToggle={togglePair}
             onToggleAuto={togglePairAutoTrade}
             onChangeTf={changeTfSet}
+            onChangeSpeed={changeSpeed}
             saving={saving}
           />
         ))}
@@ -105,6 +117,7 @@ function PairGroup({
   onToggle,
   onToggleAuto,
   onChangeTf,
+  onChangeSpeed,
   saving,
 }: {
   label: string
@@ -115,6 +128,7 @@ function PairGroup({
   onToggle: (i: string) => Promise<void>
   onToggleAuto: (i: string) => Promise<void>
   onChangeTf: (i: string, tf: TradeFinderTimeframeSet) => Promise<void>
+  onChangeSpeed: (i: string, speed: TradeFinderTimeframeSpeed) => Promise<void>
   saving: boolean
 }) {
   return (
@@ -204,6 +218,23 @@ function PairGroup({
                         {opt.label} ({opt.desc})
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {isAdded && (
+                <Select
+                  value={pc!.timeframeSpeed ?? "standard"}
+                  onValueChange={(v) =>
+                    void onChangeSpeed(fp.value, v as TradeFinderTimeframeSpeed)
+                  }
+                >
+                  <SelectTrigger className="w-24" aria-label={`Speed for ${fp.label}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="fast">Fast</SelectItem>
                   </SelectContent>
                 </Select>
               )}

@@ -15,6 +15,9 @@ import type {
   TradeFinderScoreBreakdown,
   TradeFinderTimeframeSet,
   TradeFinderManagementAction,
+  TradeFinderArrivalSpeed,
+  TradeFinderTheoreticalOutcome,
+  TradeFinderSession,
   TradeDirection,
   ZoneData,
   TrendData,
@@ -58,6 +61,9 @@ function toSetupData(row: {
   breakevenMoved: boolean
   partialTaken: boolean
   managementLog: string | null
+  arrivalSpeed: string | null
+  theoreticalOutcomeJson: string | null
+  detectionSession: string | null
   detectedAt: Date
   lastUpdatedAt: Date
 }): TradeFinderSetupData {
@@ -68,6 +74,9 @@ function toSetupData(row: {
   const managementLog: TradeFinderManagementAction[] = row.managementLog
     ? (JSON.parse(row.managementLog) as TradeFinderManagementAction[])
     : []
+  const theoreticalOutcome: TradeFinderTheoreticalOutcome | null = row.theoreticalOutcomeJson
+    ? (JSON.parse(row.theoreticalOutcomeJson) as TradeFinderTheoreticalOutcome)
+    : null
 
   return {
     id: row.id,
@@ -99,6 +108,9 @@ function toSetupData(row: {
     partialTaken: row.partialTaken,
     managementLog,
     queuePosition: null, // Computed at runtime by the daemon scanner
+    arrivalSpeed: (row.arrivalSpeed as TradeFinderArrivalSpeed) ?? null,
+    theoreticalOutcome,
+    detectionSession: (row.detectionSession as TradeFinderSession) ?? null,
   }
 }
 
@@ -157,6 +169,8 @@ export interface CreateSetupInput {
   trendData: TrendData | null
   curveData: CurveData | null
   distanceToEntryPips: number
+  arrivalSpeed?: TradeFinderArrivalSpeed
+  detectionSession?: TradeFinderSession
 }
 
 /**
@@ -184,6 +198,8 @@ export async function createSetup(input: CreateSetupInput): Promise<TradeFinderS
       trendJson: input.trendData ? JSON.stringify(input.trendData) : null,
       curveJson: input.curveData ? JSON.stringify(input.curveData) : null,
       distanceToEntry: input.distanceToEntryPips,
+      arrivalSpeed: input.arrivalSpeed ?? null,
+      detectionSession: input.detectionSession ?? null,
     },
   })
   return toSetupData(row)
@@ -453,6 +469,55 @@ export async function getPlacedAutoSetups(): Promise<TradeFinderSetupData[]> {
   const rows = await db.tradeFinderSetup.findMany({
     where: { status: "placed", autoPlaced: true, resultSourceId: { not: null } },
     orderBy: { lastUpdatedAt: "desc" },
+  })
+  return rows.map(toSetupData)
+}
+
+// ─── New: Theoretical Outcome & Arrival Speed ─────────────────────────────
+
+/** Update the arrival speed classification for a setup */
+export async function updateSetupArrivalSpeed(
+  id: string,
+  arrivalSpeed: TradeFinderArrivalSpeed,
+): Promise<void> {
+  await db.tradeFinderSetup.update({
+    where: { id },
+    data: { arrivalSpeed, lastUpdatedAt: new Date() },
+  })
+}
+
+/** Store the theoretical outcome tracking data for a closed TF setup */
+export async function updateSetupTheoreticalOutcome(
+  id: string,
+  outcome: TradeFinderTheoreticalOutcome,
+): Promise<void> {
+  await db.tradeFinderSetup.update({
+    where: { id },
+    data: { theoreticalOutcomeJson: JSON.stringify(outcome), lastUpdatedAt: new Date() },
+  })
+}
+
+/** Get all filled setups that are missing theoretical outcome data (for background monitoring) */
+export async function getFilledSetupsWithoutTheoreticalOutcome(): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: {
+      status: "filled",
+      theoreticalOutcomeJson: null,
+    },
+    orderBy: { lastUpdatedAt: "desc" },
+  })
+  return rows.map(toSetupData)
+}
+
+/** Get all setups with outcomes for adaptive learning (filled setups with known result) */
+export async function getSetupsWithOutcomes(limit = 100): Promise<TradeFinderSetupData[]> {
+  const rows = await db.tradeFinderSetup.findMany({
+    where: {
+      status: "filled",
+      autoPlaced: true,
+    },
+    orderBy: { lastUpdatedAt: "desc" },
+    take: limit,
   })
   return rows.map(toSetupData)
 }

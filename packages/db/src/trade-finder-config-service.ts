@@ -8,7 +8,12 @@
  * @module trade-finder-config-service
  */
 import { db } from "./client"
-import type { TradeFinderConfigData, TradeFinderPairConfig } from "@fxflow/types"
+import type {
+  TradeFinderConfigData,
+  TradeFinderPairConfig,
+  TradeFinderSessionPreference,
+  TradeFinderDimensionWeights,
+} from "@fxflow/types"
 import { getRiskPercent } from "./settings-service"
 import { safeIso } from "./utils"
 
@@ -63,6 +68,9 @@ export async function getTradeFinderConfig(): Promise<TradeFinderConfigData> {
     timeExitCandles: config.timeExitCandles,
     partialExitStrategy: (config.partialExitStrategy ?? "standard") as "standard" | "thirds",
     shadowMode: config.shadowMode ?? false,
+    entryDepthPercent: config.entryDepthPercent ?? 25,
+    sessionPreference: (config.sessionPreference ?? "kill_zones") as TradeFinderSessionPreference,
+    aiManagedEnabled: config.aiManagedEnabled ?? true,
     updatedAt: safeIso(config.updatedAt),
   }
 }
@@ -94,6 +102,9 @@ type UpdatableConfigFields = Pick<
   | "timeExitCandles"
   | "partialExitStrategy"
   | "shadowMode"
+  | "entryDepthPercent"
+  | "sessionPreference"
+  | "aiManagedEnabled"
 >
 
 /**
@@ -142,6 +153,9 @@ export async function updateTradeFinderConfig(
   if (data.partialExitStrategy !== undefined)
     updateData.partialExitStrategy = data.partialExitStrategy
   if (data.shadowMode !== undefined) updateData.shadowMode = data.shadowMode
+  if (data.entryDepthPercent !== undefined) updateData.entryDepthPercent = data.entryDepthPercent
+  if (data.sessionPreference !== undefined) updateData.sessionPreference = data.sessionPreference
+  if (data.aiManagedEnabled !== undefined) updateData.aiManagedEnabled = data.aiManagedEnabled
   if (data.pairs !== undefined) updateData.pairsJson = JSON.stringify(data.pairs)
 
   await db.tradeFinderConfig.update({
@@ -150,4 +164,25 @@ export async function updateTradeFinderConfig(
   })
 
   return getTradeFinderConfig()
+}
+
+// ─── Dimension Weights (Adaptive Learning) ─────────────────────────────────
+
+/** Get the stored adaptive dimension weights, or null if not yet computed */
+export async function getDimensionWeights(): Promise<TradeFinderDimensionWeights | null> {
+  const config = await getOrCreateConfig()
+  if (!config.dimensionWeightsJson) return null
+  try {
+    return JSON.parse(config.dimensionWeightsJson) as TradeFinderDimensionWeights
+  } catch {
+    return null
+  }
+}
+
+/** Store updated adaptive dimension weights */
+export async function saveDimensionWeights(weights: TradeFinderDimensionWeights): Promise<void> {
+  await db.tradeFinderConfig.update({
+    where: { id: 1 },
+    data: { dimensionWeightsJson: JSON.stringify(weights) },
+  })
 }

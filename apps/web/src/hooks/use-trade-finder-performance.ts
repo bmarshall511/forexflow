@@ -10,6 +10,7 @@ interface UseTradeFinderPerformanceReturn {
   byTimeframe: TradeFinderPerformanceData[]
   byInstrument: TradeFinderPerformanceData[]
   byScoreRange: TradeFinderPerformanceData[]
+  bySession: TradeFinderPerformanceData[]
   period: PeriodDays
   setPeriod: (days: PeriodDays) => void
   isLoading: boolean
@@ -20,6 +21,7 @@ export function useTradeFinderPerformance(): UseTradeFinderPerformanceReturn {
   const [byTimeframe, setByTimeframe] = useState<TradeFinderPerformanceData[]>([])
   const [byInstrument, setByInstrument] = useState<TradeFinderPerformanceData[]>([])
   const [byScoreRange, setByScoreRange] = useState<TradeFinderPerformanceData[]>([])
+  const [bySession, setBySession] = useState<TradeFinderPerformanceData[]>([])
   const [period, setPeriod] = useState<PeriodDays>(90)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -33,6 +35,7 @@ export function useTradeFinderPerformance(): UseTradeFinderPerformanceReturn {
         setByTimeframe(json.data.byTimeframe)
         setByInstrument(json.data.byInstrument)
         setByScoreRange(json.data.byScoreRange)
+        setBySession(json.data.bySession ?? [])
       }
     } catch {
       // Silently fail — performance data is non-critical
@@ -45,5 +48,14 @@ export function useTradeFinderPerformance(): UseTradeFinderPerformanceReturn {
     void fetchData(period)
   }, [period, fetchData])
 
-  return { overall, byTimeframe, byInstrument, byScoreRange, period, setPeriod, isLoading }
+  return {
+    overall,
+    byTimeframe,
+    byInstrument,
+    byScoreRange,
+    bySession,
+    period,
+    setPeriod,
+    isLoading,
+  }
 }

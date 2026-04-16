@@ -13,9 +13,11 @@
 import type {
   TradeFinderConfigData,
   TradeFinderSetupData,
+  TradeFinderManagementAction,
   PositionPriceTick,
   AnyDaemonMessage,
   OpenTradeData,
+  CloseContext,
 } from "@fxflow/types"
 import {
   getTradeFinderConfig,
@@ -40,7 +42,16 @@ export interface ModifyTradeSLTPFn {
 }
 
 export interface CloseTradeFn {
-  (sourceTradeId: string, units?: number, reason?: string): Promise<void>
+  (
+    sourceTradeId: string,
+    units?: number,
+    reason?: string,
+    attribution?: {
+      closedBy: NonNullable<CloseContext["closedBy"]>
+      closedByLabel: string
+      closedByDetail?: string
+    },
+  ): Promise<void>
 }
 
 export interface GetOpenTradesFn {
@@ -169,6 +180,37 @@ export class TradeFinderTradeManager {
     }
   }
 
+  /** Broadcast a management action event to connected clients */
+  private broadcastManagementAction(
+    setup: TradeFinderSetupData,
+    action: TradeFinderManagementAction,
+  ): void {
+    this.broadcast({
+      type: "trade_finder_management_action",
+      timestamp: new Date().toISOString(),
+      data: {
+        setupId: setup.id,
+        instrument: setup.instrument,
+        direction: setup.direction,
+        action,
+      },
+    })
+  }
+
+  /** Check if AI conditions are actively managing this trade */
+  private async isAiManaged(config: TradeFinderConfigData, tradeId: string): Promise<boolean> {
+    if (!config.aiManagedEnabled) return false
+    try {
+      const { listActiveConditions } = await import("@fxflow/db")
+      const conditions = await listActiveConditions()
+      return conditions.some(
+        (c) => c.tradeId === tradeId && c.createdBy === "ai" && c.status === "active",
+      )
+    } catch {
+      return false
+    }
+  }
+
   private async evaluateManagement(
     managed: ManagedTrade,
     trade: OpenTradeData,
@@ -177,6 +219,37 @@ export class TradeFinderTradeManager {
     now: number,
   ): Promise<void> {
     const { setup } = managed
+
+    // AI management deferral: if AI conditions are actively managing this trade,
+    // only intervene for emergency (5% position drawdown)
+    const aiManaged = await this.isAiManaged(config, trade.id)
+    if (aiManaged) {
+      const pipSize = getPipSize(setup.instrument)
+      const pnlPips =
+        setup.direction === "long"
+          ? (currentPrice - setup.entryPrice) / pipSize
+          : (setup.entryPrice - currentPrice) / pipSize
+      const drawdownPercent = setup.riskPips > 0 ? Math.abs(pnlPips / setup.riskPips) : 0
+
+      // Only intervene if position is in severe drawdown (> 3x risk)
+      if (pnlPips >= 0 || drawdownPercent < 3) {
+        // AI is handling this trade — skip TF management
+        if (!setup.managementLog.some((l) => l.action === "ai_handoff")) {
+          await appendTradeFinderManagementLog(setup.id, {
+            action: "ai_handoff",
+            detail: "Deferring to AI condition management",
+            timestamp: new Date().toISOString(),
+          })
+          this.broadcastManagementAction(setup, {
+            action: "ai_handoff",
+            detail: "Deferring to AI condition management",
+            timestamp: new Date().toISOString(),
+          })
+        }
+        return
+      }
+    }
+
     const pipSize = getPipSize(setup.instrument)
     const decimals = getDecimalPlaces(setup.instrument)
 
@@ -232,6 +305,11 @@ export class TradeFinderTradeManager {
             managed.sourceTradeId,
             unitsToClose,
             "Trade Finder thirds: 2nd partial at 2:1 R:R",
+            {
+              closedBy: "trade_finder",
+              closedByLabel: "Trade Finder",
+              closedByDetail: "Thirds strategy: 2nd partial at 2:1 R:R",
+            },
           )
           // Move SL to 1:1 R:R level
           const oneRLevel =
@@ -316,6 +394,13 @@ export class TradeFinderTradeManager {
         timestamp: new Date().toISOString(),
       })
 
+      const beAction: TradeFinderManagementAction = {
+        action: "breakeven",
+        detail: `SL moved to ${roundedSL.toFixed(decimals)}`,
+        previousValue: trade.stopLoss ?? undefined,
+        newValue: roundedSL,
+        timestamp: new Date().toISOString(),
+      }
       console.log(
         `[trade-finder-mgr] BREAKEVEN: ${setup.instrument} SL → ${roundedSL.toFixed(decimals)}`,
       )
@@ -324,6 +409,7 @@ export class TradeFinderTradeManager {
         timestamp: new Date().toISOString(),
         data: managed.setup,
       })
+      this.broadcastManagementAction(setup, beAction)
     } catch (err) {
       console.error(`[trade-finder-mgr] Breakeven failed for ${setup.instrument}:`, err)
     }
@@ -346,6 +432,11 @@ export class TradeFinderTradeManager {
         managed.sourceTradeId,
         unitsToClose,
         `Trade Finder partial profit at ${config.partialCloseRR}:1 R:R`,
+        {
+          closedBy: "trade_finder",
+          closedByLabel: "Trade Finder",
+          closedByDetail: `Partial profit at ${config.partialCloseRR}:1 R:R (${config.partialClosePercent}%)`,
+        },
       )
       managed.setup = { ...setup, partialTaken: true }
       managed.lastModifiedAt = Date.now()
@@ -428,6 +519,11 @@ export class TradeFinderTradeManager {
         managed.sourceTradeId,
         undefined, // Full close
         "Trade Finder time-based exit — no progress",
+        {
+          closedBy: "trade_finder",
+          closedByLabel: "Trade Finder",
+          closedByDetail: `Time exit after ${maxCandles} candles — no progress`,
+        },
       )
       await appendTradeFinderManagementLog(setup.id, {
         action: "time_exit",
@@ -443,11 +539,12 @@ export class TradeFinderTradeManager {
   }
 
   private getCandleMinutes(timeframeSet: string): number {
+    // Standard speed: hourly→M15, daily→H1, weekly→H4, monthly→D
     const map: Record<string, number> = {
-      hourly: 5, // LTF is M5
-      daily: 15, // LTF is M15
-      weekly: 60, // LTF is H1
-      monthly: 240, // LTF is H4 (approximate)
+      hourly: 15, // LTF is M15 (standard)
+      daily: 60, // LTF is H1 (standard)
+      weekly: 240, // LTF is H4 (standard)
+      monthly: 1440, // LTF is D (standard)
     }
     return map[timeframeSet] ?? 15
   }

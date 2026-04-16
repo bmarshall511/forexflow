@@ -97,6 +97,22 @@ export const AiSettingsUpdateSchema = z
     finnhubApiKey: z.string().trim().min(1).nullable().optional(),
     /** Preferences to merge into auto-analysis JSON blob */
     preferences: z.record(z.string(), z.unknown()).optional(),
+    /** Top-level AiSettings fields (reliability + budget + reconciliation). */
+    autoRetryInterrupted: z.boolean().optional(),
+    /** Null clears the cap; positive number sets it. */
+    monthlyBudgetCapUsd: z.number().positive().nullable().optional(),
+    /** Guardrail for re-run reconciliation ops. Min 1, max 100. */
+    maxReconciliationOps: z.number().int().min(1).max(100).optional(),
+    /** Re-analysis schedule config (JSON payload). */
+    reanalysisSchedule: z
+      .object({
+        mode: z.enum(["off", "time", "price", "event", "sl_approach"]),
+        intervalHours: z.number().positive().optional(),
+        pipThreshold: z.number().positive().optional(),
+        events: z.array(z.enum(["tv_signal", "calendar", "rr_milestone"])).optional(),
+        slApproachPips: z.number().positive().optional(),
+      })
+      .optional(),
   })
   .strict()
 
@@ -258,6 +274,7 @@ const TradeFinderPairConfigSchema = z.object({
   enabled: z.boolean(),
   timeframeSet: z.enum(["hourly", "daily", "weekly", "monthly"]),
   autoTradeEnabled: z.boolean().optional(),
+  timeframeSpeed: z.enum(["standard", "fast"]).optional(),
 })
 
 export const TradeFinderConfigUpdateSchema = z
@@ -290,6 +307,9 @@ export const TradeFinderConfigUpdateSchema = z
     trailingStopCandles: z.number().int().min(1).max(20).optional(),
     timeExitEnabled: z.boolean().optional(),
     timeExitCandles: z.number().int().min(5).max(100).optional(),
+    entryDepthPercent: z.number().min(0).max(50).optional(),
+    sessionPreference: z.enum(["kill_zones", "all_sessions", "conservative"]).optional(),
+    aiManagedEnabled: z.boolean().optional(),
   })
   .strict()
 

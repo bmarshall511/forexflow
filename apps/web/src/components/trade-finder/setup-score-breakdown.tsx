@@ -48,6 +48,14 @@ const SCORE_INFO: Record<string, { name: string; what: string }> = {
     name: "Backed by a bigger zone",
     what: "Does a zone on a higher timeframe overlap this one? When zones from multiple timeframes stack up, the trade is much stronger.",
   },
+  momentumConfluence: {
+    name: "Momentum supports the trade",
+    what: "Is price momentum (RSI) showing oversold conditions at a demand zone or overbought at a supply zone? This adds confidence to the entry.",
+  },
+  smcConfluence: {
+    name: "Institutional footprints",
+    what: "Do Smart Money Concepts (order blocks, fair value gaps, structure breaks) align with this zone? These patterns show where big institutions are likely positioned.",
+  },
 }
 
 function ScoreRow({ id, score }: { id: string; score: OddsEnhancerScore }) {
@@ -115,6 +123,8 @@ export function SetupScoreBreakdown({ scores }: SetupScoreBreakdownProps) {
     ["keyLevel", scores.keyLevel],
     ["volatilityRegime", scores.volatilityRegime],
     ["htfConfluence", scores.htfConfluence],
+    ["momentumConfluence", scores.momentumConfluence],
+    ["smcConfluence", scores.smcConfluence],
   ]
 
   return (
