@@ -279,6 +279,7 @@ export class TradeManager {
         await this.checkBreakeven(managed, currentPrice, mgmt)
         await this.checkPartialClose(managed, currentPrice, mgmt)
         await this.checkTrailingStop(managed, currentPrice, mgmt)
+        await this.checkSessionClose(managed)
         await this.checkTimeExit(managed, mgmt)
         await this.checkNewsProtection(managed, mgmt)
         await this.checkAiReEvaluation(managed, currentPrice, mgmt)
@@ -353,8 +354,10 @@ export class TradeManager {
     mgmt: AiTraderManagementConfig,
   ): Promise<void> {
     if (!mgmt.partialCloseEnabled || managed.partialCloseApplied) return
-    // Only partial-close after breakeven is set (we need risk locked in first)
-    if (!managed.breakevenApplied) return
+    // Partial close fires on absolute R:R achievement, NOT gated by breakeven.
+    // A scalper that spikes 2R immediately should still partial-close even if
+    // breakeven hasn't been applied yet. The audit showed this dependency was
+    // preventing profit-taking on fast movers.
 
     const riskPips = computeRiskPips({
       instrument: managed.instrument,
@@ -452,6 +455,44 @@ export class TradeManager {
       managed.currentSL,
       decision.newSL,
     )
+  }
+
+  /**
+   * Close intraday and news profile trades before NY close (20:45 UTC).
+   * Post-mortem showed intraday winners dying to choppy 16:00-16:15 ET
+   * price action. Swing trades are exempt — they hold multi-day by design.
+   */
+  private async checkSessionClose(managed: ManagedTrade): Promise<void> {
+    if (managed.profile !== "intraday" && managed.profile !== "news") return
+
+    const now = new Date()
+    const utcHour = now.getUTCHours()
+    const utcMin = now.getUTCMinutes()
+    // 20:45 UTC = 16:45 ET (summer) or 15:45 ET (winter) — 15 min before NY close
+    if (utcHour !== 20 || utcMin < 45) return
+
+    try {
+      await this.tradeSyncer.closeTrade(
+        managed.sourceTradeId,
+        undefined,
+        `EdgeFinder session close: ${managed.profile} trade closed before NY close`,
+        {
+          closedBy: "ai_trader",
+          closedByLabel: "EdgeFinder",
+          closedByDetail: `Session close: ${managed.profile} trades close at 20:45 UTC to avoid NY close chop`,
+        },
+      )
+      await this.logAction(
+        managed,
+        "close",
+        `Session close before NY close (20:45 UTC) for ${managed.profile} trade`,
+      )
+    } catch (err) {
+      console.warn(
+        `[ai-trader] Session close failed for ${managed.instrument}:`,
+        (err as Error).message,
+      )
+    }
   }
 
   private async checkTimeExit(

@@ -109,6 +109,7 @@ export class ExecutionGate {
 
     // Post-Tier-3 regime gate: ranging and low-volatility regimes need
     // higher final confidence because chop makes directional bets unreliable.
+    // Post-mortem: USD_JPY (intraday, ranging) placed at 62% → 0 MFE, SL in 19 min.
     if (regime === "ranging" && confidence < 75) {
       return {
         allowed: false,

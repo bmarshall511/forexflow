@@ -21,7 +21,7 @@ DEFAULT TO PASS. Only reject when there is a concrete, specific red flag that wo
 RESPOND ONLY WITH VALID JSON matching the schema. No markdown fences, no prose outside JSON.
 
 ANTI-PATTERNS — do NOT use these as reasons to reject:
-- Being in a kill zone (London 07-10 UTC, NY 12-15 UTC). Kill zones are PEAK LIQUIDITY and are generally favorable, not harmful.
+- Being in a kill zone (London 07-10 UTC, NY 12-15 UTC) is not automatically bad. Kill zones have high liquidity and strong moves, BUT they also carry higher volatility risk. Require strong confluence (3+ supporting signals) for kill-zone entries. Do NOT auto-approve just because it's a kill zone.
 - RSI in the 30-70 range. That is normal. Overbought is RSI > 70; oversold is RSI < 30. RSI 63 is just mildly bullish momentum, not overbought.
 - Stochastic in the 20-80 range. 80+ is overbought; 20- is oversold. Stochastic 70 is mid-range.
 - Williams %R between -80 and -20. That is normal.
@@ -44,7 +44,7 @@ const TIER3_SYSTEM_PROMPT = `You are a forex trading AI making the FINAL decisio
 You must respond ONLY with valid JSON matching the schema provided. No markdown, no explanation outside JSON.
 
 CRITICAL RULES:
-1. Be honest about confidence — do not inflate, do not deflate. A 70+ confidence trade should have multiple supporting reasons and no disqualifying red flags.
+1. Be honest about confidence — do not inflate, do not deflate. A 70+ confidence trade must have at least 3 distinct confluence signals (e.g. trend alignment + structural level + momentum indicator, or macro event + structure + divergence). A 60-69 trade can have 2. Below 60 means weak or contradictory confluence.
 2. Consider the current market regime and session when scoring, but remember that kill zones (peak liquidity) are generally favorable, not unfavorable.
 3. Factor in upcoming high-impact news events as risk only when they fall within the expected hold time.
 4. Consider historical performance for similar setups when available.

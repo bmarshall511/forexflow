@@ -396,26 +396,13 @@ export class ManagementEngine {
       const config = this.configCache.get(state.configId)
       if (!config) continue
 
-      // Rolling exponential moving average of spread. Flushed to DB at most
-      // once per SPREAD_FLUSH_INTERVAL_MS per trade to keep write load low.
+      // Update the EMA but DON'T flush yet — do that AFTER rule evaluation.
+      // If a safety net closes this trade mid-tick, flushing before rules would
+      // persist a skewed spread average on a now-closed trade.
       state.emaSpreadPips =
         state.emaSpreadPips == null
           ? spreadPips
           : SPREAD_EMA_ALPHA * spreadPips + (1 - SPREAD_EMA_ALPHA) * state.emaSpreadPips
-      if (now - state.lastSpreadFlushAt >= SPREAD_FLUSH_INTERVAL_MS) {
-        state.lastSpreadFlushAt = now
-        const flushValue = state.emaSpreadPips
-        void import("@fxflow/db")
-          .then(({ updateSmartFlowTrade }) =>
-            updateSmartFlowTrade(state.smartFlowTradeId, { avgSpread: flushValue }),
-          )
-          .catch((err) =>
-            console.warn(
-              `[smart-flow-engine] avgSpread flush failed for ${state.smartFlowTradeId}:`,
-              (err as Error).message,
-            ),
-          )
-      }
 
       const currentPrice = state.direction === "long" ? bid : ask
       const profitPips = this.computeProfitPips(state, currentPrice, pipSize)
@@ -451,6 +438,22 @@ export class ManagementEngine {
 
         // 5. Partial Close Check
         await this.checkPartialCloses(state, config, profitPips, atr, sessionMultiplier)
+
+        // Flush spread EMA AFTER all rules evaluated (trade still alive).
+        if (now - state.lastSpreadFlushAt >= SPREAD_FLUSH_INTERVAL_MS) {
+          state.lastSpreadFlushAt = now
+          const flushValue = state.emaSpreadPips
+          void import("@fxflow/db")
+            .then(({ updateSmartFlowTrade }) =>
+              updateSmartFlowTrade(state.smartFlowTradeId, { avgSpread: flushValue }),
+            )
+            .catch((err) =>
+              console.warn(
+                `[smart-flow-engine] avgSpread flush failed for ${state.smartFlowTradeId}:`,
+                (err as Error).message,
+              ),
+            )
+        }
       } catch (err) {
         console.error(
           `[smart-flow-engine] Tick evaluation error for ${state.smartFlowTradeId} (${instrument}):`,

@@ -1397,11 +1397,25 @@ export class AiTraderScanner {
 
     // Deterministic position sizing — shared helper from @fxflow/shared/trading-core.
     // Handles USD-quoted + non-USD-quoted pip value conversion uniformly.
+    //
+    // Volatility-adjusted scaling: swing/intraday in ranging/volatile regimes
+    // get smaller position sizes because wider SLs mean more absolute $$$ at
+    // risk. Without this, a 100-pip swing SL and a 15-pip scalp SL both risk
+    // 1% of account — but the swing trade's loss is 6× larger in dollars.
+    const REGIME_SIZE_SCALE: Record<string, number> = {
+      trending: 1.0,
+      ranging: 0.75,
+      volatile: 0.7,
+      low_volatility: 0.8,
+    }
+    const regimeScale = REGIME_SIZE_SCALE[signal.technicalSnapshot.regime ?? ""] ?? 1.0
+    const adjustedRiskPercent = riskPercent * regimeScale
+
     const pipSize = getPipSize(signal.instrument)
     const riskPipsForSizing = Math.abs(entryPrice - stopLoss) / pipSize
     const positionSize = calculatePositionSize({
       mode: "risk_percent",
-      riskPercent,
+      riskPercent: adjustedRiskPercent,
       accountBalance,
       instrument: signal.instrument,
       riskPips: riskPipsForSizing,
