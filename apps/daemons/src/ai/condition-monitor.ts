@@ -753,6 +753,7 @@ export class ConditionMonitor {
         direction: true,
         entryPrice: true,
         openedAt: true,
+        metadata: true,
       },
     })
 
@@ -768,6 +769,35 @@ export class ConditionMonitor {
       await updateConditionStatus(condition.id, "expired")
       this.conditions.delete(condition.id)
       return
+    }
+
+    // Guard: EdgeFinder (ai_trader) and SmartFlow trades already have their own
+    // management engines (breakeven, trailing, partial, time exit, AI re-eval).
+    // The AI Analysis condition system should NOT prematurely close these trades
+    // with aggressive support/resistance break conditions — post-mortem data
+    // shows 4 of 8 EdgeFinder losses were caused by AI conditions firing on
+    // normal pullbacks within trending markets. We block destructive conditions
+    // here and let the system's own management handle it.
+    const isDestructiveCondition =
+      condition.actionType === "close_trade" || condition.actionType === "cancel_order"
+    if (isDestructiveCondition && trade.metadata) {
+      try {
+        const meta = JSON.parse(trade.metadata)
+        const placedVia = meta?.placedVia ?? ""
+        if (placedVia === "ai_trader" || placedVia === "smart_flow") {
+          console.log(
+            `[condition-monitor] Blocking close_trade condition ${condition.id} on ` +
+              `${placedVia}-managed trade ${condition.tradeId} — ` +
+              `letting the system's own trade manager handle exits`,
+          )
+          const { updateConditionStatus } = await import("@fxflow/db")
+          await updateConditionStatus(condition.id, "expired")
+          this.conditions.delete(condition.id)
+          return
+        }
+      } catch {
+        // Non-JSON metadata — allow condition to execute normally
+      }
     }
 
     // Guard: grace period — prevents premature action execution after trade open

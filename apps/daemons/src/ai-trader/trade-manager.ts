@@ -38,6 +38,8 @@ interface ManagedTrade {
   entryPrice: number
   currentSL: number
   currentTP: number
+  /** Original SL price at fill. Used to cap news-protection tightening. */
+  originalSL: number
   units: number
   breakevenApplied: boolean
   openedAt: number // timestamp ms
@@ -133,6 +135,7 @@ export class TradeManager {
       entryPrice: opp.entryPrice,
       currentSL: opp.stopLoss,
       currentTP: opp.takeProfit,
+      originalSL: opp.stopLoss,
       units: opp.positionSize,
       breakevenApplied: opp.managementLog.some((a) => a.action === "breakeven"),
       openedAt: opp.filledAt ? new Date(opp.filledAt).getTime() : Date.now(),
@@ -288,12 +291,36 @@ export class TradeManager {
   ): Promise<void> {
     if (!mgmt.trailingStopEnabled) return
 
+    // Progressive trailing: tighten the trail distance as profit grows.
+    // At 1R: standard trail distance (trailingStopAtrMultiplier × ATR)
+    // At 2R+: half the trail distance so we lock in more of the move.
+    // This was added after post-mortem analysis showed GBP_USD running
+    // 191 pips MFE but closing at breakeven on the pullback — the
+    // standard trail was too wide to capture the move.
+    const profitPips = computeProfitPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      currentPrice,
+    })
+    const riskPips = computeRiskPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      stopLoss: managed.originalSL,
+    })
+    const currentRR = riskPips > 0 ? profitPips / riskPips : 0
+    const trailMultiplier =
+      currentRR >= 2
+        ? mgmt.trailingStopAtrMultiplier * 0.5 // Tighter at 2R+
+        : mgmt.trailingStopAtrMultiplier
+
     const decision = evaluateTrailing({
       instrument: managed.instrument,
       direction: managed.direction,
       currentPrice,
       currentSL: managed.currentSL,
-      trailDistancePrice: managed.atr * mgmt.trailingStopAtrMultiplier,
+      trailDistancePrice: managed.atr * trailMultiplier,
       // EdgeFinder only trails after breakeven is applied.
       activated: managed.breakevenApplied,
     })
@@ -304,7 +331,7 @@ export class TradeManager {
       "trailing_update",
       decision.newSL,
       managed.currentTP,
-      `Trailing stop updated to ${decision.newSL.toFixed(5)}`,
+      `Trailing stop updated to ${decision.newSL.toFixed(5)}${currentRR >= 2 ? " (tight trail at 2R+)" : ""}`,
       managed.currentSL,
       decision.newSL,
     )
@@ -345,11 +372,21 @@ export class TradeManager {
     }
   }
 
+  /** Epoch ms of last news protection SL tightening, keyed by tradeId. */
+  private lastNewsTightenAt = new Map<string, number>()
+
   private async checkNewsProtection(
     managed: ManagedTrade,
     mgmt: AiTraderManagementConfig,
   ): Promise<void> {
     if (!mgmt.newsProtectionEnabled) return
+
+    // Debounce: at most one tightening per 30 minutes per trade. The previous
+    // bug tightened every 30-second management cycle, firing 12 times in under
+    // 6 minutes and compressing the SL to zero — guaranteed stop-out.
+    const NEWS_TIGHTEN_DEBOUNCE_MS = 30 * 60_000
+    const lastTighten = this.lastNewsTightenAt.get(managed.tradeId) ?? 0
+    if (Date.now() - lastTighten < NEWS_TIGHTEN_DEBOUNCE_MS) return
 
     const bufferMinutes = mgmt.newsProtectionBufferMinutes ?? 30
     const [base, quote] = managed.instrument.split("_") as [string, string]
@@ -358,8 +395,20 @@ export class TradeManager {
       (await this.dataAggregator.hasUpcomingHighImpact(quote, bufferMinutes))
 
     if (hasUpcoming) {
-      // Tighten SL to reduce risk before news
+      // Cap: never tighten more than 50% of the original risk distance.
+      // After that, the trade has been risk-reduced as much as is safe — further
+      // tightening just guarantees a stop-out on the next pullback.
       const pipSize = getPipSize(managed.instrument)
+      const originalRisk = Math.abs(managed.entryPrice - managed.originalSL)
+      const currentRisk = Math.abs(
+        managed.direction === "long"
+          ? managed.currentSL - managed.originalSL
+          : managed.originalSL - managed.currentSL,
+      )
+      if (currentRisk >= originalRisk * 0.5) {
+        // Already tightened 50% of original risk — no further tightening.
+        return
+      }
       const tightenAmount = pipSize * (mgmt.newsProtectionTightenPips ?? 5)
 
       let newSL: number
@@ -380,6 +429,7 @@ export class TradeManager {
         managed.currentSL,
         newSL,
       )
+      this.lastNewsTightenAt.set(managed.tradeId, Date.now())
     }
   }
 

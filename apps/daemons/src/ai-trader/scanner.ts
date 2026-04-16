@@ -1463,7 +1463,11 @@ export class AiTraderScanner {
     }
 
     // ─── Post-Tier-3 Gate: check final confidence + auto-execute ─────
-    const postTier3 = this.executionGate.postTier3Check(config, tier3Result.confidence)
+    const postTier3 = this.executionGate.postTier3Check(
+      config,
+      tier3Result.confidence,
+      signal.technicalSnapshot.regime,
+    )
     if (!postTier3.allowed) {
       this.addLogEntry(
         "gate_blocked",

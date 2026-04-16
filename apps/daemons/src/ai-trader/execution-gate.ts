@@ -87,16 +87,39 @@ export class ExecutionGate {
 
   /**
    * Post-Tier-3 check: should we place the trade?
-   * Uses the final Tier 3 confidence for minimum confidence and auto-execute decisions.
+   * Uses the final Tier 3 confidence for minimum confidence and auto-execute
+   * decisions. Also applies a POST-Tier-3 regime gate: ranging markets require
+   * 75%+ FINAL confidence (not just Tier 1 confidence, which is what the
+   * pre-Tier-3 gate checks). This was added after USD_JPY (9716) — an intraday
+   * short in a ranging market — placed at 62% Tier 3 confidence and lost
+   * immediately (0 MFE, straight to SL in 19 minutes).
    */
   checkFinalConfidence(
     config: AiTraderConfigData,
     confidence: number,
+    regime?: string | null,
   ): GateResult & { autoExecute: boolean } {
     if (confidence < config.minimumConfidence) {
       return {
         allowed: false,
         reason: `Final confidence ${confidence}% below minimum ${config.minimumConfidence}%`,
+        autoExecute: false,
+      }
+    }
+
+    // Post-Tier-3 regime gate: ranging and low-volatility regimes need
+    // higher final confidence because chop makes directional bets unreliable.
+    if (regime === "ranging" && confidence < 75) {
+      return {
+        allowed: false,
+        reason: `Ranging market requires ≥75% final confidence (got ${confidence}%)`,
+        autoExecute: false,
+      }
+    }
+    if (regime === "low_volatility" && confidence < 80) {
+      return {
+        allowed: false,
+        reason: `Low-volatility market requires ≥80% final confidence (got ${confidence}%)`,
         autoExecute: false,
       }
     }
@@ -203,13 +226,14 @@ export class ExecutionGate {
   }
 
   /**
-   * Post-Tier-3 gate: checks final confidence + auto-execute decision.
+   * Post-Tier-3 gate: checks final confidence + regime + auto-execute decision.
    * Call this AFTER Tier 3 with the final confidence score.
    */
   postTier3Check(
     config: AiTraderConfigData,
     finalConfidence: number,
+    regime?: string | null,
   ): GateResult & { autoExecute: boolean } {
-    return this.checkFinalConfidence(config, finalConfidence)
+    return this.checkFinalConfidence(config, finalConfidence, regime)
   }
 }
