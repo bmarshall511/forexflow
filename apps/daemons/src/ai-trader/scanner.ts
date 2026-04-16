@@ -847,8 +847,21 @@ export class AiTraderScanner {
 
       allSignals.sort((a, b) => b.confidence - a.confidence)
 
+      // ─── Technique diversity: cap how many candidates from the same
+      // primaryTechnique can advance to Tier 2. Post-mortem showed 14/15
+      // trades used smc_structure — zero diversity. Cap at 3 per technique
+      // so other techniques get a chance even when SMC scores highest.
+      const MAX_PER_TECHNIQUE = 3
+      const techniqueCounts = new Map<string, number>()
+      const diversified = allSignals.filter((sig) => {
+        const count = techniqueCounts.get(sig.primaryTechnique) ?? 0
+        if (count >= MAX_PER_TECHNIQUE) return false
+        techniqueCounts.set(sig.primaryTechnique, count + 1)
+        return true
+      })
+
       // ─── Correlation guard: limit same-currency same-direction ──
-      const filtered = filterCorrelatedCandidates(allSignals, 2)
+      const filtered = filterCorrelatedCandidates(diversified, 2)
       const topCandidates = filtered.slice(0, 10)
 
       // ─── Analyze candidates with AI ─────────────────────────

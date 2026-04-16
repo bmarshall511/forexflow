@@ -3374,9 +3374,11 @@ export const AI_TRADER_DEFAULT_MANAGEMENT: AiTraderManagementConfig = {
   timeExitEnabled: true,
   timeExitHours: 24,
   // Previous hardcoded values from ai-trader/trade-manager.ts
+  // Post-mortem: intraday losses hit SL in 19-69 minutes. 48h was irrelevant.
+  // Tightened to 16h so stale intraday trades don't sit open indefinitely.
   profileTimeLimits: {
     scalper: 8,
-    intraday: 48,
+    intraday: 16,
     swing: 168,
     news: 4,
   },

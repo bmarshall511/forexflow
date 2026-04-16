@@ -27,6 +27,26 @@ import type { PerformanceTracker } from "./performance-tracker.js"
 import type { CostTracker } from "./cost-tracker.js"
 import { AiReEvaluator } from "./re-evaluator.js"
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Extract the managementPlan string from a stored Tier 3 JSON response. */
+function extractManagementPlan(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  try {
+    const cleaned = raw
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim()
+    const start = cleaned.indexOf("{")
+    const end = cleaned.lastIndexOf("}")
+    if (start < 0 || end < 0) return null
+    const parsed = JSON.parse(cleaned.slice(start, end + 1)) as { managementPlan?: string }
+    return parsed.managementPlan ?? null
+  } catch {
+    return null
+  }
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ManagedTrade {
@@ -42,11 +62,15 @@ interface ManagedTrade {
   originalSL: number
   units: number
   breakevenApplied: boolean
+  partialCloseApplied: boolean
   openedAt: number // timestamp ms
   atr: number // real ATR from Tier 1 analysis
   profile: AiTraderProfile
   /** Epoch ms of last AI re-evaluation call for this trade, 0 if never. */
   lastReEvalAt: number
+  /** Tier 3's management plan text. Stored for context in AI re-evaluation
+   *  prompts and for the re-evaluator to reference the original thesis. */
+  managementPlan: string | null
 }
 
 // ─── Trade Manager ───────────────────────────────────────────────────────────
@@ -84,19 +108,39 @@ export class TradeManager {
       }
     }
 
-    // Check management conditions every 30 seconds
-    this.checkTimer = setInterval(() => {
-      void this.runManagementCycle()
-    }, 30_000)
+    // Management cycle interval adapts to the fastest active profile:
+    // scalper/news (10s) need faster checks than swing (30s). We use the
+    // fastest profile among managed trades, re-evaluated every cycle.
+    this.scheduleNextCycle()
 
     console.log(`[ai-trader] Trade manager started with ${this.managedTrades.size} active trades`)
   }
 
   stop(): void {
     if (this.checkTimer) {
-      clearInterval(this.checkTimer)
+      clearTimeout(this.checkTimer)
       this.checkTimer = null
     }
+  }
+
+  private static readonly PROFILE_CYCLE_MS: Record<string, number> = {
+    scalper: 10_000,
+    news: 10_000,
+    intraday: 15_000,
+    swing: 30_000,
+  }
+
+  private scheduleNextCycle(): void {
+    // Pick the fastest interval among currently managed trade profiles.
+    // Falls back to 30s if no trades are managed (idle).
+    let fastest = 30_000
+    for (const managed of this.managedTrades.values()) {
+      const interval = TradeManager.PROFILE_CYCLE_MS[managed.profile] ?? 30_000
+      if (interval < fastest) fastest = interval
+    }
+    this.checkTimer = setTimeout(() => {
+      void this.runManagementCycle().finally(() => this.scheduleNextCycle())
+    }, fastest)
   }
 
   /**
@@ -138,10 +182,14 @@ export class TradeManager {
       originalSL: opp.stopLoss,
       units: opp.positionSize,
       breakevenApplied: opp.managementLog.some((a) => a.action === "breakeven"),
+      partialCloseApplied: opp.managementLog.some((a) => a.action === "partial_close"),
       openedAt: opp.filledAt ? new Date(opp.filledAt).getTime() : Date.now(),
       atr,
       profile: opp.profile,
       lastReEvalAt: 0,
+      // Extract Tier 3's management plan from the stored tier3Response so the
+      // re-evaluator can reference it. Graceful if parsing fails.
+      managementPlan: extractManagementPlan(opp.tier3Response),
     })
   }
 
@@ -229,6 +277,7 @@ export class TradeManager {
         const mgmt = config.managementConfig as AiTraderManagementConfig
 
         await this.checkBreakeven(managed, currentPrice, mgmt)
+        await this.checkPartialClose(managed, currentPrice, mgmt)
         await this.checkTrailingStop(managed, currentPrice, mgmt)
         await this.checkTimeExit(managed, mgmt)
         await this.checkNewsProtection(managed, mgmt)
@@ -259,6 +308,13 @@ export class TradeManager {
       currentPrice,
     })
 
+    // ATR-proportional breakeven buffer: 10% of ATR in pips, minimum 2 pips.
+    // Post-mortem showed the fixed 2-pip buffer was too tight for swing trades
+    // with 50-100 pip SL — any normal spread fluctuation stops out at BE.
+    const pipSize = getPipSize(managed.instrument)
+    const atrPips = managed.atr / pipSize
+    const bufferPips = Math.max(mgmt.breakevenBufferPips ?? 2, Math.round(atrPips * 0.1))
+
     const decision = evaluateBreakeven({
       instrument: managed.instrument,
       direction: managed.direction,
@@ -266,7 +322,7 @@ export class TradeManager {
       currentSL: managed.currentSL,
       profitPips,
       thresholdPips: riskPips * mgmt.breakevenTriggerRR,
-      bufferPips: 2,
+      bufferPips,
       alreadyApplied: managed.breakevenApplied,
     })
 
@@ -282,6 +338,67 @@ export class TradeManager {
       decision.newSL,
     )
     managed.breakevenApplied = true
+  }
+
+  /**
+   * Close a fraction of the position at a configurable R:R target.
+   * This was identified as dead config in the post-mortem — enabled in
+   * AiTraderManagementConfig but never implemented, so zero trades ever
+   * had a partial close. Now it fires at `partialCloseTargetRR` (default
+   * 1.5) and closes `partialClosePercent` (default 50%) of the position.
+   */
+  private async checkPartialClose(
+    managed: ManagedTrade,
+    currentPrice: number,
+    mgmt: AiTraderManagementConfig,
+  ): Promise<void> {
+    if (!mgmt.partialCloseEnabled || managed.partialCloseApplied) return
+    // Only partial-close after breakeven is set (we need risk locked in first)
+    if (!managed.breakevenApplied) return
+
+    const riskPips = computeRiskPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      stopLoss: managed.originalSL,
+    })
+    const profitPips = computeProfitPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      currentPrice,
+    })
+    const currentRR = riskPips > 0 ? profitPips / riskPips : 0
+    if (currentRR < mgmt.partialCloseTargetRR) return
+
+    // Close the configured percentage of the position
+    const closeUnits = Math.max(1, Math.floor(managed.units * (mgmt.partialClosePercent / 100)))
+    try {
+      await this.tradeSyncer.closeTrade(
+        managed.sourceTradeId,
+        closeUnits,
+        `EdgeFinder partial close: ${mgmt.partialClosePercent}% at ${currentRR.toFixed(1)}R`,
+        {
+          closedBy: "ai_trader",
+          closedByLabel: "EdgeFinder",
+          closedByDetail: `Partial close ${mgmt.partialClosePercent}% at ${currentRR.toFixed(1)}R (${profitPips.toFixed(1)} pips profit)`,
+        },
+      )
+      managed.partialCloseApplied = true
+      managed.units -= closeUnits
+      await this.logAction(
+        managed,
+        "partial_close",
+        `Closed ${closeUnits} units (${mgmt.partialClosePercent}%) at ${currentRR.toFixed(1)}R — ${profitPips.toFixed(1)} pips profit`,
+        undefined,
+        closeUnits,
+      )
+    } catch (err) {
+      console.warn(
+        `[ai-trader] Partial close failed for ${managed.instrument}:`,
+        (err as Error).message,
+      )
+    }
   }
 
   private async checkTrailingStop(
@@ -488,6 +605,24 @@ export class TradeManager {
     previousValue?: number,
     newValue?: number,
   ): Promise<void> {
+    // Spread guard: if the proposed SL is inside the current bid/ask spread,
+    // the OANDA API will reject it. Check before calling to avoid error spam
+    // during high-spread periods (news, rollover, low liquidity).
+    const livePrice = this.priceMap[managed.instrument]
+    if (livePrice != null && newSL > 0) {
+      const pipSize = getPipSize(managed.instrument)
+      const distanceFromPrice = Math.abs(livePrice - newSL)
+      // Reject if new SL is within 1.5 pips of current price (approximate
+      // spread buffer; OANDA minimum distance is ~1 pip on majors).
+      if (distanceFromPrice < pipSize * 1.5) {
+        console.warn(
+          `[ai-trader] Skipping ${action} on ${managed.instrument}: ` +
+            `proposed SL ${newSL.toFixed(5)} is within spread of price ${livePrice.toFixed(5)}`,
+        )
+        return
+      }
+    }
+
     try {
       await this.tradeSyncer.modifyTradeSLTP(managed.sourceTradeId, newSL, newTP)
       managed.currentSL = newSL

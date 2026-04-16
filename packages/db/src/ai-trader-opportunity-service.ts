@@ -505,26 +505,68 @@ export async function reconcileStaleOpportunities(
 ): Promise<number> {
   const active = await db.aiTraderOpportunity.findMany({
     where: { status: { in: ["placed", "filled", "managed"] } },
-    select: { id: true, resultTradeId: true },
+    select: { id: true, resultTradeId: true, status: true },
   })
 
   const staleIds: string[] = []
+  const reasons: Map<string, string> = new Map()
   for (const opp of active) {
-    // No trade ID = order never filled / was cancelled
-    // Trade ID not in open set = trade was closed without callback
-    if (!opp.resultTradeId || !openTradeSourceIds.has(opp.resultTradeId)) {
+    if (!opp.resultTradeId) {
       staleIds.push(opp.id)
+      reasons.set(opp.id, `No OANDA trade ID (order never filled, status was ${opp.status})`)
+    } else if (!openTradeSourceIds.has(opp.resultTradeId)) {
+      staleIds.push(opp.id)
+      reasons.set(
+        opp.id,
+        `Trade ${opp.resultTradeId} disappeared from OANDA (closed without callback, status was ${opp.status})`,
+      )
     }
   }
 
   if (staleIds.length === 0) return 0
 
-  const result = await db.aiTraderOpportunity.updateMany({
-    where: { id: { in: staleIds } },
-    data: { status: "expired", outcome: "cancelled", updatedAt: new Date() },
-  })
+  // Persist the cancellation reason in the management log so post-mortem
+  // analysis can see WHY 13/15 opportunities ended up as "cancelled" —
+  // previously this was silent and made it impossible to diagnose.
+  for (const id of staleIds) {
+    const reason = reasons.get(id) ?? "Unknown"
+    try {
+      const row = await db.aiTraderOpportunity.findUnique({
+        where: { id },
+        select: { managementLog: true },
+      })
+      const log = safeJsonParse<AiTraderManagementAction[]>(row?.managementLog ?? "[]", [])
+      log.push({
+        action: "close",
+        detail: `Reconciled as cancelled: ${reason}`,
+        timestamp: new Date().toISOString(),
+      })
+      await db.aiTraderOpportunity.update({
+        where: { id },
+        data: {
+          status: "expired",
+          outcome: "cancelled",
+          managementLog: JSON.stringify(log),
+          entryRationale:
+            (
+              await db.aiTraderOpportunity.findUnique({
+                where: { id },
+                select: { entryRationale: true },
+              })
+            )?.entryRationale ?? reason,
+          updatedAt: new Date(),
+        },
+      })
+    } catch {
+      // Fallback: bulk update without reason log (same as before)
+      await db.aiTraderOpportunity.update({
+        where: { id },
+        data: { status: "expired", outcome: "cancelled", updatedAt: new Date() },
+      })
+    }
+  }
 
-  return result.count
+  return staleIds.length
 }
 
 /**
