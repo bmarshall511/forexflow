@@ -280,6 +280,7 @@ export class TradeManager {
         await this.checkPartialClose(managed, currentPrice, mgmt)
         await this.checkTrailingStop(managed, currentPrice, mgmt)
         await this.checkSessionClose(managed)
+        await this.checkCorrelationTP(managed, currentPrice)
         await this.checkTimeExit(managed, mgmt)
         await this.checkNewsProtection(managed, mgmt)
         await this.checkAiReEvaluation(managed, currentPrice, mgmt)
@@ -455,6 +456,83 @@ export class TradeManager {
       managed.currentSL,
       decision.newSL,
     )
+  }
+
+  /**
+   * When 2+ correlated pairs are open (e.g. EUR_USD + GBP_USD both long), and
+   * the leading trade hits 2R+ while the lagging trade is still < 1R, tighten
+   * the lagging trade's TP to the leading trade's current R:R. This captures
+   * partial moves on secondary correlated positions instead of waiting for
+   * their original TP which may never hit.
+   */
+  private async checkCorrelationTP(managed: ManagedTrade, currentPrice: number): Promise<void> {
+    // Only check if this trade is still early (< 1R)
+    const riskPips = computeRiskPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      stopLoss: managed.originalSL,
+    })
+    const profitPips = computeProfitPips({
+      instrument: managed.instrument,
+      direction: managed.direction,
+      entryPrice: managed.entryPrice,
+      currentPrice,
+    })
+    const myRR = riskPips > 0 ? profitPips / riskPips : 0
+    if (myRR >= 1) return // Already doing well, don't tighten
+
+    // Check if any other managed trade sharing a currency is at 2R+
+    const [myBase, myQuote] = managed.instrument.split("_")
+    for (const [otherId, other] of this.managedTrades) {
+      if (otherId === managed.tradeId) continue
+      const [oBase, oQuote] = other.instrument.split("_")
+      const sharesBase = oBase === myBase || oBase === myQuote
+      const sharesQuote = oQuote === myBase || oQuote === myQuote
+      if (!sharesBase && !sharesQuote) continue
+
+      // Check the other trade's R:R
+      const otherPrice = this.priceMap[other.instrument]
+      if (!otherPrice) continue
+      const otherRisk = computeRiskPips({
+        instrument: other.instrument,
+        direction: other.direction,
+        entryPrice: other.entryPrice,
+        stopLoss: other.originalSL,
+      })
+      const otherProfit = computeProfitPips({
+        instrument: other.instrument,
+        direction: other.direction,
+        entryPrice: other.entryPrice,
+        currentPrice: otherPrice,
+      })
+      const otherRR = otherRisk > 0 ? otherProfit / otherRisk : 0
+      if (otherRR < 2) continue
+
+      // Leading correlated trade is at 2R+ but this trade is lagging.
+      // Tighten this trade's TP to current price + 1R (lock in at least 1R
+      // if the correlated move continues, but don't wait for full original TP).
+      const pipSize = getPipSize(managed.instrument)
+      const newTP =
+        managed.direction === "long"
+          ? currentPrice + riskPips * pipSize
+          : currentPrice - riskPips * pipSize
+
+      // Only tighten, never widen
+      if (managed.direction === "long" && newTP >= managed.currentTP) continue
+      if (managed.direction === "short" && newTP <= managed.currentTP) continue
+
+      await this.modifyTradeAndLog(
+        managed,
+        "adjust_tp",
+        managed.currentSL,
+        newTP,
+        `Correlated ${other.instrument} at ${otherRR.toFixed(1)}R — tightened TP to capture move`,
+        managed.currentTP,
+        newTP,
+      )
+      break // Only adjust once per cycle
+    }
   }
 
   /**

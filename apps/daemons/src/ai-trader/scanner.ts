@@ -389,8 +389,21 @@ export class AiTraderScanner {
     const balance = overview?.summary.balance ?? 0
     if (balance > 0) this.circuitBreaker.setStartingBalance(balance)
 
+    // Confidence-weighted outcome: high-confidence losses are more alarming
+    // than marginal-confidence losses (the thesis was strong but the market
+    // invalidated it — something is off). Weight losses by inverse-confidence
+    // so the circuit breaker trips sooner on high-conviction failures.
+    // A 90% confidence loss counts as $PL × 1.5; a 60% loss counts as $PL × 1.0.
+    let weightedPL = realizedPL
+    if (realizedPL < 0) {
+      const opp = await findOpportunityByResultTradeId(tradeId)
+      const conf = opp?.confidence ?? 60
+      const weight = conf >= 80 ? 1.5 : conf >= 70 ? 1.2 : 1.0
+      weightedPL = realizedPL * weight
+    }
+
     const before = this.circuitBreaker.getState()
-    this.circuitBreaker.recordOutcome(realizedPL)
+    this.circuitBreaker.recordOutcome(weightedPL)
     const after = this.circuitBreaker.getState()
 
     // Narrate state transitions into the scan log. Only log when a new pause
@@ -1004,6 +1017,7 @@ export class AiTraderScanner {
     "tier2_fail" | "tier2_pass" | "tier3_fail" | "tier3_pass" | "gate_blocked" | "placed"
   > {
     const pairLabel = signal.instrument.replace("_", "/")
+    const pipelineStartMs = Date.now()
     const tier2Prompt = buildTier2Prompt(signal)
 
     const apiKey = await getDecryptedClaudeKey()
@@ -1494,6 +1508,7 @@ export class AiTraderScanner {
       config,
       tier3Result.confidence,
       signal.technicalSnapshot.regime,
+      this.circuitBreaker.getState().dailyDrawdownPercent,
     )
     if (!postTier3.allowed) {
       this.addLogEntry(
@@ -1563,6 +1578,17 @@ export class AiTraderScanner {
       "EdgeFinder Opportunity",
       `${pairLabel} ${signal.direction.toUpperCase()} — Confidence: ${tier3Result.confidence}%`,
     )
+
+    // Log end-to-end pipeline latency for diagnostics. If spread widened or
+    // price moved during the 20-60s it takes for Tier 2 → Tier 3 → placement,
+    // this latency figure helps diagnose slippage.
+    const pipelineMs = Date.now() - pipelineStartMs
+    if (pipelineMs > 10_000) {
+      this.addLogEntry(
+        "tier3_pass",
+        `${pairLabel}: pipeline latency ${(pipelineMs / 1000).toFixed(1)}s (T2→T3→decision)`,
+      )
+    }
 
     if (postTier3.autoExecute) {
       await this.executeOpportunity(updatedOpp)

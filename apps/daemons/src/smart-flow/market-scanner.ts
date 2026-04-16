@@ -500,6 +500,31 @@ export class SmartFlowMarketScanner {
           continue
         }
 
+        // Directional bias check: if we're about to place, check how many
+        // queued/active configs share the same USD side. 3+ in the same
+        // direction = portfolio-level risk. Skip this candidate.
+        {
+          const [sigBase, sigQuote] = signal.instrument.split("_")
+          let sameSideCount = 0
+          for (const pos of openPositions) {
+            const [pBase, pQuote] = pos.instrument.split("_")
+            const sameDirection =
+              (pBase === sigBase && pos.direction === signal.direction) ||
+              (pQuote === sigQuote && pos.direction === signal.direction) ||
+              (pBase === sigQuote && pos.direction !== signal.direction) ||
+              (pQuote === sigBase && pos.direction !== signal.direction)
+            if (sameDirection) sameSideCount++
+          }
+          if (sameSideCount >= 3) {
+            emitActivity(
+              "opportunity_filtered",
+              `${signal.instrument.replace("_", "/")} skipped: ${sameSideCount} same-direction positions already open (portfolio bias limit)`,
+              { instrument: signal.instrument, severity: "warning" },
+            )
+            continue
+          }
+        }
+
         // Auto-place: create SmartFlowConfig and trigger placement
         try {
           const preset = this.selectPreset(settings, regime)

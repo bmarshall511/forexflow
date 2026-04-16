@@ -149,6 +149,20 @@ export function analyzeTrendFollowing(
   const inPullback = isBullish ? price <= ema20 && price >= ema50 : price >= ema20 && price <= ema50
   if (!inPullback) return null
 
+  // Pullback confirmation: verify the pullback is ENDING (bouncing), not
+  // continuing deeper. Check that the last 3 candles show a reversal toward
+  // the trend direction. Without this, entries at the TOP of a pullback
+  // (still moving against trend) get stopped out when the pullback deepens.
+  if (primaryCandles.length >= 3) {
+    const recent3 = primaryCandles.slice(-3)
+    const closesRising = recent3.every((c, i) => (i === 0 ? true : c.close > recent3[i - 1]!.close))
+    const closesFalling = recent3.every((c, i) =>
+      i === 0 ? true : c.close < recent3[i - 1]!.close,
+    )
+    const bouncing = isBullish ? closesRising : closesFalling
+    if (!bouncing) return null // Pullback still deepening — wait
+  }
+
   // RSI in pullback range (40-60)
   const rsi = computeRSI(pv)
   if (rsi === null || rsi < 40 || rsi > 60) return null
@@ -232,6 +246,15 @@ export function analyzeMeanReversion(
   const atBBExtreme = isOversold ? price <= bb.lower : price >= bb.upper
   if (!atBBExtreme) return null
 
+  // Bollinger bandwidth scoring: narrow bands (squeeze) give better mean-
+  // reversion R:R because the range is tight. Already-wide bands (exhausted
+  // expansion) signal the mean-reversion move may be over — score lower.
+  const atrPreBB = computeATR(primaryCandles, 14)
+  const atrVal = atrPreBB[atrPreBB.length - 1] ?? 1
+  const bbWidthRatio = bb.bandwidth / Math.max(atrVal, 0.0001)
+  // < 1.0 = squeeze (narrow), 1.0-2.0 = normal, > 2.0 = wide (exhausted)
+  const bbBandwidthScore = bbWidthRatio < 1.0 ? 15 : bbWidthRatio < 2.0 ? 8 : 3
+
   // Divergence check
   const divergences = detectRSIDivergence(pv)
   const hasDivergence = divergences.length > 0
@@ -265,7 +288,11 @@ export function analyzeMeanReversion(
   const rsiDepth = isOversold ? (30 - rsi) / 30 : (rsi - 70) / 30
 
   const scores = makeScores({
-    confluence: clamp(Math.round((hasDivergence ? 15 : 5) + (nearZone ? 10 : 0) + 5), 0, 30),
+    confluence: clamp(
+      Math.round((hasDivergence ? 15 : 5) + (nearZone ? 10 : 0) + bbBandwidthScore),
+      0,
+      30,
+    ),
     trendAlignment: 5,
     zoneQuality: nearZone ? 15 : 0,
     sessionQuality: isKillZone() ? 10 : 4,

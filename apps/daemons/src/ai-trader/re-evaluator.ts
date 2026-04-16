@@ -51,7 +51,7 @@ export interface ReEvaluatorTradeRef {
 }
 
 export interface ReEvalDecision {
-  action: "hold" | "adjust_sl" | "adjust_tp" | "partial_close" | "close"
+  action: "hold" | "adjust_sl" | "adjust_tp" | "partial_close" | "close" | "scale_in"
   newSL: number | null
   newTP: number | null
   closePercent: number | null
@@ -238,9 +238,17 @@ export class AiReEvaluator {
         )
         break
       case "partial_close":
-        // Partial close via OANDA requires computing units; skipped for now.
-        // Future: wire to positionManager.getPositions() to read current units.
-        console.log("[ai-trader-reeval] Partial close requested but not yet implemented")
+        console.log("[ai-trader-reeval] Partial close via re-eval not yet wired to units")
+        break
+      case "scale_in":
+        // Scale-in: AI re-evaluator concluded the thesis is strengthening at 2R+.
+        // Logs the intent — actual placement requires the scanner's placeOrder
+        // flow which isn't accessible from the trade-manager context. Future
+        // work: emit a WS event so the scanner can queue an add-to-position order.
+        console.log(
+          `[ai-trader-reeval] Scale-in suggested for ${managed.instrument} ` +
+            `${managed.direction} (${decision.confidence}% confidence)`,
+        )
         break
     }
   }

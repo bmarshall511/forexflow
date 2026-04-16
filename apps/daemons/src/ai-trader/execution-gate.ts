@@ -98,11 +98,23 @@ export class ExecutionGate {
     config: AiTraderConfigData,
     confidence: number,
     regime?: string | null,
+    dailyDrawdownPercent?: number,
   ): GateResult & { autoExecute: boolean } {
     if (confidence < config.minimumConfidence) {
       return {
         allowed: false,
         reason: `Final confidence ${confidence}% below minimum ${config.minimumConfidence}%`,
+        autoExecute: false,
+      }
+    }
+
+    // Account drawdown gate: when already down 1.5%+ today, only allow
+    // high-conviction trades (75%+). Prevents chasing losses with marginal
+    // setups on a bad day.
+    if (dailyDrawdownPercent != null && dailyDrawdownPercent >= 1.5 && confidence < 75) {
+      return {
+        allowed: false,
+        reason: `Daily drawdown ${dailyDrawdownPercent.toFixed(1)}% — requiring ≥75% confidence (got ${confidence}%)`,
         autoExecute: false,
       }
     }
@@ -234,7 +246,8 @@ export class ExecutionGate {
     config: AiTraderConfigData,
     finalConfidence: number,
     regime?: string | null,
+    dailyDrawdownPercent?: number,
   ): GateResult & { autoExecute: boolean } {
-    return this.checkFinalConfidence(config, finalConfidence, regime)
+    return this.checkFinalConfidence(config, finalConfidence, regime, dailyDrawdownPercent)
   }
 }
