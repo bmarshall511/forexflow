@@ -28,6 +28,7 @@ import {
 } from "@fxflow/db"
 import type { StateManager } from "../state-manager.js"
 import type { PositionManager } from "../positions/position-manager.js"
+import type { PositionPriceTracker } from "../positions/position-price-tracker.js"
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
 import type { TVAlertsState } from "./alerts-state.js"
@@ -51,6 +52,12 @@ export class SignalProcessor {
   private cleanupTimer: ReturnType<typeof setInterval> | null = null
   private syncTimer: ReturnType<typeof setInterval> | null = null
   private selfHealTimer: ReturnType<typeof setInterval> | null = null
+  private priceTracker: PositionPriceTracker | null = null
+
+  /** Late-bind the price tracker (wired after construction in index.ts). */
+  setPriceTracker(tracker: PositionPriceTracker): void {
+    this.priceTracker = tracker
+  }
 
   constructor(
     private stateManager: StateManager,
@@ -478,7 +485,11 @@ export class SignalProcessor {
 
     for (const tradeId of existingTradeIds) {
       try {
-        await this.tradeSyncer.closeTrade(tradeId, undefined, "REVERSAL")
+        await this.tradeSyncer.closeTrade(tradeId, undefined, "REVERSAL", {
+          closedBy: "tv_alert_reversal",
+          closedByLabel: "TradingView Reversal",
+          closedByDetail: "Opposite-direction alert received — protective close",
+        })
         this.alertsState.removeAutoTradeId(tradeId)
         closedIds.push(tradeId)
       } catch (err) {
@@ -602,7 +613,11 @@ export class SignalProcessor {
     const closedIds: string[] = []
     for (const tradeId of existingTradeIds) {
       try {
-        await this.tradeSyncer.closeTrade(tradeId, undefined, "REVERSAL")
+        await this.tradeSyncer.closeTrade(tradeId, undefined, "REVERSAL", {
+          closedBy: "tv_alert_reversal",
+          closedByLabel: "TradingView Reversal",
+          closedByDetail: "Reversal signal — closing existing position",
+        })
         this.alertsState.removeAutoTradeId(tradeId)
         closedIds.push(tradeId)
       } catch (err) {
@@ -942,14 +957,15 @@ export class SignalProcessor {
    *   2. ATR(14) × fallbackAtrMultiplier fallback (fetched from OANDA H1 candles)
    *   3. Returns 0 if no SL can be determined (trade will be skipped)
    *
-   * @returns { units, slDistance, slSource } — units may be 0 if sizing fails
+   * @returns { units, slDistance, slSource, atr } — units may be 0 if sizing fails.
+   *   `atr` is the raw ATR value (before multiplier) for SL/TP calculation.
    */
   private async calculateRiskBasedUnits(
     config: TVAlertsConfig,
     instrument: string,
     direction: "buy" | "sell",
     confluenceATR: number | null,
-  ): Promise<{ units: number; slDistance: number; slSource: string }> {
+  ): Promise<{ units: number; slDistance: number; slSource: string; atr: number }> {
     const overview = this.stateManager.getAccountOverview()
     if (!overview) return { units: 0, slDistance: 0, slSource: "no_account" }
 
@@ -976,13 +992,23 @@ export class SignalProcessor {
 
     if (slDistance <= 0) return { units: 0, slDistance: 0, slSource: "no_atr_data" }
 
-    // Risk-based formula (matches AI Trader pattern)
+    // Risk-based formula (matches AI Trader / Trade Finder pattern)
     const pipSize = getPipSize(instrument)
     const riskAmount = balance * (config.riskPercent / 100)
     const [, quoteCcy] = instrument.split("_")
     const isUsdQuote = quoteCcy === "USD"
-    const estimatedEntry = this.getEstimatedEntry(instrument, direction) ?? 1
-    const pipValuePerUnit = isUsdQuote ? pipSize : pipSize / Math.max(estimatedEntry, 0.0001)
+
+    // For non-USD-quoted pairs, we MUST have a live price for accurate pip value.
+    // Without it, pip value calculation can be off by 100x+ (e.g. USD/JPY at 159 vs default 1).
+    const estimatedEntry = this.getEstimatedEntry(instrument, direction)
+    if (!isUsdQuote && !estimatedEntry) {
+      console.warn(
+        `[tv-alerts] No live price available for ${instrument} — cannot calculate accurate position size`,
+      )
+      return { units: 0, slDistance, slSource: `${slSource}_no_price` }
+    }
+
+    const pipValuePerUnit = isUsdQuote ? pipSize : pipSize / Math.max(estimatedEntry ?? 1, 0.0001)
     const riskPips = slDistance / pipSize
 
     if (riskPips <= 0 || pipValuePerUnit <= 0) {
@@ -1019,17 +1045,20 @@ export class SignalProcessor {
   }
 
   /**
-   * Get an estimated entry price for SL/TP pre-calculation.
-   * Uses the current bid/ask from position price tracker or account pricing.
+   * Get an estimated entry price for SL/TP pre-calculation and pip value conversion.
+   * Priority: live bid/ask from PositionPriceTracker → existing position price → null.
    */
-  private getEstimatedEntry(instrument: string, _direction: "buy" | "sell"): number | null {
-    // Try to get current price from position tracking or account overview
-    const overview = this.stateManager.getAccountOverview()
-    if (!overview) return null
+  private getEstimatedEntry(instrument: string, direction: "buy" | "sell"): number | null {
+    // 1. Best source: live price from the position price tracker
+    if (this.priceTracker) {
+      const tick = this.priceTracker.getLatestPrice(instrument)
+      if (tick) {
+        // Buy orders fill at ask, sell orders fill at bid
+        return direction === "buy" ? tick.ask : tick.bid
+      }
+    }
 
-    // Fall back to most recent candle close (approximate)
-    // The SL/TP will be recalculated by OANDA based on actual fill price,
-    // but this gives us a close-enough value for pre-trade SL/TP placement
+    // 2. Fallback: existing open position on this instrument
     const positions = this.positionManager.getPositions()
     const existing = positions.open.find((t) => t.instrument === instrument)
     if (existing?.currentPrice) return existing.currentPrice
