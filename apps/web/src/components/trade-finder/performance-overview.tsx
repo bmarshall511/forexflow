@@ -64,7 +64,7 @@ function DimensionTable({ title, data }: { title: string; data: TradeFinderPerfo
               const winRate = total > 0 ? (row.wins / total) * 100 : 0
               return (
                 <tr
-                  key={row.dimensionKey ?? "all"}
+                  key={`${row.dimensionKey ?? "all"}-${row.periodStart}`}
                   className="border-b border-dashed last:border-0"
                 >
                   <td className="py-1.5 pr-3 font-mono">
