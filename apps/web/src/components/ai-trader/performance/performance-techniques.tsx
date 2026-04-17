@@ -25,12 +25,52 @@ const TECHNIQUE_LABELS: Record<string, string> = {
   trend_detection: "Trend Detection",
 }
 
+interface AggregatedTechnique {
+  technique: string
+  totalTrades: number
+  wins: number
+  winRate: number
+  totalPL: number
+  profitFactor: number
+}
+
 export function PerformanceTechniques({ stats }: Props) {
-  const techniques = useMemo(() => {
-    return stats
-      .filter((s) => s.technique != null)
+  const techniques = useMemo<AggregatedTechnique[]>(() => {
+    // Aggregate by technique to avoid duplicate keys when multiple
+    // profile/instrument rows share the same technique value
+    const byTechnique = new Map<
+      string,
+      { trades: number; wins: number; totalPL: number; grossProfit: number; grossLoss: number }
+    >()
+    for (const s of stats) {
+      if (s.technique == null) continue
+      const key = s.technique
+      const agg = byTechnique.get(key) ?? {
+        trades: 0,
+        wins: 0,
+        totalPL: 0,
+        grossProfit: 0,
+        grossLoss: 0,
+      }
+      agg.trades += s.totalTrades
+      agg.wins += s.wins
+      agg.totalPL += s.totalPL
+      if (s.totalPL > 0) agg.grossProfit += s.totalPL
+      else agg.grossLoss += Math.abs(s.totalPL)
+      byTechnique.set(key, agg)
+    }
+
+    return Array.from(byTechnique.entries())
+      .map(([technique, agg]) => ({
+        technique,
+        totalTrades: agg.trades,
+        wins: agg.wins,
+        winRate: agg.trades > 0 ? agg.wins / agg.trades : 0,
+        totalPL: agg.totalPL,
+        profitFactor:
+          agg.grossLoss > 0 ? agg.grossProfit / agg.grossLoss : agg.grossProfit > 0 ? 99 : 0,
+      }))
       .sort((a, b) => {
-        // Sort by win rate desc, then profit factor desc
         if (b.winRate !== a.winRate) return b.winRate - a.winRate
         return b.profitFactor - a.profitFactor
       })
@@ -51,7 +91,7 @@ export function PerformanceTechniques({ stats }: Props) {
       </h3>
       <div className="space-y-2">
         {techniques.map((t, i) => {
-          const label = TECHNIQUE_LABELS[t.technique!] ?? t.technique!
+          const label = TECHNIQUE_LABELS[t.technique] ?? t.technique.replace(/_/g, " ")
           const winPct = Math.round(t.winRate * 100)
           const barWidth = (t.totalTrades / maxTrades) * 100
           return (
