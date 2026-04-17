@@ -1044,76 +1044,89 @@ export class SignalProcessor {
       placedVia: "ut_bot_alerts",
     }
 
-    try {
-      const result = await this.tradeSyncer.placeOrder(orderRequest)
-      if (result.sourceId) {
-        this.alertsState.addAutoTradeId(result.sourceId)
-        // Start post-entry management — use fillPrice, fallback to estimated entry
-        const mgmtEntry =
-          result.fillPrice ?? this.getEstimatedEntry(instrument, direction as "buy" | "sell") ?? 0
-        if (mgmtEntry > 0) {
-          this.tradeManager?.onOrderFilled(
-            result.sourceId,
-            instrument,
-            oandaDirection as "long" | "short",
-            mgmtEntry,
-            units,
-            stopLoss,
-            takeProfit,
-            sizing.atr,
-          )
+    // Place order with retry (1 retry for new entries; reversals get 3 retries)
+    let lastErr: Error | null = null
+    const maxAttempts = 2
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const result = await this.tradeSyncer.placeOrder(orderRequest)
+        if (result.sourceId) {
+          this.alertsState.addAutoTradeId(result.sourceId)
+          const mgmtEntry =
+            result.fillPrice ?? this.getEstimatedEntry(instrument, direction as "buy" | "sell") ?? 0
+          if (mgmtEntry > 0) {
+            this.tradeManager?.onOrderFilled(
+              result.sourceId,
+              instrument,
+              oandaDirection as "long" | "short",
+              mgmtEntry,
+              units,
+              stopLoss,
+              takeProfit,
+              sizing.atr,
+            )
+          }
+        }
+
+        const executionDetails: TVExecutionDetails = {
+          isReversal: false,
+          closedTradeId: null,
+          openedTradeId: result.sourceId ?? null,
+          units,
+          fillPrice: result.fillPrice ?? null,
+          retryAttempt: attempt,
+          confluenceScore: confluenceResult?.score,
+          confluenceBreakdown: confluenceResult?.breakdown,
+          stopLossPrice: stopLoss ?? undefined,
+          takeProfitPrice: takeProfit ?? undefined,
+          sizeMultiplier: sizeMultiplier !== 1.0 ? sizeMultiplier : undefined,
+        }
+
+        await updateSignalStatus(signalId, "executed", {
+          resultTradeId: result.sourceId ?? null,
+          executionDetails,
+          processedAt: new Date(),
+        })
+
+        this.broadcastSignalUpdate(signalId)
+        await logAuditEvent(signalId, "executed", {
+          type: "new_entry",
+          openedTradeId: result.sourceId ?? null,
+          fillPrice: result.fillPrice ?? null,
+          units,
+          stopLoss,
+          takeProfit,
+          sizeMultiplier,
+          retryAttempt: attempt,
+          confluenceScore: confluenceResult?.score ?? null,
+          duration_ms: Date.now() - t0,
+        })
+        await this.emitNotification(
+          "Signal Executed",
+          `${instrument.replace("_", "/")} ${direction.toUpperCase()} — ${units} units @ ${result.fillPrice ?? "market"}${confluenceResult ? ` (score: ${confluenceResult.score.toFixed(1)})` : ""}`,
+        )
+        return
+      } catch (err) {
+        lastErr = err as Error
+        if (attempt < maxAttempts - 1) {
+          await sleep(RETRY_DELAYS[attempt]!)
         }
       }
-
-      const executionDetails: TVExecutionDetails = {
-        isReversal: false,
-        closedTradeId: null,
-        openedTradeId: result.sourceId ?? null,
-        units,
-        fillPrice: result.fillPrice ?? null,
-        retryAttempt: 0,
-        confluenceScore: confluenceResult?.score,
-        confluenceBreakdown: confluenceResult?.breakdown,
-        stopLossPrice: stopLoss ?? undefined,
-        takeProfitPrice: takeProfit ?? undefined,
-        sizeMultiplier: sizeMultiplier !== 1.0 ? sizeMultiplier : undefined,
-      }
-
-      await updateSignalStatus(signalId, "executed", {
-        resultTradeId: result.sourceId ?? null,
-        executionDetails,
-        processedAt: new Date(),
-      })
-
-      this.broadcastSignalUpdate(signalId)
-      await logAuditEvent(signalId, "executed", {
-        type: "new_entry",
-        openedTradeId: result.sourceId ?? null,
-        fillPrice: result.fillPrice ?? null,
-        units,
-        stopLoss,
-        takeProfit,
-        sizeMultiplier,
-        confluenceScore: confluenceResult?.score ?? null,
-        duration_ms: Date.now() - t0,
-      })
-      await this.emitNotification(
-        "Signal Executed",
-        `${instrument.replace("_", "/")} ${direction.toUpperCase()} — ${units} units @ ${result.fillPrice ?? "market"}${confluenceResult ? ` (score: ${confluenceResult.score.toFixed(1)})` : ""}`,
-      )
-    } catch (err) {
-      await logAuditEvent(signalId, "failed", {
-        type: "new_entry",
-        error: (err as Error).message,
-        duration_ms: Date.now() - t0,
-      })
-      await this.failSignal(signalId, (err as Error).message)
-      await this.emitNotification(
-        "Signal Failed",
-        `${instrument.replace("_", "/")} ${direction.toUpperCase()} — ${(err as Error).message}`,
-        "warning",
-      )
     }
+
+    // All attempts failed
+    await logAuditEvent(signalId, "failed", {
+      type: "new_entry",
+      error: lastErr?.message,
+      retryAttempts: maxAttempts,
+      duration_ms: Date.now() - t0,
+    })
+    await this.failSignal(signalId, lastErr?.message ?? "Unknown error")
+    await this.emitNotification(
+      "Signal Failed",
+      `${instrument.replace("_", "/")} ${direction.toUpperCase()} — ${lastErr?.message}`,
+      "warning",
+    )
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
