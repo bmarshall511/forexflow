@@ -33,6 +33,8 @@ import {
   logAuditEvent,
   cleanupOldAuditEvents,
   getOpenTradeIdsByPlacedVia,
+  hasImminentHighImpactEvent,
+  getSignalRecentResults,
 } from "@fxflow/db"
 import type { StateManager } from "../state-manager.js"
 import type { PositionManager } from "../positions/position-manager.js"
@@ -187,8 +189,6 @@ export class SignalProcessor {
     const receivedAt = new Date()
     const t0 = Date.now()
     this.alertsState.recordSignal()
-    // Record signal for whipsaw detection
-    this.tradeManager?.recordSignal(instrument)
 
     // Reload config each signal to pick up changes
     await this.reloadConfig()
@@ -226,6 +226,9 @@ export class SignalProcessor {
         return
       }
     }
+
+    // Record signal for whipsaw detection (after dedup so duplicates don't count)
+    this.tradeManager?.recordSignal(instrument)
 
     // Create initial signal record
     const signal = await createSignal({
@@ -315,7 +318,6 @@ export class SignalProcessor {
     // Async validation: news event filter (bypassed for reversals — closing is always appropriate)
     if (!isReversal) {
       try {
-        const { hasImminentHighImpactEvent } = await import("@fxflow/db")
         const newsCheck = await hasImminentHighImpactEvent(instrument, 2)
         if (newsCheck.imminent) {
           await logAuditEvent(signal.id, "validated", {
@@ -393,7 +395,6 @@ export class SignalProcessor {
         let recentWins = 0
         let recentLosses = 0
         try {
-          const { getSignalRecentResults } = await import("@fxflow/db")
           const recent = await getSignalRecentResults(20)
           for (const r of recent) {
             if (r.instrument !== instrument) continue
@@ -567,7 +568,7 @@ export class SignalProcessor {
     // 11. Spread validation — reject if current spread is too wide relative to expected risk
     if (!isReversal && this.priceTracker) {
       const tick = this.priceTracker.getLatestPrice(instrument)
-      if (tick) {
+      if (tick && tick.ask > tick.bid) {
         const spreadPrice = tick.ask - tick.bid
         const pipSize = getPipSize(instrument)
         const spreadPips = spreadPrice / pipSize
@@ -866,17 +867,23 @@ export class SignalProcessor {
 
         if (result.sourceId) {
           this.alertsState.addAutoTradeId(result.sourceId)
-          // Start post-entry management for this trade
-          this.tradeManager?.onOrderFilled(
-            result.sourceId,
-            instrument,
-            oandaDirection as "long" | "short",
-            result.fillPrice ?? 0,
-            units,
-            stopLoss,
-            takeProfit,
-            sizing.atr,
-          )
+          // Start post-entry management — use fillPrice, fallback to estimated entry
+          const mgmtEntry =
+            result.fillPrice ??
+            this.getEstimatedEntry(instrument, newDirection as "buy" | "sell") ??
+            0
+          if (mgmtEntry > 0) {
+            this.tradeManager?.onOrderFilled(
+              result.sourceId,
+              instrument,
+              oandaDirection as "long" | "short",
+              mgmtEntry,
+              units,
+              stopLoss,
+              takeProfit,
+              sizing.atr,
+            )
+          }
         }
 
         await updateSignalStatus(signalId, "executed", {
@@ -1041,17 +1048,21 @@ export class SignalProcessor {
       const result = await this.tradeSyncer.placeOrder(orderRequest)
       if (result.sourceId) {
         this.alertsState.addAutoTradeId(result.sourceId)
-        // Start post-entry management for this trade
-        this.tradeManager?.onOrderFilled(
-          result.sourceId,
-          instrument,
-          oandaDirection as "long" | "short",
-          result.fillPrice ?? 0,
-          units,
-          stopLoss,
-          takeProfit,
-          sizing.atr,
-        )
+        // Start post-entry management — use fillPrice, fallback to estimated entry
+        const mgmtEntry =
+          result.fillPrice ?? this.getEstimatedEntry(instrument, direction as "buy" | "sell") ?? 0
+        if (mgmtEntry > 0) {
+          this.tradeManager?.onOrderFilled(
+            result.sourceId,
+            instrument,
+            oandaDirection as "long" | "short",
+            mgmtEntry,
+            units,
+            stopLoss,
+            takeProfit,
+            sizing.atr,
+          )
+        }
       }
 
       const executionDetails: TVExecutionDetails = {
