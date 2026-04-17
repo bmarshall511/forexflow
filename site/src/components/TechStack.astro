@@ -4,14 +4,16 @@ import SectionHeading from "./SectionHeading.astro"
 const stack = [
   { layer: "Frontend", tech: "Next.js 15, React 19, Tailwind CSS 4, shadcn/ui, Radix UI", color: "accent" },
   { layer: "Charts", tech: "TradingView Lightweight Charts 5", color: "green" },
-  { layer: "Backend", tech: "Node.js daemon (custom HTTP + WebSocket server)", color: "green" },
-  { layer: "Edge", tech: "Cloudflare Workers + Durable Objects", color: "amber" },
-  { layer: "Database", tech: "SQLite via Prisma ORM (LibSQL adapter)", color: "blue" },
-  { layer: "AI Runtime", tech: "Claude API (Anthropic SDK)", color: "indigo" },
-  { layer: "AI Dev Tool", tech: "Claude Code with governance system", color: "indigo" },
-  { layer: "Monorepo", tech: "pnpm workspaces + Turborepo", color: "accent" },
-  { layer: "Testing", tech: "Vitest with coverage", color: "green" },
-  { layer: "Language", tech: "TypeScript 5.7 (strict mode)", color: "blue" },
+  { layer: "Backend", tech: "Node.js daemon — 13+ subsystems, HTTP + WebSocket", color: "green" },
+  { layer: "Desktop", tech: "Electron macOS app with managed daemon process", color: "amber" },
+  { layer: "Edge", tech: "Cloudflare Workers + Durable Objects (webhook relay)", color: "amber" },
+  { layer: "Database", tech: "SQLite via Prisma ORM (44 models, LibSQL/Turso adapter)", color: "blue" },
+  { layer: "AI Runtime", tech: "Claude API — Haiku (filter/debate) + Sonnet (decisions)", color: "indigo" },
+  { layer: "AI Dev Tool", tech: "Claude Code with 11 rules, 9 skills, 3 hooks", color: "indigo" },
+  { layer: "MCP Server", tech: "Claude Code bridge to live trading data", color: "indigo" },
+  { layer: "Monorepo", tech: "pnpm workspaces + Turborepo (5 apps, 3 packages)", color: "accent" },
+  { layer: "Testing", tech: "Vitest with coverage, Lefthook pre-commit/pre-push", color: "green" },
+  { layer: "Language", tech: "TypeScript 5.7 (strict mode, ~221K lines)", color: "blue" },
 ]
 
 const colorMap: Record<string, string> = {
@@ -33,7 +35,7 @@ const colorMap: Record<string, string> = {
           stack.map((item, i) => (
             <div
               class:list={[
-                "flex items-center gap-4 px-6 py-4",
+                "flex items-center gap-4 px-6 py-4 transition-colors hover:bg-bg-hover",
                 i < stack.length - 1 && "border-b border-border",
                 i % 2 === 0 ? "bg-bg-surface" : "bg-bg-elevated",
               ]}
