@@ -9,7 +9,12 @@
  */
 import { db } from "./client"
 import { encrypt, decrypt } from "./encryption"
-import type { AiSettingsData, AiAutoAnalysisSettings, AiClaudeModel } from "@fxflow/types"
+import type {
+  AiSettingsData,
+  AiAutoAnalysisSettings,
+  AiClaudeModel,
+  AiReanalysisScheduleConfig,
+} from "@fxflow/types"
 import { AI_AUTO_ANALYSIS_DEFAULTS as DEFAULTS } from "@fxflow/types"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -61,6 +66,14 @@ async function getOrCreate() {
  */
 export async function getAiSettings(): Promise<AiSettingsData> {
   const row = await getOrCreate()
+  let reanalysisSchedule: AiReanalysisScheduleConfig = { mode: "off" }
+  try {
+    if (row.reanalysisScheduleJson) {
+      reanalysisSchedule = JSON.parse(row.reanalysisScheduleJson) as AiReanalysisScheduleConfig
+    }
+  } catch {
+    // invalid JSON — keep default
+  }
   return {
     hasClaudeKey: !!row.claudeApiKey,
     claudeKeyLastFour: keyLastFour(row.claudeApiKey),
@@ -68,6 +81,10 @@ export async function getAiSettings(): Promise<AiSettingsData> {
     finnhubKeyLastFour: keyLastFour(row.finnhubApiKey),
     defaultModel: row.defaultModel as AiClaudeModel,
     autoAnalysis: parseAutoAnalysis(row.autoAnalysisJson),
+    autoRetryInterrupted: row.autoRetryInterrupted,
+    monthlyBudgetCapUsd: row.monthlyBudgetCapUsd,
+    maxReconciliationOps: row.maxReconciliationOps,
+    reanalysisSchedule,
   }
 }
 

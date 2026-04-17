@@ -32,13 +32,18 @@ export function OpenProgressBar({
     )
   }
 
-  // Calculate SL and TP distances in pips (always positive)
-  const slPips = stopLoss
-    ? Math.abs(direction === "long" ? entryPrice - stopLoss : stopLoss - entryPrice) / pipSize
+  // Calculate SL and TP distances in pips.
+  // SL distance is SIGNED: positive = normal risk, negative = SL in profit territory (trailing/breakeven)
+  const rawSlPips = stopLoss
+    ? (direction === "long" ? entryPrice - stopLoss : stopLoss - entryPrice) / pipSize
     : null
   const tpPips = takeProfit
     ? Math.abs(direction === "long" ? takeProfit - entryPrice : entryPrice - takeProfit) / pipSize
     : null
+
+  // When SL is in profit territory (trailing stop moved past entry), show locked profit
+  const slInProfit = rawSlPips !== null && rawSlPips < -0.5
+  const slPips = rawSlPips !== null ? Math.abs(rawSlPips) : null
 
   // Treat very small values as "not set"
   const effectiveSlPips = slPips !== null && slPips >= 0.5 ? slPips : null
@@ -76,10 +81,13 @@ export function OpenProgressBar({
     <div className={cn("flex flex-col gap-1.5", className)}>
       {/* Bar */}
       <div className="bg-muted/60 relative h-3 overflow-hidden rounded-full">
-        {/* SL zone (red, left of entry) */}
+        {/* SL zone — green if SL is in profit territory (trailing/breakeven), red otherwise */}
         {effectiveSlPips !== null && (
           <div
-            className="absolute inset-y-0 left-0 rounded-l-full bg-red-500/15"
+            className={cn(
+              "absolute inset-y-0 left-0 rounded-l-full",
+              slInProfit ? "bg-green-500/15" : "bg-red-500/15",
+            )}
             style={{ width: `${entryPercent}%` }}
           />
         )}
@@ -109,8 +117,12 @@ export function OpenProgressBar({
 
       {/* Labels */}
       <div className="flex justify-between text-[10px] tabular-nums">
-        <span className="text-red-500/70">
-          {effectiveSlPips !== null ? `Stop ${formatPips(effectiveSlPips)}p` : "No stop"}
+        <span className={slInProfit ? "text-green-500/70" : "text-red-500/70"}>
+          {effectiveSlPips !== null
+            ? slInProfit
+              ? `Locked +${formatPips(effectiveSlPips)}p`
+              : `Stop ${formatPips(effectiveSlPips)}p`
+            : "No stop"}
         </span>
         <span className={cn("font-medium", isInProfit ? "text-green-500" : "text-red-500")}>
           {currentPips >= 0 ? "+" : ""}

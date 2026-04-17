@@ -8,12 +8,13 @@ import { TVASettingsConnection } from "./tva-settings-connection"
 import { TVASettingsTrading } from "./tva-settings-trading"
 import { TVASettingsQuality } from "./tva-settings-quality"
 import { TVASettingsTest } from "./tva-settings-test"
+import { TVASettingsManagement } from "./tva-settings-management"
 import { toast } from "sonner"
 import type { TVAlertsConfig } from "@fxflow/types"
 import { TV_ALERTS_DEFAULT_CONFIG } from "@fxflow/types"
-import { Plug, Zap, Shield, Play } from "lucide-react"
+import { Plug, Zap, Shield, Settings2, Play } from "lucide-react"
 
-type Tab = "connection" | "trading" | "quality" | "test"
+type Tab = "connection" | "trading" | "quality" | "management" | "test"
 
 export function TVAlertsSettingsPage() {
   const {
@@ -79,6 +80,13 @@ export function TVAlertsSettingsPage() {
           count={0}
         />
         <TabNavButton
+          active={activeTab === "management"}
+          onClick={() => setActiveTab("management")}
+          icon={<Settings2 className="size-3.5" />}
+          label="Management"
+          count={0}
+        />
+        <TabNavButton
           active={activeTab === "test"}
           onClick={() => setActiveTab("test")}
           icon={<Play className="size-3.5" />}
@@ -105,6 +113,8 @@ export function TVAlertsSettingsPage() {
       )}
 
       {activeTab === "quality" && <TVASettingsQuality />}
+
+      {activeTab === "management" && <TVASettingsManagement />}
 
       {activeTab === "test" && (
         <TVASettingsTest

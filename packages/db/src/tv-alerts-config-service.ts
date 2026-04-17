@@ -30,6 +30,8 @@ function rowToConfig(row: {
   soundEnabled: boolean
   cfWorkerUrl: string
   cfWorkerSecret: string
+  aiFilterEnabled: boolean
+  aiFilterMinConfidence: number
 }): TVAlertsConfig {
   let pairWhitelist: string[]
   try {
@@ -55,6 +57,8 @@ function rowToConfig(row: {
     soundEnabled: row.soundEnabled,
     cfWorkerUrl: row.cfWorkerUrl,
     cfWorkerSecret: row.cfWorkerSecret,
+    aiFilterEnabled: row.aiFilterEnabled,
+    aiFilterMinConfidence: row.aiFilterMinConfidence,
   }
 }
 
@@ -91,6 +95,9 @@ export async function updateTVAlertsConfig(
   if (input.soundEnabled !== undefined) updateData.soundEnabled = input.soundEnabled
   if (input.cfWorkerUrl !== undefined) updateData.cfWorkerUrl = input.cfWorkerUrl
   if (input.cfWorkerSecret !== undefined) updateData.cfWorkerSecret = input.cfWorkerSecret
+  if (input.aiFilterEnabled !== undefined) updateData.aiFilterEnabled = input.aiFilterEnabled
+  if (input.aiFilterMinConfidence !== undefined)
+    updateData.aiFilterMinConfidence = input.aiFilterMinConfidence
 
   const row = await db.tVAlertsConfig.upsert({
     where: { id: 1 },

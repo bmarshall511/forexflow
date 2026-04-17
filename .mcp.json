@@ -4,7 +4,8 @@
       "command": "pnpm",
       "args": ["--filter", "@fxflow/mcp-server", "exec", "tsx", "src/index.ts"],
       "env": {
-        "DAEMON_URL": "http://localhost:4100"
+        "DAEMON_URL": "http://localhost:4100",
+        "DATABASE_URL": "file:../../data/fxflow.db"
       }
     }
   }

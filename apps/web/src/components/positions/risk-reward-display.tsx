@@ -2,6 +2,7 @@
 
 import type { TradeDirection } from "@fxflow/types"
 import { calculateRiskReward, formatPips } from "@fxflow/shared"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 
 interface RiskRewardDisplayProps {
@@ -39,16 +40,31 @@ export function RiskRewardDisplay({
   }
 
   if (compact) {
-    return <span className="font-mono text-xs tabular-nums">{result.ratio}</span>
+    return (
+      <span
+        className={cn("font-mono text-xs tabular-nums", result.profitProtected && "text-green-500")}
+      >
+        {result.ratio}
+      </span>
+    )
   }
 
   return (
     <div className="flex flex-col items-end gap-0.5">
-      <span className="font-mono text-xs font-medium tabular-nums">{result.ratio}</span>
-      <span className="text-muted-foreground text-[10px]">
-        {result.riskPips !== null ? formatPips(result.riskPips) : "—"} /{" "}
-        {result.rewardPips !== null ? formatPips(result.rewardPips) : "—"}
+      <span
+        className={cn(
+          "font-mono text-xs font-medium tabular-nums",
+          result.profitProtected && "text-green-500",
+        )}
+      >
+        {result.ratio}
       </span>
+      {!result.profitProtected && (
+        <span className="text-muted-foreground text-[10px]">
+          {result.riskPips !== null ? formatPips(result.riskPips) : "—"} /{" "}
+          {result.rewardPips !== null ? formatPips(result.rewardPips) : "—"}
+        </span>
+      )}
     </div>
   )
 }

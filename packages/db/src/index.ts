@@ -196,6 +196,11 @@ export {
 export { getTVAlertsQualityConfig, updateTVAlertsQualityConfig } from "./tv-alerts-quality-service"
 
 export {
+  getTVAlertsManagementConfig,
+  updateTVAlertsManagementConfig,
+} from "./tv-alerts-management-service"
+
+export {
   createSignal,
   updateSignalStatus,
   getRecentSignal,
@@ -472,7 +477,6 @@ export {
 export {
   getSmartFlowOpportunities,
   getSmartFlowOpportunity,
-  getSmartFlowOpportunityByConfigId,
   countTodaySmartFlowOpportunities,
   createSmartFlowOpportunity,
   updateSmartFlowOpportunityStatus,

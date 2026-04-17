@@ -33,6 +33,7 @@ import { NotificationEmitter } from "./notification-emitter.js"
 import { CFWorkerClient } from "./tv-alerts/cf-worker-client.js"
 import { SignalProcessor } from "./tv-alerts/signal-processor.js"
 import { TVAlertsState } from "./tv-alerts/alerts-state.js"
+import { TVAlertsTradeManager } from "./tv-alerts/trade-manager.js"
 import { ConditionMonitor } from "./ai/condition-monitor.js"
 import { AutoAnalyzer } from "./ai/auto-analyzer.js"
 import { DigestGenerator } from "./ai/digest-generator.js"
@@ -183,6 +184,19 @@ async function main() {
     tvAlertsState,
   )
 
+  // TV Alerts Trade Manager — post-entry management (breakeven, trailing, partial close, time exit)
+  const tvAlertsTradeManager = new TVAlertsTradeManager(broadcast)
+  tvAlertsTradeManager.setCallbacks(
+    (stid, sl, tp) => tradeSyncer.modifyTradeSLTP(stid, sl ?? undefined, tp ?? undefined),
+    (stid, units, reason, attr) => tradeSyncer.closeTrade(stid, units, reason, attr),
+    () => positionManager.getPositions().open,
+    (stid) => tvAlertsState.isAutoTrade(stid),
+  )
+
+  // Late-bind price tracker and trade manager to signal processor
+  signalProcessor.setPriceTracker(positionPriceTracker)
+  signalProcessor.setTradeManager(tvAlertsTradeManager)
+
   const cfWorkerClient = new CFWorkerClient(
     { url: "", secret: "" },
     {
@@ -239,6 +253,7 @@ async function main() {
     aiTraderScanner.onPriceTick(tick.instrument, mid)
     smartFlowManager.onPriceTick(tick.instrument, tick.bid, tick.ask)
     void tradeFinderTradeManager.onPriceTick(tick)
+    void tvAlertsTradeManager.onPriceTick(tick)
   }
 
   // 12c. Auto Analyzer — automatically analyzes trades on lifecycle events
@@ -309,6 +324,9 @@ async function main() {
           void smartFlowManager.onTradeClosed(tradeId)
           // Stop managing Trade Finder trade + record performance
           tradeFinderTradeManager.onTradeClosed(tradeId)
+          // Stop managing TV Alerts trade + feed P&L to circuit breaker
+          if (trade.sourceTradeId)
+            tvAlertsTradeManager.onTradeClosed(trade.sourceTradeId, trade.realizedPL)
           if (trade.sourceTradeId) {
             void recordTradeFinderClose(
               trade.sourceTradeId,

@@ -136,9 +136,11 @@ model TVAlertsConfig {
   dedupWindowSeconds  Int      @default(5)
   showChartMarkers    Boolean  @default(true)
   soundEnabled        Boolean  @default(true)
-  cfWorkerUrl         String   @default("")
-  cfWorkerSecret      String   @default("")
-  updatedAt           DateTime @updatedAt
+  cfWorkerUrl            String   @default("")
+  cfWorkerSecret         String   @default("")
+  aiFilterEnabled        Boolean  @default(false)
+  aiFilterMinConfidence  Int      @default(60)
+  updatedAt              DateTime @updatedAt
 }
 
 model TVAlertsQualityConfig {
@@ -165,6 +167,33 @@ model TVAlertsQualityConfig {
   lowConfThreshold   Float    @default(5.5)
   lowConfMultiplier  Float    @default(0.75)
   updatedAt          DateTime @updatedAt
+}
+
+model TVAlertsManagementConfig {
+  id                        Int      @id @default(1)
+  // Breakeven
+  breakevenEnabled          Boolean  @default(true)
+  breakevenRR               Float    @default(1.0) // Trigger at N:1 profit-to-risk
+  breakevenBufferPips       Float    @default(2.0) // Buffer beyond entry
+  // Trailing stop
+  trailingEnabled           Boolean  @default(true)
+  trailingAtrMultiple       Float    @default(1.0) // Trail distance = ATR × this
+  trailingStepPips          Float    @default(2.0) // Min move increment
+  // Partial close
+  partialCloseEnabled       Boolean  @default(true)
+  partialCloseStrategy      String   @default("thirds") // "thirds" | "standard" | "none"
+  partialCloseRR            Float    @default(1.0) // For "standard" strategy
+  partialClosePercent       Float    @default(33.0) // For "standard" strategy
+  // Time exit
+  timeExitEnabled           Boolean  @default(true)
+  timeExitHours             Float    @default(8.0)
+  timeExitMinRR             Float    @default(0.5) // Only close if P&L < this R:R
+  // Whipsaw detection (UT Bot specific)
+  whipsawDetectionEnabled   Boolean  @default(true)
+  whipsawWindowHours        Float    @default(4.0) // Lookback window
+  whipsawMaxSignals         Int      @default(3) // Max signals before suppression
+  whipsawCooldownMinutes    Int      @default(60) // Cooldown after detection
+  updatedAt                 DateTime @updatedAt
 }
 
 model AiSettings {

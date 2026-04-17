@@ -10,7 +10,15 @@ import type {
   AnyDaemonMessage,
   PlaceOrderRequest,
 } from "@fxflow/types"
-import { isMarketExpectedOpen, getPipSize, computeATR } from "@fxflow/shared"
+import {
+  isMarketExpectedOpen,
+  getPipSize,
+  computeATR,
+  calculateATRStopLoss,
+  calculateRRTakeProfit,
+  checkSpread,
+  countSharedCurrencyExposure,
+} from "@fxflow/shared"
 import {
   createSignal,
   updateSignalStatus,
@@ -32,6 +40,7 @@ import type { PositionPriceTracker } from "../positions/position-price-tracker.j
 import type { OandaTradeSyncer } from "../oanda/trade-syncer.js"
 import type { NotificationEmitter } from "../notification-emitter.js"
 import type { TVAlertsState } from "./alerts-state.js"
+import type { TVAlertsTradeManager } from "./trade-manager.js"
 import { ConfluenceEngine } from "./confluence-engine.js"
 import { CandleCache, fetchOandaCandles } from "../trade-finder/candle-cache.js"
 import { getRestUrl } from "../oanda/api-client.js"
@@ -53,10 +62,16 @@ export class SignalProcessor {
   private syncTimer: ReturnType<typeof setInterval> | null = null
   private selfHealTimer: ReturnType<typeof setInterval> | null = null
   private priceTracker: PositionPriceTracker | null = null
+  private tradeManager: TVAlertsTradeManager | null = null
 
   /** Late-bind the price tracker (wired after construction in index.ts). */
   setPriceTracker(tracker: PositionPriceTracker): void {
     this.priceTracker = tracker
+  }
+
+  /** Late-bind the trade manager for post-entry management. */
+  setTradeManager(manager: TVAlertsTradeManager): void {
+    this.tradeManager = manager
   }
 
   constructor(
@@ -172,6 +187,8 @@ export class SignalProcessor {
     const receivedAt = new Date()
     const t0 = Date.now()
     this.alertsState.recordSignal()
+    // Record signal for whipsaw detection
+    this.tradeManager?.recordSignal(instrument)
 
     // Reload config each signal to pick up changes
     await this.reloadConfig()
@@ -295,6 +312,27 @@ export class SignalProcessor {
       return
     }
 
+    // Async validation: news event filter (bypassed for reversals — closing is always appropriate)
+    if (!isReversal) {
+      try {
+        const { hasImminentHighImpactEvent } = await import("@fxflow/db")
+        const newsCheck = await hasImminentHighImpactEvent(instrument, 2)
+        if (newsCheck.imminent) {
+          await logAuditEvent(signal.id, "validated", {
+            result: "rejected",
+            reason: "news_event_imminent",
+            event: newsCheck.event,
+            duration_ms: Date.now() - t0,
+          })
+          await this.rejectSignal(signal.id, "news_event_imminent")
+          return
+        }
+      } catch (err) {
+        // Fail-open: if news check fails (e.g. no events in DB), don't block the signal
+        console.warn("[signal-processor] News check failed (continuing):", (err as Error).message)
+      }
+    }
+
     const currentStatus = this.alertsState.getStatus()
     await logAuditEvent(signal.id, "validated", {
       result: "passed",
@@ -339,6 +377,67 @@ export class SignalProcessor {
           fallthrough: true,
           duration_ms: Date.now() - t0,
         })
+      }
+    }
+
+    // AI signal filter — Haiku pre-trade evaluation (opt-in, bypassed for reversals)
+    if (config.aiFilterEnabled && !isReversal) {
+      try {
+        const { evaluateSignalWithAI } = await import("./ai-signal-filter.js")
+        const tick = this.priceTracker?.getLatestPrice(instrument)
+        const spreadPips = tick ? (tick.ask - tick.bid) / getPipSize(instrument) : null
+        const recentCount = this.tradeManager?.getRecentSignalCount(instrument, 4 * 3_600_000) ?? 0
+        const status = this.alertsState.getStatus()
+
+        // Fetch recent pair performance (best-effort, filter to this instrument)
+        let recentWins = 0
+        let recentLosses = 0
+        try {
+          const { getSignalRecentResults } = await import("@fxflow/db")
+          const recent = await getSignalRecentResults(20)
+          for (const r of recent) {
+            if (r.instrument !== instrument) continue
+            if (r.realizedPL > 0.005) recentWins++
+            else if (r.realizedPL < -0.005) recentLosses++
+          }
+        } catch {
+          /* best-effort */
+        }
+
+        const aiResult = await evaluateSignalWithAI({
+          instrument,
+          direction: direction as "buy" | "sell",
+          signalPrice: payload.price ?? null,
+          confluenceScore: confluenceResult?.score ?? null,
+          confluenceBreakdown: confluenceResult?.breakdown ?? null,
+          atr: confluenceResult?.atr ?? 0,
+          spreadPips,
+          recentSignalCount: recentCount,
+          openAutoTradeCount: status.activeAutoPositions,
+          todayPL: status.todayAutoPL,
+          recentWins,
+          recentLosses,
+        })
+
+        if (aiResult) {
+          await logAuditEvent(signal.id, "ai_filter_evaluated", {
+            execute: aiResult.execute,
+            confidence: aiResult.confidence,
+            reason: aiResult.reason,
+            model: aiResult.model,
+            inputTokens: aiResult.inputTokens,
+            outputTokens: aiResult.outputTokens,
+            durationMs: aiResult.durationMs,
+          })
+
+          if (!aiResult.execute || aiResult.confidence < config.aiFilterMinConfidence) {
+            await this.rejectSignal(signal.id, "ai_filter_rejected")
+            return
+          }
+        }
+      } catch (err) {
+        // Fail-open: if AI filter crashes, continue without it
+        console.warn("[signal-processor] AI filter error (continuing):", (err as Error).message)
       }
     }
 
@@ -433,6 +532,11 @@ export class SignalProcessor {
     // 6. Circuit breaker / daily loss limit
     // (Reversal + circuit breaker is handled before validate() via executeProtectiveClose)
     if (this.alertsState.isCircuitBreakerTripped()) return "daily_loss_limit"
+    // Also check the trade manager's shared circuit breaker (consecutive losses, drawdown)
+    if (this.tradeManager) {
+      const cb = this.tradeManager.circuitBreaker.isAllowed()
+      if (!cb.allowed) return "daily_loss_limit"
+    }
 
     // 7. Pair whitelist check
     const whitelist: string[] =
@@ -456,6 +560,38 @@ export class SignalProcessor {
     // 9. OANDA connectivity
     const oanda = this.stateManager.getOanda()
     if (!oanda.apiReachable) return "execution_failed"
+
+    // 10. Whipsaw detection — too many rapid signal flips on this instrument
+    if (!isReversal && this.tradeManager?.isWhipsawActive(instrument)) return "whipsaw_detected"
+
+    // 11. Spread validation — reject if current spread is too wide relative to expected risk
+    if (!isReversal && this.priceTracker) {
+      const tick = this.priceTracker.getLatestPrice(instrument)
+      if (tick) {
+        const spreadPrice = tick.ask - tick.bid
+        const pipSize = getPipSize(instrument)
+        const spreadPips = spreadPrice / pipSize
+        // Use a conservative 20% threshold (same as SmartFlow)
+        // If we know the ATR, calculate actual risk pips; otherwise use a 30-pip heuristic
+        const riskPips = 30 // conservative estimate; actual SL distance checked later
+        const spreadResult = checkSpread({ spreadPips, riskPips, maxPercent: 0.2 })
+        if (!spreadResult.passed) return "spread_too_wide"
+      }
+    }
+
+    // 12. Correlation guard — max 2 same-currency same-direction auto-trades
+    if (!isReversal) {
+      const autoTrades = this.positionManager
+        .getPositions()
+        .open.filter((t) => this.alertsState.isAutoTrade(t.sourceTradeId))
+      const dir: "long" | "short" = direction === "buy" ? "long" : "short"
+      const positions = autoTrades.map((t) => ({
+        instrument: t.instrument,
+        direction: t.direction as "long" | "short",
+      }))
+      const exposure = countSharedCurrencyExposure(instrument, dir, positions)
+      if (exposure >= 2) return "currency_overexposure"
+    }
 
     return null
   }
@@ -689,22 +825,13 @@ export class SignalProcessor {
       return
     }
 
-    // Calculate SL/TP from confluence ATR data
-    let stopLoss: number | null = null
-    let takeProfit: number | null = null
-    if (qc?.enabled && confluenceResult && confluenceResult.atr > 0) {
-      const estimatedEntry = this.getEstimatedEntry(instrument, newDirection as "buy" | "sell")
-      if (estimatedEntry) {
-        const sltp = this.confluenceEngine.calculateSLTP(
-          estimatedEntry,
-          confluenceResult.atr,
-          newDirection as "buy" | "sell",
-          qc,
-        )
-        stopLoss = sltp.stopLoss
-        takeProfit = sltp.takeProfit
-      }
-    }
+    // Calculate SL/TP using the best available ATR source
+    const { stopLoss, takeProfit } = this.calculateSLTPForSignal(
+      instrument,
+      newDirection as "buy" | "sell",
+      confluenceResult?.atr ?? null,
+      sizing.atr,
+    )
 
     const oandaDirection = newDirection === "buy" ? "long" : "short"
     const orderRequest: PlaceOrderRequest = {
@@ -737,7 +864,20 @@ export class SignalProcessor {
           sizeMultiplier: sizeMultiplier !== 1.0 ? sizeMultiplier : undefined,
         }
 
-        if (result.sourceId) this.alertsState.addAutoTradeId(result.sourceId)
+        if (result.sourceId) {
+          this.alertsState.addAutoTradeId(result.sourceId)
+          // Start post-entry management for this trade
+          this.tradeManager?.onOrderFilled(
+            result.sourceId,
+            instrument,
+            oandaDirection as "long" | "short",
+            result.fillPrice ?? 0,
+            units,
+            stopLoss,
+            takeProfit,
+            sizing.atr,
+          )
+        }
 
         await updateSignalStatus(signalId, "executed", {
           resultTradeId: result.sourceId ?? null,
@@ -862,21 +1002,28 @@ export class SignalProcessor {
     }
 
     // Calculate SL/TP from confluence ATR data if quality engine is enabled
-    let stopLoss: number | null = null
-    let takeProfit: number | null = null
-    if (qc?.enabled && confluenceResult && confluenceResult.atr > 0) {
-      // Use signal price as estimated entry for pre-trade SL/TP calculation
-      const estimatedEntry = this.getEstimatedEntry(instrument, direction as "buy" | "sell")
-      if (estimatedEntry) {
-        const sltp = this.confluenceEngine.calculateSLTP(
-          estimatedEntry,
-          confluenceResult.atr,
-          direction as "buy" | "sell",
-          qc,
-        )
-        stopLoss = sltp.stopLoss
-        takeProfit = sltp.takeProfit
-      }
+    // Calculate SL/TP using the best available ATR source
+    const { stopLoss, takeProfit } = this.calculateSLTPForSignal(
+      instrument,
+      direction as "buy" | "sell",
+      confluenceResult?.atr ?? null,
+      sizing.atr,
+    )
+
+    // Reject if autoSL is enabled but SL couldn't be calculated
+    if (qc?.autoSL && !stopLoss) {
+      await logAuditEvent(signalId, "failed", {
+        type: "new_entry",
+        step: "sl_calculation",
+        error: "autoSL enabled but stop loss could not be calculated",
+        atrSource: sizing.slSource,
+        duration_ms: Date.now() - t0,
+      })
+      await this.failSignal(
+        signalId,
+        "Stop loss calculation failed — refusing to place unprotected trade",
+      )
+      return
     }
 
     const oandaDirection = direction === "buy" ? "long" : "short"
@@ -892,7 +1039,20 @@ export class SignalProcessor {
 
     try {
       const result = await this.tradeSyncer.placeOrder(orderRequest)
-      if (result.sourceId) this.alertsState.addAutoTradeId(result.sourceId)
+      if (result.sourceId) {
+        this.alertsState.addAutoTradeId(result.sourceId)
+        // Start post-entry management for this trade
+        this.tradeManager?.onOrderFilled(
+          result.sourceId,
+          instrument,
+          oandaDirection as "long" | "short",
+          result.fillPrice ?? 0,
+          units,
+          stopLoss,
+          takeProfit,
+          sizing.atr,
+        )
+      }
 
       const executionDetails: TVExecutionDetails = {
         isReversal: false,
@@ -948,6 +1108,54 @@ export class SignalProcessor {
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   /**
+   * Calculate SL/TP for a signal using the best available ATR source.
+   * Works whether the confluence quality engine is enabled or not.
+   *
+   * ATR priority: confluenceATR (from quality engine) → sizingATR (from fallback H1 fetch).
+   * Uses quality config multipliers when available, otherwise fallback config values.
+   */
+  private calculateSLTPForSignal(
+    instrument: string,
+    direction: "buy" | "sell",
+    confluenceATR: number | null,
+    sizingATR: number,
+  ): { stopLoss: number | null; takeProfit: number | null } {
+    const qc = this.qualityConfig
+    const config = this.config
+
+    // Determine if auto SL/TP should be applied
+    const shouldAutoSL = qc?.autoSL ?? true // default to true for safety
+    const shouldAutoTP = qc?.autoTP ?? true
+
+    if (!shouldAutoSL && !shouldAutoTP) {
+      return { stopLoss: null, takeProfit: null }
+    }
+
+    // Pick the best ATR source
+    const atr = (confluenceATR && confluenceATR > 0 ? confluenceATR : sizingATR) || 0
+    if (atr <= 0) return { stopLoss: null, takeProfit: null }
+
+    const estimatedEntry = this.getEstimatedEntry(instrument, direction)
+    if (!estimatedEntry) return { stopLoss: null, takeProfit: null }
+
+    const slMultiplier = qc?.slAtrMultiplier ?? config?.fallbackAtrMultiplier ?? 1.5
+    const rrRatio = qc?.tpRiskRewardRatio ?? 2.0
+
+    let stopLoss: number | null = null
+    let takeProfit: number | null = null
+
+    if (shouldAutoSL) {
+      stopLoss = calculateATRStopLoss(estimatedEntry, atr, direction, slMultiplier)
+    }
+
+    if (shouldAutoTP && stopLoss !== null) {
+      takeProfit = calculateRRTakeProfit(estimatedEntry, stopLoss, rrRatio, direction)
+    }
+
+    return { stopLoss, takeProfit }
+  }
+
+  /**
    * Risk-based position sizing.
    *
    * Formula: units = riskAmount / (slDistance × pipValuePerUnit)
@@ -967,30 +1175,31 @@ export class SignalProcessor {
     confluenceATR: number | null,
   ): Promise<{ units: number; slDistance: number; slSource: string; atr: number }> {
     const overview = this.stateManager.getAccountOverview()
-    if (!overview) return { units: 0, slDistance: 0, slSource: "no_account" }
+    if (!overview) return { units: 0, slDistance: 0, slSource: "no_account", atr: 0 }
 
     const balance = overview.summary.balance
-    if (balance <= 0) return { units: 0, slDistance: 0, slSource: "zero_balance" }
+    if (balance <= 0) return { units: 0, slDistance: 0, slSource: "zero_balance", atr: 0 }
 
-    // Determine SL distance (in price, not pips)
+    // Determine SL distance (in price, not pips) and raw ATR
     let slDistance = 0
     let slSource = "none"
+    let rawATR = 0
 
     if (confluenceATR && confluenceATR > 0) {
-      // Use quality config's ATR multiplier when available, otherwise fallback multiplier
       const multiplier = this.qualityConfig?.slAtrMultiplier ?? config.fallbackAtrMultiplier
       slDistance = confluenceATR * multiplier
+      rawATR = confluenceATR
       slSource = "confluence_atr"
     } else {
-      // Fallback: fetch H1 candles and compute ATR(14)
-      const atr = await this.fetchATRFallback(instrument)
-      if (atr > 0) {
-        slDistance = atr * config.fallbackAtrMultiplier
+      const fallbackATR = await this.fetchATRFallback(instrument)
+      if (fallbackATR > 0) {
+        slDistance = fallbackATR * config.fallbackAtrMultiplier
+        rawATR = fallbackATR
         slSource = "fallback_atr"
       }
     }
 
-    if (slDistance <= 0) return { units: 0, slDistance: 0, slSource: "no_atr_data" }
+    if (slDistance <= 0) return { units: 0, slDistance: 0, slSource: "no_atr_data", atr: 0 }
 
     // Risk-based formula (matches AI Trader / Trade Finder pattern)
     const pipSize = getPipSize(instrument)
@@ -1005,18 +1214,18 @@ export class SignalProcessor {
       console.warn(
         `[tv-alerts] No live price available for ${instrument} — cannot calculate accurate position size`,
       )
-      return { units: 0, slDistance, slSource: `${slSource}_no_price` }
+      return { units: 0, slDistance, slSource: `${slSource}_no_price`, atr: rawATR }
     }
 
     const pipValuePerUnit = isUsdQuote ? pipSize : pipSize / Math.max(estimatedEntry ?? 1, 0.0001)
     const riskPips = slDistance / pipSize
 
     if (riskPips <= 0 || pipValuePerUnit <= 0) {
-      return { units: 0, slDistance, slSource }
+      return { units: 0, slDistance, slSource, atr: rawATR }
     }
 
     const units = Math.floor(riskAmount / (riskPips * pipValuePerUnit))
-    return { units, slDistance, slSource }
+    return { units, slDistance, slSource, atr: rawATR }
   }
 
   /** Fetch ATR(14) from H1 candles as fallback when confluence is not enabled. */

@@ -445,6 +445,7 @@ export interface CloseContext {
     | "smart_flow"
     | "smart_flow_ai"
     | "tv_alert_reversal"
+    | "tv_alert_management"
     | "system"
   /**
    * Short human-readable label for the close source, used directly by the
@@ -1212,6 +1213,12 @@ export type TVAlertRejectionReason =
   | "same_direction_exists"
   | "execution_failed"
   | "low_confluence"
+  | "whipsaw_detected"
+  | "spread_too_wide"
+  | "news_event_imminent"
+  | "currency_overexposure"
+  | "sl_calculation_failed"
+  | "ai_filter_rejected"
 
 /** Raw webhook payload from TradingView */
 export interface TVWebhookPayload {
@@ -1323,6 +1330,10 @@ export interface TVAlertsConfig {
   cfWorkerUrl: string
   /** Daemon authentication secret for CF Worker */
   cfWorkerSecret: string
+  /** Enable AI pre-trade signal filter (Haiku call before execution). */
+  aiFilterEnabled: boolean
+  /** Minimum AI confidence (0-100) to execute a signal. Below this → rejected. */
+  aiFilterMinConfidence: number
 }
 
 /** Default configuration values */
@@ -1343,6 +1354,8 @@ export const TV_ALERTS_DEFAULT_CONFIG: TVAlertsConfig = {
   soundEnabled: true,
   cfWorkerUrl: "",
   cfWorkerSecret: "",
+  aiFilterEnabled: false,
+  aiFilterMinConfidence: 60,
 }
 
 /** TV Alerts system status (daemon → client, real-time) */
@@ -1611,6 +1624,67 @@ export const TV_ALERTS_QUALITY_DEFAULT_CONFIG: TVAlertsQualityConfig = {
   highConfMultiplier: 1.25,
   lowConfThreshold: 5.5,
   lowConfMultiplier: 0.75,
+}
+
+// ─── TV Alerts Trade Management ──────────────────────────────────────────────
+
+/** Configuration for TV Alerts post-entry trade management. */
+export interface TVAlertsManagementConfig {
+  /** Move SL to entry + buffer when profit reaches breakevenRR × risk. */
+  breakevenEnabled: boolean
+  /** Breakeven trigger as risk multiple (e.g. 1.0 = at 1:1). */
+  breakevenRR: number
+  /** Buffer pips beyond entry for breakeven SL. */
+  breakevenBufferPips: number
+  /** Trail SL behind price using ATR-based distance. */
+  trailingEnabled: boolean
+  /** Trail distance = ATR × this multiple. */
+  trailingAtrMultiple: number
+  /** Minimum SL move increment in pips. */
+  trailingStepPips: number
+  /** Close portions of the position at profit targets. */
+  partialCloseEnabled: boolean
+  /** Partial close strategy: "thirds" closes 33% at 1:1 and 2:1, "standard" uses custom R:R. */
+  partialCloseStrategy: "thirds" | "standard" | "none"
+  /** For "standard" strategy: R:R trigger for partial close. */
+  partialCloseRR: number
+  /** For "standard" strategy: percentage of position to close. */
+  partialClosePercent: number
+  /** Close the trade if it hasn't reached minimum R:R after a time limit. */
+  timeExitEnabled: boolean
+  /** Maximum hold time in hours before time exit is evaluated. */
+  timeExitHours: number
+  /** Only apply time exit if P&L is below this R:R ratio. */
+  timeExitMinRR: number
+  /** Detect and suppress UT Bot whipsaw (rapid signal flips). */
+  whipsawDetectionEnabled: boolean
+  /** Lookback window in hours for counting signal flips. */
+  whipsawWindowHours: number
+  /** Max signal flips on same instrument before suppression. */
+  whipsawMaxSignals: number
+  /** Cooldown in minutes after whipsaw is detected. */
+  whipsawCooldownMinutes: number
+}
+
+/** Default management config values. */
+export const TV_ALERTS_MANAGEMENT_DEFAULTS: TVAlertsManagementConfig = {
+  breakevenEnabled: true,
+  breakevenRR: 1.0,
+  breakevenBufferPips: 2.0,
+  trailingEnabled: true,
+  trailingAtrMultiple: 1.0,
+  trailingStepPips: 2.0,
+  partialCloseEnabled: true,
+  partialCloseStrategy: "thirds",
+  partialCloseRR: 1.0,
+  partialClosePercent: 33.0,
+  timeExitEnabled: true,
+  timeExitHours: 8.0,
+  timeExitMinRR: 0.5,
+  whipsawDetectionEnabled: true,
+  whipsawWindowHours: 4.0,
+  whipsawMaxSignals: 3,
+  whipsawCooldownMinutes: 60,
 }
 
 // ─── CF Worker ↔ Daemon Messages ───────────────────────────────────────────

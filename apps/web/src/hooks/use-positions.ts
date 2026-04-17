@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react"
 import { useDaemonStatus } from "./use-daemon-status"
+import { calculatePipValueUsd, priceToPips } from "@fxflow/shared"
 import type {
   PositionsData,
   PositionsSummary,
@@ -97,11 +98,22 @@ export function usePositions(): UsePositionsReturn {
       if (!tick) return trade
 
       const currentPrice = trade.direction === "long" ? tick.bid : tick.ask
-      // Compute live unrealized P/L from price movement
-      const unrealizedPL =
+      // Compute live unrealized P/L in account currency (USD).
+      // CRITICAL: `priceDiff × units` gives P/L in QUOTE currency, NOT USD.
+      // For JPY pairs this is off by ~150-215x. Use calculatePipValueUsd for proper conversion.
+      const priceDiff =
         trade.direction === "long"
-          ? (currentPrice - trade.entryPrice) * trade.currentUnits
-          : (trade.entryPrice - currentPrice) * trade.currentUnits
+          ? currentPrice - trade.entryPrice
+          : trade.entryPrice - currentPrice
+      const pips = priceToPips(trade.instrument, Math.abs(priceDiff))
+      const pipValueUsd = calculatePipValueUsd({
+        instrument: trade.instrument,
+        units: trade.currentUnits,
+        currentPrice,
+      })
+      // pipValueUsd is per-pip, so multiply by pips and sign
+      const unrealizedPL =
+        pipValueUsd !== null ? pipValueUsd * pips * Math.sign(priceDiff) : trade.unrealizedPL // fallback to OANDA-reported value for cross pairs
       return {
         ...trade,
         currentPrice,

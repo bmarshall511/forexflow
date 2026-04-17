@@ -51,14 +51,16 @@ export function calculateDistanceInfo(
 // ─── Risk / Reward ──────────────────────────────────────────────────────────
 
 export interface RiskRewardResult {
-  /** Ratio string like "2.5:1" (reward:risk), or null if missing SL or TP */
+  /** Ratio string like "2.5:1" (reward:risk), "Protected" when SL is in profit, or null */
   ratio: string | null
-  /** Risk in pips (entry to SL), or null if no SL */
+  /** Risk in pips (entry to SL, always positive magnitude), or null if no SL */
   riskPips: number | null
-  /** Reward in pips (entry to TP), or null if no TP */
+  /** Reward in pips (entry to TP, always positive magnitude), or null if no TP */
   rewardPips: number | null
   /** True if neither SL nor TP is set */
   unprotected: boolean
+  /** True when SL has moved past entry into profit territory (trailing/breakeven) */
+  profitProtected?: boolean
 }
 
 /** Calculate risk:reward from entry price, SL, and TP. */
@@ -74,9 +76,12 @@ export function calculateRiskReward(
   let riskPips: number | null = null
   let rewardPips: number | null = null
 
+  // signedRisk: positive = normal risk (SL below entry for longs), negative = profit locked
+  let signedRisk: number | null = null
   if (stopLoss !== null) {
     const riskDistance = direction === "long" ? entryPrice - stopLoss : stopLoss - entryPrice
-    riskPips = Math.abs(riskDistance) / pipSize
+    signedRisk = riskDistance / pipSize
+    riskPips = Math.abs(signedRisk)
   }
 
   if (takeProfit !== null) {
@@ -85,13 +90,18 @@ export function calculateRiskReward(
   }
 
   const unprotected = stopLoss === null && takeProfit === null
+  // When SL is in profit territory (signedRisk < 0), show "Profit Protected" instead of R:R
+  const profitProtected = signedRisk !== null && signedRisk < -0.5
   let ratio: string | null = null
 
-  if (riskPips !== null && rewardPips !== null && riskPips > 0) {
+  if (profitProtected) {
+    // SL is past entry — trade is profit-protected, R:R is essentially infinite
+    ratio = "Protected"
+  } else if (riskPips !== null && rewardPips !== null && riskPips > 0) {
     ratio = `${(rewardPips / riskPips).toFixed(1)}:1`
   }
 
-  return { ratio, riskPips, rewardPips, unprotected }
+  return { ratio, riskPips, rewardPips, unprotected, profitProtected }
 }
 
 // ─── Formatting ─────────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ const FINNHUB_BASE = "https://finnhub.io/api/v1"
 /** Finnhub calendar/economic response shape */
 interface FinnhubEconomicEvent {
   country: string
+  date?: string // "YYYY-MM-DD" — present in Finnhub responses but not always documented
   event: string
   impact: string // "high" | "medium" | "low"
   actual?: number | null
@@ -97,12 +98,21 @@ export class CalendarFetcher {
     }
   }
 
+  private loggedNoKey = false
+
   async fetchEvents(): Promise<void> {
     const apiKey = await this.getApiKey()
     if (!apiKey) {
-      // Graceful degradation — no key configured
+      if (!this.loggedNoKey) {
+        console.log(
+          "[calendar-fetcher] No FinnHub API key configured — calendar/news features disabled. " +
+            "Set the key in Settings > AI to enable economic calendar data.",
+        )
+        this.loggedNoKey = true
+      }
       return
     }
+    this.loggedNoKey = false
 
     // Fetch events for the next 7 days
     const from = this.formatDate(new Date())
@@ -126,14 +136,35 @@ export class CalendarFetcher {
       }
 
       const data = (await response.json()) as FinnhubCalendarResponse
-      const rawEvents = data.economicCalendar ?? []
+
+      // Handle both array and nested response formats from Finnhub
+      // Some API versions return { economicCalendar: [...] }
+      // Others return { economicCalendar: { result: [...] } }
+      let rawEvents: FinnhubEconomicEvent[] = []
+      const cal = data.economicCalendar
+      if (Array.isArray(cal)) {
+        rawEvents = cal
+      } else if (cal && typeof cal === "object" && "result" in cal) {
+        rawEvents = (cal as { result: FinnhubEconomicEvent[] }).result ?? []
+      }
 
       if (rawEvents.length === 0) {
-        console.log("[calendar-fetcher] No events returned from Finnhub")
+        console.log(
+          `[calendar-fetcher] No events returned from Finnhub (response keys: ${Object.keys(data).join(", ")})`,
+        )
         return
       }
 
+      // Log first event shape on first successful fetch for diagnostics
+      if (rawEvents.length > 0) {
+        const sample = rawEvents[0]!
+        console.log(
+          `[calendar-fetcher] Fetched ${rawEvents.length} events. Sample fields: ${Object.keys(sample).join(", ")}`,
+        )
+      }
+
       const events: EconomicEventInput[] = []
+      let skippedTimestamp = 0
       for (const raw of rawEvents) {
         if (!raw.event || !raw.country) continue
 
@@ -142,7 +173,10 @@ export class CalendarFetcher {
         // and the date comes from the query range. We need to parse the full timestamp.
         // The `time` field may be empty — default to midnight.
         const timestamp = this.parseEventTimestamp(from, to, raw)
-        if (!timestamp) continue
+        if (!timestamp) {
+          skippedTimestamp++
+          continue
+        }
 
         events.push({
           title: raw.event,
@@ -156,7 +190,10 @@ export class CalendarFetcher {
       }
 
       const count = await upsertEconomicEvents(events)
-      console.log(`[calendar-fetcher] Upserted ${count} events (${rawEvents.length} from Finnhub)`)
+      console.log(
+        `[calendar-fetcher] Upserted ${count} events (${rawEvents.length} from Finnhub` +
+          `${skippedTimestamp > 0 ? `, ${skippedTimestamp} skipped due to timestamp parse failure` : ""})`,
+      )
     } catch (err) {
       if ((err as Error).name === "AbortError") return
       console.error("[calendar-fetcher] Fetch failed:", (err as Error).message)
@@ -166,23 +203,26 @@ export class CalendarFetcher {
   }
 
   /**
-   * Parse event timestamp. Finnhub economic calendar events have a date
-   * embedded in the response and a time field. We construct the full Date.
+   * Parse event timestamp from Finnhub economic calendar event.
+   * Finnhub returns a `date` field (YYYY-MM-DD) and a `time` field (HH:mm:ss).
    */
   private parseEventTimestamp(_from: string, _to: string, raw: FinnhubEconomicEvent): Date | null {
     try {
-      // Finnhub v1 economic calendar doesn't always include a full datetime.
-      // The `time` field is "HH:mm:ss" or empty. Events also don't include a date field
-      // in the nested object, so we use the array ordering within the date range.
-      // However, Finnhub actually returns each event with implicit date context.
-      // We'll construct from the event data — if time is present, use it; otherwise midnight.
-      // Note: In practice, the Finnhub response includes a date string per event.
-      // We handle both formats gracefully.
-      const rawAny = raw as unknown as Record<string, unknown>
-      const dateStr = (rawAny.date as string) ?? _from
+      const dateStr = raw.date ?? _from
       const timeStr = raw.time || "00:00:00"
-      return new Date(`${dateStr}T${timeStr}Z`)
-    } catch {
+      const parsed = new Date(`${dateStr}T${timeStr}Z`)
+      if (isNaN(parsed.getTime())) {
+        console.warn(
+          `[calendar-fetcher] Invalid timestamp for "${raw.event}": date=${dateStr} time=${timeStr}`,
+        )
+        return null
+      }
+      return parsed
+    } catch (err) {
+      console.warn(
+        `[calendar-fetcher] Failed to parse timestamp for "${raw.event}":`,
+        (err as Error).message,
+      )
       return null
     }
   }
