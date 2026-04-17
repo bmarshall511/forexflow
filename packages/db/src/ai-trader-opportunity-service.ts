@@ -53,6 +53,13 @@ function toOpportunityData(row: {
   technicalSnapshot: string
   fundamentalSnapshot: string
   sentimentSnapshot: string
+  technicalBrief: string | null
+  macroRiskBrief: string | null
+  bullCase: string | null
+  bearCase: string | null
+  debateCost: number
+  debateInputTokens: number
+  debateOutputTokens: number
   tier2Response: string | null
   tier2Model: string | null
   tier2InputTokens: number
@@ -96,6 +103,13 @@ function toOpportunityData(row: {
     session: row.session as AiTraderSession | null,
     primaryTechnique: row.primaryTechnique as AiTraderTechnique | null,
     entryRationale: row.entryRationale,
+    technicalBrief: row.technicalBrief,
+    macroRiskBrief: row.macroRiskBrief,
+    bullCase: row.bullCase,
+    bearCase: row.bearCase,
+    debateCost: row.debateCost,
+    debateInputTokens: row.debateInputTokens,
+    debateOutputTokens: row.debateOutputTokens,
     technicalSnapshot: safeJsonParse<unknown>(row.technicalSnapshot, {}),
     fundamentalSnapshot: safeJsonParse<unknown>(row.fundamentalSnapshot, {}),
     sentimentSnapshot: safeJsonParse<unknown>(row.sentimentSnapshot, {}),
@@ -225,6 +239,14 @@ export async function updateOpportunityStatus(
     tier3InputTokens: number
     tier3OutputTokens: number
     tier3Cost: number
+    // Multi-agent debate data
+    technicalBrief: string
+    macroRiskBrief: string
+    bullCase: string
+    bearCase: string
+    debateCost: number
+    debateInputTokens: number
+    debateOutputTokens: number
   }>,
 ): Promise<void> {
   const data: Record<string, unknown> = { status, updatedAt: new Date() }

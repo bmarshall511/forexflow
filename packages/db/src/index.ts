@@ -367,6 +367,15 @@ export {
 } from "./ai-trader-analytics-service"
 
 export {
+  createReflection,
+  getRelevantReflections,
+  getReflectionByOpportunityId,
+  hasReflection,
+  cleanupOldReflections,
+  type CreateReflectionInput,
+} from "./ai-trader-reflection-service"
+
+export {
   createPriceAlert,
   listPriceAlerts,
   getPriceAlert,

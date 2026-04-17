@@ -27,6 +27,7 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 - `settings-service.ts` — app settings CRUD
 - `ai-settings-service.ts` / `ai-analysis-service.ts` / `ai-recommendation-service.ts`
 - `trade-condition-service.ts` — AI trade conditions
+- `ai-trader-reflection-service.ts` — Post-trade reflections for EdgeFinder (multi-agent memory)
 - `tv-alerts-config-service.ts` (TVAlertsConfig fields: `riskPercent` Float default 1.0, `minUnits` Int default 1000 for risk-based position sizing; legacy `positionSizePercent` deprecated) / `tv-alerts-signal-service.ts` (weekend-aware: `getTodaySignalCount()` and `getAutoTradesSummary()` use `getLastTradingSessionStart()` to show last session's data on weekends) / `signal-audit-service.ts`
 - `zone-service.ts` / `zone-settings-service.ts`
 - `trend-service.ts` / `trend-settings-service.ts`

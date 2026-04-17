@@ -26,6 +26,7 @@ import type { DataAggregator } from "./data-aggregator.js"
 import type { PerformanceTracker } from "./performance-tracker.js"
 import type { CostTracker } from "./cost-tracker.js"
 import { AiReEvaluator } from "./re-evaluator.js"
+import { ReflectionEngine } from "./reflection-engine.js"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ export class TradeManager {
   private checkTimer: ReturnType<typeof setInterval> | null = null
   private priceMap: Record<string, number> = {}
   private aiReEvaluator: AiReEvaluator | null = null
+  private reflectionEngine = new ReflectionEngine()
 
   constructor(
     private tradeSyncer: OandaTradeSyncer,
@@ -251,6 +253,13 @@ export class TradeManager {
         `${opp.instrument.replace("_", "/")} ${opp.direction} — ${prefix}$${realizedPL.toFixed(2)}`,
         outcome === "win" ? "info" : "warning",
       )
+
+      // Generate post-trade reflection (async, fire-and-forget)
+      // Re-fetch the opportunity to get the latest managementLog
+      const freshOpp = await findOpportunityByResultTradeId(tradeId)
+      if (freshOpp) {
+        void this.reflectionEngine.generateReflection(freshOpp, realizedPL, outcome)
+      }
     }
   }
 

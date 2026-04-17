@@ -1,6 +1,7 @@
 import type {
   AiTraderConfigData,
   AiTraderStrategyPerformanceData,
+  AiTraderReflectionData,
   EconomicCalendarEvent,
   NewsSentimentData,
 } from "@fxflow/types"
@@ -264,6 +265,325 @@ RULES:
 - Never widen SL (only tighten or hold)
 - partial_close should specify closePercent (25, 50, 75)
 - "close" only if the trade thesis is invalidated`,
+  }
+}
+
+// ���── Multi-Agent: Analyst Briefs ─────────────────────────────────────────────
+
+export function buildTechnicalBriefPrompt(signal: Tier1Signal): { system: string; user: string } {
+  return {
+    system: `You are a forex technical analyst. Summarize the technical picture in 3-5 sentences.
+
+Focus on: trend direction, key support/resistance levels, confluence signals, and any divergences or warning signs. Cite specific price levels. Be direct — no hedging language.
+
+Plain English only. No jargon or acronyms.`,
+    user: `Summarize the technical setup for this ${signal.direction.toUpperCase()} on ${signal.instrument}:
+
+### Entry Levels
+- Entry: ${signal.entryPrice}, SL: ${signal.suggestedSL}, TP: ${signal.suggestedTP}
+- R:R: ${signal.riskRewardRatio.toFixed(2)} (spread-adjusted: ${signal.spreadAdjustedRR.toFixed(2)})
+
+### Technical Snapshot
+${formatTechnicalSnapshot(signal.technicalSnapshot)}
+
+### Confluence Signals (${signal.confidence}/100)
+${signal.reasons.map((r) => `- ${r}`).join("\n")}
+
+### Confluence Breakdown
+${Object.entries(signal.confluenceBreakdown)
+  .map(
+    ([k, v]) =>
+      `- ${k}: ${v.present ? "present" : "absent"} (weight: ${v.weight}, contribution: ${v.contribution.toFixed(1)})`,
+  )
+  .join("\n")}
+
+Write a 3-5 sentence technical summary. No JSON — plain text only.`,
+  }
+}
+
+export function buildMacroRiskBriefPrompt(
+  signal: Tier1Signal,
+  fundamentalData: {
+    calendar: EconomicCalendarEvent[]
+    sentiment: Record<string, NewsSentimentData | null>
+    macro: Record<string, unknown>
+  },
+  performanceHistory: AiTraderStrategyPerformanceData[],
+  accountBalance: number,
+  openTradeCount: number,
+  maxConcurrentTrades: number,
+  consecutiveLosses: number,
+  pairProfileWinRate: number | null,
+): { system: string; user: string } {
+  return {
+    system: `You are a forex macro and risk analyst. Summarize the fundamental and risk picture in 3-5 sentences.
+
+Focus on: upcoming economic events within expected hold time, central bank stance, news sentiment, account risk state, and any reasons for caution. Be specific about which events and when.
+
+Plain English only. No jargon or acronyms.`,
+    user: `Assess the macro and risk context for this ${signal.direction.toUpperCase()} ${signal.profile} trade on ${signal.instrument}:
+
+### Fundamental Data
+${formatFundamentals(fundamentalData)}
+
+### Historical Performance (90d, similar setups)
+${formatPerformance(performanceHistory)}
+
+### Account Context
+- Balance: $${accountBalance.toFixed(2)}
+- Open AI trades: ${openTradeCount} / ${maxConcurrentTrades} max
+- Consecutive losses: ${consecutiveLosses}
+${pairProfileWinRate !== null ? `- Pair+profile win rate: ${(pairProfileWinRate * 100).toFixed(0)}%` : "- No historical data for this pair+profile combo"}
+
+Write a 3-5 sentence macro/risk summary. No JSON — plain text only.`,
+  }
+}
+
+// ─── Multi-Agent: Bull/Bear Debate ────────��─────────────────────────────────
+
+export function buildBullCasePrompt(
+  signal: Tier1Signal,
+  technicalBrief: string,
+  macroRiskBrief: string,
+): { system: string; user: string } {
+  return {
+    system: `You are a bull advocate for this forex trade. Your job is to argue convincingly WHY this trade should be taken.
+
+Rules:
+- Use the analyst briefs as your evidence base — cite specific price levels and conditions.
+- Be honest: if the case is genuinely weak, say so rather than fabricating reasons.
+- 4-6 sentences. Plain English only — no jargon or acronyms.
+- Do NOT output JSON. Write a plain-text argument.`,
+    user: `Argue FOR this ${signal.direction.toUpperCase()} on ${signal.instrument} (${signal.profile} profile):
+
+### Entry: ${signal.entryPrice} | SL: ${signal.suggestedSL} | TP: ${signal.suggestedTP} | R:R: ${signal.riskRewardRatio.toFixed(2)}
+
+### Technical Brief
+${technicalBrief}
+
+### Macro/Risk Brief
+${macroRiskBrief}
+
+Write your bull case (4-6 sentences, plain text).`,
+  }
+}
+
+export function buildBearCasePrompt(
+  signal: Tier1Signal,
+  technicalBrief: string,
+  macroRiskBrief: string,
+  bullCase: string,
+): { system: string; user: string } {
+  return {
+    system: `You are a bear advocate arguing AGAINST this forex trade. You have read the bull's argument and must counter it directly.
+
+Rules:
+- Address the bull's specific points and explain why they may be wrong or insufficient.
+- Identify risks, unfavorable conditions, and reasons the trade could fail.
+- Be honest: if the bull case is strong and you cannot find real counter-arguments, acknowledge that.
+- 4-6 sentences. Plain English only — no jargon or acronyms.
+- Do NOT output JSON. Write a plain-text counter-argument.`,
+    user: `Argue AGAINST this ${signal.direction.toUpperCase()} on ${signal.instrument} (${signal.profile} profile):
+
+### Entry: ${signal.entryPrice} | SL: ${signal.suggestedSL} | TP: ${signal.suggestedTP} | R:R: ${signal.riskRewardRatio.toFixed(2)}
+
+### Technical Brief
+${technicalBrief}
+
+### Macro/Risk Brief
+${macroRiskBrief}
+
+### Bull's Argument
+${bullCase}
+
+Write your bear counter-argument (4-6 sentences, plain text).`,
+  }
+}
+
+// ─── Multi-Agent: Judge Decision ────────────────────────────────────────────
+
+export interface JudgeContext extends Tier3Context {
+  technicalBrief: string
+  macroRiskBrief: string
+  bullCase: string
+  bearCase: string
+  reflections: AiTraderReflectionData[]
+}
+
+export function buildJudgePrompt(ctx: JudgeContext): { system: string; user: string } {
+  const {
+    signal,
+    tier2Response,
+    config,
+    accountBalance,
+    openTradeCount,
+    technicalBrief,
+    macroRiskBrief,
+    bullCase,
+    bearCase,
+    reflections,
+  } = ctx
+
+  const riskPercent = ctx.riskPercent ?? 1
+  const riskAmount = accountBalance * (riskPercent / 100)
+
+  const reflectionSection =
+    reflections.length > 0
+      ? `### Lessons from Similar Past Trades
+
+${reflections
+  .map(
+    (r, i) =>
+      `${i + 1}. [${r.instrument} ${r.profile}, ${r.outcome.toUpperCase()} ${r.realizedPL >= 0 ? "+" : ""}$${r.realizedPL.toFixed(2)}]:
+   Reflection: "${r.reflection}"
+   Lessons: "${r.lessonsLearned}"`,
+  )
+  .join("\n\n")}
+
+Consider these lessons when making your decision — but verify they still apply to current market conditions.
+`
+      : ""
+
+  return {
+    system: `${TIER3_SYSTEM_PROMPT}
+
+ADDITIONAL CONTEXT: You are the JUDGE in a multi-agent analysis. You have received:
+1. Analyst briefs (technical + macro/risk summaries)
+2. A bull/bear adversarial debate
+3. Past trade reflections (if available)
+
+You MUST address both the bull and bear arguments in your entryRationale — explain which points you agree with and why. Do not ignore either side.`,
+    user: `## Judge Decision — Final Trade Verdict
+
+You are making the FINAL decision on whether to execute this trade. Respond with JSON:
+
+\`\`\`json
+{
+  "execute": boolean,
+  "confidence": number,
+  "adjustedEntry": number | null,
+  "adjustedSL": number | null,
+  "adjustedTP": number | null,
+  "scores": {
+    "technical": number,
+    "fundamental": number,
+    "sentiment": number,
+    "session": number,
+    "historical": number,
+    "confluence": number
+  },
+  "entryRationale": string,
+  "riskAssessment": string,
+  "managementPlan": string
+}
+\`\`\`
+
+### Candidate Details
+- **Instrument**: ${signal.instrument}
+- **Direction**: ${signal.direction.toUpperCase()}
+- **Profile**: ${signal.profile}
+- **Primary Technique**: ${signal.primaryTechnique}
+- **Entry**: ${signal.entryPrice}
+- **SL**: ${signal.suggestedSL} (${signal.riskPips.toFixed(1)} pips risk)
+- **TP**: ${signal.suggestedTP} (${signal.rewardPips.toFixed(1)} pips reward)
+- **R:R (raw)**: ${signal.riskRewardRatio.toFixed(2)}
+- **R:R (after spread)**: ${signal.spreadAdjustedRR.toFixed(2)} (spread: ${signal.spreadPips.toFixed(1)} pips, ${(signal.spreadImpactPercent * 100).toFixed(0)}% degradation)
+
+### Tier 2 Assessment
+${tier2Response}
+
+### Technical Brief
+${technicalBrief}
+
+### Macro/Risk Brief
+${macroRiskBrief}
+
+### Bull Case
+${bullCase}
+
+### Bear Case
+${bearCase}
+
+${reflectionSection}### Account Context
+- Balance: $${accountBalance.toFixed(2)}
+- Risk per trade: ${riskPercent}% = $${riskAmount.toFixed(2)}
+- Open AI trades: ${openTradeCount} / ${config.maxConcurrentTrades} max
+- Operating mode: ${config.operatingMode}
+
+### Management Config
+- Breakeven: ${config.managementConfig.breakevenEnabled ? `ON (trigger at ${config.managementConfig.breakevenTriggerRR}R)` : "OFF"}
+- Trailing stop: ${config.managementConfig.trailingStopEnabled ? `ON (${config.managementConfig.trailingStopAtrMultiplier}x ATR)` : "OFF"}
+- Partial close: ${config.managementConfig.partialCloseEnabled ? `ON (${config.managementConfig.partialClosePercent}% at ${config.managementConfig.partialCloseTargetRR}R)` : "OFF"}
+- Time exit: ${config.managementConfig.timeExitEnabled ? `ON (${config.managementConfig.timeExitHours}h)` : "OFF"}
+- News protection: ${config.managementConfig.newsProtectionEnabled ? "ON" : "OFF"}
+
+${buildRiskWarning(ctx)}
+IMPORTANT:
+- You MUST reference both the bull and bear arguments in your entryRationale
+- Position sizing is calculated automatically — do NOT include positionSizeUnits
+- If adjusting entry/SL/TP, ensure R:R >= ${signal.profile === "scalper" || signal.profile === "news" ? "1.3" : signal.profile === "intraday" ? "1.8" : "2.0"}
+- Confidence must be honest — 80+ should be truly exceptional setups
+- All text fields must be plain English, not jargon`,
+  }
+}
+
+// ─── Reflection Prompt ────────────���─────────────────────────────────────────
+
+export interface ReflectionContext {
+  instrument: string
+  direction: "long" | "short"
+  profile: string
+  entryPrice: number
+  stopLoss: number
+  takeProfit: number
+  confidence: number
+  entryRationale: string | null
+  outcome: "win" | "loss" | "breakeven"
+  realizedPL: number
+  managementLog: Array<{ action: string; detail: string; timestamp: string }>
+  technicalSnapshot: TechnicalSnapshot | null
+}
+
+export function buildReflectionPrompt(ctx: ReflectionContext): { system: string; user: string } {
+  return {
+    system: `You are reviewing a completed forex trade to extract lessons for future decisions.
+
+Be specific and actionable. Focus on:
+1. What signals were correct or incorrect
+2. What was missed that could have been caught
+3. What should be done differently in similar future situations
+
+Respond ONLY with JSON:
+\`\`\`json
+{
+  "reflection": "Narrative of what happened and why (3-5 sentences, plain English)",
+  "lessonsLearned": "2-3 actionable bullet points for similar future trades"
+}
+\`\`\``,
+    user: `## Post-Trade Reflection
+
+### Trade Details
+- **Instrument**: ${ctx.instrument}
+- **Direction**: ${ctx.direction.toUpperCase()}
+- **Profile**: ${ctx.profile}
+- **Entry**: ${ctx.entryPrice}
+- **SL**: ${ctx.stopLoss}
+- **TP**: ${ctx.takeProfit}
+- **Confidence at entry**: ${ctx.confidence}%
+
+### Original Thesis
+${ctx.entryRationale ?? "No entry rationale recorded."}
+
+### Outcome
+- **Result**: ${ctx.outcome.toUpperCase()}
+- **Realized P&L**: $${ctx.realizedPL.toFixed(2)}
+
+### Management History
+${ctx.managementLog.length > 0 ? ctx.managementLog.map((a) => `- [${a.timestamp}] ${a.action}: ${a.detail}`).join("\n") : "No management actions taken."}
+
+${ctx.technicalSnapshot ? `### Technical Snapshot at Entry\n${formatTechnicalSnapshot(ctx.technicalSnapshot)}` : ""}
+
+Generate a reflection and lessons learned. Be specific about what signals were right or wrong.`,
   }
 }
 

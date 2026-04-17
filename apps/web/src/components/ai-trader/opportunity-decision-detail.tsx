@@ -12,7 +12,12 @@ import {
   Gauge,
   Coins,
   TrendingUp,
+  TrendingDown,
   AlertTriangle,
+  BookOpen,
+  MessageSquare,
+  Scale,
+  Lightbulb,
 } from "lucide-react"
 
 // ─── Parse tier responses ─────────────────────────────────────────────────────
@@ -87,8 +92,11 @@ export function OpportunityDecisionDetail({ opportunity: opp }: Props) {
   const tier3 = useMemo(() => tryParseJSON<Tier3Parsed>(opp.tier3Response), [opp.tier3Response])
 
   const isRejected = opp.status === "rejected" || opp.status === "skipped"
-  const totalCost = opp.tier2Cost + opp.tier3Cost
-  const hasAnyDetail = tier2 || tier3 || opp.entryRationale || opp.regime || opp.primaryTechnique
+  const totalCost = opp.tier2Cost + opp.tier3Cost + (opp.debateCost ?? 0)
+  const hasDebate = opp.bullCase || opp.bearCase
+  const hasBriefs = opp.technicalBrief || opp.macroRiskBrief
+  const hasAnyDetail =
+    tier2 || tier3 || opp.entryRationale || opp.regime || opp.primaryTechnique || hasDebate
 
   if (!hasAnyDetail) return null
 
@@ -169,6 +177,52 @@ export function OpportunityDecisionDetail({ opportunity: opp }: Props) {
         </div>
       )}
 
+      {/* Analyst briefs (multi-agent) */}
+      {hasBriefs && (
+        <DetailRow icon={BookOpen} label="Analyst Briefs">
+          <div className="space-y-1.5">
+            {opp.technicalBrief && (
+              <div>
+                <p className="text-muted-foreground text-[10px] font-medium">Technical</p>
+                <p className="text-muted-foreground">{opp.technicalBrief}</p>
+              </div>
+            )}
+            {opp.macroRiskBrief && (
+              <div>
+                <p className="text-muted-foreground text-[10px] font-medium">Macro / Risk</p>
+                <p className="text-muted-foreground">{opp.macroRiskBrief}</p>
+              </div>
+            )}
+          </div>
+        </DetailRow>
+      )}
+
+      {/* Bull/bear debate (multi-agent) */}
+      {hasDebate && (
+        <DetailRow icon={Scale} label="Bull / Bear Debate">
+          <div className="space-y-2">
+            {opp.bullCase && (
+              <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2">
+                <p className="mb-0.5 flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="size-2.5" />
+                  Bull Case
+                </p>
+                <p className="text-muted-foreground text-xs leading-relaxed">{opp.bullCase}</p>
+              </div>
+            )}
+            {opp.bearCase && (
+              <div className="rounded-md border border-red-500/20 bg-red-500/5 p-2">
+                <p className="mb-0.5 flex items-center gap-1 text-[10px] font-medium text-red-600 dark:text-red-400">
+                  <TrendingDown className="size-2.5" />
+                  Bear Case
+                </p>
+                <p className="text-muted-foreground text-xs leading-relaxed">{opp.bearCase}</p>
+              </div>
+            )}
+          </div>
+        </DetailRow>
+      )}
+
       {/* Cost row */}
       {totalCost > 0 && (
         <div className="text-muted-foreground flex items-center gap-1 text-[10px]">
@@ -178,7 +232,9 @@ export function OpportunityDecisionDetail({ opportunity: opp }: Props) {
             {opp.tier2Cost > 0 && opp.tier3Cost > 0 && (
               <span>
                 {" "}
-                (T2: ${opp.tier2Cost.toFixed(4)} + T3: ${opp.tier3Cost.toFixed(4)})
+                (T2: ${opp.tier2Cost.toFixed(4)}
+                {(opp.debateCost ?? 0) > 0 && ` + Debate: $${opp.debateCost.toFixed(4)}`} + T3: $
+                {opp.tier3Cost.toFixed(4)})
               </span>
             )}
           </span>

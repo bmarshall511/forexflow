@@ -87,6 +87,7 @@ function toConfigData(config: Awaited<ReturnType<typeof getOrCreateConfig>>): Ai
     monthlyBudgetUsd: config.monthlyBudgetUsd,
     scanModel: config.scanModel,
     decisionModel: config.decisionModel,
+    multiAgentEnabled: config.multiAgentEnabled,
     fredApiKey: !!config.fredApiKey,
     alphaVantageApiKey: !!config.alphaVantageApiKey,
   }
@@ -128,6 +129,7 @@ export async function updateAiTraderConfig(
     monthlyBudgetUsd: number
     scanModel: string
     decisionModel: string
+    multiAgentEnabled: boolean
   }>,
 ): Promise<AiTraderConfigData> {
   await getOrCreateConfig()
@@ -157,6 +159,7 @@ export async function updateAiTraderConfig(
   if (data.monthlyBudgetUsd !== undefined) updateData.monthlyBudgetUsd = data.monthlyBudgetUsd
   if (data.scanModel !== undefined) updateData.scanModel = data.scanModel
   if (data.decisionModel !== undefined) updateData.decisionModel = data.decisionModel
+  if (data.multiAgentEnabled !== undefined) updateData.multiAgentEnabled = data.multiAgentEnabled
 
   await db.aiTraderConfig.update({
     where: { id: 1 },

@@ -38,6 +38,7 @@ interface AiTraderConfig {
   monthlyBudgetUsd: number
   scanModel: string
   decisionModel: string
+  multiAgentEnabled: boolean
   pairWhitelist: string[]
   enabledProfiles: Record<AiTraderProfile, boolean>
   enabledTechniques: Record<AiTraderTechnique, boolean>
@@ -509,6 +510,23 @@ export function AiTraderSettingsPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm">Multi-Agent Analysis</p>
+              <p className="text-muted-foreground text-xs">
+                Use adversarial bull/bear debate to improve decision quality. Adds ~$0.001 per
+                candidate.
+              </p>
+            </div>
+            <Toggle
+              checked={config.multiAgentEnabled}
+              onChange={(v) => void save({ multiAgentEnabled: v })}
+              disabled={saving}
+            />
           </div>
         </CardContent>
       </Card>

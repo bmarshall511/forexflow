@@ -10,10 +10,13 @@ import {
   AlertTriangle,
   Zap,
   TrendingUp,
+  TrendingDown,
   ShieldAlert,
   ArrowUpRight,
   ChevronDown,
   ChevronRight,
+  BookOpen,
+  Scale,
 } from "lucide-react"
 import { ScanLogEntryDetail } from "./scan-log-entry-detail"
 
@@ -41,6 +44,10 @@ const BASE_STYLE: Record<string, { icon: React.ReactNode; color: string }> = {
   trade_placed: { icon: <ArrowUpRight className="size-3.5" />, color: "text-emerald-500" },
   trade_rejected: { icon: <XCircle className="size-3.5" />, color: "text-red-500" },
   gate_blocked: { icon: <ShieldAlert className="size-3.5" />, color: "text-amber-500" },
+  brief_complete: { icon: <BookOpen className="size-3.5" />, color: "text-blue-400" },
+  bull_case: { icon: <TrendingUp className="size-3.5" />, color: "text-emerald-400" },
+  bear_case: { icon: <TrendingDown className="size-3.5" />, color: "text-red-400" },
+  judge_decision: { icon: <Scale className="size-3.5" />, color: "text-violet-500" },
 }
 
 /** Generate a plain-English summary label based on entry type and metadata */
@@ -100,6 +107,10 @@ function getEntryStyle(entry: AiTraderScanLogEntry): EntryStyle {
     trade_placed: `Placed ${dir} on ${pair}${m?.entryPrice ? ` @ ${m.entryPrice}` : ""}${rr}`,
     trade_rejected: `${pair} placement failed${reason ? ` — ${reason}` : ""}`,
     gate_blocked: `${pair} blocked — ${m?.reason || entry.message || "risk check failed"}`,
+    brief_complete: `${pair}: Analyst briefs generated (technical + macro/risk)`,
+    bull_case: entry.message || `${pair}: Bull case generated`,
+    bear_case: entry.message || `${pair}: Bear case generated`,
+    judge_decision: entry.message || `${pair}: Judge making final decision`,
   }
 
   return { ...base, label: labels[entry.type] ?? entry.type }
@@ -122,6 +133,8 @@ const EXPANDABLE_TYPES = new Set([
   "pair_scanned",
   "scan_error",
   "scan_skip",
+  "bull_case",
+  "bear_case",
 ])
 
 function formatTime(iso: string): string {

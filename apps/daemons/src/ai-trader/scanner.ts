@@ -58,6 +58,7 @@ import {
   type Tier1NearMiss,
 } from "./strategy-engine.js"
 import { buildTier2Prompt, buildTier3Prompt, type Tier3Context } from "./prompt-builder.js"
+import { MultiAgentAnalyzer } from "./multi-agent.js"
 
 const MAX_SCAN_LOG_ENTRIES = 100
 
@@ -1258,58 +1259,121 @@ export class AiTraderScanner {
         ? pairPerfMatch.wins / pairPerfMatch.totalTrades
         : null
 
-    const tier3Ctx: Tier3Context = {
-      signal,
-      tier2Response: tier2Text,
-      fundamentalData,
-      performanceHistory,
-      config,
-      accountBalance,
-      openTradeCount,
-      riskPercent,
-      consecutiveLosses: this.circuitBreaker.getState().consecutiveLosses,
-      pairProfileWinRate,
-    }
+    // Multi-agent debate data (populated only when multiAgentEnabled)
+    let debateData: {
+      technicalBrief: string
+      macroRiskBrief: string
+      bullCase: string
+      bearCase: string
+      debateCost: number
+      debateInputTokens: number
+      debateOutputTokens: number
+    } | null = null
 
-    const tier3Prompt = buildTier3Prompt(tier3Ctx)
+    let tier3Text: string
+    let tier3InputTokens: number
+    let tier3OutputTokens: number
+    let tier3Model: string
+    let tier3Cost: number
 
-    // Tier 3 with prompt caching — same pattern as Tier 2.
-    const tier3Response = await anthropic.messages.create({
-      model: config.decisionModel || "claude-sonnet-4-6",
-      max_tokens: 1500,
-      system: [
-        {
-          type: "text" as const,
-          text: tier3Prompt.system,
-          cache_control: { type: "ephemeral" as const },
-        },
-      ],
-      messages: [{ role: "user", content: tier3Prompt.user }],
-    })
+    if (config.multiAgentEnabled) {
+      // ── Multi-agent path: briefs → debate → judge ──────────────────
+      const multiAgent = new MultiAgentAnalyzer(this.costTracker, this.addLogEntry.bind(this))
 
-    const tier3Text = tier3Response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("")
+      const maResult = await multiAgent.analyze(anthropic, {
+        signal,
+        tier2Response: tier2Text,
+        fundamentalData,
+        performanceHistory,
+        config,
+        accountBalance,
+        openTradeCount,
+        riskPercent,
+        consecutiveLosses: this.circuitBreaker.getState().consecutiveLosses,
+        pairProfileWinRate,
+      })
 
-    const tier3InputTokens = tier3Response.usage.input_tokens
-    const tier3OutputTokens = tier3Response.usage.output_tokens
-    const tier3UsageWithCache = tier3Response.usage as typeof tier3Response.usage & {
-      cache_read_input_tokens?: number
-      cache_creation_input_tokens?: number
-    }
-    const tier3CacheRead = tier3UsageWithCache.cache_read_input_tokens ?? 0
-    const tier3CacheWrite = tier3UsageWithCache.cache_creation_input_tokens ?? 0
-    const tier3Model = config.decisionModel || "claude-sonnet-4-6"
-    if (tier2CacheRead > 0 || tier3CacheRead > 0) {
+      debateData = {
+        technicalBrief: maResult.technicalBrief,
+        macroRiskBrief: maResult.macroRiskBrief,
+        bullCase: maResult.bullCase,
+        bearCase: maResult.bearCase,
+        debateCost: maResult.debateCost,
+        debateInputTokens: maResult.debateInputTokens,
+        debateOutputTokens: maResult.debateOutputTokens,
+      }
+
+      tier3Text = maResult.judgeResponse
+      tier3InputTokens = maResult.judgeInputTokens
+      tier3OutputTokens = maResult.judgeOutputTokens
+      tier3Model = maResult.judgeModel
+      tier3Cost = maResult.judgeCost
+
+      const reflectionCount = maResult.reflections.length
       this.addLogEntry(
-        "tier3_pass",
-        `${pairLabel}: cache hits — T2 ${tier2CacheRead}r/${tier2CacheWrite}w, T3 ${tier3CacheRead}r/${tier3CacheWrite}w tokens`,
+        "judge_decision",
+        `${pairLabel}: Judge deciding with ${reflectionCount} past reflection${reflectionCount !== 1 ? "s" : ""}`,
+        undefined,
+        {
+          instrument: signal.instrument,
+          direction: signal.direction,
+          profile: signal.profile,
+        },
       )
-    }
-    const tier3Cost = getModelCost(tier3Model, tier3InputTokens, tier3OutputTokens)
+    } else {
+      // ── Single Tier 3 path (existing behavior) ─────────────────────
+      const tier3Ctx: Tier3Context = {
+        signal,
+        tier2Response: tier2Text,
+        fundamentalData,
+        performanceHistory,
+        config,
+        accountBalance,
+        openTradeCount,
+        riskPercent,
+        consecutiveLosses: this.circuitBreaker.getState().consecutiveLosses,
+        pairProfileWinRate,
+      }
 
-    this.costTracker.invalidateCache()
+      const tier3Prompt = buildTier3Prompt(tier3Ctx)
+
+      const tier3Response = await anthropic.messages.create({
+        model: config.decisionModel || "claude-sonnet-4-6",
+        max_tokens: 1500,
+        system: [
+          {
+            type: "text" as const,
+            text: tier3Prompt.system,
+            cache_control: { type: "ephemeral" as const },
+          },
+        ],
+        messages: [{ role: "user", content: tier3Prompt.user }],
+      })
+
+      tier3Text = tier3Response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+
+      tier3InputTokens = tier3Response.usage.input_tokens
+      tier3OutputTokens = tier3Response.usage.output_tokens
+      const tier3UsageWithCache = tier3Response.usage as typeof tier3Response.usage & {
+        cache_read_input_tokens?: number
+        cache_creation_input_tokens?: number
+      }
+      const tier3CacheRead = tier3UsageWithCache.cache_read_input_tokens ?? 0
+      const tier3CacheWrite = tier3UsageWithCache.cache_creation_input_tokens ?? 0
+      tier3Model = config.decisionModel || "claude-sonnet-4-6"
+      if (tier2CacheRead > 0 || tier3CacheRead > 0) {
+        this.addLogEntry(
+          "tier3_pass",
+          `${pairLabel}: cache hits — T2 ${tier2CacheRead}r/${tier2CacheWrite}w, T3 ${tier3CacheRead}r/${tier3CacheWrite}w tokens`,
+        )
+      }
+      tier3Cost = getModelCost(tier3Model, tier3InputTokens, tier3OutputTokens)
+
+      this.costTracker.invalidateCache()
+    }
 
     let tier3Result: {
       execute: boolean
@@ -1476,11 +1540,21 @@ export class AiTraderScanner {
       tier2Passed: true,
       tier2DecidedAt: new Date(),
       tier3Response: tier3Text,
-      tier3Model: config.decisionModel || "claude-sonnet-4-6",
+      tier3Model,
       tier3InputTokens,
       tier3OutputTokens,
       tier3Cost,
       suggestedAt: tier3Result.execute ? new Date() : undefined,
+      // Multi-agent debate data (only when multiAgentEnabled)
+      ...(debateData && {
+        technicalBrief: debateData.technicalBrief,
+        macroRiskBrief: debateData.macroRiskBrief,
+        bullCase: debateData.bullCase,
+        bearCase: debateData.bearCase,
+        debateCost: debateData.debateCost,
+        debateInputTokens: debateData.debateInputTokens,
+        debateOutputTokens: debateData.debateOutputTokens,
+      }),
     })
 
     if (!tier3Result.execute) {
@@ -1531,7 +1605,7 @@ export class AiTraderScanner {
         tier2OutputTokens,
         tier2Cost,
         tier3Response: tier3Text,
-        tier3Model: config.decisionModel || "claude-sonnet-4-6",
+        tier3Model,
         tier3InputTokens,
         tier3OutputTokens,
         tier3Cost,
@@ -1561,11 +1635,21 @@ export class AiTraderScanner {
       status: "suggested",
       tier2Response: tier2Text,
       tier3Response: tier3Text,
-      tier3Model: config.decisionModel || "claude-sonnet-4-6",
+      tier3Model,
       tier3InputTokens,
       tier3OutputTokens,
       tier3Cost,
       suggestedAt: new Date().toISOString(),
+      // Include debate data in WS broadcast so UI can render it immediately
+      ...(debateData && {
+        technicalBrief: debateData.technicalBrief,
+        macroRiskBrief: debateData.macroRiskBrief,
+        bullCase: debateData.bullCase,
+        bearCase: debateData.bearCase,
+        debateCost: debateData.debateCost,
+        debateInputTokens: debateData.debateInputTokens,
+        debateOutputTokens: debateData.debateOutputTokens,
+      }),
     }
 
     this.broadcast({
