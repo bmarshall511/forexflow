@@ -879,42 +879,55 @@ export class OandaTradeSyncer {
       orderBody.timeInForce = "GTC"
     }
 
-    // Validate SL/TP are on the correct side of entry and not equal after rounding
-    const effectiveEntry = entryPrice ?? 0
+    // Validate SL/TP are on the correct side of entry and not equal after rounding.
+    // For MARKET orders, entryPrice is unknown pre-fill — skip pre-validation
+    // (OANDA will reject invalid SL/TP server-side, and our calculateSLTPForSignal
+    // already computed them from the live bid/ask).
+    const effectiveEntry = entryPrice ?? null
     if (stopLoss !== null) {
       const slRounded = stopLoss.toFixed(decimals)
-      const entryRounded = effectiveEntry.toFixed(decimals)
-      if (slRounded === entryRounded) {
-        throw new Error(
-          `SL (${slRounded}) equals entry (${entryRounded}) after rounding — order would be unprotected`,
-        )
-      }
-      if (direction === "long" && stopLoss >= effectiveEntry) {
-        throw new Error(`SL (${stopLoss}) must be below entry (${effectiveEntry}) for long trades`)
-      }
-      if (direction === "short" && stopLoss <= effectiveEntry) {
-        throw new Error(`SL (${stopLoss}) must be above entry (${effectiveEntry}) for short trades`)
+      // Pre-validate SL side only when we know the entry price (LIMIT orders).
+      // For MARKET orders, effectiveEntry is null — OANDA validates server-side.
+      if (effectiveEntry !== null) {
+        const entryRounded = effectiveEntry.toFixed(decimals)
+        if (slRounded === entryRounded) {
+          throw new Error(
+            `SL (${slRounded}) equals entry (${entryRounded}) after rounding — order would be unprotected`,
+          )
+        }
+        if (direction === "long" && stopLoss >= effectiveEntry) {
+          throw new Error(
+            `SL (${stopLoss}) must be below entry (${effectiveEntry}) for long trades`,
+          )
+        }
+        if (direction === "short" && stopLoss <= effectiveEntry) {
+          throw new Error(
+            `SL (${stopLoss}) must be above entry (${effectiveEntry}) for short trades`,
+          )
+        }
       }
       orderBody.stopLossOnFill = { price: slRounded, timeInForce: "GTC" }
     }
 
     if (takeProfit !== null) {
       const tpRounded = takeProfit.toFixed(decimals)
-      const entryRounded = effectiveEntry.toFixed(decimals)
-      if (tpRounded === entryRounded) {
-        throw new Error(
-          `TP (${tpRounded}) equals entry (${entryRounded}) after rounding — no profit potential`,
-        )
-      }
-      if (direction === "long" && takeProfit <= effectiveEntry) {
-        throw new Error(
-          `TP (${takeProfit}) must be above entry (${effectiveEntry}) for long trades`,
-        )
-      }
-      if (direction === "short" && takeProfit >= effectiveEntry) {
-        throw new Error(
-          `TP (${takeProfit}) must be below entry (${effectiveEntry}) for short trades`,
-        )
+      if (effectiveEntry !== null) {
+        const entryRounded = effectiveEntry.toFixed(decimals)
+        if (tpRounded === entryRounded) {
+          throw new Error(
+            `TP (${tpRounded}) equals entry (${entryRounded}) after rounding — no profit potential`,
+          )
+        }
+        if (direction === "long" && takeProfit <= effectiveEntry) {
+          throw new Error(
+            `TP (${takeProfit}) must be above entry (${effectiveEntry}) for long trades`,
+          )
+        }
+        if (direction === "short" && takeProfit >= effectiveEntry) {
+          throw new Error(
+            `TP (${takeProfit}) must be below entry (${effectiveEntry}) for short trades`,
+          )
+        }
       }
       orderBody.takeProfitOnFill = { price: tpRounded, timeInForce: "GTC" }
     }
