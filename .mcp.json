@@ -7,6 +7,10 @@
         "DAEMON_URL": "http://localhost:4100",
         "DATABASE_URL": "file:../../data/fxflow.db"
       }
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
     }
   }
 }

@@ -115,6 +115,13 @@ Canonical standards with full detail live in:
 User-facing documentation lives in `docs/user/` (8 categories, ~40 pages).
 Both `docs/user/` and `docs/dev/` are served in-app via the Documentation page.
 
+## Claude Agents
+
+Specialized subagent definitions in `.claude/agents/` for structured review workflows:
+
+- `code-reviewer.md` — Reviews staged changes against FXFlow coding standards, import boundaries, trading domain patterns, accessibility, and file size limits. Outputs APPROVE / WARNING / BLOCK verdict with severity-tiered findings (CRITICAL / HIGH / MEDIUM / LOW). Runs on Sonnet for cost efficiency.
+- `security-reviewer.md` — Security audit focused on OANDA credential exposure, webhook token leaks, API route auth, CF Worker injection, XSS in trade data display, and OWASP Top 10. Outputs PASS / ADVISORY / FAIL verdict.
+
 ## Claude Rules
 
 Path-scoped rules in `.claude/rules/` provide context-specific guidance:
@@ -130,3 +137,19 @@ Path-scoped rules in `.claude/rules/` provide context-specific guidance:
 - `08-trading-domain.md` — trading domain rules
 - `09-docs-sync.md` — keep docs in sync with code changes
 - `10-desktop-patterns.md` — Electron desktop app conventions
+
+## Hooks
+
+Automated guardrails in `.claude/hooks/`:
+
+- **PreToolUse (Bash)**: `guard-bash.mjs` blocks super-destructive commands; `docs-sync-check.mjs` prevents commits with undocumented code changes.
+- **PostToolUse (Write|Edit)**: `format-on-edit.mjs` auto-formats with Prettier after edits.
+- **Stop**: `session-end-check.mjs` runs `pnpm typecheck` at session end to catch accumulated type drift (informational, non-blocking).
+
+## Token Optimization
+
+Cost-saving environment variables configured in `settings.local.json`:
+
+- `MAX_THINKING_TOKENS=10000` — caps extended thinking (default 31,999 is often wasteful), ~70% thinking cost reduction.
+- `CLAUDE_CODE_SUBAGENT_MODEL=haiku` — routes exploration subagents to Haiku, ~80% cheaper for file reading and search tasks.
+- **Compaction strategy**: compact after planning phases and after debugging. Never mid-implementation. Use `/clear` between unrelated tasks.
