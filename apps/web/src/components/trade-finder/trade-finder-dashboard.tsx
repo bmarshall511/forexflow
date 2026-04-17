@@ -33,13 +33,14 @@ import {
 import { SetupCard } from "./setup-card"
 import { SetupDetailSheet } from "./setup-card-details"
 import { AutoTradeLog } from "./auto-trade-log"
+import { LiveTradesTab } from "./live-trades-tab"
 import { PerformanceOverview } from "./performance-overview"
 import { toast } from "sonner"
 import { formatRelativeTime } from "@fxflow/shared"
 import { PageHeader } from "@/components/ui/page-header"
 import { cn } from "@/lib/utils"
 
-type Tab = "active" | "history" | "activity" | "performance"
+type Tab = "active" | "live" | "history" | "activity" | "performance"
 
 export function TradeFinderDashboard() {
   const {
@@ -253,6 +254,14 @@ export function TradeFinderDashboard() {
           pulse={approachingCount > 0}
         />
         <TabNavButton
+          active={tab === "live"}
+          onClick={() => setTab("live")}
+          icon={<Activity className="size-3.5" />}
+          label="Live"
+          count={setups.filter((s) => s.status === "filled").length}
+          pulse={setups.some((s) => s.status === "filled")}
+        />
+        <TabNavButton
           active={tab === "history"}
           onClick={() => setTab("history")}
           icon={<History className="size-3.5" />}
@@ -370,6 +379,8 @@ export function TradeFinderDashboard() {
             )}
           </>
         )}
+
+        {tab === "live" && <LiveTradesTab setups={[...setups, ...history]} />}
 
         {tab === "history" && (
           <>

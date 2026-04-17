@@ -353,8 +353,6 @@ export class TradeFinderScanner {
     const tfMap = getTimeframeSetMap(speed)
     const { htf, mtf, ltf } = tfMap[pair.timeframeSet]
     const instrument = pair.instrument
-    const zoneConfig = getPresetConfig("standard")
-
     // 1. Fetch candles for all 3 timeframes
     const [htfCandles, mtfCandles, ltfCandles] = await Promise.all([
       fetchOandaCandles(instrument, htf, CANDLE_COUNT_MAP[htf] ?? 200, apiUrl, token, this.cache),
@@ -368,6 +366,19 @@ export class TradeFinderScanner {
 
     // Seed price cache so REST /price/:instrument works for Trade Finder instruments
     this.seedPriceFn?.(instrument, currentPrice, currentPrice)
+
+    // Regime-aware zone detection: select preset based on market conditions
+    let zonePreset: "conservative" | "standard" | "aggressive" = "standard"
+    if (ltfCandles.length >= 50) {
+      const regimeCandles = ltfCandles.map((c) => ({ ...c, volume: 0 }))
+      const regime = detectRegime(regimeCandles)
+      if (regime.regime === "ranging" || regime.regime === "low_volatility") {
+        zonePreset = "conservative" // Tighter bases, higher move-out requirement
+      } else if (regime.regime === "volatile") {
+        zonePreset = "aggressive" // Wider bases acceptable, momentum helps
+      }
+    }
+    const zoneConfig = getPresetConfig(zonePreset)
 
     // 2. HTF: Detect zones → build curve + store for confluence scoring
     let curveData: CurveData | null = null

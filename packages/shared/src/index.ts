@@ -244,6 +244,8 @@ export { checkStructuralConfirmation, type StructuralConfirmation } from "./stru
 
 export { classifyArrivalSpeed } from "./arrival-speed"
 
+export { detectCompoundZones, getCompoundBonus } from "./compound-zones"
+
 // ─── Trading core primitives (shared guards, validators, sizers) ─────────────
 export {
   // types

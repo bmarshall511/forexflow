@@ -27,7 +27,9 @@ import {
   appendTradeFinderManagementLog,
   getFilledSetups,
 } from "@fxflow/db"
-import { getPipSize, getDecimalPlaces } from "@fxflow/shared"
+import { getPipSize, getDecimalPlaces, checkStructuralConfirmation } from "@fxflow/shared"
+import type { ZoneCandle } from "@fxflow/types"
+import { getTimeframeSetMap } from "@fxflow/types"
 
 /** Callback types for late-binding */
 export interface ModifyTradeSLTPFn {
@@ -58,6 +60,10 @@ export interface GetOpenTradesFn {
   (): OpenTradeData[]
 }
 
+export interface FetchCandlesFn {
+  (instrument: string, timeframe: string, count: number): Promise<ZoneCandle[]>
+}
+
 /** Grace period after fill before management starts (prevents whipsaw) */
 const FILL_GRACE_MS = 30_000
 
@@ -76,6 +82,7 @@ export class TradeFinderTradeManager {
   private modifyTradeFn: ModifyTradeSLTPFn | null = null
   private closeTradeFn: CloseTradeFn | null = null
   private getOpenTradesFn: GetOpenTradesFn | null = null
+  private fetchCandlesFn: FetchCandlesFn | null = null
   private broadcast: (msg: AnyDaemonMessage) => void
 
   constructor(broadcast: (msg: AnyDaemonMessage) => void) {
@@ -87,10 +94,12 @@ export class TradeFinderTradeManager {
     modifyTrade: ModifyTradeSLTPFn,
     closeTrade: CloseTradeFn,
     getOpenTrades: GetOpenTradesFn,
+    fetchCandles?: FetchCandlesFn,
   ): void {
     this.modifyTradeFn = modifyTrade
     this.closeTradeFn = closeTrade
     this.getOpenTradesFn = getOpenTrades
+    this.fetchCandlesFn = fetchCandles ?? null
   }
 
   /** Initialize by loading existing filled setups */
@@ -261,13 +270,21 @@ export class TradeFinderTradeManager {
 
     const rrAchieved = setup.riskPips > 0 ? pnlPips / setup.riskPips : 0
 
-    // 1. Breakeven move — scale trigger by risk distance
+    // 1. Breakeven move — scale trigger by risk distance + structural confirmation
     //    Tight SL (< 15 pips): 1.5:1 R:R (more room to breathe)
     //    Normal SL (15-30 pips): 1.0:1 R:R (standard)
     //    Wide SL (30+ pips): 0.75:1 R:R (lock in faster)
     if (config.breakevenEnabled && !setup.breakevenMoved) {
       const beThreshold = setup.riskPips < 15 ? 1.5 : setup.riskPips > 30 ? 0.75 : 1.0
       if (rrAchieved >= beThreshold) {
+        // Structural confirmation: require swing point before BE (unless > 2x risk in profit)
+        if (rrAchieved < 2.0) {
+          const structural = await this.checkStructural(managed)
+          if (!structural) {
+            // No structural confirmation yet — wait for next tick
+            return
+          }
+        }
         await this.moveToBreakeven(managed, trade, decimals)
         return // One action per tick
       }
@@ -470,8 +487,14 @@ export class TradeFinderTradeManager {
 
     const { setup } = managed
     const pipSize = getPipSize(setup.instrument)
-    // Trail behind current price by a minimum distance (ATR-like: use riskPips as proxy)
-    const trailDistance = Math.max(setup.riskPips * pipSize * 0.5, pipSize * 10) // Min 10 pips
+
+    // ATR-based trailing: fetch live ATR and use timeframe-appropriate multiplier
+    const atr = await this.fetchATRForSetup(setup)
+    const trailMultiplier = this.getTrailMultiplier(setup.timeframeSet)
+    // ATR-based distance, with riskPips fallback and 10-pip minimum
+    const trailDistance = atr
+      ? Math.max(atr * trailMultiplier, pipSize * 10)
+      : Math.max(setup.riskPips * pipSize * 0.5, pipSize * 10)
 
     let newSL: number
     if (setup.direction === "long") {
@@ -547,5 +570,69 @@ export class TradeFinderTradeManager {
       monthly: 1440, // LTF is D (standard)
     }
     return map[timeframeSet] ?? 15
+  }
+
+  /** ATR trailing multiplier by timeframe (scalp=tight, swing=wide) */
+  private getTrailMultiplier(timeframeSet: string): number {
+    const map: Record<string, number> = {
+      hourly: 1.0,
+      daily: 1.5,
+      weekly: 2.0,
+      monthly: 2.5,
+    }
+    return map[timeframeSet] ?? 1.5
+  }
+
+  /** Fetch current ATR for a setup's LTF to use in adaptive trailing */
+  private async fetchATRForSetup(setup: TradeFinderSetupData): Promise<number | null> {
+    if (!this.fetchCandlesFn) return null
+    try {
+      const tfMap = getTimeframeSetMap("standard")
+      const { ltf } = tfMap[setup.timeframeSet]
+      const candles = await this.fetchCandlesFn(setup.instrument, ltf, 20)
+      if (candles.length < 14) return null
+      // Simple ATR calculation
+      let sum = 0
+      for (let i = candles.length - 14; i < candles.length; i++) {
+        const c = candles[i]!
+        const prev = candles[i - 1]!
+        const tr = Math.max(
+          c.high - c.low,
+          Math.abs(c.high - prev.close),
+          Math.abs(c.low - prev.close),
+        )
+        sum += tr
+      }
+      return sum / 14
+    } catch {
+      return null
+    }
+  }
+
+  /** Check structural confirmation (swing point in trade direction) before breakeven */
+  private async checkStructural(managed: ManagedTrade): Promise<boolean> {
+    if (!this.fetchCandlesFn) return true // Fail open if no candle access
+    const { setup } = managed
+    try {
+      const tfMap = getTimeframeSetMap("standard")
+      const { ltf } = tfMap[setup.timeframeSet]
+      const candles = await this.fetchCandlesFn(setup.instrument, ltf, 30)
+      if (candles.length < 10) return false
+
+      // Only use candles after fill
+      const fillTime = managed.filledAt / 1000
+      const postFillCandles = candles
+        .filter((c) => c.time >= fillTime)
+        .map((c) => ({ ...c, volume: 0 }))
+
+      if (postFillCandles.length < 7) return false
+
+      const dir = setup.direction as "long" | "short"
+      const result = checkStructuralConfirmation(dir, setup.entryPrice, postFillCandles, 3)
+      return result.confirmed
+    } catch {
+      // On error, allow breakeven (fail open to protect the trade)
+      return true
+    }
   }
 }
