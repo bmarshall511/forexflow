@@ -10,6 +10,20 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
+- 2026-04-21 agent: `.claude/agents/explorer.md` (write)
+- 2026-04-21 agent: `.claude/agents/dep-upgrade.md` (write)
+- 2026-04-21 agent: `.claude/agents/requirements-curator.md` (write)
+- 2026-04-21 agent: `.claude/agents/migration-writer.md` (write)
+- 2026-04-21 agent: `.claude/agents/perf-auditor.md` (write)
+- 2026-04-21 agent: `.claude/agents/docs-syncer.md` (write)
+- 2026-04-21 agent: `.claude/agents/refactor-planner.md` (write)
+- 2026-04-21 agent: `.claude/agents/test-writer.md` (write)
+- 2026-04-21 agent: `.claude/agents/debug-investigator.md` (write)
+- 2026-04-21 agent: `.claude/agents/meta-reviewer.md` (write)
+- 2026-04-21 agent: `.claude/agents/integration-reviewer.md` (write)
+- 2026-04-21 agent: `.claude/agents/security-reviewer.md` (write)
+- 2026-04-21 agent: `.claude/agents/code-reviewer.md` (write)
+- 2026-04-21 agent: `.claude/agents/README.md` (write)
 - 2026-04-21 plan: `.claude/plans/phase-1.md` (edit)
 - 2026-04-21 decision: `.claude/decisions/rejected/README.md` (write)
 - 2026-04-21 decision: `.claude/decisions/0005-post-edit-meta-log-changelog.md` (write)
