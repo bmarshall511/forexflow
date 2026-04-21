@@ -1,0 +1,17 @@
+# GitHub Funding configuration
+#
+# Not accepting funding at this time. This file exists as a placeholder
+# so maintainers can enable sponsorships in the future without a new PR.
+#
+# Uncomment and populate the relevant line(s) to enable:
+#
+# github: []
+# patreon: ""
+# open_collective: ""
+# ko_fi: ""
+# tidelift: ""
+# community_bridge: ""
+# liberapay: ""
+# issuehunt: ""
+# otechie: ""
+# custom: []

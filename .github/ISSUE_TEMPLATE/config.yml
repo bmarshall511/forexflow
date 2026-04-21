@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Questions & Discussion
-    url: https://github.com/bmarshall511/fxflow/discussions
-    about: Ask questions and discuss ideas in GitHub Discussions
+  - name: Questions, ideas, and help
+    url: https://github.com/bmarshall511/forexflow/discussions
+    about: For questions, feature ideas, or help using ForexFlow, start a Discussion. Issues are reserved for confirmed bugs and accepted feature proposals.
+  - name: Security vulnerabilities
+    url: https://github.com/bmarshall511/forexflow/security/advisories/new
+    about: Never report a security vulnerability in a public issue. Use GitHub's private advisory form instead.

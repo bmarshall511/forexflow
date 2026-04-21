@@ -1,48 +1,53 @@
 # Security Policy
 
+ForexFlow handles credentials for real-money forex trading. We take security seriously and welcome responsible disclosure of vulnerabilities.
+
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in ForexFlow, please report it responsibly.
+**Please do not open a public issue for security vulnerabilities.**
 
-**Do not open a public GitHub issue for security vulnerabilities.**
+Report privately through GitHub's Private Vulnerability Reporting:
 
-Instead, please email **security@forexflow.dev** or use [GitHub Security Advisories](https://github.com/bmarshall511/forexflow/security/advisories/new) to report the issue privately.
+👉 **[Open a private security advisory](https://github.com/bmarshall511/forexflow/security/advisories/new)**
 
-### What to include
+You will receive:
 
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
-
-### Response timeline
-
-- **Acknowledgment:** Within 48 hours
-- **Initial assessment:** Within 1 week
-- **Fix and disclosure:** Coordinated with reporter
+- An acknowledgement within **72 hours**
+- A triage assessment (severity, scope, reproducibility) within **7 days**
+- A fix or mitigation plan within **30 days** for accepted reports
+- Credit in the release notes when the fix ships, unless you request otherwise
 
 ## Scope
 
-### In scope
+In scope:
 
-- All application source code in `apps/` and `packages/`
-- Authentication and credential handling
-- Encryption implementation (`packages/db/src/encryption.ts`)
-- WebSocket communication security
-- API route authorization
+- The ForexFlow application code on this repository (`v3` branch and the legacy `main` branch)
+- Build scripts, CI workflows, and the packaged desktop app
+- Documentation that instructs users to configure credentials insecurely
 
-### Out of scope
+Out of scope:
 
-- OANDA's API and infrastructure
-- Cloudflare's platform and Workers runtime
-- TradingView's webhook infrastructure
-- Third-party npm dependencies (report to the upstream maintainer)
+- Vulnerabilities in upstream dependencies (report those to the upstream project; we track advisories via Dependabot)
+- Vulnerabilities in OANDA, TradingView, Cloudflare, or any third-party service ForexFlow integrates with
+- Issues that require the attacker to have already compromised the user's device
+- User-owned credentials (OANDA API keys, webhook tokens) — these are the user's responsibility to rotate if exposed
 
-## Security Design
+## Supported Versions
 
-ForexFlow handles sensitive financial data. Key security measures include:
+During the `v3` rebuild, only the active development branch receives security fixes. Once `v3` ships as the new `main`, this table will be updated with a formal support window.
 
-- **Credential encryption:** OANDA API tokens are encrypted at rest using AES-256-GCM (`packages/db/src/encryption.ts`)
-- **Environment isolation:** All secrets stored in `.env.local` files, never in source code
-- **Webhook validation:** TradingView webhooks are validated by IP whitelist and token authentication
-- **Sandbox controls:** The `.claude/` governance system prevents AI tooling from accessing secrets or `.env` files
+| Version | Supported |
+|---------|-----------|
+| `v3` (in progress) | ✅ |
+| legacy `main` | ⚠️ critical fixes only |
+
+## Safe Harbor
+
+We will not pursue legal action against researchers who:
+
+- Make a good-faith effort to follow this policy
+- Do not access data belonging to other users
+- Do not disrupt the service or other users
+- Give us reasonable time to respond before public disclosure
+
+Thank you for helping keep ForexFlow and its users safe.

@@ -1,78 +1,74 @@
-# deps
+# ─── Dependencies ───────────────────────────────────────────────────────────
 node_modules/
-**/node_modules/
+.pnpm-store/
+.pnp.*
 
-# next
-.next/
-out/
+# ─── Build output ───────────────────────────────────────────────────────────
 dist/
 build/
-
-# caches
+out/
+.next/
 .turbo/
-.cache/
-.eslintcache
+.wrangler/
+*.tsbuildinfo
+*.tgz
 
-# coverage
-coverage/
+# ─── Electron build artifacts ───────────────────────────────────────────────
+release/
+daemon-bundle/
+assets/template.db
 
-# logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# env / secrets
+# ─── Environment variables ─────────────────────────────────────────────────
 .env
 .env.*
-secrets/
-**/*.pem
-**/*.key
+!.env.example
 
-# databases
-*.sqlite
-*.sqlite3
-*.db
-
-# prisma generated
-**/generated/prisma/
-
-# cloudflare
-.wrangler/
-**/.wrangler/
-
-# database journals
-*.db-shm
-*.db-wal
-*.db-journal
-
-# data directory (runtime databases)
+# ─── Database (local dev) ──────────────────────────────────────────────────
 data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
-# pnpm store
-.pnpm-store/
+# ─── Logs & telemetry ──────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# build cache
-tsconfig.tsbuildinfo
+# ─── Test output ───────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+.vitest/
 
-# OS / editor
+# ─── Editor / OS ───────────────────────────────────────────────────────────
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
-.cursor/
-.agents/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
 
-# dev orchestrator state
-.dev/
-
-# generated docs
-docs/api/
-
-# personal / private docs
-docs/lightning-talk-script.md
-docs/blog-post-personal.md
-
-# Claude local-only files
+# ─── Claude Code (per-user state) ──────────────────────────────────────────
 .claude/settings.local.json
-CLAUDE.local.md
+.claude/telemetry/
+!.claude/telemetry/.gitkeep
+!.claude/telemetry/README.md
+.claude/handoffs/*.md
+!.claude/handoffs/README.md
+.claude/snapshots/*
+!.claude/snapshots/README.md
+.claude/config/reserved-identifiers.json
+
+# ─── Cursor (per-user state) ───────────────────────────────────────────────
+.cursor/mcp.json
+
+# ─── Misc ──────────────────────────────────────────────────────────────────
+*.pem
+.vercel

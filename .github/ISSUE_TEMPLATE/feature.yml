@@ -1,0 +1,79 @@
+name: Feature proposal
+description: Propose a new feature or material enhancement to ForexFlow
+title: "[feat] <short description>"
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening this, please check:
+        - The [Discussions board](https://github.com/bmarshall511/forexflow/discussions) for similar ideas
+        - The [requirements index](../../docs/requirements/index.md) for existing requirements this might align with
+        - The `v3` roadmap in [`.claude/plans/active.md`](../../.claude/plans/active.md)
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user need, pain point, or opportunity does this address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should ForexFlow behave once this is built?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about and why you rejected them
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Which area of the codebase is primarily affected?
+      options:
+        - web (frontend)
+        - daemon (trading engine)
+        - cf-worker (webhook relay)
+        - mcp-server (AI bridge)
+        - desktop (Electron packaging)
+        - db (schema / services)
+        - shared (cross-cutting utilities)
+        - docs
+        - ci / tooling
+        - claude (agent configuration)
+        - multiple / unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Specific, testable conditions that must be true for this feature to be considered done
+      placeholder: |
+        - [ ] User can do X from the Y screen
+        - [ ] The action respects the Z risk guard
+        - [ ] Mobile and desktop layouts both work
+    validations:
+      required: true
+
+  - type: input
+    id: requirement
+    attributes:
+      label: Related requirement ID (if any)
+      description: If this relates to an existing `REQ-*-###` in docs/requirements/, reference it here
+      placeholder: "REQ-TRADING-007"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, prior-art screenshots, external references

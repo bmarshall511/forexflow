@@ -1,168 +1,108 @@
 # Contributing to ForexFlow
 
-Thanks for your interest in contributing! ForexFlow is a production-grade forex trading platform, so we care about code quality, consistency, and safety.
+Thanks for your interest. ForexFlow is an open-source project and contributions are welcome — from bug reports and documentation fixes to full features.
 
-## Getting Started
+This guide covers the contribution workflow. For the coding standards the project enforces, see the files under [`.claude/rules/`](./.claude/rules/).
 
-### Prerequisites
+## Ground rules
 
-- Node.js >= 22
-- pnpm >= 10
-- An OANDA practice account ([sign up free](https://www.oanda.com/apply/))
+- Be kind. All participation is governed by the [Code of Conduct](./CODE_OF_CONDUCT.md).
+- Discuss before building. For anything non-trivial, open a [Discussion](https://github.com/bmarshall511/forexflow/discussions) or issue first. We don't want you to waste time on a PR that doesn't fit.
+- Security issues never go in public — see [`SECURITY.md`](./SECURITY.md).
+- During the `v3` rebuild, the `main` branch is frozen. Contribute on top of `v3`.
 
-### Development Setup
+## Prerequisites
 
-```bash
-# Clone the repo
-git clone https://github.com/bmarshall511/forexflow.git
-cd forexflow
+- [mise](https://mise.jdx.dev/) for toolchain version management
+  - Installs Node, pnpm, and anything else the project pins
+- An editor with AI assistance (optional but recommended):
+  - [Cursor](https://cursor.com), or
+  - VS Code with the [Claude Code extension](https://claude.com/claude-code)
 
-# Install dependencies
-pnpm install
-
-# Generate Prisma client
-pnpm --filter @fxflow/db db:generate
-
-# Copy environment files
-cp apps/daemons/.env.example apps/daemons/.env.local
-cp apps/web/.env.example apps/web/.env.local
-
-# Generate an encryption key
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-# Paste the output as ENCRYPTION_KEY in both .env.local files
-
-# Configure OANDA credentials via the Settings page (after starting the app)
-
-# Start development
-pnpm dev
-```
-
-The web app runs on `http://localhost:3000` and the daemon on `http://localhost:4100`.
-
-## Using Claude Code
-
-This project includes a complete AI governance system in the `.claude/` directory. If you use [Claude Code](https://claude.ai/claude-code), you get:
-
-- **CLAUDE.md** — Project constitution loaded into every session (monorepo layout, import boundaries, coding standards, domain concepts)
-- **8 path-scoped rules** — Context-specific guidance auto-loaded based on which files you're editing
-- **8 reusable skills** — Task templates for common operations (adding API routes, daemon endpoints, DB services, WebSocket events)
-- **Automated hooks** — Prettier format-on-edit + destructive command guard
-- **Sandbox controls** — Prevents AI from accessing `.env` files or secrets
-
-This means you can contribute effectively with AI assistance from your first session.
-
-## Code Standards
-
-The full coding standards are documented in [`docs/ai/standards.md`](docs/ai/standards.md). Key highlights:
-
-- **Strict TypeScript** — No `any`. Discriminated unions, branded types for IDs, exhaustive switch/never
-- **File size limits** — Components <= 150 LOC, services <= 300 LOC
-- **Runtime validation** — Zod at system boundaries (webhooks, API responses, user input)
-- **Error handling** — No silent catches. Errors must be typed, logged, and surfaced
-- **Mobile-first** — Responsive layout, touch-friendly targets (min 44x44px)
-- **Accessibility** — AAA baseline. Semantic HTML, keyboard navigation, visible focus indicators
-
-## Monorepo Structure
-
-```
-apps/
-  web/           — Next.js 15 App Router (frontend + API routes)
-  daemons/       — Node.js daemon (trade syncing, signals, AI analysis)
-  cf-worker/     — Cloudflare Worker (TradingView webhook relay)
-  mcp-server/    — MCP server (Claude Code ↔ live data bridge)
-
-packages/
-  types/         — Shared TypeScript contracts
-  shared/        — Pure utilities (no runtime-specific imports)
-  db/            — Prisma schema + SQLite, service files per domain
-```
-
-### Import Boundaries (strict)
-
-- `apps/*` may import from `packages/*`
-- `apps/*` must NOT import from other `apps/*`
-- `packages/*` must NOT import from `apps/*`
-- `packages/shared` and `packages/types` must have no runtime-specific imports
-
-## Making Changes
-
-### Before you start
-
-1. Check existing issues and PRs to avoid duplicate work
-2. For non-trivial changes, open an issue first to discuss the approach
-
-### Pull request process
-
-1. Fork the repo and create a feature branch from `main`
-2. Make your changes following the code standards above
-3. Run the full check suite:
-   ```bash
-   pnpm typecheck    # TypeScript compilation
-   pnpm lint         # ESLint
-   pnpm test         # Vitest test suite
-   pnpm format:check # Prettier formatting
-   ```
-4. Write a clear PR description explaining what and why
-5. Keep PRs focused — one feature or fix per PR
-
-### Commit messages
-
-This project enforces [Conventional Commits](https://www.conventionalcommits.org/) via commitlint. Every commit message must follow this format:
-
-```
-type(scope): description
-```
-
-**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
-
-**Scopes:** `web`, `daemons`, `cf-worker`, `mcp-server`, `types`, `shared`, `db`, `ci`, `docs`, `deps`
-
-**Examples:**
+From a fresh clone:
 
 ```bash
-git commit -m "feat(web): add dark mode toggle to settings"
-git commit -m "fix(daemons): prevent duplicate signal processing"
-git commit -m "docs: update API documentation"
+mise install          # installs the pinned Node + pnpm versions
+pnpm install          # installs project dependencies (once they exist)
 ```
 
-Invalid commit messages will be rejected by the pre-commit hook.
+See [`docs/dev/GETTING_STARTED.md`](./docs/dev/GETTING_STARTED.md) for the full local setup walkthrough.
 
-### Pre-commit hooks
+## Workflow
 
-[Lefthook](https://github.com/evilmartians/lefthook) runs automatically on git operations:
+1. **Fork + clone** the repository (or create a feature branch if you have push access)
+2. **Branch from `v3`**, not from `main`
+3. **Name your branch** descriptively: `feat/<scope>/<short-description>` or `fix/<scope>/<short-description>`
+4. **Make your change**. The repository ships with a configured AI agent setup; if you use Cursor or Claude Code, the rules and hooks will guide you
+5. **Tests are required** for most changes (see below)
+6. **Commit using conventional commits** — see below
+7. **Push and open a pull request** against `v3`
+8. **Fill out the PR template completely** — linked requirement ID, test evidence, security considerations
 
-- **On commit:** Prettier auto-formats staged files, ESLint auto-fixes staged files
-- **On commit message:** commitlint validates conventional commit format
-- **On push:** TypeScript type checking + full test suite must pass
+## Conventional commits
 
-Hooks are installed automatically via `pnpm install` (postinstall script). If hooks are missing, run `pnpm lefthook install`.
+Commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) specification, enforced by commitlint:
 
-### CI checks
+```
+<type>(<scope>): <short description>
 
-Every pull request runs the following checks via GitHub Actions:
+<optional longer body>
 
-| Check            | What it does                                               |
-| ---------------- | ---------------------------------------------------------- |
-| **lint-format**  | ESLint + Prettier across all workspaces                    |
-| **typecheck**    | `tsc --noEmit` across all workspaces                       |
-| **test**         | Vitest test suites with coverage                           |
-| **build**        | Full production build                                      |
-| **audit**        | `pnpm audit` for known vulnerabilities                     |
-| **knip**         | Detects unused exports and dependencies                    |
-| **prisma-drift** | Ensures migrations match the schema                        |
-| **danger**       | Automated PR review (size, description, import boundaries) |
+<optional footer>
+```
 
-All checks must pass before merging. PRs are squash-merged to `main`.
+Accepted `<type>` values: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `chore`, `ci`, `build`, `style`.
 
-## Areas Welcoming Contributions
+Accepted `<scope>` values grow as the project grows. The current enum lives in [`commitlint.config.mjs`](./commitlint.config.mjs) (added in a later sub-phase of Phase 1). During Phase 1 rebuild, scopes include: `claude`, `docs`, `ci`, `repo`, `agents`, `hooks`, `skills`, `rules`.
 
-- **Additional broker integrations** — Currently OANDA only
-- **More technical indicators** — Expand the AI analysis context
-- **Testing coverage** — The app needs more automated tests
-- **Zone detection refinements** — Algorithm improvements
-- **Mobile responsiveness** — UI polish on small screens
-- **Documentation** — User guides, tutorials, setup videos
+Example:
 
-## Questions?
+```
+feat(web): add equity curve drawdown overlay
 
-Open a [Discussion](https://github.com/bmarshall511/forexflow/discussions) on GitHub.
+Overlays peak-to-trough drawdown segments on the equity curve so a
+trader can see where their worst stretches were. Respects the
+prefers-reduced-motion setting.
+
+@req: REQ-ANALYTICS-014
+```
+
+## Tests
+
+Most non-trivial changes require tests. The project uses:
+
+- **Vitest** for unit + integration tests
+- **Playwright** for end-to-end tests (required for any `apps/web/**` change that touches UI behavior)
+- **Contract tests** for API ↔ type-package consistency
+- **Visual regression** for UI components
+
+Tests live next to the code they test (`*.test.ts`, `*.test.tsx`) or under `apps/*/e2e/` for Playwright specs. Every test should reference the requirement it covers with a `// @req: REQ-ID` tag.
+
+## The AI agent setup
+
+ForexFlow is actively developed with AI tooling. The agent configuration under [`.claude/`](./.claude/) is considered part of the project and is treated with the same rigor as application code:
+
+- Rules are versioned and schema-validated
+- Hooks block violations at write time
+- Agents have declared tool allowlists and verdict schemas
+- `.cursor/rules/` is generated from `.claude/rules/` — don't edit `.cursor/` by hand
+
+See [`.claude/README.md`](./.claude/README.md) for how to invoke agents and skills.
+
+## Pull request checklist
+
+Before opening a PR, make sure:
+
+- [ ] Branch is based on latest `v3`
+- [ ] Commit messages follow conventional commits
+- [ ] Tests cover the change and pass locally
+- [ ] No `any` in TypeScript (or a `// TODO(type):` comment explaining the exception)
+- [ ] Any new exported symbol has JSDoc
+- [ ] Documentation updated (the `pre-commit-docs-sync` hook will remind you)
+- [ ] Requirements file updated if this is a new feature (the `pre-commit-requirements-sync` hook will remind you)
+- [ ] No personal names, emails, or identifying handles in code, comments, tests, or docs
+- [ ] PR description fills out every section of the template
+
+## Questions
+
+Open a [GitHub Discussion](https://github.com/bmarshall511/forexflow/discussions). We'd rather answer a question than see you struggle alone.

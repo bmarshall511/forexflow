@@ -1,0 +1,89 @@
+name: Bug report
+description: Report a reproducible defect in ForexFlow
+title: "[bug] <short description>"
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill out every section — incomplete reports get closed.
+        **Do not include API keys, session tokens, or other credentials in any part of this report.**
+
+  - type: input
+    id: version
+    attributes:
+      label: ForexFlow version
+      description: Output of the app's "About" screen, or the git commit SHA you're running
+      placeholder: "v0.0.0 or commit abc1234"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Deployment mode
+      options:
+        - Dev (pnpm dev)
+        - Desktop app (DMG)
+        - Self-hosted daemon + local web
+        - Other (describe in context)
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and version, browser if web-related
+      placeholder: "macOS 14.4 / Chrome 124"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, in one or two sentences
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reliably reproduce the issue
+      placeholder: |
+        1. Open the Positions tab
+        2. Click "Close all"
+        3. Observe the error toast
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages (with credentials redacted) and log snippets if applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, logs, configuration notes, links to related issues
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I have redacted all API keys, tokens, account IDs, and other credentials from this report
+          required: true

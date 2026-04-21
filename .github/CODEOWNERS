@@ -1,1 +1,8 @@
+# GitHub CODEOWNERS for ForexFlow
+#
+# During the v3 rebuild, a single maintainer owns every path.
+# This will expand to team handles as the contributor base grows.
+#
+# Format docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-configuration/customizing-your-repository/about-code-owners
+
 * @bmarshall511

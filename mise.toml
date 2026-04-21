@@ -1,0 +1,12 @@
+[tools]
+node = "22"
+pnpm = "10"
+python = "3.12"
+
+[settings]
+idiomatic_version_file_enable_tools = []
+experimental = true
+
+[env]
+# Prevent pnpm from prompting about store location across iCloud-synced paths.
+PNPM_HOME = "{{ config_root }}/.pnpm-store"
