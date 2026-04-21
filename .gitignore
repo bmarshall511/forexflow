@@ -57,6 +57,7 @@ Thumbs.db
 
 # ─── Claude Code (per-user state) ──────────────────────────────────────────
 .claude/settings.local.json
+.claude/.session-state/
 .claude/telemetry/
 !.claude/telemetry/.gitkeep
 !.claude/telemetry/README.md

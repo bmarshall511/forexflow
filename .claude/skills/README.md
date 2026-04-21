@@ -91,13 +91,14 @@ One directory per skill. The `SKILL.md` file is the source of truth. Any helper 
 
 **Meta / session**
 
-| Skill                                  | Purpose                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------- |
-| [/status](./status/SKILL.md)           | One-command health dashboard of the entire `.claude/` system                          |
-| [/handoff](./handoff/SKILL.md)         | Generate a context-transfer prompt → `.claude/handoffs/<ts>.md` + `latest.md` symlink |
-| [/why](./why/SKILL.md)                 | Explain a decision via ADRs + git blame + related rules                               |
-| [/contribute](./contribute/SKILL.md)   | Onboard a new teammate: verify toolchain, copy per-user configs, walk first PR        |
-| [/cost-report](./cost-report/SKILL.md) | Agent-invocation cost summary from `.claude/telemetry/`                               |
+| Skill                                  | Purpose                                                                                                          |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [/status](./status/SKILL.md)           | One-command health dashboard of the entire `.claude/` system                                                     |
+| [/handoff](./handoff/SKILL.md)         | Generate a context-transfer prompt → `.claude/handoffs/<ts>.md` + `latest.md` symlink                            |
+| [/why](./why/SKILL.md)                 | Explain a decision via ADRs + git blame + related rules                                                          |
+| [/contribute](./contribute/SKILL.md)   | Onboard a new teammate: verify toolchain, copy per-user configs, walk first PR                                   |
+| [/cost-report](./cost-report/SKILL.md) | Agent-invocation cost summary from `.claude/telemetry/`                                                          |
+| [/learn](./learn/SKILL.md)             | Capture corrections / false-positives / recurring fix-ups as learnings; propose + review config edits (ADR 0006) |
 
 **Validation**
 

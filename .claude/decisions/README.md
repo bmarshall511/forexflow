@@ -29,6 +29,7 @@ The `meta-reviewer` agent keeps this list current. Do not hand-edit below; regen
 | 0003 | [TodoWrite marker as the plan-required signal](./0003-todowrite-plan-marker.md)          | accepted | 2026-04-21 |
 | 0004 | [per-user gitignored reserved-identifiers list](./0004-reserved-identifiers-per-user.md) | accepted | 2026-04-21 |
 | 0005 | [post-edit-meta-log auto-CHANGELOG behavior](./0005-post-edit-meta-log-changelog.md)     | accepted | 2026-04-21 |
+| 0006 | [continuous-learning loop](./0006-continuous-learning-loop.md)                           | accepted | 2026-04-21 |
 
 ## Rejected proposals
 

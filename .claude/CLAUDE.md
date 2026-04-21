@@ -72,6 +72,22 @@ You may edit files under `.claude/` to keep them accurate as the project evolves
 
 Bump `.claude/VERSION` when a sub-phase completes. Follow [SemVer](https://semver.org) for the config itself.
 
+## Continuous-learning loop
+
+The `.claude/` configuration is meant to get sharper over time. Every signal the project surfaces — maintainer corrections, hook false positives, harness fixture failures, recurring manual fix-ups — is worth capturing as a proposal to improve the rails. Full rationale: [ADR 0006](./decisions/0006-continuous-learning-loop.md).
+
+As the main interactive agent, **surface a learning candidate** whenever you notice any of the five triggers:
+
+1. The maintainer corrects your approach ("don't do X, do Y")
+2. A hook blocks a change the maintainer expected to pass (false positive)
+3. A hook allows a change that should have been blocked (false negative — usually surfaced later by a reviewer agent or harness fixture)
+4. A test-harness fixture fails on code believed correct — the rule may need relaxing, or the code may be wrong
+5. You find yourself (or the maintainer) making the same manual fix-up 3+ times across commits
+
+When you see one, propose: _"That seems worth capturing as a learning. Want me to run `/learn <observation>`?"_ The maintainer decides. Minted learnings live under [`.claude/learnings/`](./learnings/) and route through `meta-reviewer` before they apply.
+
+**Never silently apply** a learning-driven change. Every application goes through review, and every commit that lands a learning cites `@learning: LRN-NNNN` in the commit message.
+
 ## Required tooling
 
 - Sessions start by reading `.claude/plans/active.md` to know what phase of the rebuild is active
@@ -84,7 +100,7 @@ The full skill catalog lives in `.claude/README.md`.
 
 ## What is on this branch
 
-`v3` is a greenfield rebuild of ForexFlow. The previous version (ForexFlow V2) remains on the `main` branch for reference. `v3` will replace `main` when Phase 1 completes.
+`v3` is a greenfield rebuild of ForexFlow. The previous version (ForexFlow V2) remains on the `main` branch for reference. **When `v3` replaces `main` is the maintainer's call alone** — no phase number, no automated trigger, no assumption about timing. If you are writing any claim about when the cutover happens, stop and either omit the timing or ask the maintainer. Until the maintainer says otherwise, `main` is frozen as historical reference.
 
 During the rebuild, treat `main` as read-only historical reference. You may study its patterns and learn from its mistakes, but **never copy code forward**. Every line on `v3` must be written fresh with today's standards.
 

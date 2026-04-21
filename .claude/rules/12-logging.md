@@ -6,6 +6,8 @@ version: 0.1.0
 related:
   - "context/stack.md"
   - "rules/04-security.md"
+  - "agents/code-reviewer.md"
+  - "agents/security-reviewer.md"
 applies_when: "Logging anywhere in application code"
 ---
 
@@ -19,8 +21,8 @@ Every app gets a configured Pino instance from `packages/logger`:
 
 ```ts
 // packages/logger/src/daemon-logger.ts (added in Phase 2)
-import pino from "pino"
-import { daemonEnv } from "@forexflow/config/daemon-env"
+import pino from "pino";
+import { daemonEnv } from "@forexflow/config/daemon-env";
 
 export const daemonLogger = pino({
   level: daemonEnv.LOG_LEVEL,
@@ -46,16 +48,16 @@ export const daemonLogger = pino({
     level: (label) => ({ level: label }),
   },
   timestamp: pino.stdTimeFunctions.isoTime,
-})
+});
 ```
 
 Application code imports and uses:
 
 ```ts
-import { daemonLogger } from "@forexflow/logger/daemon"
+import { daemonLogger } from "@forexflow/logger/daemon";
 
-const log = daemonLogger.child({ subsystem: "trade-syncer" })
-log.info({ tradeId, units }, "trade reconciled")
+const log = daemonLogger.child({ subsystem: "trade-syncer" });
+log.info({ tradeId, units }, "trade reconciled");
 ```
 
 ## Rules
@@ -85,13 +87,13 @@ Every log is `{ ...context }, "message"` — the object first, the message secon
 
 ```ts
 // good
-log.info({ tradeId, units, instrument }, "trade placed")
+log.info({ tradeId, units, instrument }, "trade placed");
 
 // bad — string interpolation
-log.info(`trade ${tradeId} placed with ${units} units`)
+log.info(`trade ${tradeId} placed with ${units} units`);
 
 // bad — just a string
-log.info("trade placed")
+log.info("trade placed");
 ```
 
 Structured logs:
@@ -105,30 +107,30 @@ Structured logs:
 When a subsystem handles multiple operations, bind the context once:
 
 ```ts
-const log = daemonLogger.child({ subsystem: "trade-syncer", tradeId })
-log.info("reconciling")
-log.debug({ oandaState }, "fetched oanda state")
-log.info("reconciled")
+const log = daemonLogger.child({ subsystem: "trade-syncer", tradeId });
+log.info("reconciling");
+log.debug({ oandaState }, "fetched oanda state");
+log.info("reconciled");
 ```
 
 Child loggers compose — they inherit context from the parent:
 
 ```ts
-const reqLog = daemonLogger.child({ requestId })
-reqLog.child({ subsystem: "auth" }).info("session validated")
+const reqLog = daemonLogger.child({ requestId });
+reqLog.child({ subsystem: "auth" }).info("session validated");
 // log has both requestId and subsystem
 ```
 
 ### 4. Levels
 
-| Level | Use for |
-|---|---|
-| `trace` | Very high-frequency or byte-level detail. Off by default |
-| `debug` | Useful during development; off in production unless explicitly enabled |
-| `info` | Normal operational events — start/stop, significant milestones, expected outcomes |
-| `warn` | Unexpected but recoverable — retried operation, fallback taken, deprecated usage |
-| `error` | Operation failed; caller must handle; application continues |
-| `fatal` | Application cannot continue; process exit imminent |
+| Level   | Use for                                                                           |
+| ------- | --------------------------------------------------------------------------------- |
+| `trace` | Very high-frequency or byte-level detail. Off by default                          |
+| `debug` | Useful during development; off in production unless explicitly enabled            |
+| `info`  | Normal operational events — start/stop, significant milestones, expected outcomes |
+| `warn`  | Unexpected but recoverable — retried operation, fallback taken, deprecated usage  |
+| `error` | Operation failed; caller must handle; application continues                       |
+| `fatal` | Application cannot continue; process exit imminent                                |
 
 **Not every error condition is `error`.** A validation failure from a user is `warn` (expected failure mode); an unhandled downstream exception is `error`.
 
@@ -141,19 +143,22 @@ The Pino config redacts known sensitive field names. This is **not** a substitut
 Never do:
 
 ```ts
-log.info({ request: rawRequest }, "incoming")
-log.info({ err: errorWithCredentials }, "failed")
-log.info({ user }, "login") // if user has .password or .passwordHash
+log.info({ request: rawRequest }, "incoming");
+log.info({ err: errorWithCredentials }, "failed");
+log.info({ user }, "login"); // if user has .password or .passwordHash
 ```
 
 Always filter before logging:
 
 ```ts
-log.info({
-  method: req.method,
-  path: req.path,
-  userId: session.userId,
-}, "incoming")
+log.info(
+  {
+    method: req.method,
+    path: req.path,
+    userId: session.userId,
+  },
+  "incoming",
+);
 ```
 
 The `security-reviewer` agent flags logs that might expose secrets.
@@ -187,11 +192,11 @@ Every request through the web or daemon gets a correlation ID. Hono middleware a
 ```ts
 // apps/daemon/src/middleware/correlation.ts (added in Phase 5)
 app.use(async (c, next) => {
-  const correlationId = c.req.header("x-correlation-id") ?? crypto.randomUUID()
-  c.set("log", daemonLogger.child({ correlationId }))
-  c.set("correlationId", correlationId)
-  await next()
-})
+  const correlationId = c.req.header("x-correlation-id") ?? crypto.randomUUID();
+  c.set("log", daemonLogger.child({ correlationId }));
+  c.set("correlationId", correlationId);
+  await next();
+});
 ```
 
 ### 8. Rate-limited logs
@@ -200,12 +205,12 @@ Avoid log floods. High-frequency events log at `trace` or `debug`; summaries log
 
 ```ts
 // bad — floods on every price tick
-onPriceTick(tick => log.info({ tick }, "tick"))
+onPriceTick((tick) => log.info({ tick }, "tick"));
 
 // good
-onPriceTick(tick => log.trace({ tick }, "tick"))
+onPriceTick((tick) => log.trace({ tick }, "tick"));
 // periodic summary at info
-setInterval(() => log.info({ ticksInLastMinute }, "tick summary"), 60_000)
+setInterval(() => log.info({ ticksInLastMinute }, "tick summary"), 60_000);
 ```
 
 ### 9. CF Worker logging
@@ -213,9 +218,9 @@ setInterval(() => log.info({ ticksInLastMinute }, "tick summary"), 60_000)
 Cloudflare Workers use their own structured logging. The `logger` package exports a Worker-compatible Pino config that writes to `console` (Workers intercept and structure):
 
 ```ts
-import { workerLogger } from "@forexflow/logger/cf-worker"
+import { workerLogger } from "@forexflow/logger/cf-worker";
 
-workerLogger.info({ webhookToken: "..." }, "received webhook")
+workerLogger.info({ webhookToken: "..." }, "received webhook");
 ```
 
 The Worker logger applies the same redaction policy.
