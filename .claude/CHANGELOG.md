@@ -10,6 +10,21 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
+- 2026-04-21 decision: `.claude/decisions/rejected/0002-tauri-instead-of-electron.md` (edit)
+- 2026-04-21 meta: `.claude/snapshots/README.md` (write)
+- 2026-04-21 meta: `.claude/handoffs/README.md` (write)
+- 2026-04-21 meta: `.claude/telemetry/.gitkeep` (write)
+- 2026-04-21 meta: `.claude/telemetry/README.md` (write)
+- 2026-04-21 meta: `.claude/journal/2026-04.md` (write)
+- 2026-04-21 meta: `.claude/journal/README.md` (write)
+- 2026-04-21 meta: `.claude/failure-modes.md` (write)
+- 2026-04-21 decision: `.claude/decisions/rejected/README.md` (edit)
+- 2026-04-21 decision: `.claude/decisions/rejected/0005-jest-instead-of-vitest.md` (write)
+- 2026-04-21 decision: `.claude/decisions/rejected/0004-express-instead-of-hono.md` (write)
+- 2026-04-21 decision: `.claude/decisions/rejected/0003-bun-instead-of-pnpm-node.md` (write)
+- 2026-04-21 decision: `.claude/decisions/rejected/0002-tauri-instead-of-electron.md` (write)
+- 2026-04-21 decision: `.claude/decisions/rejected/0001-drizzle-instead-of-prisma.md` (write)
+- 2026-04-21 rule: `.claude/rules/00-foundation.md` (edit)
 - 2026-04-21 meta: `.claude/learnings/0005-fabricated-phase-cutover-claim.md` (edit)
 - 2026-04-21 meta: `.claude/learnings/0005-fabricated-phase-cutover-claim.md` (write)
 - 2026-04-21 decision: `.claude/decisions/README.md` (edit)

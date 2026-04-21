@@ -74,10 +74,10 @@ The learning validates ADR 0006's premise: the agent cannot self-catch every mis
 
 ## Follow-ups
 
-- [x] Correct the fabricated sentence in `CLAUDE.md` (twice — Fab 1 and the attempted "fix" Fab 2)
-- [ ] **Sub-phase 9 mandatory**: add a non-negotiable to `CLAUDE.md` explicitly naming "timing / cutover / release claims" as a class that requires a cited maintainer-authoritative source, **never** an agent-authored roadmap
-- [ ] **Sub-phase 9 mandatory**: add a similar guardrail line to `.claude/rules/00-foundation.md` — "agent-authored plans are proposals, not commitments. Don't cite them as authority for schedule/commitment claims."
-- [ ] **Sub-phase 9 consideration**: a structural fixture that greps `.claude/**/*.md` for absolute claims about phase completion, cutover timing, or release triggers, and flags any that aren't in a maintainer-authored ADR
+- [x] Correct the fabricated sentence in `CLAUDE.md` (twice — Fab 1 and the attempted "fix" Fab 2). Landed Sub-phase 8
+- [x] **Sub-phase 9 mandatory**: added Non-negotiable #13 to `CLAUDE.md` explicitly naming "timing / cutover / release claims" as a class that requires a cited maintainer-authoritative source, **never** an agent-authored roadmap. Also promoted the pattern to failure-mode `FM-0001` so it shows up in `.claude/failure-modes.md` for future sessions
+- [x] **Sub-phase 9 mandatory**: added the "agent-authored plans are proposals, not commitments" paragraph to `.claude/rules/00-foundation.md` §2; bumped rule version to `0.2.0` and added this learning to its `related:` frontmatter
+- [ ] **Sub-phase 9 consideration** (deferred): a structural fixture that greps `.claude/**/*.md` for absolute claims about phase completion, cutover timing, or release triggers, and flags any not grounded in a maintainer-authored ADR. Deferred because (a) the `meta-reviewer` agent already reviews every `.claude/` edit and is in the right position to catch the pattern, (b) harness fixtures work best for deterministic structural checks, and "claim about timing that isn't grounded" is a soft semantic check that reviewer agents handle better. Revisit if the pattern recurs despite the reviewer
 - [ ] Whenever a fabrication correction lands in the future, mint a new `LRN-*` immediately. The journal aggregates these monthly; a cluster signals a pattern worth a harder guardrail
 
 ## Adjacent considerations

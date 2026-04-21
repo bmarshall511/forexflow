@@ -19,6 +19,10 @@ If you do not know — about a file path, an API shape, a requirement, a convent
 
 When a piece of the system is not covered by any rule, any context file, or any existing code: that is the "unknown territory" signal. Stop. Ask the maintainer. Record the answer as an ADR. Update the relevant context or rule file. Then proceed.
 
+**Agent-authored plans are proposals, not commitments.** The `.claude/plans/*.md` files, the sub-phase lists, the roadmap tables, and anything else the agent has written about future work are _proposed sequences_ — the maintainer's approval of a plan ratifies the _work_, not a _schedule_ or _trigger_. Never cite one of these artifacts as authority for a timing / cutover / release claim. When in doubt whether a claim is a plan or a commitment, treat it as a plan and defer to the maintainer.
+
+This was violated in LRN-0005 — two successive fabrications on the same claim, the second "fix" made worse by citing agent-authored speculation as authoritative. Read [`.claude/learnings/0005-fabricated-phase-cutover-claim.md`](../learnings/0005-fabricated-phase-cutover-claim.md) once to internalize the pattern.
+
 ## 3. Small surgical changes
 
 Prefer the smallest change that solves the problem. No drive-by refactors. No "while I'm in here" cleanup. Each commit has a single, traceable intent.

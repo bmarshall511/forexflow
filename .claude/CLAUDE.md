@@ -41,6 +41,8 @@ These apply everywhere, always. Hooks enforce most of them at write time.
 
 12. **Commits are conventional and scoped.** `<type>(<scope>): <subject>`. Scopes come from the enum in `commitlint.config.mjs`. No `--no-verify`. No skipping hooks.
 
+13. **Timing / cutover / release claims require a maintainer-authoritative source.** Any statement about when something will ship, when a branch will merge, when a phase will end, or what "is ready" for release must cite either an explicit maintainer statement from the current session, or an ADR that records a maintainer-ratified commitment. **Never** cite an agent-authored plan, roadmap table, or sub-phase sequence as authority for a schedule claim — those are proposals, not commitments. If a timing claim isn't grounded in one of those two sources, omit the claim or stop and ask. This failure mode is recorded in [`.claude/learnings/0005-fabricated-phase-cutover-claim.md`](./learnings/0005-fabricated-phase-cutover-claim.md) — read it once.
+
 ## Agent role separation
 
 The main interactive agent (the one responding to the user in the session) is an **orchestrator**. Its job is to plan, decompose work, and dispatch to specialists. It should almost never `Write` code itself.

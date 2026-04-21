@@ -2,12 +2,13 @@
 name: foundation
 scope: []
 enforcement: strict
-version: 0.1.0
+version: 0.2.0
 related:
   - "CLAUDE.md"
   - "context/domain.md"
   - "context/conventions.md"
   - "agents/meta-reviewer.md"
+  - "learnings/0005-fabricated-phase-cutover-claim.md"
 applies_when: "Always. This is the baseline every other rule builds on."
 ---
 
@@ -24,6 +25,10 @@ For any work beyond a trivial one-line fix, use `TodoWrite` to break the work in
 If you do not know — about a file path, an API shape, a requirement, a convention — **stop and ask or investigate**. Do not invent. Do not "probably". A fabricated import or a hallucinated function wastes more time than the minute it takes to confirm.
 
 When a piece of the system is not covered by any rule, any context file, or any existing code: that is the "unknown territory" signal. Stop. Ask the maintainer. Record the answer as an ADR. Update the relevant context or rule file. Then proceed.
+
+**Agent-authored plans are proposals, not commitments.** The `.claude/plans/*.md` files, the sub-phase lists, the roadmap tables, and anything else the agent has written about future work are _proposed sequences_ — the maintainer's approval of a plan ratifies the _work_, not a _schedule_ or _trigger_. Never cite one of these artifacts as authority for a timing / cutover / release claim. When in doubt whether a claim is a plan or a commitment, treat it as a plan and defer to the maintainer.
+
+This was violated in LRN-0005 — two successive fabrications on the same claim, the second "fix" made worse by citing agent-authored speculation as authoritative. Read [`.claude/learnings/0005-fabricated-phase-cutover-claim.md`](../learnings/0005-fabricated-phase-cutover-claim.md) once to internalize the pattern.
 
 ## 3. Small surgical changes
 
