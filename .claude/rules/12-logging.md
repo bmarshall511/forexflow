@@ -1,0 +1,243 @@
+---
+name: logging
+scope: ["apps/**", "packages/**"]
+enforcement: strict
+version: 0.1.0
+related:
+  - "context/stack.md"
+  - "rules/04-security.md"
+applies_when: "Logging anywhere in application code"
+---
+
+# Logging
+
+One logger, one convention, one redaction policy. Pino everywhere.
+
+## The logger
+
+Every app gets a configured Pino instance from `packages/logger`:
+
+```ts
+// packages/logger/src/daemon-logger.ts (added in Phase 2)
+import pino from "pino"
+import { daemonEnv } from "@forexflow/config/daemon-env"
+
+export const daemonLogger = pino({
+  level: daemonEnv.LOG_LEVEL,
+  redact: {
+    paths: [
+      "*.apiKey",
+      "*.api_key",
+      "*.token",
+      "*.secret",
+      "*.password",
+      "*.session",
+      "*.cookie",
+      "*.authorization",
+      "req.headers.authorization",
+      "req.headers.cookie",
+      "oanda.apiKey",
+      "oanda.accountId",
+      "webhookToken",
+    ],
+    censor: "[REDACTED]",
+  },
+  formatters: {
+    level: (label) => ({ level: label }),
+  },
+  timestamp: pino.stdTimeFunctions.isoTime,
+})
+```
+
+Application code imports and uses:
+
+```ts
+import { daemonLogger } from "@forexflow/logger/daemon"
+
+const log = daemonLogger.child({ subsystem: "trade-syncer" })
+log.info({ tradeId, units }, "trade reconciled")
+```
+
+## Rules
+
+### 1. No `console.*` in production code
+
+Banned in:
+
+- `apps/daemon/src/**/*.ts`
+- `apps/web/src/app/api/**/*.ts`
+- `apps/cf-worker/src/**/*.ts`
+- `apps/mcp-server/src/**/*.ts`
+- `apps/desktop/src/main/**/*.ts`
+- `packages/**/*.ts` (except test files)
+
+Allowed (but discouraged):
+
+- `apps/web/src/components/**` and `apps/web/src/hooks/**` — browser `console.*` during development; stripped in production builds
+- `**/*.test.ts`, `**/*.spec.ts` — tests may log for debugging
+- Build scripts, CLI scripts (explicit output is the point)
+
+Replace `console.log` with the scoped Pino logger. Replace `console.error` with `log.error({ err }, "description")`.
+
+### 2. Structured logs
+
+Every log is `{ ...context }, "message"` — the object first, the message second:
+
+```ts
+// good
+log.info({ tradeId, units, instrument }, "trade placed")
+
+// bad — string interpolation
+log.info(`trade ${tradeId} placed with ${units} units`)
+
+// bad — just a string
+log.info("trade placed")
+```
+
+Structured logs:
+
+- Are parseable by log aggregators
+- Can be filtered on fields (`{ tradeId: "..." }`)
+- Redaction works (strings cannot be redacted field-by-field)
+
+### 3. Child loggers bind context
+
+When a subsystem handles multiple operations, bind the context once:
+
+```ts
+const log = daemonLogger.child({ subsystem: "trade-syncer", tradeId })
+log.info("reconciling")
+log.debug({ oandaState }, "fetched oanda state")
+log.info("reconciled")
+```
+
+Child loggers compose — they inherit context from the parent:
+
+```ts
+const reqLog = daemonLogger.child({ requestId })
+reqLog.child({ subsystem: "auth" }).info("session validated")
+// log has both requestId and subsystem
+```
+
+### 4. Levels
+
+| Level | Use for |
+|---|---|
+| `trace` | Very high-frequency or byte-level detail. Off by default |
+| `debug` | Useful during development; off in production unless explicitly enabled |
+| `info` | Normal operational events — start/stop, significant milestones, expected outcomes |
+| `warn` | Unexpected but recoverable — retried operation, fallback taken, deprecated usage |
+| `error` | Operation failed; caller must handle; application continues |
+| `fatal` | Application cannot continue; process exit imminent |
+
+**Not every error condition is `error`.** A validation failure from a user is `warn` (expected failure mode); an unhandled downstream exception is `error`.
+
+**Not every warning is `warn`.** Transient conditions expected by design (OANDA rate-limit, reconnect attempt) are `info` with contextual hints.
+
+### 5. Redaction
+
+The Pino config redacts known sensitive field names. This is **not** a substitute for not logging secrets in the first place.
+
+Never do:
+
+```ts
+log.info({ request: rawRequest }, "incoming")
+log.info({ err: errorWithCredentials }, "failed")
+log.info({ user }, "login") // if user has .password or .passwordHash
+```
+
+Always filter before logging:
+
+```ts
+log.info({
+  method: req.method,
+  path: req.path,
+  userId: session.userId,
+}, "incoming")
+```
+
+The `security-reviewer` agent flags logs that might expose secrets.
+
+### 6. No stack traces with credentials
+
+When logging an error that originated from a module that may have credentials in its state:
+
+```ts
+try {
+  await oandaClient.placeOrder(...)
+} catch (err) {
+  // bad — err.config might contain the api key
+  log.error({ err }, "place order failed")
+
+  // good — only log the safe surface
+  log.error({
+    err: { message: err.message, code: err.code, stack: err.stack },
+    instrument,
+    direction,
+  }, "place order failed")
+}
+```
+
+Pino's redaction catches most cases; explicit filtering catches the rest.
+
+### 7. Log correlation
+
+Every request through the web or daemon gets a correlation ID. Hono middleware attaches one to the request context; child loggers bind it. Logs for a single request are traceable by correlation ID.
+
+```ts
+// apps/daemon/src/middleware/correlation.ts (added in Phase 5)
+app.use(async (c, next) => {
+  const correlationId = c.req.header("x-correlation-id") ?? crypto.randomUUID()
+  c.set("log", daemonLogger.child({ correlationId }))
+  c.set("correlationId", correlationId)
+  await next()
+})
+```
+
+### 8. Rate-limited logs
+
+Avoid log floods. High-frequency events log at `trace` or `debug`; summaries log at `info`:
+
+```ts
+// bad — floods on every price tick
+onPriceTick(tick => log.info({ tick }, "tick"))
+
+// good
+onPriceTick(tick => log.trace({ tick }, "tick"))
+// periodic summary at info
+setInterval(() => log.info({ ticksInLastMinute }, "tick summary"), 60_000)
+```
+
+### 9. CF Worker logging
+
+Cloudflare Workers use their own structured logging. The `logger` package exports a Worker-compatible Pino config that writes to `console` (Workers intercept and structure):
+
+```ts
+import { workerLogger } from "@forexflow/logger/cf-worker"
+
+workerLogger.info({ webhookToken: "..." }, "received webhook")
+```
+
+The Worker logger applies the same redaction policy.
+
+### 10. Electron renderer logging
+
+The Electron renderer is just a browser; `console.*` during dev is fine. In production builds the main process captures renderer console output and forwards it to the structured Pino instance via IPC.
+
+## Log volumes and retention
+
+- **Desktop / self-hosted**: logs rotate to disk via Pino's file transport, retained 14 days, max 100 MB
+- **Cloud daemon**: logs go to the hosting provider's ingest (Railway, Fly.io); retention per provider config
+- **Sensitive events** (login, settings change, trade placement) additionally write structured audit entries to the database — and the database is where we go for forensics, not the log files
+
+## What `code-reviewer` checks
+
+- No `console.*` in production paths
+- Structured log calls (`log.method(obj, msg)`)
+- No string interpolation in log messages
+- No logging of `req.body`, `req.headers` (unless filtered)
+- No logging of `err.config`, `err.request`, or other objects prone to containing credentials
+- Child logger usage for multi-step operations
+- Levels used appropriately
+
+Violations block the PR.

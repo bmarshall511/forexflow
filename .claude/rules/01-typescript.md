@@ -1,0 +1,223 @@
+---
+name: typescript
+scope: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"]
+enforcement: strict
+version: 0.1.0
+related:
+  - "hooks/pre-edit-no-any.mjs"
+  - "hooks/pre-edit-hallucination-guard.mjs"
+  - "agents/code-reviewer.md"
+  - "context/stack.md"
+applies_when: "Editing any TypeScript source file"
+---
+
+# TypeScript
+
+The project is strict-mode TypeScript. Every compiler strictness flag is on. Types are load-bearing documentation.
+
+## No `any`
+
+`any` is banned. If a type is genuinely unknown, prefer `unknown` and narrow it. If `any` is truly necessary (typically when interfacing with a third-party library whose types are broken), accompany it with an explanatory comment:
+
+```ts
+// TODO(type): @forexflow/some-dep ships broken types; revisit after upstream fix #42
+const result = external.something() as any
+```
+
+The `pre-edit-no-any` hook blocks `: any`, `as any`, and `<any>` occurrences that lack an adjacent `// TODO(type):` comment. The code-reviewer agent flags `any` even with the comment as a technical-debt signal that should be resolved, not accumulated.
+
+## No `@ts-ignore` or `@ts-nocheck`
+
+Both are banned. If the compiler is wrong, it's usually because the types are wrong — fix the types. If you genuinely need to suppress a compiler error, use `@ts-expect-error` with an explanatory comment on the same line:
+
+```ts
+// @ts-expect-error — upstream lib types are wrong; see issue #57
+foo.bar()
+```
+
+`@ts-expect-error` fails the build when the error disappears, so it can't go stale.
+
+## Strict compiler flags
+
+The root `tsconfig.json` (added in Phase 2) enables:
+
+- `strict: true` (all the strict flags)
+- `noUncheckedIndexedAccess: true` (array/object access returns `T | undefined`)
+- `noImplicitOverride: true`
+- `noImplicitReturns: true`
+- `noFallthroughCasesInSwitch: true`
+- `exactOptionalPropertyTypes: true`
+
+Agents must write code that compiles cleanly under these flags. No narrowing via `!` assertions unless inside a clearly-justified single line.
+
+## Discriminated unions over loose records
+
+Prefer:
+
+```ts
+type Signal =
+  | { type: "entry"; price: number; sl: number; tp: number }
+  | { type: "exit"; reason: "sl" | "tp" | "manual" }
+  | { type: "cancel"; reason: string }
+```
+
+Over:
+
+```ts
+interface Signal {
+  type: string
+  price?: number
+  sl?: number
+  tp?: number
+  reason?: string
+}
+```
+
+The union catches mismatched field usage at compile time. The loose record does not.
+
+## Exhaustive `switch` with `never`
+
+When switching on a union's discriminant, the default case asserts exhaustiveness:
+
+```ts
+switch (signal.type) {
+  case "entry": return handleEntry(signal)
+  case "exit": return handleExit(signal)
+  case "cancel": return handleCancel(signal)
+  default: {
+    const _exhaustive: never = signal
+    throw new Error(`Unhandled signal type: ${JSON.stringify(_exhaustive)}`)
+  }
+}
+```
+
+When a new variant is added to `Signal`, the compiler flags every non-exhaustive switch. No silent misses.
+
+## Branded types for domain IDs
+
+IDs that should not be intermixed get branded types:
+
+```ts
+type TradeId = string & { readonly __brand: "TradeId" }
+type OrderId = string & { readonly __brand: "OrderId" }
+
+function closeTrade(id: TradeId) { /* ... */ }
+
+// const order: OrderId = ...
+// closeTrade(order) — compiler error ✓
+```
+
+Apply branded types to: `TradeId`, `OrderId`, `PositionId`, `SignalId`, `ConditionId`, `UserId`, `SessionId`, account identifiers, webhook tokens. Use utility factories in `packages/shared` to construct them.
+
+## `import type` for type-only imports
+
+ESLint enforces `@typescript-eslint/consistent-type-imports: error`. Type-only imports do not emit runtime bundle weight:
+
+```ts
+// good
+import type { Trade } from "@forexflow/types"
+import { closeTrade } from "@forexflow/db"
+
+// bad — type and value mixed
+import { Trade, closeTrade } from "..."
+```
+
+## `readonly` by default
+
+Function parameters of object or array type are `readonly`. Mutation crosses a function boundary only when the function's name says so (`pushTrade`, `mutateZone`):
+
+```ts
+function sum(values: readonly number[]): number { /* ... */ }
+function filter<T>(items: readonly T[], pred: (t: T) => boolean): T[] { /* ... */ }
+```
+
+Interfaces with mutable state are the exception, not the default. When in doubt, `readonly`.
+
+## No enums — use `as const` unions
+
+TypeScript's `enum` has runtime baggage, unintuitive behavior with `const enum` across modules, and does not compose well with discriminated unions. Use `as const` arrays and derive types:
+
+```ts
+// good
+export const TRADE_DIRECTIONS = ["long", "short"] as const
+export type TradeDirection = (typeof TRADE_DIRECTIONS)[number]
+
+// bad
+export enum TradeDirection { Long = "long", Short = "short" }
+```
+
+## Zod at boundaries
+
+Every external input is parsed through a Zod schema at the boundary and converted to a typed value. Types and schemas live together in `packages/types` — the Zod schema is the single source of truth, types are derived with `z.infer`:
+
+```ts
+// packages/types/src/trade-events.ts
+import { z } from "zod"
+
+export const TradePlacedEventSchema = z.object({
+  type: z.literal("trade_placed"),
+  tradeId: z.string(),
+  instrument: z.string(),
+  direction: z.enum(["long", "short"]),
+  units: z.number().int().positive(),
+  ts: z.number(),
+})
+
+export type TradePlacedEvent = z.infer<typeof TradePlacedEventSchema>
+```
+
+Webhooks, API route bodies, WebSocket messages, third-party API responses, env vars — all parse through a schema. The agents/code-reviewer agent flags untyped boundary data.
+
+## No implicit returns or catches
+
+```ts
+// bad — silent undefined
+function findTrade(id: TradeId) {
+  if (!id) return
+  // ...
+}
+
+// good
+function findTrade(id: TradeId): Trade | undefined {
+  if (!id) return undefined
+  // ...
+}
+```
+
+```ts
+// bad — silent swallow
+try { riskyOp() } catch {}
+
+// good
+try { riskyOp() } catch (err) {
+  logger.error({ err, operation: "riskyOp" }, "risky op failed")
+  throw new RiskyOpError("failed to...", { cause: err })
+}
+```
+
+## Avoid namespace imports from workspace packages
+
+```ts
+// bad
+import * as Types from "@forexflow/types"
+
+// good
+import type { Trade, Signal } from "@forexflow/types"
+```
+
+Namespace imports defeat tree-shaking and obscure what is actually used.
+
+## Generics: constrain, don't leave naked
+
+```ts
+// bad
+function uniqueBy<T, K>(items: T[], key: (t: T) => K): T[] { /* ... */ }
+
+// good
+function uniqueBy<T, K extends string | number>(
+  items: readonly T[],
+  key: (t: T) => K,
+): T[] { /* ... */ }
+```
+
+If your generic could be `any`, the constraint is probably missing.

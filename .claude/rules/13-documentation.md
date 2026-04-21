@@ -1,0 +1,220 @@
+---
+name: documentation
+scope: []
+enforcement: strict
+version: 0.1.0
+related:
+  - "hooks/pre-commit-docs-sync.mjs"
+  - "agents/docs-syncer.md"
+  - "skills/doc-check/SKILL.md"
+applies_when: "Any change that alters externally-observable behavior"
+---
+
+# Documentation
+
+Documentation is not optional, not a separate PR, not a "we'll get to it." It ships in the same commit as the code change. The `pre-commit-docs-sync` hook enforces this.
+
+## What counts as documentation
+
+Five layers, each with its own purpose:
+
+| Layer | Lives in | Audience | Updated when |
+|---|---|---|---|
+| **Requirements** | `docs/requirements/*.md` | Maintainers, contributors, users | A feature is added, changed, or removed |
+| **User docs** | `docs/user/**/*.md` | End users | A user-facing capability changes |
+| **Developer docs** | `docs/dev/**/*.md` | Contributors | Setup, CI, deployment, tooling changes |
+| **Per-package README** | `apps/<app>/CLAUDE.md`, `packages/<pkg>/CLAUDE.md` | Agents + contributors | The package's structure, conventions, or notable behaviors change |
+| **In-code JSDoc** | Exported symbols in source files | Compilers, editors, type-aware tools | Any exported symbol is added or changed |
+
+Every layer has a rule about when it must be updated. The `pre-commit-docs-sync` hook enforces the per-package and requirements layers at commit time.
+
+## Per-package `CLAUDE.md`
+
+Every app and package has a `CLAUDE.md` at its root:
+
+```
+apps/web/CLAUDE.md
+apps/daemon/CLAUDE.md
+apps/cf-worker/CLAUDE.md
+apps/desktop/CLAUDE.md
+apps/mcp-server/CLAUDE.md
+packages/types/CLAUDE.md
+packages/shared/CLAUDE.md
+packages/db/CLAUDE.md
+packages/config/CLAUDE.md
+packages/logger/CLAUDE.md
+```
+
+Each `CLAUDE.md` answers:
+
+1. **What is this module and what problem does it solve?** One paragraph.
+2. **What is its public surface?** The entry point, the key exported symbols, the primary responsibility.
+3. **What are its patterns?** Naming conventions specific to this module, how files are organized, state ownership, error handling style.
+4. **What are its gotchas?** Non-obvious invariants, places where a casual reader will go wrong, performance traps, security-sensitive paths.
+5. **What are its tests?** Where they live, how they run, what's covered.
+6. **Last verified:** ISO date (`YYYY-MM-DD`) of the last time a maintainer confirmed the file matches reality.
+
+The `Last verified:` line is mandatory. The `docs-syncer` agent checks it monthly; anything > 30 days stale is flagged for re-audit.
+
+Size limit per the `07-file-size.md` rule: 300 LOC. These are orientation docs, not textbooks.
+
+## JSDoc
+
+Every **exported** symbol in a source file has a JSDoc block. Not every internal function — only the public surface of each file.
+
+Minimum required:
+
+```ts
+/**
+ * Computes position size from risk amount and stop distance.
+ *
+ * Returns 0 when riskAmount is 0 or riskPips is 0 (prevents divide-by-zero).
+ * Floors fractional units to avoid over-sizing.
+ */
+export function calculatePositionSize(params: PositionSizeParams): number {
+  // ...
+}
+```
+
+Conventions:
+
+- **One-line summary** sentence first — what the function does, not how
+- **Behavioral edge cases** in a paragraph if non-obvious
+- **No `@param`, `@returns` tags for obvious types** — TypeScript types already document that
+- **Use `@param` / `@returns` when the type alone is insufficient** (units, valid ranges, nullable semantics)
+- **`@throws`** when the function can throw — and which error type
+- **`@see`** for cross-references to related functions or docs
+- **`@deprecated`** with a `since` date and replacement path when deprecating
+
+Types and interfaces also get JSDoc:
+
+```ts
+/**
+ * Input parameters for calculating position size.
+ *
+ * `riskAmount` is in account currency (typically USD); `riskPips` is the
+ * distance from entry to stop loss in pips; `pipValuePerUnit` is the pip
+ * value in account currency per unit of the instrument (differs for JPY
+ * pairs and cross-pairs).
+ */
+export interface PositionSizeParams {
+  readonly riskAmount: number
+  readonly riskPips: number
+  readonly pipValuePerUnit: number
+}
+```
+
+Internal (non-exported) functions do **not** need JSDoc. Good names and types suffice. If an internal function is complex enough to warrant JSDoc, consider whether it should be exported and tested.
+
+## Inline comments
+
+Not JSDoc; regular `// ...` or `/* ... */`.
+
+**Default: do not write inline comments.** Well-named identifiers and types document intent.
+
+**Write a comment only when the *why* is non-obvious:**
+
+- A hidden constraint that cannot be expressed in code
+- A workaround for a specific upstream bug (link the issue)
+- A counter-intuitive choice that a reader would undo
+- A subtle invariant a refactorer could easily break
+
+**Never write:**
+
+- Comments that paraphrase what the next line does (`// loop through trades`)
+- Change-log comments (`// added for ticket #42`, `// removed old logic`)
+- TODOs without owner-role, date, or issue link
+
+**`TODO` format:**
+
+```ts
+// TODO(role|issue|date): context
+// TODO(type): upstream lib types are broken; revisit after upstream fix #42
+// TODO(perf|2026-07): N+1 query here; batch once opportunity-store lands
+```
+
+The prefix in parens tags the kind of follow-up so `/todo-scan` (a future skill) can filter.
+
+## User documentation (`docs/user/`)
+
+User docs are built out phase-by-phase as features ship. They follow a structure decided in a later phase's ADR. For now, `docs/user/` doesn't exist yet — it's seeded in Sub-phase 10.
+
+When a user-facing capability ships:
+
+- A corresponding page exists in `docs/user/<category>/<feature>.md`
+- Screenshots or GIFs for any visual flow
+- Troubleshooting section for known rough edges
+
+The `docs-syncer` agent owns keeping these current.
+
+## Developer documentation (`docs/dev/`)
+
+Stable developer-facing docs:
+
+- `docs/dev/GETTING_STARTED.md` — local setup (exists since Sub-phase 1)
+- `docs/dev/CI.md` — CI workflow overview (Sub-phase 11)
+- `docs/dev/ARCHITECTURE.md` — high-level architecture (Phase 2)
+- `docs/dev/DEPLOYMENT.md` — how the three deployment modes work
+- `docs/dev/TESTING.md` — test pyramid + how to run everything
+
+Updated when the underlying topic changes. Check the `pre-commit-docs-sync` hook's DOC_MAP (Sub-phase 4) for the code → doc mapping.
+
+## API documentation
+
+Every HTTP and WebSocket contract is documented:
+
+- HTTP routes: `docs/dev/api/<app>-http.md` — one section per route, with schema, example, error cases
+- WebSocket messages: `docs/dev/api/<app>-ws.md` — one section per message type, with schema, example, direction (server→client or both)
+
+These are generated where possible (from Zod schemas via a script) and hand-edited where not. The `docs-syncer` agent regenerates on every API surface change.
+
+## The `pre-commit-docs-sync` hook
+
+Behavior:
+
+1. Read the diff of staged changes
+2. Map each changed file to the docs it is expected to update (via `DOC_MAP` in the hook script)
+3. For each mapped doc, check whether it is also staged or has uncommitted changes
+4. If a mapping says "file X requires doc Y updated" and Y is neither staged nor uncommitted, block the commit with a message pointing at the expected doc
+5. Maintainer response: either update the doc or stage it as-is (explicit acknowledgement)
+
+Skipped paths:
+
+- Test files (`*.test.ts`, `*.spec.ts`)
+- Style-only changes (CSS, `className`-only diffs detected by the hook)
+- Trivial JSON / YAML config
+- Internal refactors that don't change the exported surface (not detectable; this is checked by the reviewer agent instead)
+
+## The `docs-syncer` agent
+
+Dispatched by `/doc-sync` or `/phase-complete`. Its job:
+
+1. Read changes since last invocation
+2. Re-read every affected doc against the current code
+3. Detect stale references (file paths, function names, type names no longer in the code)
+4. Propose updates
+5. Bump `Last verified:` dates on docs it has confirmed current
+
+Output: a patch the maintainer reviews and accepts or amends.
+
+## README (repo root)
+
+`README.md` at the repo root is the public-facing front door. Updated when:
+
+- Product positioning changes
+- Major features ship
+- Screenshots go stale
+- License or status changes
+
+Never updated casually — it's marketing surface as much as documentation.
+
+## What `code-reviewer` checks
+
+- Every new exported symbol has JSDoc
+- JSDoc matches the current signature
+- No unjustified inline comments
+- TODO comments have owner/issue/date
+- `CLAUDE.md` files exist for new packages
+- `Last verified:` dates present on `CLAUDE.md` files
+
+Violations block the PR.

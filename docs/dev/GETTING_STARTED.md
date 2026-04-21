@@ -55,14 +55,20 @@ pnpm install
 
 ## 5. Environment variables
 
-ForexFlow validates every environment variable it reads through a Zod schema (T3 Env). The schema is the source of truth — copy the example file and fill in your values:
+ForexFlow keeps `.env` files minimal. They hold only infrastructure bootstrapping values — the things the process needs to know before the database or UI is reachable (DB URL, port, log level, build-time deployment mode).
+
+**User-owned credentials — OANDA API keys, webhook tokens, Anthropic keys, etc. — are not in `.env` files.** They are configured through the in-app Settings UI and stored encrypted in the database.
+
+Copy the example files:
 
 ```bash
 cp apps/web/.env.example apps/web/.env.local
-cp apps/daemons/.env.example apps/daemons/.env.local
+cp apps/daemon/.env.example apps/daemon/.env.local
 ```
 
-At minimum you'll need OANDA credentials (practice account is fine). See `.env.example` for the full list and per-variable notes.
+Review each `.env.example` — every variable has an explanatory comment. Typical defaults work for local dev; override only what you need.
+
+See [`.claude/rules/11-env-vars.md`](../../.claude/rules/11-env-vars.md) for the full policy on what belongs in env vars versus the settings UI.
 
 ## 6. Database (local dev)
 
@@ -72,7 +78,7 @@ ForexFlow uses SQLite locally, with a Prisma schema. To initialize:
 pnpm --filter @forexflow/db db:migrate
 ```
 
-This creates `./data/forexflow.db` and applies the current migrations.
+This creates `./data/forexflow.db` and applies the current migrations. On first app launch, open Settings and enter your OANDA credentials, webhook tokens, and any optional API keys — everything is stored encrypted in this database.
 
 ## 7. Run it
 

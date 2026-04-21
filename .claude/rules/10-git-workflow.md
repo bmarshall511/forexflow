@@ -1,0 +1,233 @@
+---
+name: git-workflow
+scope: []
+enforcement: strict
+version: 0.1.0
+related:
+  - "hooks/guard-bash.mjs"
+  - "hooks/pre-commit-secrets-scan.mjs"
+  - "hooks/pre-commit-docs-sync.mjs"
+  - "hooks/pre-commit-requirements-sync.mjs"
+  - "hooks/pre-commit-continuous-green.mjs"
+  - "hooks/pre-commit-ide-parity.mjs"
+  - "CONTRIBUTING.md"
+applies_when: "Any git operation — commit, branch, push, merge"
+---
+
+# Git Workflow
+
+Git is how intent persists. Every branch, commit, and PR is a permanent artifact. Treat them accordingly.
+
+## Branches
+
+### Base branch
+
+- **`v3`** is the active rebuild branch. All feature branches base off `v3`.
+- **`main`** is frozen for reference during the rebuild. Do not base new work off `main`.
+- When Phase 14 (cutover) completes, `v3` becomes the new `main` and the above flips.
+
+### Branch names
+
+Format: `<type>/<scope>/<short-description>`
+
+- **type**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `perf`
+- **scope**: matches commit-scope enum (e.g. `web`, `daemon`, `claude`, `repo`)
+- **short-description**: kebab-case, imperative, 2–5 words
+
+Examples:
+
+- `feat/web/add-equity-curve-drawdown`
+- `fix/daemon/reset-stuck-executing-states`
+- `refactor/shared/split-pip-utils`
+- `docs/claude/update-domain-glossary`
+
+Bad:
+
+- `bens-branch` (personal identifier; also vague)
+- `fix` (no scope, no description)
+- `UpdateThing` (wrong case)
+- `fix-bug` (no scope)
+
+## Commits
+
+### Conventional Commits
+
+All commits follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types**: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `chore`, `ci`, `build`, `style`.
+
+**Scopes** are enum-enforced by commitlint. During Phase 1:
+
+- `claude`, `docs`, `ci`, `repo`, `agents`, `hooks`, `skills`, `rules`
+
+Expanded in later phases with: `web`, `daemon`, `cf-worker`, `mcp-server`, `desktop`, `types`, `shared`, `db`, `config`, `logger`, `deps`.
+
+### Subject line
+
+- Imperative mood: `add`, `fix`, `remove` — not `added`, `fixes`, `removing`
+- ≤ 70 characters
+- No trailing period
+- Concrete, not vague
+
+Good: `fix(daemon): reset stuck executing states on startup`
+Bad: `fix(daemon): bug fix`
+Bad: `Fixed a bug`
+
+### Body
+
+Explain **why**, not **what**. The diff shows what.
+
+Good body:
+
+```
+The OANDA transaction stream can disconnect mid-sync, leaving trades in an
+"executing" state with no way out. Previously required manual DB intervention.
+The reconciler now sweeps on startup and resets anything stuck > 5 minutes to
+"pending", letting normal reconciliation retry.
+```
+
+Bad body:
+
+```
+Changed the code to fix the issue.
+```
+
+Wrap body lines at ~72 chars. Use blank lines between paragraphs.
+
+### Footer
+
+For structured metadata:
+
+```
+BREAKING CHANGE: the /trades endpoint now returns a paginated envelope
+@req: REQ-TRADING-014
+Closes: #123
+```
+
+**No `Co-Authored-By:` lines.** Rule: never reference individuals. The commit author on the git object is recorded by local git config; that is not subject to this rule (it's not content the project produces; it's how git tracks provenance).
+
+**No `[skip ci]`** directives to bypass CI. If CI needs to skip, there's a legitimate reason codified in a workflow condition — the developer does not annotate individual commits.
+
+### Atomic commits
+
+One commit = one logical change. If a diff mixes multiple concerns, split.
+
+Good:
+
+- Commit 1: `refactor(shared): extract pip-value into own file`
+- Commit 2: `feat(shared): add JPY-pair handling to pip-value`
+- Commit 3: `test(shared): cover pip-value edge cases for JPY pairs`
+
+Bad:
+
+- Commit 1: `feat(shared): pip-value rewrite + new JPY handling + tests + fixed unrelated import`
+
+The `refactor-planner` agent and the `code-reviewer` agent both flag diffs that should be multiple commits.
+
+### Continuous green
+
+Every commit must leave `main` / `v3` in a state where:
+
+- `pnpm typecheck` passes
+- `pnpm lint` passes
+- `pnpm test` passes
+
+Enforced by the `pre-commit-continuous-green` hook. No "I'll fix the tests in the next commit." No "the build is broken on main temporarily." Never.
+
+In Phase 1, before app code exists, these checks effectively no-op. As soon as Phase 2 adds a package, they become load-bearing.
+
+## Pre-commit checks (hooks)
+
+On every `git commit`, these run in order:
+
+1. **`pre-commit-secrets-scan`** — gitleaks + regex fallback. Blocks on detection
+2. **`pre-commit-docs-sync`** — blocks if staged changes alter documented behavior without updating docs
+3. **`pre-commit-requirements-sync`** — blocks `feat()` commits that don't update `docs/requirements/`
+4. **`pre-commit-ide-parity`** — blocks if `.claude/rules/` changed without regenerating `.cursor/rules/`
+5. **`pre-commit-continuous-green`** — runs `pnpm typecheck && pnpm lint && pnpm test`
+
+Any failure blocks the commit. Do **not** bypass with `--no-verify`. Fix the underlying issue.
+
+## Pre-push checks
+
+On `git push`:
+
+- Full preflight (`pnpm preflight`) — mirrors CI
+- Branch name validated against the format above
+- No force-push to `main` or `v3` (hooks block; branch protection also blocks at the GitHub level)
+
+## Merging
+
+### Pull requests only
+
+No direct pushes to `v3` (once it has teammates). No direct pushes to `main`, ever, during the rebuild. PRs are the review surface.
+
+### Merge strategy
+
+- **Squash merge** for feature branches — the PR becomes one clean commit with the conventional-commits subject
+- **Rebase merge** for release branches (Phase 14)
+- **No merge commits** on the main branches — linear history is a feature
+
+PRs that violate conventional-commits in their squash subject are blocked by the repo's merge settings.
+
+### PR requirements
+
+Every PR must:
+
+- Pass CI (`claude-config.yml` now; full stack later)
+- Have an approved review from at least one CODEOWNER
+- Reference a requirement ID in the body (`@req: REQ-*-*`)
+- Fill out the PR template completely
+- Have a test plan or test evidence
+
+See `.github/PULL_REQUEST_TEMPLATE.md`.
+
+## Dangerous operations
+
+These require explicit maintainer approval, not just "in the flow":
+
+| Operation | When it's acceptable |
+|---|---|
+| `git push --force` or `-f` | Only to a feature branch, only if you opened the PR. Never to `main` or `v3` |
+| `git push --force-with-lease` | Preferred alternative when rewriting your own branch |
+| `git reset --hard` | Only to discard local work; the reflog is your friend |
+| `git rebase -i` | Non-interactive in our hooks; rewrite history only before the branch has been reviewed |
+| `git branch -D` | Never on shared branches. Only on your own local copies |
+| `gh pr close --delete-branch` | Only after the PR is merged or explicitly rejected |
+
+The `guard-bash` hook blocks `git push --force` to protected branches. The `ask` permission on `git reset --hard` and `git clean -f` ensures a confirmation prompt.
+
+## Signing
+
+- GPG or SSH-signed commits preferred but not required during the rebuild
+- When required (later phase), the signing key belongs to a project identity, not a personal account — to keep with the no-individuals rule
+
+## Bisecting
+
+When a bug is suspected to have a git origin:
+
+```
+git bisect start
+git bisect bad
+git bisect good <known-good-commit>
+# checkout loop
+```
+
+Every commit on a main branch leaves the tree green → bisect works cleanly. That is the payoff for the continuous-green rule.
+
+## Recovering
+
+If you realize a commit already pushed contains sensitive content:
+
+1. Rotate the credential immediately at its source (OANDA, TradingView, etc.)
+2. Open a private SECURITY advisory documenting the rotation
+3. Do **not** force-push history rewrites without maintainer authorization — on a public repo, history rewrites are visible and cached
+4. The rotation is the fix; history rewriting is cleanup, not remediation
