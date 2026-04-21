@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Per-user overrides. Copy to .claude/settings.local.json (gitignored). These values take precedence over .claude/settings.json.",
+  "env": {
+    "_comment_env": "MAX_THINKING_TOKENS caps extended thinking. Default (~32000) is often wasteful; 10000 gives ~70% cost reduction with minimal quality loss. CLAUDE_CODE_SUBAGENT_MODEL routes exploration subagents (Glob/Grep/Read-heavy work) to a cheaper model.",
+    "MAX_THINKING_TOKENS": "10000",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku"
+  },
+  "permissions": {
+    "_comment_permissions": "Populate with your preferred allowlist. These extend the deny/ask/allow rules in settings.json.",
+    "allow": [
+      "WebSearch",
+      "Skill(*)"
+    ]
+  }
+}

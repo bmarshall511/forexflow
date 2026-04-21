@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Shared settings for ForexFlow. Per-user overrides (thinking budget, MCP permissions) go in .claude/settings.local.json — see settings.local.example.json for a template.",
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "*.github.com",
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "objects.githubusercontent.com",
+        "npmjs.com",
+        "*.npmjs.com",
+        "registry.npmjs.org",
+        "mise.run",
+        "mise.jdx.dev",
+        "nodejs.org",
+        "contributor-covenant.org",
+        "www.contributor-covenant.org",
+        "conventionalcommits.org",
+        "www.conventionalcommits.org",
+        "keepachangelog.com",
+        "semver.org"
+      ],
+      "allowLocalBinding": true
+    }
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./apps/*/.env)",
+      "Read(./apps/*/.env.*)",
+      "Read(./packages/*/.env)",
+      "Read(./packages/*/.env.*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Edit(./secrets/**)",
+      "Edit(./apps/*/.env)",
+      "Edit(./apps/*/.env.*)",
+      "Edit(./packages/*/.env)",
+      "Edit(./packages/*/.env.*)",
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Write(./secrets/**)"
+    ],
+    "ask": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(git branch -D*)",
+      "Bash(npm publish*)",
+      "Bash(pnpm publish*)",
+      "Bash(gh release delete*)",
+      "Bash(gh repo delete*)"
+    ],
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "WebFetch"
+    ]
+  },
+  "hooks": {
+    "_comment": "Hook scripts are added in Sub-phase 4. This section is intentionally empty in 0.1.0; wiring arrives with the scripts themselves."
+  }
+}
