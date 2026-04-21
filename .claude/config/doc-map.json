@@ -25,6 +25,16 @@
       "pattern": ".claude/context/*.md",
       "docs": [".claude/CLAUDE.md"],
       "label": "agent canonical context"
+    },
+    {
+      "pattern": "docs/requirements/*.md",
+      "docs": ["docs/requirements/index.md"],
+      "label": "requirements index"
+    },
+    {
+      "pattern": "docs/requirements/**/*.md",
+      "docs": ["docs/requirements/index.md"],
+      "label": "requirements index (nested)"
     }
   ]
 }
