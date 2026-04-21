@@ -1,0 +1,61 @@
+# Cursor ignore — mirrors .gitignore plus Cursor-specific exclusions.
+# Keeps the Cursor index lean and the agent focused on source.
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.turbo/
+.wrangler/
+*.tsbuildinfo
+
+# Electron artifacts
+release/
+daemon-bundle/
+assets/template.db
+
+# Env + secrets
+.env
+.env.*
+!.env.example
+
+# Database
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs + telemetry
+logs/
+*.log
+.claude/telemetry/
+.claude/handoffs/*.md
+.claude/snapshots/*
+.claude/.session-state/
+
+# Per-user Cursor state
+.cursor/mcp.json
+
+# Per-user Claude state
+.claude/settings.local.json
+.claude/config/reserved-identifiers.json
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+
+# Misc
+*.pem
+.vercel/
