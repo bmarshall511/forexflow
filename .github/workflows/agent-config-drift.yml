@@ -1,0 +1,60 @@
+name: agent-config-drift
+
+# Daily cron that catches .claude/ rot accumulated between PRs.
+# Specifically: stale references, cursor-parity drift, and broken
+# cross-links that didn't happen to trigger claude-config on any
+# individual PR.
+
+on:
+  schedule:
+    - cron: "17 12 * * *" # 12:17 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift-scan:
+    name: Scan for agent-config drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run full harness
+        id: harness
+        continue-on-error: true
+        run: node .claude/test-harness/run.mjs
+
+      - name: Cursor-parity check
+        id: parity
+        continue-on-error: true
+        run: node scripts/sync-ide-rules.mjs --check
+
+      - name: Parity validator
+        id: validator
+        continue-on-error: true
+        run: bash scripts/test-cursor-parity.sh
+
+      - name: Summarize
+        if: always()
+        run: |
+          echo "## Agent-config drift report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Harness: ${{ steps.harness.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Cursor parity generator: ${{ steps.parity.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Cursor parity validator: ${{ steps.validator.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if anything drifted
+        if: steps.harness.outcome == 'failure' || steps.parity.outcome == 'failure' || steps.validator.outcome == 'failure'
+        run: |
+          echo "Drift detected. Investigate and run:"
+          echo "  node scripts/sync-ide-rules.mjs"
+          echo "  node .claude/test-harness/run.mjs"
+          exit 1

@@ -35,6 +35,26 @@
       "pattern": "docs/requirements/**/*.md",
       "docs": ["docs/requirements/index.md"],
       "label": "requirements index (nested)"
+    },
+    {
+      "pattern": ".github/workflows/*.yml",
+      "docs": ["docs/dev/CI.md"],
+      "label": "CI workflows"
+    },
+    {
+      "pattern": "renovate.json",
+      "docs": ["docs/dev/CI.md"],
+      "label": "Renovate config"
+    },
+    {
+      "pattern": ".releaserc.json",
+      "docs": ["docs/dev/CI.md"],
+      "label": "semantic-release config"
+    },
+    {
+      "pattern": "commitlint.config.mjs",
+      "docs": ["docs/dev/CI.md", ".claude/context/conventions.md"],
+      "label": "commitlint scope enum"
     }
   ]
 }

@@ -10,6 +10,7 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
+- 2026-04-21 test-harness: `.claude/test-harness/fixtures/structure-ci-workflows.mjs` (write)
 - 2026-04-21 test-harness: `.claude/test-harness/fixtures/structure-requirements.mjs` (write)
 - 2026-04-21 config: `.claude/config/doc-map.json` (edit)
 - 2026-04-21 decision: `.claude/decisions/rejected/0002-tauri-instead-of-electron.md` (edit)

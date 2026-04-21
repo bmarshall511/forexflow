@@ -1,0 +1,77 @@
+name: claude-config
+
+# Validates .claude/ on every push and PR. This workflow is active from
+# Phase 1 onward — it is the CI mirror of .claude/test-harness.
+#
+# If any fixture fails, the agent config has drifted from its own rails
+# and the PR cannot merge until repaired.
+
+on:
+  push:
+    branches: [v3, main]
+  pull_request:
+    branches: [v3, main]
+
+concurrency:
+  group: claude-config-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    name: Run agent test harness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run harness
+        run: node .claude/test-harness/run.mjs
+
+  cursor-parity:
+    name: Cursor-parity check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run generator in --check mode
+        run: node scripts/sync-ide-rules.mjs --check
+
+      - name: Parity validator
+        run: bash scripts/test-cursor-parity.sh
+
+  json-schemas:
+    name: Validate .claude/ JSON files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Parse every JSON file under .claude/config/
+        run: |
+          set -e
+          for f in .claude/config/*.json; do
+            node -e "JSON.parse(require('node:fs').readFileSync('$f','utf8'))"
+            echo "$f ✓"
+          done
+
+      - name: Parse .claude/settings.json
+        run: node -e "JSON.parse(require('node:fs').readFileSync('.claude/settings.json','utf8'))"

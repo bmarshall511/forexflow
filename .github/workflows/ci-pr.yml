@@ -1,0 +1,117 @@
+name: ci-pr
+
+# Heavier per-PR CI: build, E2E (Playwright), contract tests. Runs in
+# addition to ci-push.
+#
+# Currently INERT by design — skips cleanly until the monorepo exists.
+# ci-push handles the always-on path (lint/typecheck/test).
+
+on:
+  pull_request:
+    branches: [v3, main]
+
+concurrency:
+  group: ci-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Check if monorepo exists
+    runs-on: ubuntu-latest
+    outputs:
+      has_workspace: ${{ steps.check.outputs.has_workspace }}
+      has_web: ${{ steps.check.outputs.has_web }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect monorepo + web app
+        id: check
+        run: |
+          if [ -f "pnpm-workspace.yaml" ] && [ -f "package.json" ]; then
+            echo "has_workspace=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_workspace=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -d "apps/web" ]; then
+            echo "has_web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build all packages
+    needs: guard
+    if: needs.guard.outputs.has_workspace == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+  e2e:
+    name: Playwright E2E
+    needs: [guard, build]
+    if: needs.guard.outputs.has_web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps
+
+      - name: Run E2E
+        run: pnpm --filter @forexflow/web exec playwright test
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+  contract:
+    name: Contract tests
+    needs: [guard, build]
+    if: needs.guard.outputs.has_workspace == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run contract tests
+        run: pnpm --filter @forexflow/types test -- --run "contracts/"

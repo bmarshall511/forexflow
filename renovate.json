@@ -1,0 +1,100 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitType(chore)",
+    ":semanticCommitScope(deps)",
+    ":separateMajorReleases",
+    ":combinePatchMinorReleases",
+    ":dependencyDashboard"
+  ],
+  "description": "Per rule 09. Renovate manages dependency bumps; the dep-upgrade agent evaluates each PR. Patch + security bumps auto-approve if CI passes; minor needs-review with migration notes; major always human-merge. License + breaking-note checks happen in the agent, not here.",
+  "timezone": "America/New_York",
+  "schedule": ["before 5am on monday"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "baseBranches": ["v3", "main"],
+  "labels": ["deps"],
+  "rangeStrategy": "bump",
+  "rebaseWhen": "conflicted",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["deps", "security"],
+    "schedule": ["at any time"]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am on the first day of the month"]
+  },
+  "packageRules": [
+    {
+      "description": "Node + pnpm minor/patch auto-merge after CI passes",
+      "matchDepTypes": ["engines"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
+      "description": "Group type packages",
+      "matchPackagePatterns": ["^@types/"],
+      "groupName": "type definitions",
+      "matchUpdateTypes": ["patch", "minor"]
+    },
+    {
+      "description": "Group ESLint + plugins",
+      "matchPackagePatterns": ["^eslint", "^@typescript-eslint/"],
+      "groupName": "eslint"
+    },
+    {
+      "description": "Group Prettier + plugins",
+      "matchPackagePatterns": ["^prettier", "^prettier-plugin-"],
+      "groupName": "prettier"
+    },
+    {
+      "description": "Group Vitest",
+      "matchPackagePatterns": ["^vitest", "^@vitest/"],
+      "groupName": "vitest"
+    },
+    {
+      "description": "Group Playwright",
+      "matchPackagePatterns": ["^@playwright/", "^playwright"],
+      "groupName": "playwright"
+    },
+    {
+      "description": "Group Hono + plugins",
+      "matchPackagePatterns": ["^hono", "^@hono/"],
+      "groupName": "hono"
+    },
+    {
+      "description": "Prisma pinned exact during rebuild",
+      "matchPackagePatterns": ["^prisma", "^@prisma/"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "description": "Never auto-merge majors — always human-reviewed via dep-upgrade agent",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["deps", "major"]
+    },
+    {
+      "description": "Major Prisma, Hono, Electron, Next, React — high-impact: tag for manual scrutiny",
+      "matchPackagePatterns": [
+        "^prisma",
+        "^@prisma/",
+        "^hono",
+        "^electron",
+        "^next",
+        "^react",
+        "^react-dom"
+      ],
+      "matchUpdateTypes": ["major"],
+      "labels": ["deps", "major", "high-impact"]
+    }
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "apps/desktop/daemon-bundle/**",
+    "apps/desktop/release/**"
+  ]
+}

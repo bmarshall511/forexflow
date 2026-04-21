@@ -1,0 +1,50 @@
+name: codeql
+
+# Static analysis for JavaScript/TypeScript. Free on public repos.
+# Runs on every push to v3 and main, on every PR, and weekly as a
+# backstop against new CodeQL rule releases catching something the
+# per-PR scan missed.
+
+on:
+  push:
+    branches: [v3, main]
+  pull_request:
+    branches: [v3, main]
+  schedule:
+    - cron: "42 4 * * 1" # Monday 04:42 UTC
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["javascript-typescript"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

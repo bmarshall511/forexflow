@@ -1,0 +1,33 @@
+name: gitleaks
+
+# Secret scanning on every PR and push. Defensive layer on top of the
+# pre-commit-secrets-scan hook — if a contributor bypasses the hook
+# (they shouldn't), CI still catches the leak before merge.
+
+on:
+  push:
+    branches: [v3, main]
+  pull_request:
+    branches: [v3, main]
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Scan for leaked secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Gitleaks' default ruleset covers OANDA-shaped tokens,
+          # Anthropic keys, GitHub PATs, AWS keys, and the private-key
+          # block header. Customizations (if any) would live in a
+          # committed .gitleaks.toml.

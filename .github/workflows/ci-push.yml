@@ -1,0 +1,68 @@
+name: ci-push
+
+# Lightweight per-push CI: lint, typecheck, unit/integration tests.
+#
+# Currently INERT by design — skips cleanly until pnpm-workspace.yaml
+# and a root package.json with the expected scripts exist (Phase 2+
+# via /bootstrap). The skip condition is intentional so this workflow
+# can land in Phase 1 without failing on missing files.
+
+on:
+  push:
+    branches: [v3, main]
+  pull_request:
+    branches: [v3, main]
+
+concurrency:
+  group: ci-push-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Check if monorepo exists
+    runs-on: ubuntu-latest
+    outputs:
+      has_workspace: ${{ steps.check.outputs.has_workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect monorepo
+        id: check
+        run: |
+          if [ -f "pnpm-workspace.yaml" ] && [ -f "package.json" ]; then
+            echo "has_workspace=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_workspace=false" >> "$GITHUB_OUTPUT"
+            echo "Monorepo not present — skipping ci-push (Phase 1 state)"
+          fi
+
+  lint-typecheck-test:
+    name: Lint + typecheck + test
+    needs: guard
+    if: needs.guard.outputs.has_workspace == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
