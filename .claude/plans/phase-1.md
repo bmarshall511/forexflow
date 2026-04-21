@@ -32,20 +32,20 @@ See `.claude/decisions/` for ADRs documenting each:
 
 ## Sub-phases
 
-| # | Goal | Status |
-|---|---|---|
-| 1 | Clear slate + repo hygiene (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, .github/, mise, .editorconfig, .gitignore, docs/dev/GETTING_STARTED) | ✅ committed `96d4c0e` |
-| 2 | `.claude/` foundation (CLAUDE.md, README, VERSION, CHANGELOG, settings.json, settings.local.example.json, context/*, plans/*) | In progress |
-| 3 | Rules — 16 path-scoped rules with machine-readable frontmatter | Pending |
-| 4 | Hooks — 16 executable guardrails, wired into settings.json | Pending |
-| 5 | Agents — 13 specialist sub-agents (reviewers, implementers, explorers) | Pending |
-| 6 | Skills — 29 slash-command workflows | Pending |
-| 7 | Cursor-parity generator + test harness | Pending |
-| 8 | Agent test harness (synthetic violations verify every hook fires) | Pending |
-| 9 | Meta directories (decisions, journal, failure-modes, telemetry, handoffs, snapshots) | Pending |
-| 10 | Requirements scaffolding (`docs/requirements/` index + README + template + counter) | Pending |
-| 11 | CI workflows (config-only validation; app CI templates seeded but inert) | Pending |
-| 12 | Validation + `/bootstrap --dry-run` + phase completion ADR + promote to Phase 2 | Pending |
+| #   | Goal                                                                                                                                                       | Status                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| 1   | Clear slate + repo hygiene (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, .github/, mise, .editorconfig, .gitignore, docs/dev/GETTING_STARTED) | ✅ committed `96d4c0e` |
+| 2   | `.claude/` foundation (CLAUDE.md, README, VERSION, CHANGELOG, settings.json, settings.local.example.json, context/_, plans/_)                              | ✅ committed `0e1a901` |
+| 3   | Rules — 16 path-scoped rules with machine-readable frontmatter                                                                                             | ✅ committed `83a05f2` |
+| 4   | Hooks — 17 executable guardrails, wired into settings.json                                                                                                 | ✅ committed `6e44113` |
+| 5   | Agents — 13 specialist sub-agents (reviewers, implementers, explorers)                                                                                     | Pending                |
+| 6   | Skills — 29 slash-command workflows                                                                                                                        | Pending                |
+| 7   | Cursor-parity generator + test harness                                                                                                                     | Pending                |
+| 8   | Agent test harness (synthetic violations verify every hook fires)                                                                                          | Pending                |
+| 9   | Meta directories (decisions, journal, failure-modes, telemetry, handoffs, snapshots)                                                                       | Pending                |
+| 10  | Requirements scaffolding (`docs/requirements/` index + README + template + counter)                                                                        | Pending                |
+| 11  | CI workflows (config-only validation; app CI templates seeded but inert)                                                                                   | Pending                |
+| 12  | Validation + `/bootstrap --dry-run` + phase completion ADR + promote to Phase 2                                                                            | Pending                |
 
 Full decision rationale for each sub-phase lives in the conversation record that produced this plan. During execution, the maintainer may steer any sub-phase; the plan is a guide, not a contract.
 
@@ -82,3 +82,38 @@ When all seven pass, `/phase-complete` bumps `VERSION` to `0.2.0`, writes the co
 ## Post-phase
 
 Phase 2 begins in a fresh chat session. The first session message reads `active.md`, which by then points at `phase-2.md`, then reads the most recent handoff under `.claude/handoffs/latest.md`.
+
+## Deferred follow-ups from earlier sub-phases
+
+Every design choice that was knowingly deferred during a sub-phase is pinned here so it cannot be lost between sessions. Each item cites the ADR that captures its full rationale.
+
+### From Sub-phase 4 — hooks
+
+**Bootstrap fail-open paths** (ADR [#0002](../decisions/0002-fail-open-bootstrap-posture.md))
+
+- [ ] Backfill the `ADR #0002` reference into the header comment of every hook that currently says "fails open" without citing the ADR. Do this in **Sub-phase 8** when the test harness runs over every hook.
+- [ ] `/stale-rules` skill (**Sub-phase 6**) includes a check that each fail-open hook's activation signal would correctly flip the hook from allow to enforce given the current repo state.
+- [ ] Test-harness fixtures (**Sub-phase 8**) cover both infrastructure-absent (fail-open) and infrastructure-present (enforcing) states for each of these six hooks: `pre-commit-continuous-green`, `pre-commit-docs-sync`, `pre-commit-requirements-sync`, `pre-commit-ide-parity`, `pre-edit-plan-required`, `pre-edit-requirement-link`.
+- [ ] When Phase 2 adds the missing scripts/dirs that activate one of these hooks, the activating commit includes a smoke-test snippet in the PR body showing the hook now enforces.
+
+**TodoWrite plan-marker emitter** (ADR [#0003](../decisions/0003-todowrite-plan-marker.md))
+
+- [ ] **Sub-phase 8**: ship `.claude/hooks/post-todowrite-plan-marker.mjs` and wire it in `settings.json` under `PostToolUse` with matcher `TodoWrite`. Writes `.claude/.session-state/plans/<timestamp>.json`.
+- [ ] **Sub-phase 8**: update `.claude/hooks/stop-session-check.mjs` to clean `.claude/.session-state/plans/` on Stop so the next session starts clean.
+- [ ] **Sub-phase 8**: test-harness fixtures covering both states — no plan marker → block a >50-LOC Write; marker present → allow.
+- [ ] **Sub-phase 8**: update the root `.gitignore` to include `.claude/.session-state/`.
+
+**Reserved-identifiers per-user list** (ADR [#0004](../decisions/0004-reserved-identifiers-per-user.md))
+
+- [ ] **Sub-phase 6**: `/contribute` skill reminds new teammates to copy `.claude/config/reserved-identifiers.example.json` → `reserved-identifiers.json` during onboarding.
+- [ ] **Sub-phase 8**: test-harness fixtures covering both the empty-list (no-op) and populated-list (blocking) paths of `pre-edit-no-personal-names`.
+
+**post-edit-meta-log auto-CHANGELOG** (ADR [#0005](../decisions/0005-post-edit-meta-log-changelog.md))
+
+- [ ] **Sub-phase 6**: `/phase-complete` skill promotes `.claude/CHANGELOG.md` `[Unreleased]` to a numbered release, bumps `.claude/VERSION`, and writes the phase-completion ADR.
+- [ ] **Sub-phase 8**: test-harness fixture verifies running the hook twice on the same path does not produce a duplicate changelog line.
+
+### Cross-cutting
+
+- [ ] **Sub-phase 9** (or earlier, if convenient during Sub-phase 5/6): populate `.claude/decisions/rejected/` with the Drizzle / Tauri / Bun / Express / Jest rejections discussed during Phase 1 planning. These were decided against in conversation but not yet recorded.
+- [ ] **Sub-phase 12**: every checkbox above is either completed or explicitly moved to a later phase's plan before Phase 1 can close.

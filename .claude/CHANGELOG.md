@@ -10,6 +10,15 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
+- 2026-04-21 plan: `.claude/plans/phase-1.md` (edit)
+- 2026-04-21 decision: `.claude/decisions/rejected/README.md` (write)
+- 2026-04-21 decision: `.claude/decisions/0005-post-edit-meta-log-changelog.md` (write)
+- 2026-04-21 decision: `.claude/decisions/0004-reserved-identifiers-per-user.md` (write)
+- 2026-04-21 decision: `.claude/decisions/0003-todowrite-plan-marker.md` (write)
+- 2026-04-21 decision: `.claude/decisions/0002-fail-open-bootstrap-posture.md` (write)
+- 2026-04-21 decision: `.claude/decisions/0001-v3-greenfield-rebuild.md` (write)
+- 2026-04-21 decision: `.claude/decisions/_template.md` (write)
+- 2026-04-21 decision: `.claude/decisions/README.md` (write)
 - 2026-04-21 config: `.claude/config/reserved-identifiers.example.json` (write)
 - 2026-04-21 config: `.claude/config/doc-map.json` (write)
 - 2026-04-21 config: `.claude/config/import-boundary-graph.json` (write)
