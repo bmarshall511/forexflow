@@ -1,0 +1,30 @@
+{
+  "description": "Code-path glob → required doc path mapping for the pre-commit-docs-sync hook. When a staged file matches `pattern` AND the matching `docs` are neither staged nor uncommitted, the commit is blocked. The map is intentionally narrow during Phase 1 — more entries are added as each app/package lands.",
+  "entries": [
+    {
+      "pattern": ".claude/rules/*.md",
+      "docs": [".claude/README.md"],
+      "label": "agent rules"
+    },
+    {
+      "pattern": ".claude/hooks/*.mjs",
+      "docs": [".claude/hooks/README.md"],
+      "label": "agent hooks"
+    },
+    {
+      "pattern": ".claude/agents/*.md",
+      "docs": [".claude/README.md"],
+      "label": "agent sub-agents"
+    },
+    {
+      "pattern": ".claude/skills/**/SKILL.md",
+      "docs": [".claude/README.md"],
+      "label": "agent skills"
+    },
+    {
+      "pattern": ".claude/context/*.md",
+      "docs": [".claude/CLAUDE.md"],
+      "label": "agent canonical context"
+    }
+  ]
+}

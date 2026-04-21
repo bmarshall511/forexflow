@@ -10,7 +10,11 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
-- (pending — next sub-phase)
+- 2026-04-21 config: `.claude/config/reserved-identifiers.example.json` (write)
+- 2026-04-21 config: `.claude/config/doc-map.json` (write)
+- 2026-04-21 config: `.claude/config/import-boundary-graph.json` (write)
+- 2026-04-21 config: `.claude/config/size-exceptions.json` (write)
+- 2026-04-21 config: `.claude/config/README.md` (write)
 
 ## [0.1.0] — Phase 1, Sub-phase 2 — 2026-04-21
 

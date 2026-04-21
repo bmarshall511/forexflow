@@ -1,0 +1,5 @@
+{
+  "$schema": "./size-exceptions.schema.json",
+  "description": "Per-path overrides to the file-size limit table in .claude/hooks/lib/size.mjs. Every entry must be backed by an ADR under .claude/decisions/.",
+  "paths": {}
+}

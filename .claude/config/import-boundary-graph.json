@@ -1,0 +1,10 @@
+{
+  "description": "Allowed package dependency graph. Mirror of .claude/rules/06-monorepo-boundaries.md. Keys are package short names (the part after @forexflow/). Values are arrays of short names the package is allowed to import from. Apps may import from any package in the graph; the hook only validates package-to-package imports and blocks apps-to-apps or packages-to-apps imports.",
+  "packages": {
+    "types": [],
+    "shared": ["types"],
+    "config": ["types"],
+    "logger": ["types"],
+    "db": ["types", "shared", "config", "logger"]
+  }
+}

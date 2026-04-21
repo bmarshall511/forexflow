@@ -1,0 +1,4 @@
+{
+  "description": "Copy to .claude/config/reserved-identifiers.json (gitignored) and populate with the personal names, handles, or emails this repo's pre-edit-no-personal-names hook should block. The list is per-user by design — the file is gitignored because its contents would otherwise violate the project's no-individuals rule in the very file meant to enforce it.",
+  "identifiers": []
+}
