@@ -1,0 +1,197 @@
+---
+name: bootstrap
+description: Scaffold the monorepo skeleton (Phase 2 entry point) — workspaces, Turbo, tsconfigs, eslint, Lefthook, commitlint, T3 Env + Pino packages, empty app and package shells
+disable-model-invocation: false
+model: sonnet
+args:
+  - name: mode
+    type: string
+    required: false
+    description: "'dry-run' | 'apply'. Default: dry-run"
+dispatches: [code-reviewer, integration-reviewer, security-reviewer]
+version: 0.1.0
+---
+
+# /bootstrap [mode]
+
+The Phase 2 entry-point skill. Turns the empty `v3` tree into a buildable monorepo skeleton: root `package.json`, pnpm workspaces, Turbo, shared tsconfigs, ESLint Flat config, Prettier, Lefthook, commitlint, and empty `apps/` + `packages/` shells that each have a valid `CLAUDE.md`, `package.json`, and `tsconfig.json`.
+
+Dry-run is the default. `apply` actually writes files — only run `apply` after the dry-run output has been reviewed and approved.
+
+## Dogfood role
+
+Phase 1 Sub-phase 12 requires this skill to produce a valid dry-run plan — proving the `.claude/` rails generate a correct Phase 2 scaffold without needing any hand-written patches. If the dry-run output has gaps, Phase 1 is not complete.
+
+## Procedure
+
+### 1. Preconditions
+
+- Current branch: `v3`
+- Phase 1 closed: `.claude/plans/active.md` points at `phase-2.md`
+- Working tree clean
+- No `package.json` at repo root (otherwise the monorepo is already bootstrapped — refuse to run)
+
+### 2. Plan the scaffold
+
+Assemble the file plan. Every file has a purpose cited to a specific rule or ADR:
+
+**Root**
+
+- `package.json` — root workspace, devDeps only (Turbo, Prettier, ESLint, commitlint, Lefthook, Vitest, Playwright) per rule 09
+- `pnpm-workspace.yaml` — apps/_ + packages/_ + site (when applicable), pnpm catalog block
+- `turbo.json` — pipeline: build, lint, typecheck, test, format, bench; caching config
+- `tsconfig.base.json` — strict mode, `noUncheckedIndexedAccess`, target ES2022, `skipLibCheck`, path aliases
+- `tsconfig.json` — root project references
+- `eslint.config.mjs` — Flat config, strict TS, import ordering, per-workspace overrides
+- `.prettierrc`, `.prettierignore`
+- `lefthook.yml` — pre-commit (Prettier, commitlint); pre-push (Prisma generate, format, lint, typecheck, test, Prisma drift)
+- `commitlint.config.mjs` — conventional commits, scope enum locked to rule 10
+- `vitest.config.ts` — root shared config
+- `playwright.config.ts` — placeholder (activated Phase 7)
+- `knip.json` — per-workspace entry points, ignore patterns
+- `scripts/preflight.sh` — local CI mirror
+
+**`packages/types/`**
+
+- `package.json`, `tsconfig.json`, `src/index.ts` (empty exports), `CLAUDE.md`
+
+**`packages/shared/`**
+
+- Same shell; no trading-core yet (arrives Phase 3)
+
+**`packages/config/`** (T3 Env schemas — new package per context/stack.md)
+
+- Same shell; scaffolding for `daemon-env.ts`, `web-env.ts`, `cf-worker-env.ts`
+
+**`packages/logger/`** (Pino factories — new package per context/stack.md)
+
+- Same shell; factory stubs for `daemon.ts`, `web.ts`, `cf-worker.ts`
+
+**`packages/db/`**
+
+- `package.json`, `tsconfig.json`, `prisma/schema.prisma` (empty model set), `src/index.ts`, `src/client.ts` stub, `src/encryption.ts` stub, `CLAUDE.md`
+
+**`apps/web/`, `apps/daemon/`, `apps/cf-worker/`, `apps/mcp-server/`, `apps/desktop/`**
+
+- Empty shells: `package.json` with workspace scripts, `tsconfig.json` extending base, `src/` placeholder, `CLAUDE.md` (last-verified today)
+- No source code beyond an `index.ts` that exports nothing
+
+**`.github/workflows/`**
+
+- `claude-config.yml` — already present; verify
+- `ci-push.yml`, `ci-pr.yml`, `release.yml` — seeded templates from Sub-phase 11
+
+**`docs/requirements/`**
+
+- Created in Sub-phase 10 if not present; bootstrap confirms existence
+
+### 3. Dry-run output
+
+Dry-run produces a complete file tree with path, one-line purpose, and file-size estimate — but writes nothing.
+
+### 4. Apply mode
+
+If `mode=apply`:
+
+- Write each file
+- Run `pnpm install` once
+- Run `pnpm typecheck` — expect green
+- Run `/verify` — expect PASS
+- Dispatch `/review`, `/security-review`, `integration-reviewer` on the full diff
+- Commit as `feat(repo): bootstrap Phase 2 monorepo skeleton` with the scaffolded tree summary in the body
+
+### 5. Hand off
+
+After the first `apply`, Phase 2 is active and sub-phases within it proceed per `phase-2.md`.
+
+## Output shape
+
+**Dry-run:**
+
+```markdown
+# /bootstrap — DRY RUN
+
+**Mode:** dry-run (no files written)
+**Phase:** 2 active (from .claude/plans/active.md)
+
+## Preconditions
+
+- Branch: v3 ✓
+- Active plan: phase-2.md ✓
+- Working tree clean: ✓
+- No existing root package.json: ✓
+
+## Planned writes (<N> files)
+
+### Root (M files)
+
+- `package.json` — workspace root
+- `pnpm-workspace.yaml` — workspaces + catalog
+- `turbo.json` — pipeline
+- ... (complete list)
+
+### packages/ (M files)
+
+- `packages/types/package.json`
+- `packages/types/src/index.ts`
+- ... (complete list)
+
+### apps/ (M files)
+
+- ... (complete list)
+
+### Infrastructure
+
+- `scripts/preflight.sh`
+- `.github/workflows/*.yml`
+
+## Post-apply verification plan
+
+1. `pnpm install`
+2. `pnpm typecheck`
+3. `/verify`
+4. `/review` + `/security-review` on the full diff
+5. Commit + report
+
+## Next step
+
+Review the planned writes. If acceptable, run `/bootstrap apply`.
+```
+
+**Apply:**
+
+```markdown
+# /bootstrap — APPLY
+
+(Same as dry-run, plus execution results for each step.)
+
+## Wrote N files across M directories.
+
+## Verification
+
+- pnpm install: ✓ (<duration>)
+- typecheck: ✓
+- /verify: PASS
+- /review: APPROVE
+- /security-review: PASS
+- integration-reviewer: SAFE
+
+## Committed as abc1234
+
+<conventional commit subject + body>
+
+## Phase 2 now executable
+
+`active.md` already points at phase-2.md; sub-phase 2.1 can begin.
+```
+
+## Refusal cases
+
+- Root `package.json` already exists → refuse; scaffolding is non-idempotent by design
+- Working tree dirty → refuse; the bootstrap commit must be clean
+- Phase 1 not closed → refuse; call `/phase-complete` first
+- `mode=apply` without a prior dry-run review in session → warn and prompt
+
+## Time / cost
+
+Sonnet-tier for the plan. `apply` adds wall-clock time for `pnpm install` (one-time) plus the reviewer dispatches.

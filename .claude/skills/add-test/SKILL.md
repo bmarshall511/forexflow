@@ -1,0 +1,96 @@
+---
+name: add-test
+description: Dispatch test-writer against a subject file or requirement — generates Vitest, integration, contract, Playwright, or visual specs per rule 02
+disable-model-invocation: false
+model: sonnet
+args:
+  - name: subject
+    type: string
+    required: true
+    description: "File path (e.g. packages/shared/src/pip-utils.ts) or requirement ID (REQ-TRADING-023) or symptom ('regression for <bug>')"
+  - name: kind
+    type: string
+    required: false
+    description: "unit | integration | contract | e2e | visual. Default: inferred from subject"
+dispatches: [test-writer]
+version: 0.1.0
+---
+
+# /add-test `<subject>` [kind]
+
+Thin wrapper around `test-writer`. Use when a file is missing tests, when a requirement needs coverage, or when a bug needs a regression test.
+
+## When to run
+
+- `code-reviewer` flagged missing tests on a subject
+- A new implementation landed without a sibling test (rare — TDD-concurrent is the rule; this is the escape hatch)
+- A requirement has acceptance criteria but no matching test
+- `debug-investigator` resolved a bug and wants a regression test
+
+## Inference rules for `kind`
+
+If `kind` not supplied:
+
+| Subject                                      | Inferred kind                                   |
+| -------------------------------------------- | ----------------------------------------------- |
+| `packages/shared/src/**/*.ts` (pure utility) | unit                                            |
+| `packages/db/src/*-service.ts`               | integration                                     |
+| `packages/types/src/**/*.ts` (schema)        | contract                                        |
+| `apps/web/src/components/**/*.tsx`           | e2e + visual                                    |
+| `apps/web/src/app/api/**/route.ts`           | integration + contract                          |
+| `apps/daemon/src/**/*.ts`                    | integration                                     |
+| HTTP route or WebSocket type                 | contract                                        |
+| REQ-\* with no tests yet                     | whatever the requirement's test plan prescribes |
+| Symptom (regression)                         | unit or integration matching the bug site       |
+
+## Procedure
+
+1. **Resolve subject and kind.** If ambiguous, ask rather than guess
+2. **Read the subject** (file, requirement, or grep for the symptom site)
+3. **Dispatch `test-writer`** with subject + kind + known requirement IDs
+4. **Review the verdict:**
+   - `WRITTEN` — test file created, runs green. Surface path + case count
+   - `PARTIAL` — some cases written, others require clarification. Surface gaps
+   - `BLOCKED` — underlying subject prevents testing (e.g., uses `new Date()` directly instead of an injected clock). Surface the refactor needed; dispatch `refactor-planner` or `code-reviewer` as appropriate
+5. **Confirm `@req:` tags.** Every `it` must have one. If the agent produced tests without tags, that's a `BLOCKED` — tell the agent to retry with explicit requirement IDs
+
+## Output shape
+
+```markdown
+# /add-test result — <subject>
+
+## Verdict: WRITTEN | PARTIAL | BLOCKED
+
+**Kind:** unit | integration | contract | e2e | visual
+**Subject:** `<path or REQ-id>`
+**Requirement(s):** REQ-<SCOPE>-<###>
+
+## Tests written
+
+- `<path>` — <N> cases covering: <list>
+
+## Coverage mapping
+
+| Acceptance criterion | Test case | Status |
+| -------------------- | --------- | ------ |
+| ...                  | ...       | ✓      |
+
+## Run result
+
+<output of `pnpm vitest run <path>` or Playwright equivalent>
+
+## Gaps / blocks
+
+- (if PARTIAL / BLOCKED)
+
+## Next step
+
+- WRITTEN: commit tests alongside the implementation
+- PARTIAL: supply missing context; re-dispatch
+- BLOCKED: dispatch `refactor-planner` or `code-reviewer` per the
+  agent's recommendation
+```
+
+## Bootstrap tolerance
+
+Returns "N/A — no subject code yet" when targeting an app that hasn't shipped its phase. During Phase 1 itself, the only testable subjects are `.claude/` scripts — not yet in scope.

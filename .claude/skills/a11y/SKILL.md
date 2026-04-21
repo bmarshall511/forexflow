@@ -1,0 +1,129 @@
+---
+name: a11y
+description: AAA accessibility checklist against changed UI components and pages; runs axe-playwright assertions when app code exists
+disable-model-invocation: false
+model: sonnet
+args:
+  - name: target
+    type: string
+    required: false
+    description: "File, component name, or URL path; default: every changed file under apps/web/src/**"
+dispatches: []
+version: 0.1.0
+---
+
+# /a11y
+
+Verify AAA accessibility on UI changes. Backs rule 03 at the PR level — mandatory for any commit touching `apps/web/src/components/**`, `apps/web/src/app/**`, or `apps/desktop/src/**/*.tsx`.
+
+## When to run
+
+- Any UI change before committing (mandatory per rule 03)
+- When `code-reviewer` flags an a11y concern
+- On the weekly agent-config-drift workflow (as a regression check)
+
+## Procedure
+
+### 1. Identify UI scope
+
+- If `target` supplied, use it (resolve to a file or URL)
+- Else: `git diff --cached --name-only | grep -E "apps/web/src/(components|app)/|apps/desktop/src/.*\.tsx$"`
+
+If nothing UI-related changed, report "N/A — no UI changes" and exit.
+
+### 2. Walk the checklist (static)
+
+For every changed component, read the source and check against rule 03:
+
+- **Semantics** — `<button>` for actions, `<a>` for nav, no div-as-button
+- **Labels** — `<label htmlFor>` paired with an `id`, or visually-hidden labels
+- **Keyboard** — all interactive elements reachable by Tab, no `tabindex` other than `0`/`-1`
+- **Focus** — visible focus rings (`focus-visible:ring-*`), never `outline-none` without a replacement
+- **ARIA** — used only where native HTML can't express the role; no duplicated labels
+- **Color** — semantic tokens (`text-status-*`, `bg-surface-*`), no raw hex, contrast 7:1 normal text / 4.5:1 large text
+- **Motion** — respects `prefers-reduced-motion`
+- **Touch** — 44×44 minimum targets on mobile, 8px spacing between siblings
+- **Headings** — one `<h1>` per page, no level-skipping
+- **Forms** — `aria-describedby` for errors, `required` attribute + visible indicator, no on-type validation
+- **Images** — `alt=""` for decorative, `alt="<description>"` for informative
+- **Tables** — `<th scope>`, caption where needed, `aria-sort` for sortable headers
+
+### 3. Run automated checks (when app code exists — Phase 7+)
+
+- Playwright spec exercising keyboard nav and focus order
+- `await injectAxe(page); await checkA11y(page)` — zero violations required
+- Contrast assertion against WCAG AAA via pa11y or axe CLI
+
+During Phase 1–6, app code doesn't exist yet — this skill reports "automated checks: N/A (no app code yet)" and runs only the static review.
+
+### 4. Cross-reference with Playwright coverage
+
+Every `apps/web/src/**` UI change must have a corresponding Playwright spec per rule 02:
+
+- Grep `apps/web/e2e/` for an assertion that touches the changed component
+- If no spec exists, flag for `test-writer` dispatch
+
+## Output shape
+
+```markdown
+# /a11y result — <scope>
+
+## Verdict: ✓ AAA / ⚠ ADVISORY / ✗ BLOCK
+
+## Checklist results
+
+| Category         | Status | Notes     |
+| ---------------- | ------ | --------- |
+| Semantics        | ✓ / ✗  | <details> |
+| Labels           | ✓ / ✗  | <details> |
+| Keyboard         | ✓ / ✗  | <details> |
+| Focus visible    | ✓ / ✗  | <details> |
+| ARIA             | ✓ / ✗  | <details> |
+| Color / contrast | ✓ / ✗  | <details> |
+| Motion           | ✓ / ✗  | <details> |
+| Touch targets    | ✓ / ✗  | <details> |
+| Headings         | ✓ / ✗  | <details> |
+| Forms            | ✓ / ✗  | <details> |
+| Images           | ✓ / ✗  | <details> |
+| Tables           | ✓ / ✗  | <details> |
+
+## Automated (when applicable)
+
+- axe violations: N
+- Contrast failures: N (expected minimum 7:1 / 4.5:1)
+- Keyboard-only test: PASS / FAIL
+- Screenshot diff vs. baseline: PASS / FAIL
+
+## Playwright coverage
+
+- Corresponding spec: `<path>` / MISSING
+- If MISSING: dispatch `test-writer` with:
+  - Subject: `<component>`
+  - Required assertions: keyboard nav, focus order, axe clean
+
+## Violations
+
+For each ✗:
+
+- **<category>**: `<file>:<line>` — <what's wrong>
+  Fix: <specific remediation>
+
+## Verdict logic
+
+- **✓ AAA** — every category passes; zero axe violations
+- **⚠ ADVISORY** — minor issues the maintainer may choose to defer
+  (e.g., aria-label polish, heading order on a new page still being
+  prototyped)
+- **✗ BLOCK** — any concrete violation (missing focus ring, color-only
+  meaning, below-44px touch target, keyboard trap). Rule 03 is strict
+```
+
+## What this skill does NOT do
+
+- Auto-fix a11y issues (the implementer fixes)
+- Override design decisions (design spec conflicting with AAA → file a design-review issue; do not ship the violation)
+- Evaluate subjective UX (scope is strict AAA compliance)
+
+## Time / cost
+
+Sonnet-tier for static review. Automated phase adds a few seconds of Playwright runtime when app code exists.

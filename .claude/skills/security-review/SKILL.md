@@ -1,0 +1,105 @@
+---
+name: security-review
+description: Dispatch the security-reviewer agent on staged changes or a given range
+disable-model-invocation: false
+model: opus
+args:
+  - name: range
+    type: string
+    required: false
+    description: "Git range to review (default: staged)"
+dispatches: [security-reviewer]
+version: 0.1.0
+---
+
+# /security-review
+
+Run the security-reviewer agent. Use on every change that touches auth, credentials, webhooks, routes, DB schema, logging, or Electron/CF Worker surfaces. Safer to run even when you're not sure it applies — the agent is cheap compared to a missed credential leak.
+
+## When to run
+
+- Any commit touching `apps/**/auth`, `apps/**/middleware`, `apps/**/api`, webhooks, OANDA integration, CF Worker
+- Any change to `packages/db/src/encryption.ts` or credential-bearing DB columns
+- Any new or modified env-var schema (rule 11)
+- Any change to logging configuration
+- Every PR touching Electron IPC, preload, or contextBridge surface
+- Before shipping any feature that takes user input
+
+## Procedure
+
+1. **Resolve scope** the same way `/review` does — `range` arg, else staged, else `HEAD~1..HEAD`
+2. **Dispatch `security-reviewer`** with the scope
+3. **Map the verdict** to a combined action:
+
+   | security-reviewer | Combined        |
+   | ----------------- | --------------- |
+   | PASS              | SAFE TO SHIP    |
+   | ADVISORY          | SHIP WITH NOTES |
+   | FAIL              | FIX REQUIRED    |
+
+4. **If FAIL**: list the CRITICAL findings for the implementer. Do not attempt to implement fixes from this skill — security fixes get their own review loop
+5. **If any credential leak detected**: surface the rotation path immediately (which credential, where it rotates at the source) per rule 04
+
+## Output shape
+
+```markdown
+# /security-review result — <scope>
+
+## Verdict: PASS | ADVISORY | FAIL
+
+<one-line summary>
+
+## Critical findings (N)
+
+- **<category>** at `<file>:<line>` — <what went wrong>
+  Threat: <one-line threat model>
+  Fix: <specific remediation>
+
+## High / Advisory findings (N)
+
+- ...
+
+## Medium findings (N)
+
+- ...
+
+## Low / hygiene (N)
+
+- ...
+
+## Checklist coverage
+
+- Credentials: ✓ / ✗
+- Webhooks: ✓ / ✗
+- API auth: ✓ / ✗
+- Injection: ✓ / ✗
+- Frontend XSS: ✓ / ✗
+- Logging redaction: ✓ / ✗
+- Electron surfaces: ✓ / ✗ / N/A
+- CF Worker: ✓ / ✗ / N/A
+- Crypto: ✓ / ✗
+- OWASP scan: ✓ / ✗
+
+## Action
+
+- **SAFE TO SHIP**: commit
+- **SHIP WITH NOTES**: acknowledge advisories; commit; schedule follow-ups
+- **FIX REQUIRED**: address CRITICAL findings, re-run `/security-review`
+- **CREDENTIAL LEAK DETECTED**: rotate credential immediately at source,
+  then fix + re-run
+```
+
+## Rotation reminders (when applicable)
+
+- OANDA key — rotate at OANDA dashboard → Account → API Access
+- Webhook token — rotate from the app's in-app TV Alerts settings
+- Anthropic key — rotate at the Anthropic console
+- Cloudflare Worker signing key — `wrangler secret put SIGNING_KEY`
+
+## Failure mode
+
+If the scope resolves to an empty diff, return "NO CHANGES — NOTHING TO REVIEW" and exit. Do not invent findings.
+
+## Time / cost
+
+Opus-tier, 10-minute time-box. Parallel-safe with `/review`.

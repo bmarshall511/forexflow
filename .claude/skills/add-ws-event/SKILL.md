@@ -1,0 +1,172 @@
+---
+name: add-ws-event
+description: Wire a new WebSocket message type end-to-end — type union + Zod schema, daemon broadcast, web hook consumption, contract test
+disable-model-invocation: false
+model: sonnet
+args:
+  - name: type
+    type: string
+    required: true
+    description: "snake_case event type, e.g. 'trade_placed', 'position_update_v2'"
+  - name: payload
+    type: string
+    required: true
+    description: "One-line description of the payload; Zod schema follows"
+dispatches: [test-writer]
+version: 0.1.0
+---
+
+# /add-ws-event `<type>` `<payload>`
+
+End-to-end wiring for a new realtime event. Per rule 15 §10, every lifecycle event must have a Zod schema, a broadcast site in the daemon, a consumer site in the web hook, and a contract test.
+
+## Procedure
+
+### 1. Resolve paths
+
+```
+packages/types/src/websocket.ts                # union + schema additions
+apps/daemon/src/<subsystem>/<broadcast-site>.ts # broadcast call added
+apps/web/src/hooks/use-daemon-connection.ts    # handler added
+apps/web/src/state/<context>-context.tsx       # (optional) consumer context
+packages/types/src/contracts/<type>.contract.test.ts   # contract test
+```
+
+### 2. Ask
+
+- Which daemon subsystem emits this event?
+- Which UI consumer reacts to it? (a single hook, a context, or many components)
+- Is this a new event or a versioned replacement (rule 08: `position_update_v2`, not reshape of `position_update`)?
+- Which requirement? REQ-<SCOPE>-<###>
+
+### 3. Add schema + union
+
+In `packages/types/src/websocket.ts` (or the domain file):
+
+```ts
+import { z } from "zod";
+
+export const TradePlacedEventSchema = z.object({
+  type: z.literal("trade_placed"),
+  ts: z.number(),
+  payload: z.object({
+    tradeId: z.string(),
+    instrument: z.string(),
+    direction: z.enum(["long", "short"]),
+    units: z.number().int().positive(),
+    entryPrice: z.number(),
+    placedVia: z.enum([
+      "manual",
+      "tv_alert",
+      "trade_finder",
+      "trade_finder_auto",
+      "ai_trader",
+      "smart_flow",
+    ]),
+  }),
+});
+export type TradePlacedEvent = z.infer<typeof TradePlacedEventSchema>;
+```
+
+Add `TradePlacedEvent` to the `DaemonMessage` discriminated union:
+
+```ts
+export type DaemonMessage =
+  | TradePlacedEvent
+  | /* existing types */
+```
+
+### 4. Daemon broadcast
+
+In the owning subsystem:
+
+```ts
+import { TradePlacedEventSchema } from "@forexflow/types";
+import { broadcast } from "../server/ws";
+
+const event = TradePlacedEventSchema.parse({
+  type: "trade_placed",
+  ts: Date.now(),
+  payload: { tradeId, instrument, direction, units, entryPrice, placedVia },
+});
+broadcast(event);
+```
+
+Note: broadcast only sends the already-validated object. If the daemon builds a malformed event, the schema `.parse` throws before a client sees it.
+
+### 5. Web hook consumption
+
+In `apps/web/src/hooks/use-daemon-connection.ts`, add a handler in the switch:
+
+```ts
+switch (message.type) {
+  case "trade_placed":
+    handleTradePlaced(message.payload);
+    break;
+  // existing cases
+}
+```
+
+For shared state, expose via a context provider (`DaemonStatusContext` or a more specific one per feature). Never `useEffect(() => fetch(...))` per component — all realtime flows through the single connection and dispatcher (rule 05).
+
+### 6. Contract test
+
+In `packages/types/src/contracts/<type>.contract.test.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import WebSocket from "ws";
+import { TradePlacedEventSchema } from "../websocket";
+
+describe("trade_placed WS contract", () => {
+  it("daemon emits a schema-valid payload", async () => {
+    // @req: REQ-<SCOPE>-<###>
+    // Connect to daemon (test fixture), trigger a trade, capture the event
+    const ws = new WebSocket("ws://localhost:4100/ws");
+    const event = await waitForMessage(ws, "trade_placed");
+    expect(TradePlacedEventSchema.safeParse(event).success).toBe(true);
+  });
+});
+```
+
+### 7. Documentation
+
+Update `docs/dev/api/daemon-ws.md` (when it exists, Sub-phase 11+) with the new event's schema and emission conditions. The `pre-commit-docs-sync` hook enforces this when the doc-map entry is in place.
+
+### 8. Review
+
+`/review` — `integration-reviewer` is particularly important (this changes a cross-module contract).
+
+## Output shape
+
+```markdown
+# /add-ws-event result — <type>
+
+## Files changed
+
+- `packages/types/src/websocket.ts` — added schema + union member
+- `apps/daemon/src/<subsystem>/<site>.ts` — broadcast added
+- `apps/web/src/hooks/use-daemon-connection.ts` — handler added
+- `apps/web/src/state/<context>-context.tsx` — exposed to consumers (optional)
+- `packages/types/src/contracts/<type>.contract.test.ts` — contract test
+
+## Versioning
+
+- New event: yes / no (if no, check rule 08 — prefer new type literal over reshape)
+
+## Test-writer: WRITTEN / PARTIAL
+
+## Review: APPROVE / SAFE
+
+## Integration-reviewer: SAFE / RISKY / BREAKING
+
+## Docs
+
+- `docs/dev/api/daemon-ws.md`: updated / N/A
+
+## Requirement: REQ-<SCOPE>-<###>
+```
+
+## Bootstrap tolerance
+
+Returns "N/A — daemon + web apps arrive in Phase 5 and 7" during earlier phases.

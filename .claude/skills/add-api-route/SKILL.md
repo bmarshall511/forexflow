@@ -1,0 +1,176 @@
+---
+name: add-api-route
+description: Scaffold a Next.js App Router API route with Zod validation, error envelope, auth middleware integration, and contract test
+disable-model-invocation: false
+model: sonnet
+args:
+  - name: path
+    type: string
+    required: true
+    description: "Route path under /api/, e.g. 'positions', 'trade-finder/setups'"
+  - name: methods
+    type: string
+    required: false
+    description: "Comma-separated HTTP methods. Default: GET"
+dispatches: [test-writer]
+version: 0.1.0
+---
+
+# /add-api-route `<path>` [methods]
+
+Scaffold `apps/web/src/app/api/<path>/route.ts` with Zod validation at every boundary, a consistent error envelope, the contract test that keeps `packages/types` honest, and auth by default.
+
+## Procedure
+
+### 1. Resolve paths
+
+```
+apps/web/src/app/api/<path>/route.ts             # handler
+apps/web/src/app/api/<path>/route.test.ts        # integration test
+packages/types/src/contracts/<slug>.contract.test.ts   # contract test
+```
+
+### 2. Ask
+
+- Public or authenticated? (default: authenticated; public requires explicit approval + entry in the `public routes` list in middleware)
+- Rule classification: read (DB query via `@forexflow/db`) or action (proxy to daemon)?
+- Which requirement? REQ-WEB-<AREA>-<###>
+- Request shape (for POST/PUT/PATCH) — Zod schema
+- Response shape — Zod schema, exported from `packages/types`
+
+### 3. Write the route
+
+Template (read):
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getPositions } from "@forexflow/db";
+import { requireAuth } from "@/lib/auth";
+import { PositionsResponseSchema } from "@forexflow/types";
+import { webLogger } from "@forexflow/logger/web";
+
+const log = webLogger.child({ route: "/api/<path>" });
+
+const QuerySchema = z.object({
+  instrument: z.string().optional(),
+});
+
+/**
+ * GET /api/<path> — <one-line description>.
+ *
+ * @req: REQ-WEB-<AREA>-<###>
+ */
+export async function GET(request: NextRequest) {
+  const correlationId =
+    request.headers.get("x-correlation-id") ?? crypto.randomUUID();
+  const reqLog = log.child({ correlationId });
+  try {
+    await requireAuth(request);
+    const query = QuerySchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams),
+    );
+    const data = await getPositions(query);
+    const parsed = PositionsResponseSchema.parse(data);
+    return NextResponse.json(parsed, {
+      headers: { "x-correlation-id": correlationId },
+    });
+  } catch (err) {
+    reqLog.error({ err }, "positions request failed");
+    return NextResponse.json(
+      {
+        error: {
+          code: "POSITIONS_FETCH_FAILED",
+          message: "Failed to fetch positions",
+        },
+      },
+      { status: 500, headers: { "x-correlation-id": correlationId } },
+    );
+  }
+}
+```
+
+Template (action — proxy to daemon):
+
+```ts
+const BodySchema = z.object({ tradeId: z.string(), units: z.number().int() });
+
+export async function POST(request: NextRequest) {
+  /* auth + parse body + fetch daemon + return */
+}
+```
+
+Enforced:
+
+- Zod parse on query/body/headers (rule 04)
+- `requireAuth` unless explicitly public (rule 04)
+- Scoped logger with `correlationId` (rule 12)
+- Error envelope `{ error: { code, message } }` (rule 04)
+- No secret leakage in error responses (rule 04)
+- No `console.*` (rule 12)
+- JSDoc + `@req:` tag (rules 13 + 14)
+- ≤ 250 LOC (rule 07)
+
+### 4. Integration test
+
+Dispatch `test-writer`. Required cases:
+
+- Unauthenticated request → 401
+- Malformed query/body → 400 with validation details
+- Happy path → 200 with schema-valid body
+- DB / daemon error → 500 with error envelope; no credential leak in response
+
+### 5. Contract test
+
+Also emitted by `test-writer`, at `packages/types/src/contracts/<slug>.contract.test.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { PositionsResponseSchema } from "../positions";
+
+describe("GET /api/<path> contract", () => {
+  it("matches the declared schema", async () => {
+    // @req: REQ-WEB-<AREA>-<###>
+    const response = await fetch("http://localhost:3000/api/<path>");
+    expect(
+      PositionsResponseSchema.safeParse(await response.json()).success,
+    ).toBe(true);
+  });
+});
+```
+
+### 6. Review
+
+`/review` + `/security-review` — always. Auth / injection / error-envelope leaks are the usual finds.
+
+## Output shape
+
+```markdown
+# /add-api-route result — /api/<path>
+
+## Files created
+
+- `apps/web/src/app/api/<path>/route.ts` — <N> LOC
+- `apps/web/src/app/api/<path>/route.test.ts` — integration test
+- `packages/types/src/contracts/<slug>.contract.test.ts` — contract
+
+## Methods: <GET | POST | ...>
+
+## Auth: required / public (explicitly approved)
+
+## Schemas
+
+- Query: <inline or link>
+- Body: <inline or link>
+- Response: <exported from packages/types>
+
+## Test-writer: WRITTEN / PARTIAL
+
+## Review: APPROVE / SAFE
+
+## Security-review: PASS / ADVISORY / FAIL
+```
+
+## Bootstrap tolerance
+
+Returns "N/A — `apps/web/` arrives in Phase 7" during earlier phases.

@@ -1,0 +1,186 @@
+---
+name: add-component
+description: Scaffold an apps/web React component with sibling Playwright spec, AAA-baseline props, and JSDoc; dispatches test-writer for the spec
+disable-model-invocation: false
+model: sonnet
+args:
+  - name: path
+    type: string
+    required: true
+    description: "Relative path under apps/web/src/components/, e.g. 'positions/trade-card'"
+  - name: kind
+    type: string
+    required: false
+    description: "container | presenter | ui (shadcn-style primitive). Default: presenter"
+dispatches: [test-writer]
+version: 0.1.0
+---
+
+# /add-component `<path>` [kind]
+
+Scaffold a new React component under `apps/web/src/components/<path>` with an accompanying Playwright spec. Enforces rule 03 (AAA) and rule 07 (≤150 LOC) from line one.
+
+## When to run
+
+- Adding a new feature component (Phase 7+)
+- Adding a UI primitive (shadcn extension)
+- Prototyping a new page before wiring it up
+
+## Procedure
+
+### 1. Resolve target paths
+
+```
+apps/web/src/components/<path>.tsx                   # component
+apps/web/src/components/<path>.visual.spec.ts        # visual regression
+apps/web/e2e/<path-slug>.spec.ts                     # keyboard/a11y E2E
+```
+
+### 2. Ask for the essentials (unless obvious)
+
+- What is the component's one responsibility? (force clarity; vague → ask again)
+- Which requirement does it implement? (REQ-WEB-<area>-<num>)
+- Is it a container (state + effects) or a presenter (props → JSX)?
+  Containers may also need siblings (`<name>-view.tsx`, `<name>-utils.ts`) if they approach the 150-LOC limit
+
+### 3. Write the component
+
+Template (presenter):
+
+```tsx
+import { cn } from "@/lib/utils"
+
+/**
+ * <one-line description>.
+ *
+ * @req: REQ-WEB-<AREA>-<###>
+ */
+export interface <ComponentName>Props {
+  readonly <prop>: <type>
+}
+
+export function <ComponentName>({ <prop> }: <ComponentName>Props) {
+  return (
+    <div className={cn(/* ... */)}>
+      {/* ... */}
+    </div>
+  )
+}
+```
+
+Template (container):
+
+```tsx
+import { useState } from "react"
+import { <Name>View } from "./<name>-view"
+
+/**
+ * Container for <feature>. Owns state and effects; delegates presentation
+ * to <Name>View.
+ *
+ * @req: REQ-WEB-<AREA>-<###>
+ */
+export function <ComponentName>() {
+  const [state, setState] = useState<...>()
+  return <<Name>View state={state} onAction={setState} />
+}
+```
+
+Requirements enforced from line one:
+
+- JSDoc on every exported symbol (rule 13)
+- `@req:` comment adjacent to the main export (rule 14)
+- No `any` (rule 01)
+- Props type declared with `readonly` fields
+- No `console.log` (rule 12 — enforced in API code strictly; in components it's allowed in dev but stripped in prod; avoid committing regardless)
+- Named exports only (rule 08)
+- File size: target under 150 LOC at creation (rule 07)
+
+### 4. Write the Playwright spec
+
+Dispatch `test-writer` with:
+
+- Subject: the component
+- Required assertions: keyboard nav, focus order, axe clean, mobile viewport render
+- Output path: `apps/web/e2e/<path-slug>.spec.ts`
+
+Template the agent produces matches rule 02's Playwright conventions.
+
+### 5. Visual regression snapshot
+
+Create `<path>.visual.spec.ts` alongside the component:
+
+```ts
+import { test, expect } from "@playwright/test";
+
+test.describe("<ComponentName> visual", () => {
+  test("mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/__storybook__/<path>"); // or a Playwright fixture page
+    await expect(page).toHaveScreenshot("<name>.mobile.png");
+  });
+
+  test("desktop", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/__storybook__/<path>");
+    await expect(page).toHaveScreenshot("<name>.desktop.png");
+  });
+});
+```
+
+### 6. Wire into the app (if applicable)
+
+If the component is consumed by a specific page, also update that page to import it. Do not create a standalone component with no consumer — if it's not needed yet, don't add it.
+
+### 7. Run /verify
+
+Typecheck, lint, format. Playwright spec is ready but needs to run against a built web app (Phase 7+).
+
+### 8. Review
+
+Dispatch `/review` on the new files. Expect APPROVE / SAFE.
+
+## Output shape
+
+```markdown
+# /add-component result — <path>
+
+## Files created
+
+- `apps/web/src/components/<path>.tsx` — <N> LOC (limit 150)
+- `apps/web/src/components/<path>.visual.spec.ts` — <N> LOC
+- `apps/web/e2e/<path-slug>.spec.ts` — <N> LOC
+
+## Requirement link
+
+- REQ-WEB-<AREA>-<###> (<status>)
+
+## Test-writer verdict
+
+- WRITTEN / PARTIAL / BLOCKED
+
+## Review
+
+- /review: APPROVE / SAFE
+- /a11y: ✓ PASS (static review; Playwright runs when app is built)
+
+## Next step
+
+- Consume the component where needed
+- Run `/smoke-test <feature>` once the app is buildable to verify
+  golden-path rendering
+```
+
+## Bootstrap tolerance
+
+During Phase 1–6 no `apps/web/` exists. Skill returns "N/A — `apps/web/` arrives in Phase 7" and exits.
+
+## What /add-component does NOT do
+
+- Add business logic beyond the minimum skeleton (that's feature implementation)
+- Create a Storybook story (no Storybook per context/stack.md — visual specs use Playwright screenshots)
+- Invent a requirement — requires an existing REQ ID
+
+## Time / cost
+
+Sonnet-tier. Typical 30–90 seconds including the dispatch to test-writer.
