@@ -118,3 +118,64 @@ The hooks were enforcing nothing. The agent could have shipped `x: any` code and
 #### How to recognize it next time
 
 A review feedback note like "I thought the hook was supposed to catch this?" is the smoke signal. Check whether the hook has a corresponding harness fixture and whether that fixture exercises _this specific input shape_. If it doesn't, the fixture is the first deliverable of the fix.
+
+---
+
+### FM-0004 — README policy drifts silently from .gitignore / hook / rule enforcement
+
+**First seen:** 2026-04-22 · **Category:** meta / policy-drift
+**Signature:** a cold-start session or cold-checkout clone fails because a file a README described as "tracked / committed / enforced" is in fact not, due to a broader ignore/hook/rule pattern that captured it.
+**Prevention:** narrow ignore/rule patterns so they match the README's stated policy; cross-check via a structural harness fixture that reads every `.claude/**/README.md` claim and verifies the enforcement artifact agrees.
+**Origin:** [`LRN-0006`](./learnings/0006-policy-enforcement-drift-handoff-gitignore.md)
+
+#### What happened
+
+Phase 1 close shipped with the Phase 1 completion handoff gitignored — the `.gitignore` pattern `.claude/handoffs/*.md` was too broad and caught the file even though `handoffs/README.md` explicitly said phase-boundary handoffs are durable reference artifacts. The first cold-start session broke at the reading-list step because `latest.md` pointed at a file that didn't exist on a fresh clone. Same class of issue almost bit `snapshots/*` and was caught proactively mid-Sub-phase-12.
+
+#### Why it was dangerous
+
+The failure is **silent until a cold-start session hits it** — there's no CI signal, no hook warning, no visible artifact. The repo looks healthy to the author because the file exists locally. The handoff system was designed precisely for cold-start continuity and this class of drift defeats it.
+
+#### What catches it now
+
+- `.gitignore` narrowed: `!.claude/handoffs/*-phase-*-complete.md` so phase-boundary handoffs are tracked
+- LRN-0006 captures the pattern and the specific fix
+- Pending (Phase 2): a structural harness fixture that reads every `.claude/**/README.md`, extracts "tracked" / "committed" / "enforced" claims about paths, and verifies `git check-ignore` and enforcement artifacts agree
+
+#### How to recognize it next time
+
+A README sentence like "X is committed / tracked / enforced" paired with a `.gitignore` / hook / rule that could possibly catch X. If either artifact is broader than the other, there's drift. Also: any cold-start session that can't find a file it was told to read is this pattern until proven otherwise.
+
+---
+
+### FM-0005 — iCloud sync generates "<filename> 2.<ext>" conflict duplicates across the repo
+
+**First seen:** 2026-04-22 · **Category:** environment / sync-conflict
+**Signature:** `git status` shows dozens of untracked files with the suffix pattern ` 2` before the extension (e.g., `README 2.md`, `claude-config 2.yml`, `.counter 2`). They appear anywhere in the tree iCloud is syncing.
+**Prevention:** long-term — relocate the repo out of iCloud-synced paths. Short-term — clean conflict duplicates before committing via `find . -name "* 2.*" -not -path "./.git/*" -delete` plus explicit `rm` for the extension-less cases.
+**Origin:** Phase 1 Sub-phase 12 close; also referenced in LRN-0006 "Adjacent consideration"
+
+#### What happened
+
+During Phase 1 close, ~129 conflict-duplicate files materialized across `.claude/`, `.github/`, `scripts/`, and root-level files. iCloud's conflict-resolution writes both versions with ` 2` appended before the extension. Left uncleaned, `git add .` on the next commit would have included them all.
+
+This is the fourth iCloud-related incident during the rebuild:
+
+1. Sub-phase 1 — `rm` blocked on iCloud-xattr-marked `.mcp.json` (sandbox permission issue)
+2. Sub-phase 7 — UTF-8 byte corruption in a file with a Unicode character (iCloud re-encoded on sync)
+3. Sub-phase 7 — `cp` to `/tmp` blocked by sandbox on iCloud-xattr-marked files
+4. Sub-phase 12 close — conflict duplicates across 129 files
+
+#### Why it was dangerous
+
+Any `git add -A` or `git add .` after iCloud syncs a conflict silently commits the duplicate files. Even if `git status` lists them as untracked, busy sessions skip over the output. The duplicates pollute every subsequent operation (harness sees extra files, directory listings get confusing, imports could accidentally resolve to ` 2` variants).
+
+#### What catches it now
+
+- This failure-mode entry exists so future sessions recognize the pattern
+- Short-term playbook: `find . -name "* 2.*" -not -path "./.git/*" -not -path "./node_modules/*" -delete`; follow up with explicit `rm` for extension-less cases like `VERSION 2`
+- Long-term: relocate the repo out of iCloud — captured as an open decision for the maintainer; a future ADR would formalize the relocation path
+
+#### How to recognize it next time
+
+`git status` after any session that had multiple processes writing to the repo (Claude Code + VS Code + terminal + another editor all touching the same files via iCloud sync) — if the output contains `??  "<filename> 2.<ext>"` entries, this is FM-0005. Clean before staging.

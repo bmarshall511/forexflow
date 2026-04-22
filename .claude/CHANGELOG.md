@@ -10,7 +10,9 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
-- (pending — next sub-phase)
+- 2026-04-22 meta: `.claude/failure-modes.md` (edit)
+- 2026-04-22 meta: `.claude/learnings/0006-policy-enforcement-drift-handoff-gitignore.md` (write)
+- 2026-04-22 meta: `.claude/learnings/.counter` (write)
 
 ## [0.2.0] — Phase 1 complete — 2026-04-22
 
