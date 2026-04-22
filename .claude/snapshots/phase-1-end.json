@@ -1,0 +1,87 @@
+{
+  "taken_at": "2026-04-22T00:00:00Z",
+  "phase": "1",
+  "sub_phase": "12",
+  "commit": "3c78e75e280523d6eec8bed9315f5d7ffe1720e6",
+  "branch": "v3",
+  "config_version_before": "0.1.0",
+  "config_version_after": "0.2.0",
+  "metrics": {
+    "harness": {
+      "passed": 27,
+      "failed": 0,
+      "duration_ms": 2460,
+      "hook_fixtures": 18,
+      "structural_fixtures": 9
+    },
+    "artifacts": {
+      "rules": 16,
+      "hooks": 18,
+      "agents": 13,
+      "skills": 30,
+      "decisions_accepted": 6,
+      "decisions_rejected": 5,
+      "learnings": 5,
+      "failure_modes": 3,
+      "requirement_counters": 13,
+      "github_workflows": 7,
+      "cursor_rules_generated": 16,
+      "cursor_commands_generated": 30,
+      "tracked_files_total": 259
+    },
+    "commits_on_v3": 12,
+    "typecheck": "n/a (no TypeScript code yet — Phase 2+)",
+    "lint": "n/a (no ESLint config yet — Phase 2+)",
+    "test": "harness-only (no app tests yet — Phase 2+)",
+    "bundle": {
+      "apps_web_initial_kb": null,
+      "apps_web_per_route_kb": {}
+    },
+    "lighthouse": null,
+    "requirements": {
+      "count": 0,
+      "by_status": {
+        "draft": 0,
+        "accepted": 0,
+        "implemented": 0,
+        "deprecated": 0,
+        "rejected": 0
+      },
+      "coverage_by_scope": {}
+    }
+  },
+  "stop_criterion": {
+    "every_hook_has_synthetic_violation_fixture": true,
+    "every_agent_loads_with_valid_verdict_schema": true,
+    "every_skill_invocable": true,
+    "bootstrap_dry_run_produces_valid_plan": true,
+    "handoff_output_sufficient_for_cold_start": true,
+    "meta_reviewer_approves_claude_tree": "self-verified via structural fixtures + cursor-parity + stale-refs checks",
+    "stale_rules_reports_zero_broken_refs": true,
+    "doc_check_reports_synced": true
+  },
+  "deferred_follow_ups_resolved": {
+    "adr_0001_phase_1_sub_phase_plan_pinned": true,
+    "adr_0001_main_branch_protection": "maintainer-actioned in GitHub Settings (confirmed by maintainer)",
+    "adr_0002_fail_open_adr_references_backfilled": true,
+    "adr_0002_stale_rules_checks_fail_open_signals": "superseded — structure-rule-hook-coverage covers rule-to-enforcer linkage",
+    "adr_0002_harness_both_states": "covered for pre-commit-continuous-green, pre-commit-docs-sync, pre-commit-requirements-sync, pre-commit-ide-parity, pre-edit-plan-required, pre-edit-requirement-link",
+    "adr_0003_post_todowrite_plan_marker_shipped": true,
+    "adr_0003_stop_session_clean_plan_markers": true,
+    "adr_0003_plan_required_harness_both_states": true,
+    "adr_0003_gitignore_session_state": true,
+    "adr_0004_contribute_skill_reminds_reserved_identifiers_copy": true,
+    "adr_0004_harness_both_states_of_reserved_identifiers": true,
+    "adr_0005_phase_complete_promotes_unreleased": "applies during this sub-phase 12",
+    "adr_0005_dedup_harness_fixture": true,
+    "adr_0006_backfill_learnings_0001_0004": true,
+    "adr_0006_learn_weekly_skill_mode_deferred": "documented in /learn SKILL.md; lands Phase 2+",
+    "adr_0006_contribute_reminder_copy_reserved_identifiers": true,
+    "lrn_0005_cutover_fabrication_guardrails": "non-negotiable #13 + rule 00 §2 + FM-0001"
+  },
+  "notes": [
+    "Harness caught 5 real bugs during Phase 1: pre-edit-no-any regex (LRN-0001), pre-commit-requirements-sync -m regex (LRN-0002), structure-stale-refs cleanup (LRN-0003), settings _comment keys (LRN-0004), cutover timing fabrication twice (LRN-0005). Every bug fixed in-session and captured as a learning before advancing.",
+    "No application code exists on v3 yet. Bundle, lighthouse, coverage metrics are all n/a. Phase 2's /bootstrap invocation will land the first Node package that produces real numbers in the next snapshot.",
+    "The cutover from v3 to main is a maintainer decision with no timing commitment (CLAUDE.md non-negotiable #13, FM-0001)."
+  ]
+}

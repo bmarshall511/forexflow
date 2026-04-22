@@ -63,8 +63,10 @@ Thumbs.db
 !.claude/telemetry/README.md
 .claude/handoffs/*.md
 !.claude/handoffs/README.md
+!.claude/handoffs/latest.md
 .claude/snapshots/*
 !.claude/snapshots/README.md
+!.claude/snapshots/phase-*.json
 .claude/config/reserved-identifiers.json
 
 # ─── Cursor (per-user state) ───────────────────────────────────────────────

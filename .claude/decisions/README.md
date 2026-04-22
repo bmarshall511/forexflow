@@ -30,6 +30,7 @@ The `meta-reviewer` agent keeps this list current. Do not hand-edit below; regen
 | 0004 | [per-user gitignored reserved-identifiers list](./0004-reserved-identifiers-per-user.md) | accepted | 2026-04-21 |
 | 0005 | [post-edit-meta-log auto-CHANGELOG behavior](./0005-post-edit-meta-log-changelog.md)     | accepted | 2026-04-21 |
 | 0006 | [continuous-learning loop](./0006-continuous-learning-loop.md)                           | accepted | 2026-04-21 |
+| 0007 | [Phase 1 complete](./0007-phase-1-complete.md)                                           | accepted | 2026-04-22 |
 
 ## Rejected proposals
 

@@ -32,20 +32,20 @@ See `.claude/decisions/` for ADRs documenting each:
 
 ## Sub-phases
 
-| #   | Goal                                                                                                                                                       | Status                 |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| 1   | Clear slate + repo hygiene (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, .github/, mise, .editorconfig, .gitignore, docs/dev/GETTING_STARTED) | ✅ committed `96d4c0e` |
-| 2   | `.claude/` foundation (CLAUDE.md, README, VERSION, CHANGELOG, settings.json, settings.local.example.json, context/_, plans/_)                              | ✅ committed `0e1a901` |
-| 3   | Rules — 16 path-scoped rules with machine-readable frontmatter                                                                                             | ✅ committed `83a05f2` |
-| 4   | Hooks — 17 executable guardrails, wired into settings.json                                                                                                 | ✅ committed `6e44113` |
-| 5   | Agents — 13 specialist sub-agents (reviewers, implementers, explorers)                                                                                     | Pending                |
-| 6   | Skills — 29 slash-command workflows                                                                                                                        | Pending                |
-| 7   | Cursor-parity generator + test harness                                                                                                                     | Pending                |
-| 8   | Agent test harness (synthetic violations verify every hook fires)                                                                                          | Pending                |
-| 9   | Meta directories (decisions, journal, failure-modes, telemetry, handoffs, snapshots)                                                                       | Pending                |
-| 10  | Requirements scaffolding (`docs/requirements/` index + README + template + counter)                                                                        | Pending                |
-| 11  | CI workflows (config-only validation; app CI templates seeded but inert)                                                                                   | Pending                |
-| 12  | Validation + `/bootstrap --dry-run` + phase completion ADR + promote to Phase 2                                                                            | Pending                |
+| #   | Goal                                                                                                                                                       | Status                        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| 1   | Clear slate + repo hygiene (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, .github/, mise, .editorconfig, .gitignore, docs/dev/GETTING_STARTED) | ✅ committed `96d4c0e`        |
+| 2   | `.claude/` foundation (CLAUDE.md, README, VERSION, CHANGELOG, settings.json, settings.local.example.json, context/_, plans/_)                              | ✅ committed `0e1a901`        |
+| 3   | Rules — 16 path-scoped rules with machine-readable frontmatter                                                                                             | ✅ committed `83a05f2`        |
+| 4   | Hooks — 17 executable guardrails, wired into settings.json                                                                                                 | ✅ committed `6e44113`        |
+| 5   | Agents — 13 specialist sub-agents (reviewers, implementers, explorers)                                                                                     | ✅ committed `6bbb57f`        |
+| 6   | Skills — 30 slash-command workflows (29 + `/learn` added in SP8)                                                                                           | ✅ committed `fd549ea`        |
+| 7   | Cursor-parity generator + activation of `pre-commit-ide-parity`                                                                                            | ✅ committed `c4e56db`        |
+| 8   | Agent test harness + continuous-learning loop (ADR 0006 + LRN-0001..0005)                                                                                  | ✅ committed `ad0f125`        |
+| 9   | LRN-0005 guardrails + meta directories (rejected ADRs, failure-modes, journal, telemetry, handoffs, snapshots)                                             | ✅ committed `bc03d94`        |
+| 10  | Requirements scaffolding + activation of requirements hooks                                                                                                | ✅ committed `6cc6fdf`        |
+| 11  | CI workflows + commitlint + Renovate + semantic-release + docs/dev/CI.md                                                                                   | ✅ committed `3c78e75`        |
+| 12  | Validation + snapshot + completion ADR + version bump + Phase 2 handoff                                                                                    | ✅ committed (this sub-phase) |
 
 Full decision rationale for each sub-phase lives in the conversation record that produced this plan. During execution, the maintainer may steer any sub-phase; the plan is a guide, not a contract.
 

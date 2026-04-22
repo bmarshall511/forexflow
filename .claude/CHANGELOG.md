@@ -10,6 +10,27 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
+- (pending — next sub-phase)
+
+## [0.2.0] — Phase 1 complete — 2026-04-22
+
+Phase 1 of the ForexFlow V3 rebuild shipped. Every AI-agent rail is in place before any application code. Full context: [ADR 0007](./decisions/0007-phase-1-complete.md).
+
+### Added
+
+- 2026-04-22 meta: `.claude/VERSION` bumped 0.1.0 → 0.2.0
+- 2026-04-22 decision: `.claude/decisions/0007-phase-1-complete.md` (Phase 1 completion)
+- 2026-04-22 plan: `.claude/plans/phase-2.md` (monorepo skeleton proposal)
+- 2026-04-22 plan: `.claude/plans/active.md` symlink → phase-2.md
+- 2026-04-22 meta: `.claude/handoffs/2026-04-22-phase-1-complete.md` + latest.md symlink (Phase 2 kickoff handoff)
+- 2026-04-22 meta: `.claude/snapshots/phase-1-end.json` (metrics snapshot at commit 3c78e75)
+- 2026-04-21 meta: `.claude/VERSION` (write)
+- 2026-04-22 decision: `.claude/decisions/README.md` (edit)
+- 2026-04-22 decision: `.claude/decisions/0007-phase-1-complete.md` (write)
+- 2026-04-22 plan: `.claude/plans/phase-1.md` (edit)
+- 2026-04-22 plan: `.claude/plans/phase-2.md` (write)
+- 2026-04-22 meta: `.claude/handoffs/2026-04-22-phase-1-complete.md` (write)
+- 2026-04-22 meta: `.claude/snapshots/phase-1-end.json` (write)
 - 2026-04-21 test-harness: `.claude/test-harness/fixtures/structure-ci-workflows.mjs` (write)
 - 2026-04-21 test-harness: `.claude/test-harness/fixtures/structure-requirements.mjs` (write)
 - 2026-04-21 config: `.claude/config/doc-map.json` (edit)
