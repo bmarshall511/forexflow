@@ -126,7 +126,7 @@ A review feedback note like "I thought the hook was supposed to catch this?" is 
 **First seen:** 2026-04-22 · **Category:** meta / policy-drift
 **Signature:** a cold-start session or cold-checkout clone fails because a file a README described as "tracked / committed / enforced" is in fact not, due to a broader ignore/hook/rule pattern that captured it.
 **Prevention:** narrow ignore/rule patterns so they match the README's stated policy; cross-check via a structural harness fixture that reads every `.claude/**/README.md` claim and verifies the enforcement artifact agrees.
-**Origin:** [`LRN-0006`](./learnings/0006-policy-enforcement-drift-handoff-gitignore.md), [`LRN-0007`](./learnings/0007-gitignore-dir-vs-glob-and-doc-scaffold-naming-drift.md)
+**Origin:** [`LRN-0006`](./learnings/0006-policy-enforcement-drift-handoff-gitignore.md), [`LRN-0007`](./learnings/0007-gitignore-dir-vs-glob-and-doc-scaffold-naming-drift.md), [`LRN-0008`](./learnings/0008-untracked-leftovers-masquerade-as-scaffold.md)
 
 #### Specific sub-pattern: `.gitignore` directory ignore (`foo/`) silently defeats subsequent negation rules
 
