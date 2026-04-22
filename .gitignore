@@ -64,6 +64,10 @@ Thumbs.db
 .claude/handoffs/*.md
 !.claude/handoffs/README.md
 !.claude/handoffs/latest.md
+# Phase-boundary handoffs are durable reference artifacts — tracked
+# so cold-start sessions can read them. Day-to-day mid-session
+# handoffs stay per-user gitignored.
+!.claude/handoffs/*-phase-*-complete.md
 .claude/snapshots/*
 !.claude/snapshots/README.md
 !.claude/snapshots/phase-*.json
