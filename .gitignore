@@ -58,7 +58,11 @@ Thumbs.db
 # ─── Claude Code (per-user state) ──────────────────────────────────────────
 .claude/settings.local.json
 .claude/.session-state/
-.claude/telemetry/
+# Use a glob (.../* ) rather than a directory ignore (.../) so the
+# negations below can re-include README.md and .gitkeep. Git doesn't
+# recurse into a fully-ignored directory, which would make negation
+# rules no-ops. See FM-0004 / LRN-0006 / LRN-0007.
+.claude/telemetry/*
 !.claude/telemetry/.gitkeep
 !.claude/telemetry/README.md
 .claude/handoffs/*.md

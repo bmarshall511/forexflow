@@ -67,8 +67,9 @@ One of:
 
 ### 1. ID allocation
 
-- Read `.reqid-counter` file for the target scope
-  (e.g., `docs/requirements/trading/.reqid-counter`)
+- Read the per-scope counter file at
+  `docs/requirements/.reqid-counters/<scope>`
+  (e.g., `docs/requirements/.reqid-counters/trading`)
 - If it doesn't exist, create it with value `0`
 - Increment, zero-pad to 3 digits
 - Never reuse an ID even if the requirement was later deprecated

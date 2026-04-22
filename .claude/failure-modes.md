@@ -126,7 +126,15 @@ A review feedback note like "I thought the hook was supposed to catch this?" is 
 **First seen:** 2026-04-22 · **Category:** meta / policy-drift
 **Signature:** a cold-start session or cold-checkout clone fails because a file a README described as "tracked / committed / enforced" is in fact not, due to a broader ignore/hook/rule pattern that captured it.
 **Prevention:** narrow ignore/rule patterns so they match the README's stated policy; cross-check via a structural harness fixture that reads every `.claude/**/README.md` claim and verifies the enforcement artifact agrees.
-**Origin:** [`LRN-0006`](./learnings/0006-policy-enforcement-drift-handoff-gitignore.md)
+**Origin:** [`LRN-0006`](./learnings/0006-policy-enforcement-drift-handoff-gitignore.md), [`LRN-0007`](./learnings/0007-gitignore-dir-vs-glob-and-doc-scaffold-naming-drift.md)
+
+#### Specific sub-pattern: `.gitignore` directory ignore (`foo/`) silently defeats subsequent negation rules
+
+When the parent path is ignored as a directory (`foo/`), git does not recurse into it to evaluate `!foo/keep.md` negations. The correct pattern is `foo/*` (glob) with the negations below. LRN-0007 caught this for `.claude/telemetry/` after LRN-0006 had already fixed the same class for `.claude/handoffs/*.md` — the sub-patterns look similar but the fix differs. When writing a `.gitignore` block with `!` negations, always use the glob form, never the directory form, for the parent rule.
+
+#### Specific sub-pattern: rule / agent / skill text names an artifact that the scaffold does not implement
+
+LRN-0007 also caught this with the requirements counter: rule 14 + agent + skill all referenced a singular `.reqid-counter` file, while Sub-phase 10's scaffold shipped a plural `.reqid-counters/` directory (better design). The Sub-phase 10 commit fixed the scaffold but not the rule text. On cold-start, the agent would look for a file that doesn't exist. Whenever a sub-phase commit changes a scaffold shape, grep the rule / agent / skill text for the old name and update in the same commit.
 
 #### What happened
 

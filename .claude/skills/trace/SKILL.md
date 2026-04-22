@@ -95,7 +95,7 @@ Scope-wise coverage report:
 Dispatches `requirements-curator` to:
 
 1. Infer the target scope from the description (or prompt if ambiguous)
-2. Read `.reqid-counter` for that scope and allocate the next ID
+2. Read `docs/requirements/.reqid-counters/<scope>` and allocate the next ID (increment + zero-pad to 3 digits)
 3. Draft a new requirement file from `docs/requirements/_template.md`
 4. Return the draft for maintainer review
 

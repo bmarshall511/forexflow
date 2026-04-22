@@ -10,6 +10,10 @@ The `post-edit-meta-log` hook appends entries to `[Unreleased]` automatically wh
 
 ### Added
 
+- 2026-04-22 meta: `.claude/learnings/0007-gitignore-dir-vs-glob-and-doc-scaffold-naming-drift.md` (write)
+- 2026-04-22 skill: `.claude/skills/trace/SKILL.md` (edit)
+- 2026-04-22 agent: `.claude/agents/requirements-curator.md` (edit)
+- 2026-04-22 rule: `.claude/rules/14-requirements-traceability.md` (edit)
 - 2026-04-22 meta: `.claude/failure-modes.md` (edit)
 - 2026-04-22 meta: `.claude/learnings/0006-policy-enforcement-drift-handoff-gitignore.md` (write)
 - 2026-04-22 meta: `.claude/learnings/.counter` (write)

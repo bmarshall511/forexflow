@@ -1,8 +1,16 @@
 ---
 name: requirements-traceability
-scope: ["apps/**", "packages/**", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "docs/requirements/**"]
+scope:
+  [
+    "apps/**",
+    "packages/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "docs/requirements/**",
+  ]
 enforcement: strict
-version: 0.1.0
+version: 0.2.0
 related:
   - "hooks/pre-commit-requirements-sync.mjs"
   - "agents/requirements-curator.md"
@@ -29,7 +37,7 @@ Examples:
 - `REQ-WEB-POSITIONS-004` — a feature-sub-scoped requirement (hyphenated scope is allowed when useful for organization)
 - `REQ-CLAUDE-002` — a requirement about the `.claude/` configuration itself (rare; most `.claude/` changes trace to an ADR)
 
-IDs are allocated by the `requirements-curator` agent (which reads `.reqid-counter` files under `docs/requirements/`). They are never reused. Deleted requirements leave their ID vacant forever.
+IDs are allocated by the `requirements-curator` agent (which reads per-scope integer files under `docs/requirements/.reqid-counters/`, one file per scope). They are never reused. Deleted requirements leave their ID vacant forever.
 
 ## Where requirements live
 
@@ -38,7 +46,10 @@ docs/requirements/
 ├── README.md              What requirements are, how to add one, traceability rules
 ├── index.md               The master traceability table
 ├── _template.md           Per-requirement template
-├── .reqid-counter         Simple integer, incremented by requirements-curator
+├── .reqid-counters/       One integer file per scope, incremented by requirements-curator
+│   ├── trading            → REQ-TRADING-<NNN>
+│   ├── web                → REQ-WEB-<NNN>
+│   └── ...                (one file per commit-scope enum value)
 │
 ├── trading/
 │   ├── 001-risk-based-sizing.md
@@ -55,7 +66,7 @@ docs/requirements/
 
 One file per requirement. Filename: `<number>-<kebab-slug>.md`.
 
-Phase 1 scaffolds `docs/requirements/README.md`, `index.md`, `_template.md`, and `.reqid-counter`. The feature directories (`trading/`, `web/`, etc.) are created as features land in later phases.
+Phase 1 scaffolds `docs/requirements/README.md`, `index.md`, `_template.md`, and `.reqid-counters/` with one zero-initialized integer file per commit-scope enum value (13 scopes). The feature directories (`trading/`, `web/`, etc.) are created as features land in later phases.
 
 ## The per-requirement file
 
@@ -63,11 +74,11 @@ Phase 1 scaffolds `docs/requirements/README.md`, `index.md`, `_template.md`, and
 ---
 id: REQ-TRADING-023
 title: Position size derived from risk amount and stop distance
-status: draft                   # draft | accepted | implemented | deprecated
+status: draft # draft | accepted | implemented | deprecated
 scope: trading
 owner: maintainer
 created: 2026-05-03
-implemented: null               # ISO date once shipped
+implemented: null # ISO date once shipped
 tests:
   - packages/shared/src/trading-core/risk-sizing.test.ts
   - apps/daemon/src/__tests__/integration/place-order.test.ts
@@ -110,7 +121,7 @@ prevents drift between TV Alerts, Trade Finder, AI Trader, and SmartFlow.
 - Unit: every branch of the formula, including edge cases
 - Integration: place an order through the daemon and verify sizing
 - Property-based (optional, later): generated inputs, invariant `sizing
-  never exceeds risk budget`
+never exceeds risk budget`
 
 ## Implementation notes
 
@@ -127,18 +138,18 @@ prevents drift between TV Alerts, Trade Finder, AI Trader, and SmartFlow.
 
 Frontmatter fields:
 
-| Field | Required | Notes |
-|---|---|---|
-| `id` | yes | Must match filename number |
-| `title` | yes | One-line summary |
-| `status` | yes | `draft` → `accepted` → `implemented` (or `deprecated`) |
-| `scope` | yes | Matches commit scope |
-| `owner` | yes | Role (`maintainer`, `contributor`) — never a personal name |
-| `created` | yes | ISO date |
-| `implemented` | no | ISO date once shipped, `null` before |
-| `tests` | yes (when implemented) | Array of test file paths |
-| `code` | yes (when implemented) | Array of implementation file paths |
-| `related` | no | Array of related requirement IDs or decision ADRs |
+| Field         | Required               | Notes                                                      |
+| ------------- | ---------------------- | ---------------------------------------------------------- |
+| `id`          | yes                    | Must match filename number                                 |
+| `title`       | yes                    | One-line summary                                           |
+| `status`      | yes                    | `draft` → `accepted` → `implemented` (or `deprecated`)     |
+| `scope`       | yes                    | Matches commit scope                                       |
+| `owner`       | yes                    | Role (`maintainer`, `contributor`) — never a personal name |
+| `created`     | yes                    | ISO date                                                   |
+| `implemented` | no                     | ISO date once shipped, `null` before                       |
+| `tests`       | yes (when implemented) | Array of test file paths                                   |
+| `code`        | yes (when implemented) | Array of implementation file paths                         |
+| `related`     | no                     | Array of related requirement IDs or decision ADRs          |
 
 ## The `@req` test tag
 
@@ -148,19 +159,37 @@ Every test's `it` block includes a `@req` comment naming the requirement(s) it c
 describe("calculatePositionSize", () => {
   it("returns floor of risk / (pips × pipValue)", () => {
     // @req: REQ-TRADING-023
-    expect(calculatePositionSize({ riskAmount: 100, riskPips: 20, pipValuePerUnit: 0.1 })).toBe(50)
-  })
+    expect(
+      calculatePositionSize({
+        riskAmount: 100,
+        riskPips: 20,
+        pipValuePerUnit: 0.1,
+      }),
+    ).toBe(50);
+  });
 
   it("rounds down fractional units", () => {
     // @req: REQ-TRADING-023
-    expect(calculatePositionSize({ riskAmount: 99, riskPips: 20, pipValuePerUnit: 0.1 })).toBe(49)
-  })
+    expect(
+      calculatePositionSize({
+        riskAmount: 99,
+        riskPips: 20,
+        pipValuePerUnit: 0.1,
+      }),
+    ).toBe(49);
+  });
 
   it("returns 0 when risk is zero", () => {
     // @req: REQ-TRADING-023
-    expect(calculatePositionSize({ riskAmount: 0, riskPips: 20, pipValuePerUnit: 0.1 })).toBe(0)
-  })
-})
+    expect(
+      calculatePositionSize({
+        riskAmount: 0,
+        riskPips: 20,
+        pipValuePerUnit: 0.1,
+      }),
+    ).toBe(0);
+  });
+});
 ```
 
 Multiple requirements per test are allowed:
@@ -184,11 +213,12 @@ The `/trace` skill parses these tags and builds the requirement → test → cod
 Auto-maintained by the `requirements-curator` agent. Do not edit by hand; the
 agent will reconcile on every feature commit.
 
-| ID | Title | Status | Scope | Tests | Code | Last updated |
-|---|---|---|---|---|---|---|
-| REQ-TRADING-023 | Position size derived from risk and stop distance | implemented | trading | 2 | 1 | 2026-05-20 |
-| REQ-WEB-POSITIONS-004 | Positions render as card list on mobile | implemented | web | 3 | 2 | 2026-06-01 |
-| REQ-CLAUDE-001 | Agent configuration versioned with SemVer | accepted | claude | 0 | 0 | 2026-04-21 |
+| ID                    | Title                                             | Status      | Scope   | Tests | Code | Last updated |
+| --------------------- | ------------------------------------------------- | ----------- | ------- | ----- | ---- | ------------ |
+| REQ-TRADING-023       | Position size derived from risk and stop distance | implemented | trading | 2     | 1    | 2026-05-20   |
+| REQ-WEB-POSITIONS-004 | Positions render as card list on mobile           | implemented | web     | 3     | 2    | 2026-06-01   |
+| REQ-CLAUDE-001        | Agent configuration versioned with SemVer         | accepted    | claude  | 0     | 0    | 2026-04-21   |
+
 ...
 ```
 
@@ -211,7 +241,7 @@ Behavior on a staged commit:
 
 Escape hatches for legitimate cases:
 
-- `feat` commits that *only* add infrastructure (e.g., a new `CLAUDE.md`): the footer `@req: REQ-CLAUDE-*` handles this
+- `feat` commits that _only_ add infrastructure (e.g., a new `CLAUDE.md`): the footer `@req: REQ-CLAUDE-*` handles this
 - Reverts (`revert:`): no requirement link needed; the original commit's link suffices
 
 ## The `requirements-curator` agent
