@@ -6,7 +6,7 @@ import { parseAnalyticsFilters } from "../_parse-filters"
 
 export async function GET(request: NextRequest): Promise<Response> {
   try {
-    const filters = parseAnalyticsFilters(request.nextUrl.searchParams)
+    const filters = await parseAnalyticsFilters(request.nextUrl.searchParams)
     const data: PerformanceSummary = await getPerformanceSummary(filters)
     return apiSuccess<ApiResponse<PerformanceSummary>["data"]>(data)
   } catch (error) {

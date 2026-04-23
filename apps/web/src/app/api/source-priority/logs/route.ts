@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
-import { listPriorityLogs } from "@fxflow/db"
+import { listPriorityLogs, getSettings } from "@fxflow/db"
 
 export async function GET() {
   try {
-    const logs = await listPriorityLogs({ limit: 50 })
+    const settings = await getSettings()
+    const logs = await listPriorityLogs({ limit: 50, account: settings.tradingMode })
     return NextResponse.json({ ok: true, data: logs })
   } catch (error) {
     console.error("[GET /api/source-priority/logs]", error)

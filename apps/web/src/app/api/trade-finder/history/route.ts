@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { getSetupHistory } from "@fxflow/db"
+import { getSetupHistory, getSettings } from "@fxflow/db"
 import type { ApiResponse, TradeFinderSetupData } from "@fxflow/types"
 
 export async function GET(
@@ -7,7 +7,8 @@ export async function GET(
 ): Promise<NextResponse<ApiResponse<TradeFinderSetupData[]>>> {
   try {
     const limit = Number(request.nextUrl.searchParams.get("limit") ?? "50")
-    const history = await getSetupHistory(limit)
+    const settings = await getSettings()
+    const history = await getSetupHistory(limit, settings.tradingMode)
     return NextResponse.json({ ok: true, data: history })
   } catch (error) {
     console.error("[GET /api/trade-finder/history]", error)

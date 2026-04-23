@@ -1,9 +1,10 @@
-import { getSourceBreakdown } from "@fxflow/db"
+import { getSourceBreakdown, getSettings } from "@fxflow/db"
 import { apiSuccess, apiError } from "@/lib/api-validation"
 
 export async function GET(): Promise<Response> {
   try {
-    const data = await getSourceBreakdown()
+    const settings = await getSettings()
+    const data = await getSourceBreakdown({ account: settings.tradingMode })
     return apiSuccess(data)
   } catch (error) {
     console.error("[GET /api/analytics/source-breakdown]", error)

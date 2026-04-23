@@ -98,8 +98,9 @@ export async function getTradeFinderPerformance(options?: {
 /** Get overall aggregate stats */
 export async function getTradeFinderOverallStats(
   daysBack = 90,
+  account?: TradingMode,
 ): Promise<TradeFinderPerformanceData | null> {
-  const stats = await getTradeFinderPerformance({ dimension: "overall", daysBack })
+  const stats = await getTradeFinderPerformance({ dimension: "overall", daysBack, account })
   if (stats.length === 0) return null
 
   // Aggregate across all monthly periods

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { getSignalPerformanceStats } from "@fxflow/db"
+import { getSignalPerformanceStats, getSettings } from "@fxflow/db"
 import type { ApiResponse, TVSignalPerformanceStats } from "@fxflow/types"
 
 export async function GET(
@@ -10,7 +10,8 @@ export async function GET(
     const from = params.get("from") ? new Date(params.get("from")!) : undefined
     const to = params.get("to") ? new Date(params.get("to")!) : undefined
 
-    const stats = await getSignalPerformanceStats({ from, to })
+    const settings = await getSettings()
+    const stats = await getSignalPerformanceStats({ from, to, account: settings.tradingMode })
     return NextResponse.json({ ok: true, data: stats })
   } catch (error) {
     console.error("[GET /api/tv-alerts/stats]", error)

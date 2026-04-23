@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import {
   getTradeFinderPerformance,
   getTradeFinderOverallStats,
+  getSettings,
   type TradeFinderPerformanceData,
 } from "@fxflow/db"
 
@@ -16,13 +17,15 @@ interface PerformanceResponse {
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const daysBack = parseInt(request.nextUrl.searchParams.get("daysBack") ?? "90", 10)
+    const settings = await getSettings()
+    const account = settings.tradingMode
 
     const [overall, byTimeframe, byInstrument, byScoreRange, bySession] = await Promise.all([
-      getTradeFinderOverallStats(daysBack),
-      getTradeFinderPerformance({ dimension: "timeframe", daysBack }),
-      getTradeFinderPerformance({ dimension: "instrument", daysBack }),
-      getTradeFinderPerformance({ dimension: "score_range", daysBack }),
-      getTradeFinderPerformance({ dimension: "session", daysBack }),
+      getTradeFinderOverallStats(daysBack, account),
+      getTradeFinderPerformance({ dimension: "timeframe", daysBack, account }),
+      getTradeFinderPerformance({ dimension: "instrument", daysBack, account }),
+      getTradeFinderPerformance({ dimension: "score_range", daysBack, account }),
+      getTradeFinderPerformance({ dimension: "session", daysBack, account }),
     ])
 
     const data: PerformanceResponse = {

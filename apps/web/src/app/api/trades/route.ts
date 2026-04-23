@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { listTrades, deleteClosedTrades, setLastResetAt, type TradeListResponse } from "@fxflow/db"
+import {
+  listTrades,
+  deleteClosedTrades,
+  setLastResetAt,
+  getSettings,
+  type TradeListResponse,
+} from "@fxflow/db"
 import type { ApiResponse } from "@fxflow/types"
 import { parseSearchParams } from "@/lib/api-validation"
 import { tradeListParamsSchema } from "@/lib/api-schemas"
@@ -16,7 +22,9 @@ export async function GET(
     const limitNum = parsed.data.limit ?? 20
     const offset = (pageNum - 1) * limitNum
 
+    const settings = await getSettings()
     const result = await listTrades({
+      account: settings.tradingMode,
       status,
       instrument,
       direction,

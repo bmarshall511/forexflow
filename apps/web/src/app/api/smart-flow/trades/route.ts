@@ -4,6 +4,7 @@ import {
   getActiveSmartFlowTrades,
   getSmartFlowTradesByStatus,
   getSmartFlowTradeHistory,
+  getSettings,
 } from "@fxflow/db"
 
 export async function GET(request: NextRequest) {
@@ -11,20 +12,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const history = searchParams.get("history")
     const status = searchParams.get("status")
+    const settings = await getSettings()
+    const account = settings.tradingMode
 
     if (history === "true") {
-      const trades = await getSmartFlowTradeHistory()
+      const trades = await getSmartFlowTradeHistory({ account })
       return NextResponse.json({ ok: true, data: trades })
     }
 
     if (status) {
       const trades = await getSmartFlowTradesByStatus(
         status as import("@fxflow/types").SmartFlowTradeStatus,
+        account,
       )
       return NextResponse.json({ ok: true, data: trades })
     }
 
-    const trades = await getActiveSmartFlowTrades()
+    const trades = await getActiveSmartFlowTrades(account)
     return NextResponse.json({ ok: true, data: trades })
   } catch (error) {
     console.error("[GET /api/smart-flow/trades]", error)

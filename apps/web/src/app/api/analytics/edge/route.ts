@@ -5,7 +5,7 @@ import { parseAnalyticsFilters } from "../_parse-filters"
 
 export async function GET(request: NextRequest): Promise<Response> {
   try {
-    const filters = parseAnalyticsFilters(request.nextUrl.searchParams)
+    const filters = await parseAnalyticsFilters(request.nextUrl.searchParams)
     const data = await getMfeMaeDistribution(filters)
     return apiSuccess(data)
   } catch (error) {

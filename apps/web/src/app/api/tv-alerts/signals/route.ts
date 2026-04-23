@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { listSignals, clearAllSignals } from "@fxflow/db"
+import { listSignals, clearAllSignals, getSettings } from "@fxflow/db"
 import type { ApiResponse, TVSignalListResponse } from "@fxflow/types"
 
 export async function GET(
@@ -32,12 +32,14 @@ export async function GET(
       return NextResponse.json({ ok: false, error: "Invalid dateTo" }, { status: 400 })
     }
 
+    const settings = await getSettings()
     const result = await listSignals({
       page,
       pageSize,
       status,
       instrument,
       source,
+      account: settings.tradingMode,
       dateFrom,
       dateTo,
     })

@@ -1,10 +1,17 @@
 import type { AnalyticsFilters } from "@fxflow/types"
+import { getSettings } from "@fxflow/db"
 
 /**
  * Parse analytics filter query params shared by all analytics routes.
- * Returns an AnalyticsFilters object (undefined fields are omitted).
+ *
+ * Always resolves and injects `account` from `Settings.tradingMode` so
+ * analytics are scoped to the currently-active OANDA account. Practice and
+ * live history never commingle after this; legacy rows (account="unknown")
+ * are excluded automatically.
+ *
+ * Returns an AnalyticsFilters object (undefined fields omitted).
  */
-export function parseAnalyticsFilters(params: URLSearchParams): AnalyticsFilters {
+export async function parseAnalyticsFilters(params: URLSearchParams): Promise<AnalyticsFilters> {
   const filters: AnalyticsFilters = {}
 
   const dateFrom = params.get("dateFrom")
@@ -27,6 +34,9 @@ export function parseAnalyticsFilters(params: URLSearchParams): AnalyticsFilters
 
   const direction = params.get("direction")
   if (direction === "long" || direction === "short") filters.direction = direction
+
+  const settings = await getSettings()
+  filters.account = settings.tradingMode
 
   return filters
 }

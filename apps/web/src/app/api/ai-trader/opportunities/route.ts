@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getAllOpportunities } from "@fxflow/db"
+import { getAllOpportunities, getSettings } from "@fxflow/db"
 import type {
   AiTraderOpportunityData,
   AiTraderOpportunityStatus,
@@ -36,11 +36,13 @@ export async function GET(request: NextRequest) {
     const page = parseInt(params.get("page") ?? "1", 10)
     const limit = Math.min(parseInt(params.get("limit") ?? "20", 10), 100)
 
+    const settings = await getSettings()
     const result = await getAllOpportunities({
       status,
       instrument,
       profile,
       direction,
+      account: settings.tradingMode,
       search,
       sort,
       sortDir,
