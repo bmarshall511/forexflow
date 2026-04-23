@@ -1,20 +1,32 @@
 import dotenv from "dotenv"
 import { resolve, dirname } from "path"
 import { fileURLToPath } from "node:url"
+import { existsSync } from "node:fs"
 
-// Single source of truth: repo-root `.env.local` (with `.env` as fallback).
-// Historically apps/web and apps/daemons each had their own .env.local with
-// the SAME DATABASE_URL + ENCRYPTION_KEY — keeping them in sync was manual and
-// broke silently (the daemon would fail to decrypt user credentials that the
-// web had happily encrypted with a different key). Loading once from the repo
-// root makes drift impossible.
+// Canonical source of truth: repo-root `.env.local`. Historically apps/web
+// and apps/daemons each had their own .env.local with the SAME DATABASE_URL
+// + ENCRYPTION_KEY — keeping them in sync was manual and broke silently
+// (the daemon would fail to decrypt user credentials that the web had
+// successfully encrypted). The root file is now the canonical location.
 //
-// Resolve root from this file's own URL (apps/daemons/src/index.ts →
-// repo-root) so the path is correct regardless of process.cwd() — tsx / turbo
-// / electron fork all set CWD differently.
+// dotenv defaults to override=false, so load order is a precedence chain:
+//   1. repo-root .env.local   (authoritative)
+//   2. apps/daemons/.env.local (legacy, warns if present)
+//   3. repo-root .env          (non-secret fallback)
+// During migration either file works; once .env.local is present at root
+// the legacy per-app file is deprecated and noisy.
 const __filename = fileURLToPath(import.meta.url)
-const repoRoot = resolve(dirname(__filename), "../../..")
+const daemonDir = resolve(dirname(__filename), "..")
+const repoRoot = resolve(daemonDir, "../..")
+const legacyEnvPath = resolve(daemonDir, ".env.local")
+
 dotenv.config({ path: resolve(repoRoot, ".env.local") })
+if (existsSync(legacyEnvPath)) {
+  console.warn(
+    `[daemon] apps/daemons/.env.local is deprecated — the canonical env file is the repo-root .env.local. Move your values there and delete the per-app file to avoid drift.`,
+  )
+  dotenv.config({ path: legacyEnvPath })
+}
 dotenv.config({ path: resolve(repoRoot, ".env") })
 import {
   startServer,
