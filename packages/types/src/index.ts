@@ -5,6 +5,13 @@
 /** OANDA account environment — "live" for real money, "practice" for demo/paper trading. */
 export type TradingMode = "live" | "practice"
 
+/**
+ * Value stored on every trade-derived row to isolate practice vs. live history.
+ * `"unknown"` is reserved for pre-migration rows whose origin cannot be inferred;
+ * new writes always stamp `"practice"` or `"live"` from the active credentials.
+ */
+export type TradingAccount = TradingMode | "unknown"
+
 // ─── OANDA Settings ──────────────────────────────────────────────────────────
 
 /** Credential info returned by the API (never contains raw tokens) */
@@ -3721,6 +3728,14 @@ export interface AnalyticsFilters {
   /** placedVia value from metadata (enriched source). */
   source?: string
   direction?: "long" | "short"
+  /**
+   * Restrict analytics to a single OANDA account (practice vs. live).
+   * Web routes auto-inject this from `Settings.tradingMode`; dashboards
+   * never see commingled history across accounts. Rows with
+   * `account = "unknown"` (pre-migration legacy) are always excluded when
+   * this filter is set.
+   */
+  account?: TradingMode
 }
 
 /** Overall performance summary across all filtered trades. */

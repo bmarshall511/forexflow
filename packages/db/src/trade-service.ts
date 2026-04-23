@@ -15,6 +15,7 @@ import type {
   TradeCloseReason,
   TradeOutcome,
   Timeframe,
+  TradingMode,
   ClosedTradeData,
   CloseContext,
   TradeDetailData,
@@ -24,6 +25,14 @@ import type {
 
 /** Fields required to create or update a trade record via upsert. */
 export interface UpsertTradeInput {
+  /**
+   * Active OANDA account the trade belongs to ("practice" | "live"). Stamped
+   * at create time from the daemon's credential state; never mutated on update
+   * so that switching modes doesn't retroactively reassign historical rows.
+   * Optional for backward compat — writers that don't pass it will create
+   * rows with account="unknown" (treated as legacy by analytics).
+   */
+  account?: TradingMode
   source: TradeSource
   sourceTradeId: string
   status: TradeStatus
@@ -63,6 +72,12 @@ export interface CloseTradeInput {
 
 /** Filtering, sorting, and pagination options for listing trades. */
 export interface ListTradesOptions {
+  /**
+   * Scope results to a single OANDA account. Dashboards and the positions page
+   * pass the active trading mode here so practice and live history stay
+   * isolated after the Phase -1 migration.
+   */
+  account?: TradingMode
   status?: TradeStatus
   instrument?: string
   direction?: TradeDirection
@@ -267,6 +282,10 @@ export async function upsertTrade(input: UpsertTradeInput) {
   return db.trade.upsert({
     where,
     create: {
+      // Stamp account at create only. If a caller updates an existing row via
+      // upsert they won't accidentally overwrite the original account — the
+      // update branch below never touches this field.
+      ...(input.account ? { account: input.account } : {}),
       source: input.source,
       sourceTradeId: input.sourceTradeId,
       status: input.status,
@@ -650,6 +669,7 @@ export async function getOpenTradeIdsByPlacedVia(placedVia: string): Promise<str
 /** List trades with filtering, sorting, and pagination. */
 export async function listTrades(opts: ListTradesOptions = {}): Promise<TradeListResponse> {
   const {
+    account,
     status,
     instrument,
     direction,
@@ -664,6 +684,8 @@ export async function listTrades(opts: ListTradesOptions = {}): Promise<TradeLis
   } = opts
 
   const where: Record<string, unknown> = {}
+  // Account filter — exact match drops legacy "unknown" rows automatically.
+  if (account) where.account = account
   if (status) where.status = status
   if (instrument) where.instrument = instrument
   if (direction) where.direction = direction
@@ -711,13 +733,24 @@ export async function listTrades(opts: ListTradesOptions = {}): Promise<TradeLis
   }
 }
 
-/** Get today's closed trades for the WebSocket payload. */
-export async function getClosedTradesToday(forexDayStart: Date): Promise<ClosedTradeData[]> {
+/**
+ * Get today's closed trades for the WebSocket payload.
+ *
+ * The daemon passes `account` from its credential state so the WS payload is
+ * always scoped to the currently-active OANDA account. Callers that pre-date
+ * account scoping may omit it, but the daemon always supplies it.
+ */
+export async function getClosedTradesToday(
+  forexDayStart: Date,
+  account?: TradingMode,
+): Promise<ClosedTradeData[]> {
+  const where: Record<string, unknown> = {
+    status: "closed",
+    closedAt: { gte: forexDayStart },
+  }
+  if (account) where.account = account
   const trades = await db.trade.findMany({
-    where: {
-      status: "closed",
-      closedAt: { gte: forexDayStart },
-    },
+    where,
     orderBy: { closedAt: "desc" },
     include: { tags: { include: { tag: true } } },
   })

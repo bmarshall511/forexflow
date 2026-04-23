@@ -64,6 +64,9 @@ async function fetchClosed(filters?: AnalyticsFilters, includeCancelled = false)
   if (!includeCancelled) {
     where.OR = [{ exitPrice: { not: null } }, { realizedPL: { not: 0 } }]
   }
+  // Account isolation: when a specific account is requested, rows with
+  // account="unknown" (pre-migration legacy) are excluded by the equality match.
+  if (filters?.account) where.account = filters.account
   if (filters?.dateFrom || filters?.dateTo) {
     const d: Record<string, Date> = {}
     if (filters.dateFrom) d.gte = filters.dateFrom
@@ -373,13 +376,19 @@ function startOfWeek(d: Date): Date {
   return r
 }
 
-export async function getSourceBreakdown(): Promise<SourceDetailedPerformance[]> {
-  // Fetch all closed trades once (no date filter)
-  const allClosed = await fetchClosed()
+export async function getSourceBreakdown(
+  filters?: AnalyticsFilters,
+): Promise<SourceDetailedPerformance[]> {
+  // Fetch all closed trades once (no date filter, but honor account/instrument/etc)
+  const allClosed = await fetchClosed(filters)
 
-  // Fetch open trades for unrealized P&L
+  // Fetch open trades for unrealized P&L — scoped to the same account so the
+  // dashboard never shows live unrealized P&L while the user is in practice.
+  const openWhere: Record<string, unknown> = { status: "open" }
+  if (filters?.account) openWhere.account = filters.account
+  if (filters?.instrument) openWhere.instrument = filters.instrument
   const openRows = await db.trade.findMany({
-    where: { status: "open" },
+    where: openWhere,
     select: { source: true, metadata: true, unrealizedPL: true },
   })
 
