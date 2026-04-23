@@ -5,22 +5,26 @@ import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import dotenv from "dotenv"
 
-// Single source of truth for env: repo-root `.env.local`. Historically
-// apps/web and apps/daemons each had their own, with the SAME DATABASE_URL
-// + ENCRYPTION_KEY — easy to drift, and when they drifted the daemon
-// silently failed to decrypt credentials the web had encrypted. Preload
-// the root file here so Next.js starts with root values in process.env.
-// dotenv defaults to override=false, so any stray apps/web/.env.local won't
-// silently shadow root values — but we warn the user if it exists so it
-// gets cleaned up.
+// Single source of truth for env: repo-root `.env.local`. If a legacy
+// apps/web/.env.local is present it's an error — run `pnpm setup:env` at
+// the repo root to migrate. Two env files drifting was the incident that
+// motivated this refactor.
 const repoRoot = resolve(import.meta.dirname, "../..")
-dotenv.config({ path: resolve(repoRoot, ".env.local") })
-dotenv.config({ path: resolve(repoRoot, ".env") })
-if (existsSync(resolve(import.meta.dirname, ".env.local"))) {
-  console.warn(
-    "[next.config] apps/web/.env.local exists — this file is deprecated. The canonical location is the repo-root .env.local. Remove apps/web/.env.local to avoid drift.",
+const rootEnvPath = resolve(repoRoot, ".env.local")
+const legacyWebEnvPath = resolve(import.meta.dirname, ".env.local")
+
+if (existsSync(legacyWebEnvPath)) {
+  throw new Error(
+    "apps/web/.env.local exists and is no longer supported. Run `pnpm setup:env` at the repo root to migrate your values into .env.local, then restart.",
   )
 }
+if (!existsSync(rootEnvPath)) {
+  throw new Error(
+    `No .env.local found at repo root (${rootEnvPath}). Create it (see README.md for the template), or run \`pnpm setup:env\` if you have legacy per-app env files to migrate.`,
+  )
+}
+dotenv.config({ path: rootEnvPath })
+dotenv.config({ path: resolve(repoRoot, ".env") })
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",

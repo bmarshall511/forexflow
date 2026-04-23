@@ -3,30 +3,28 @@ import { resolve, dirname } from "path"
 import { fileURLToPath } from "node:url"
 import { existsSync } from "node:fs"
 
-// Canonical source of truth: repo-root `.env.local`. Historically apps/web
-// and apps/daemons each had their own .env.local with the SAME DATABASE_URL
-// + ENCRYPTION_KEY — keeping them in sync was manual and broke silently
-// (the daemon would fail to decrypt user credentials that the web had
-// successfully encrypted). The root file is now the canonical location.
-//
-// dotenv defaults to override=false, so load order is a precedence chain:
-//   1. repo-root .env.local   (authoritative)
-//   2. apps/daemons/.env.local (legacy, warns if present)
-//   3. repo-root .env          (non-secret fallback)
-// During migration either file works; once .env.local is present at root
-// the legacy per-app file is deprecated and noisy.
+// Single source of truth for env: repo-root `.env.local`. If you're coming
+// from a clone that had per-app env files, run `pnpm setup:env` once to
+// migrate — there is no fallback to apps/daemons/.env.local. Keeping two
+// files in sync broke silently before (the daemon would fail to decrypt
+// user credentials the web had successfully encrypted when the two drifted).
 const __filename = fileURLToPath(import.meta.url)
-const daemonDir = resolve(dirname(__filename), "..")
-const repoRoot = resolve(daemonDir, "../..")
-const legacyEnvPath = resolve(daemonDir, ".env.local")
+const repoRoot = resolve(dirname(__filename), "../../..")
+const rootEnvPath = resolve(repoRoot, ".env.local")
+const legacyDaemonEnvPath = resolve(repoRoot, "apps/daemons/.env.local")
 
-dotenv.config({ path: resolve(repoRoot, ".env.local") })
-if (existsSync(legacyEnvPath)) {
-  console.warn(
-    `[daemon] apps/daemons/.env.local is deprecated — the canonical env file is the repo-root .env.local. Move your values there and delete the per-app file to avoid drift.`,
+if (!existsSync(rootEnvPath)) {
+  const legacyPresent = existsSync(legacyDaemonEnvPath)
+  console.error(
+    `[daemon] No .env.local found at repo root (${rootEnvPath}).\n` +
+      (legacyPresent
+        ? `[daemon] Legacy apps/daemons/.env.local detected — run \`pnpm setup:env\` at the repo root to migrate your values to .env.local, then restart.\n`
+        : `[daemon] Create .env.local at the repo root with DATABASE_URL, ENCRYPTION_KEY, NEXT_PUBLIC_DAEMON_REST_URL, NEXT_PUBLIC_DAEMON_URL. See README.md for the template.\n`),
   )
-  dotenv.config({ path: legacyEnvPath })
+  process.exit(1)
 }
+
+dotenv.config({ path: rootEnvPath })
 dotenv.config({ path: resolve(repoRoot, ".env") })
 import {
   startServer,
