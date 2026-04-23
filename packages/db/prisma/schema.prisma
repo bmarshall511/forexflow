@@ -39,6 +39,7 @@ model Notification {
 
 model Trade {
   id                   String       @id @default(uuid())
+  account              String       @default("unknown") // "practice" | "live" | "unknown" (pre-migration rows)
   source               String // "oanda"
   sourceTradeId        String // OANDA trade/order ID
   status               String // "pending" | "open" | "closed"
@@ -75,6 +76,10 @@ model Trade {
   smartFlowTrades      SmartFlowTrade[]
 
   @@unique([source, sourceTradeId])
+  @@index([account, status, openedAt])
+  @@index([account, status, closedAt])
+  @@index([account, instrument, status])
+  @@index([account, updatedAt])
   @@index([status, openedAt])
   @@index([status, closedAt])
   @@index([instrument, status])
@@ -103,6 +108,7 @@ model TradeTag {
 }
 
 model TradeEvent {
+  // account is derived via the Trade relation; no duplicate column to keep drift-free.
   id        String   @id @default(uuid())
   tradeId   String
   trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
@@ -410,6 +416,7 @@ model AiDigest {
 
 model TVAlertSignal {
   id               String    @id @default(uuid())
+  account          String    @default("unknown") // "practice" | "live" | "unknown"
   source           String    @default("ut_bot_alerts") // Extensible for future modules
   instrument       String // OANDA format: "EUR_USD"
   direction        String // "buy" | "sell"
@@ -426,6 +433,8 @@ model TVAlertSignal {
 
   auditEvents      SignalAuditEvent[]
 
+  @@index([account, receivedAt])
+  @@index([account, status, receivedAt])
   @@index([instrument, receivedAt])
   @@index([status, receivedAt])
   @@index([source, receivedAt])
@@ -570,6 +579,7 @@ model TradeFinderConfig {
 
 model TradeFinderSetup {
   id               String   @id @default(uuid())
+  account          String   @default("unknown") // "practice" | "live" | "unknown"
   instrument       String
   direction        String // "long" | "short"
   timeframeSet     String // "hourly" | "daily" | "weekly" | "monthly"
@@ -605,6 +615,8 @@ model TradeFinderSetup {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  @@index([account, status])
+  @@index([account, status, detectedAt])
   @@index([instrument, status])
   @@index([status, scoreTotal])
   @@index([status, detectedAt])
@@ -614,6 +626,7 @@ model TradeFinderSetup {
 
 model TradeFinderPerformance {
   id           String   @id @default(uuid())
+  account      String   @default("unknown") // "practice" | "live" | "unknown"
   dimension    String   // "overall" | "timeframe" | "instrument" | "score_range"
   dimensionKey String?  // e.g. "hourly", "EUR_USD", "10-12" (null for overall)
   periodStart  DateTime
@@ -632,6 +645,7 @@ model TradeFinderPerformance {
   maxDrawdown  Float    @default(0)
   updatedAt    DateTime @updatedAt
 
+  @@index([account, dimension, periodStart])
   @@index([dimension, dimensionKey, periodStart])
   @@index([dimension, periodStart])
 }
@@ -665,6 +679,7 @@ model AiTraderConfig {
 
 model AiTraderOpportunity {
   id                  String    @id @default(uuid())
+  account             String    @default("unknown") // "practice" | "live" | "unknown"
   instrument          String
   direction           String    // "long" | "short"
   profile             String    // "scalper" | "intraday" | "swing" | "news"
@@ -727,6 +742,8 @@ model AiTraderOpportunity {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  @@index([account, status])
+  @@index([account, status, detectedAt])
   @@index([instrument, status])
   @@index([status, confidence])
   @@index([profile, status])
@@ -755,6 +772,7 @@ model AiTraderMarketData {
 /// and lost at the end of each scan.
 model AiTraderNearMiss {
   id             String   @id @default(uuid())
+  account        String   @default("unknown") // "practice" | "live" | "unknown"
   instrument     String
   direction      String   // "long" | "short"
   profile        String   // "scalper" | "intraday" | "swing" | "news"
@@ -769,6 +787,8 @@ model AiTraderNearMiss {
   metadata       String   @default("{}")
   detectedAt     DateTime @default(now())
 
+  @@index([account, detectedAt])
+  @@index([account, profile, detectedAt])
   @@index([detectedAt])
   @@index([instrument, detectedAt])
   @@index([profile, detectedAt])
@@ -780,6 +800,7 @@ model AiTraderNearMiss {
 /// change) and injects them into future Judge prompts as "experience memory".
 model AiTraderReflection {
   id               String   @id @default(uuid())
+  account          String   @default("unknown") // "practice" | "live" | "unknown"
   /// FK to AiTraderOpportunity — one reflection per closed trade
   opportunityId    String   @unique
   instrument       String
@@ -803,6 +824,7 @@ model AiTraderReflection {
   closedAt         DateTime
   createdAt        DateTime @default(now())
 
+  @@index([account, profile, createdAt])
   @@index([instrument, profile, createdAt])
   @@index([profile, outcome, createdAt])
   @@index([createdAt])
@@ -812,6 +834,7 @@ model AiTraderReflection {
 
 model PriceAlert {
   id           String    @id @default(cuid())
+  account      String    @default("unknown") // "practice" | "live" | "unknown"
   instrument   String // e.g., "EUR_USD"
   direction    String // "above" | "below"
   targetPrice  Float
@@ -824,6 +847,8 @@ model PriceAlert {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  @@index([account, status])
+  @@index([account, instrument, status])
   @@index([status])
   @@index([instrument, status])
   @@index([expiresAt])
@@ -843,6 +868,7 @@ model SourcePriorityConfig {
 
 model SourcePriorityLog {
   id               String   @id @default(uuid())
+  account          String   @default("unknown") // "practice" | "live" | "unknown"
   instrument       String
   requestingSource String
   existingSource   String?
@@ -851,6 +877,7 @@ model SourcePriorityLog {
   reason           String
   createdAt        DateTime @default(now())
 
+  @@index([account, createdAt])
   @@index([instrument, createdAt])
   @@index([requestingSource, createdAt])
   @@index([createdAt])
@@ -897,6 +924,7 @@ model SmartFlowSettings {
 
 model SmartFlowConfig {
   id                       String   @id @default(uuid())
+  account                  String   @default("unknown") // "practice" | "live" | "unknown"
   instrument               String
   name                     String
   direction                String // "long" | "short"
@@ -957,12 +985,15 @@ model SmartFlowConfig {
   updatedAt                DateTime @updatedAt
   trades                   SmartFlowTrade[]
 
+  @@index([account, isActive])
+  @@index([account, instrument, isActive])
   @@index([instrument, isActive])
   @@index([instrument, direction])
 }
 
 model SmartFlowTrade {
   id                     String    @id @default(uuid())
+  account                String    @default("unknown") // "practice" | "live" | "unknown" (stamped at create, derivable from config)
   configId               String
   config                 SmartFlowConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
   tradeId                String?   // FK to Trade.id once placed
@@ -1009,6 +1040,8 @@ model SmartFlowTrade {
   closedAt               DateTime?
   updatedAt              DateTime  @updatedAt
 
+  @@index([account, status])
+  @@index([account, status, createdAt])
   @@index([configId])
   @@index([status])
   @@index([status, createdAt])
@@ -1034,6 +1067,7 @@ model SmartFlowTimeEstimate {
 
 model SmartFlowActivityLog {
   id         String   @id @default(uuid())
+  account    String   @default("unknown") // "practice" | "live" | "unknown"
   type       String // SmartFlowActivityType
   message    String
   detail     String?
@@ -1043,6 +1077,7 @@ model SmartFlowActivityLog {
   configId   String?
   createdAt  DateTime @default(now())
 
+  @@index([account, createdAt])
   @@index([createdAt])
   @@index([configId, createdAt])
   @@index([instrument, createdAt])
@@ -1050,6 +1085,7 @@ model SmartFlowActivityLog {
 
 model SmartFlowOpportunity {
   id               String   @id @default(uuid())
+  account          String   @default("unknown") // "practice" | "live" | "unknown"
   instrument       String
   direction        String // "long" | "short"
   scanMode         String // SmartFlowScanMode: "trend_following" | "mean_reversion" | "breakout" | "session_momentum"
@@ -1079,6 +1115,8 @@ model SmartFlowOpportunity {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  @@index([account, status])
+  @@index([account, status, detectedAt])
   @@index([instrument, status])
   @@index([status, score])
   @@index([scanMode, status])
@@ -1124,6 +1162,7 @@ model EconomicEvent {
 
 model AiTraderStrategyPerformance {
   id           String   @id @default(uuid())
+  account      String   @default("unknown") // "practice" | "live" | "unknown"
   profile      String   // AiTraderProfile
   instrument   String?  // null = all instruments
   session      String?  // null = all sessions
@@ -1141,6 +1180,7 @@ model AiTraderStrategyPerformance {
   maxDrawdown  Float    @default(0)
   updatedAt    DateTime @updatedAt
 
+  @@index([account, profile, periodStart])
   @@index([profile, instrument, periodStart])
   @@index([profile, periodStart])
 }
