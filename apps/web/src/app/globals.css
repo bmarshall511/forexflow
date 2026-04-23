@@ -431,3 +431,21 @@
 .prose-fxflow li.nested {
   margin-left: 1.5rem;
 }
+
+/* ─── Dashboard privacy mode ─────────────────────────────────────────────── */
+
+/* Toggled on <html> by the PrivacyToggle primitive. Any element that marks
+   itself with data-private="true" (dollar amounts, balances, R:R values)
+   is blurred so the user can show the dashboard in public spaces without
+   exposing live P&L. Doesn't affect hover/focus — the values are still
+   copy/paste-able for devtools debugging. */
+html[data-privacy-mode="true"] [data-private="true"] {
+  filter: blur(6px);
+  transition: filter 120ms ease-out;
+  user-select: none;
+}
+
+html[data-privacy-mode="true"] [data-private="true"]:hover,
+html[data-privacy-mode="true"] [data-private="true"]:focus-within {
+  filter: blur(0);
+}
