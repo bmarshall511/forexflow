@@ -4,11 +4,11 @@ import { DashboardHeader } from "./dashboard-header"
 import { GreetingBar } from "./greeting-bar"
 import { LiveStrip } from "./live-strip"
 import { PerformanceHero } from "./performance-hero"
+import { DepthSections } from "./depth-sections"
 import { TradeSpotlight } from "./trade-spotlight"
 import { ActivityFeed } from "./activity-feed"
 import { AutomationBar } from "./automation-bar"
 import { MarketCalendarCard } from "./market-calendar-card"
-import { SourcePerformanceCard } from "./source-performance-card"
 import { AiInsightsBar } from "./ai-insights-bar"
 import { SmartFlowCard } from "./smart-flow-card"
 import { SetupPanel } from "@/components/dashboard/shared"
@@ -61,6 +61,12 @@ export function DashboardContent() {
           </CardErrorBoundary>
         </div>
 
+        <div className="px-4 md:px-6">
+          <CardErrorBoundary>
+            <DepthSections />
+          </CardErrorBoundary>
+        </div>
+
         <div className="grid grid-cols-1 gap-4 px-4 md:px-6 xl:grid-cols-2 xl:items-start">
           <CardErrorBoundary>
             <TradeSpotlight />
@@ -79,12 +85,6 @@ export function DashboardContent() {
         <div className="px-4 md:px-6">
           <CardErrorBoundary>
             <SmartFlowCard />
-          </CardErrorBoundary>
-        </div>
-
-        <div className="px-4 md:px-6">
-          <CardErrorBoundary>
-            <SourcePerformanceCard />
           </CardErrorBoundary>
         </div>
 
