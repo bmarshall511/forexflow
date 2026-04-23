@@ -30,11 +30,14 @@ src/
 - **Reads**: query DB directly via `packages/db` services.
 - **Trade actions** (place, close, modify): proxy to daemon REST at `http://localhost:4100`.
 - Always return `NextResponse.json()`.
+- **Account scoping**: every trade-derived read route auto-injects `account: settings.tradingMode` so practice and live history never commingle. Analytics routes get this via the async `parseAnalyticsFilters` helper; other list routes read `getSettings()` inline and pass `account` to the DB service. See `/api/alerts`, `/api/trades`, `/api/trade-finder/*`, `/api/smart-flow/trades`, `/api/ai-trader/opportunities`, `/api/tv-alerts/signals`, `/api/source-priority/logs`.
+- **Legacy data**: `/api/settings/legacy-data` exposes GET (counts) + DELETE (wipe) for rows stamped `account="unknown"` by the Phase -1 migration.
 
 ## State Management
 
 - React Context providers in `state/` (DaemonStatus, InternetStatus, Notification, Sidebar, TradingMode).
 - No global state library. Local state + context + SWR-like hooks.
+- **Mode switch broadcast**: `TradingModeContext.setMode` dispatches `window.dispatchEvent("fxflow-account-changed", { detail: { mode } })` after a successful switch. Dashboard hooks should listen for this event to invalidate account-scoped caches and refetch under the new mode.
 
 ## WebSocket
 

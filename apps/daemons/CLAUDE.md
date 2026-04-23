@@ -42,6 +42,17 @@ src/
 - `transaction-stream-client.ts` — SSE transaction stream (fills, cancels, modifications). Tracks `lastTransactionId` from stream events; on reconnection, triggers immediate reconcile to catch up on missed events.
 - **Realtime status refresh endpoints**: `POST /refresh-credentials` forces `credentialWatcher.checkNow()` so the daemon picks up a credential save/delete without waiting for the next `dbPollIntervalMs` tick. `POST /actions/oanda/refresh-health` forces `healthChecker.checkNow()` so a test-connection click in the UI surfaces the updated `status_snapshot` over WS immediately. Both are called by the corresponding web API routes (`/api/settings/oanda/credentials`, `/api/settings/oanda/test-connection`) via `apps/web/src/lib/poke-daemon-oanda.ts`.
 
+## Account Isolation
+
+- Every trade-derived row carries `account: "practice" | "live" | "unknown"`. Daemon writers resolve `stateManager.getCredentials()?.mode` and stamp it at insert. No fallback to `"unknown"` on new writes — if credentials can't be resolved, the write is dropped with a warning.
+- `trade-syncer` passes `creds.mode` on every `upsertTrade` (placeOrder, backfill, reconcile) and calls `getClosedTradesToday(forexDayStart, creds.mode)` so the WS today-closed payload stays per-account.
+- `tv-alerts/signal-processor` resolves `activeAccount` at the top of `processWebhook` and drops signals when no credentials exist.
+- `ai-trader/scanner.processTier2And3` takes `account` as a required param; all three `createOpportunity` paths and the near-miss loop stamp it.
+- `trade-finder/scanner.scanPair` takes `account` and stamps `createSetup`.
+- `smart-flow/manager` resolves account in `placeMarketEntry` / `createSmartEntry`. `market-scanner` uses `setAccountFn` late-binding wired from `index.ts`. `activity-feed` uses `setActivityAccountResolver` so every persisted event is attributable (events with no resolvable account are dropped).
+- `source-priority-manager` uses `setAccountResolver`; `logDecision` drops the DB write when no account is resolvable.
+- Performance trackers (`trade-finder/performance-tracker`, `ai-trader/performance-tracker`, `ai-trader/reflection-engine`) read the canonical `trade.account` / `opp.account` from the closed row so account switches don't misattribute history.
+
 ## Trade Syncing
 
 - `trade-syncer.ts` reconciles OANDA state with DB every 2 minutes.

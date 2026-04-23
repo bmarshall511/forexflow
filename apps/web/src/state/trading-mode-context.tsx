@@ -72,6 +72,15 @@ export function TradingModeProvider({ children, initialSettings }: TradingModePr
           if (DAEMON_REST_URL) {
             fetch(`${DAEMON_REST_URL}/refresh-credentials`, { method: "POST" }).catch(() => {})
           }
+          // Broadcast so dashboard hooks / caches can invalidate their
+          // current-mode data and refetch for the new account. The custom
+          // event keeps the cross-cutting concern out of every hook that
+          // cares about account-scoped data.
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("fxflow-account-changed", { detail: { mode: newMode } }),
+            )
+          }
           return { ok: true }
         }
         return { ok: false, error: data.error }

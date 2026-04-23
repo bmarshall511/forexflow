@@ -38,6 +38,17 @@ Each domain has a dedicated service file exporting pure functions that accept a 
 
 ## Key Patterns
 
+### Account Isolation (Phase -1)
+
+Every trade-derived model carries `account: TradingAccount` (= `TradingMode | "unknown"`). Practice and live history never commingle in analytics.
+
+- **Writers** — every creator requires `account: TradingMode`. No optional shims. Daemon resolves `stateManager.getCredentials()?.mode` and drops the write if null rather than writing `"unknown"`.
+- **Readers** — optional `account?: TradingMode` filter. Web routes inject `settings.tradingMode`; when set, legacy `"unknown"` rows are excluded via the equality match.
+- **Join-derived tables** — `TradeEvent`, `AiAnalysis`, `TradeCondition`, `AiImmediateActionLog`, `AiRecommendationOutcome`, `SignalAuditEvent` deliberately do NOT duplicate the column — filter via the parent Trade or Signal join.
+- **Performance trackers** read `trade.account` from the closed Trade row (not the active mode) so trades opened in practice don't get misattributed to live after a mode switch.
+- **Migration** — `scripts/migrate-account-column.sql` applied once. Re-apply not supported (SQLite lacks `IF NOT EXISTS` on `ALTER TABLE ADD COLUMN`). Existing rows stamped `"unknown"`.
+- **Legacy cleanup** — `legacy-data-service.ts` exports `getLegacyDataCounts()` + `clearLegacyData()`. `DELETE /api/settings/legacy-data` wipes unknown-account rows in a single transaction.
+
 ### enrichSource
 
 - `Trade.source` in DB is always `"oanda"` (OANDA is the canonical trade repository).
