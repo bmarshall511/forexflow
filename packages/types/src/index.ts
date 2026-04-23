@@ -3720,6 +3720,49 @@ export interface PriceAlertTriggeredMessage extends DaemonMessage<PriceAlertData
   type: "price_alert_triggered"
 }
 
+// ─── Dashboard Setup Status ─────────────────────────────────────────────────
+
+/**
+ * Stable IDs for setup-check items. Enumerated so the client can persist
+ * per-item dismissals without the server and client drifting on strings.
+ */
+export type SetupCheckId =
+  | "onboarding"
+  | "oanda_missing"
+  | "claude_key"
+  | "finnhub_key"
+  | "fred_key"
+  | "alpha_vantage_key"
+  | "cf_worker_missing"
+  | "tv_alerts_no_whitelist"
+  | "trade_finder_no_pairs"
+  | "edge_finder_no_profiles"
+  | "edge_finder_no_techniques"
+  | "smart_flow_no_active_configs"
+
+export type SetupCheckSeverity = "error" | "warning" | "info"
+
+export interface SetupCheckItem {
+  id: SetupCheckId
+  severity: SetupCheckSeverity
+  title: string
+  /** Short one-line explanation of what's missing and why it matters. */
+  detail: string
+  /** Where to send the user to resolve it (web app route). */
+  fixHref: string
+  /** When true the UI may render a dismiss button that hides this item per-device. */
+  dismissible: boolean
+}
+
+/** Aggregate response shape for GET /api/settings/setup-status. */
+export interface SetupStatusResponse {
+  items: SetupCheckItem[]
+  /** Count of unresolved items, useful for a "Setup (3)" badge. */
+  total: number
+  /** `true` when no items are outstanding — the banner can hide itself. */
+  allConfigured: boolean
+}
+
 // ─── Performance Analytics ──────────────────────────────────────────────────
 
 /** Filters for analytics queries. All fields are optional. */
