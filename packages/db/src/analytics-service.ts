@@ -4,7 +4,7 @@ import { getCurrentSession } from "@fxflow/shared"
 import type {
   TradeSource, AnalyticsFilters, PerformanceSummary, InstrumentPerformance,
   SessionPerformance, DayOfWeekPerformance, HourOfDayPerformance,
-  SourcePerformance, MfeMaeEntry, EquityCurvePoint,
+  SourcePerformance, MfeMaeEntry, EquityCurvePoint, DrawdownPoint,
   SourcePeriodStats, SourceDetailedPerformance,
 } from "@fxflow/types" // prettier-ignore
 
@@ -292,7 +292,15 @@ export async function getMfeMaeDistribution(filters?: AnalyticsFilters): Promise
   }))
 }
 
-export async function getEquityCurve(filters?: AnalyticsFilters): Promise<EquityCurvePoint[]> {
+/**
+ * Daily cumulative P&L curve. When `startingBalance` is provided each point
+ * also carries `balance = startingBalance + cumulativePL` so charts can
+ * render a true balance curve without a second query.
+ */
+export async function getEquityCurve(
+  filters?: AnalyticsFilters,
+  startingBalance?: number,
+): Promise<EquityCurvePoint[]> {
   const trades = await fetchClosed(filters)
   if (trades.length === 0) return []
   const daily = new Map<string, { pl: number; count: number }>()
@@ -310,8 +318,36 @@ export async function getEquityCurve(filters?: AnalyticsFilters): Promise<Equity
     .map(([date, { pl, count }]) => {
       cum += pl
       tc += count
-      return { date, cumulativePL: cum, tradeCount: tc }
+      const point: EquityCurvePoint = { date, cumulativePL: cum, tradeCount: tc }
+      if (startingBalance !== undefined) point.balance = startingBalance + cum
+      return point
     })
+}
+
+/**
+ * Drawdown series derived from the equity curve — peak-to-trough deltas in
+ * the same currency as `cumulativePL`. Every `drawdown` value is ≤ 0; zero
+ * means we're at a running peak.
+ *
+ * When `startingBalance` is supplied, `peakBalance` is anchored to the
+ * starting-balance-adjusted curve and `drawdownPct` is computed against
+ * that peak. Without it, percentages are relative to the peak cumulative
+ * P&L (which can be unstable near zero — callers should be aware).
+ */
+export async function getDrawdownCurve(
+  filters?: AnalyticsFilters,
+  startingBalance?: number,
+): Promise<DrawdownPoint[]> {
+  const curve = await getEquityCurve(filters, startingBalance)
+  if (curve.length === 0) return []
+  let peak = startingBalance ?? 0
+  return curve.map((p) => {
+    const value = p.balance ?? p.cumulativePL
+    if (value > peak) peak = value
+    const drawdown = value - peak
+    const drawdownPct = peak !== 0 ? (drawdown / Math.abs(peak)) * 100 : 0
+    return { date: p.date, drawdown, drawdownPct, peakBalance: peak }
+  })
 }
 
 // ─── Source Breakdown ───────────────────────────────────────────────────────

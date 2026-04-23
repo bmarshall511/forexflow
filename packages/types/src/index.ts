@@ -3869,7 +3869,23 @@ export interface EquityCurvePoint {
   date: string
   cumulativePL: number
   tradeCount: number
+  /**
+   * Account balance at end-of-day. `startingBalance + cumulativePL` when a
+   * starting balance is known; otherwise anchored at cumulativePL (origin 0).
+   */
   balance?: number
+}
+
+/** Single data point on the drawdown curve. */
+export interface DrawdownPoint {
+  /** ISO date string (YYYY-MM-DD). */
+  date: string
+  /** Peak-to-trough in the same currency as cumulativePL — always ≤ 0 during a drawdown. */
+  drawdown: number
+  /** Same as `drawdown` expressed as a percentage of `peakBalance`. */
+  drawdownPct: number
+  /** Running peak of (balance | cumulativePL) at this point. */
+  peakBalance: number
 }
 
 // ─── Source Priority ─────────────────────────────────────────────────────

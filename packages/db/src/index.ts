@@ -429,6 +429,7 @@ export {
   getPerformanceBySource,
   getMfeMaeDistribution,
   getEquityCurve,
+  getDrawdownCurve,
   getSourceBreakdown,
 } from "./analytics-service"
 
