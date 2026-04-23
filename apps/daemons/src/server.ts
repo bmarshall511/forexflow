@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { WebSocketServer, WebSocket } from "ws"
 import type { StateManager } from "./state-manager.js"
 import type { CredentialWatcher } from "./db/credential-watcher.js"
+import type { OandaHealthChecker } from "./oanda/health-checker.js"
 import type { OandaTradeSyncer } from "./oanda/trade-syncer.js"
 import type { NotificationEmitter } from "./notification-emitter.js"
 import type { CFWorkerClient } from "./tv-alerts/cf-worker-client.js"
@@ -77,6 +78,7 @@ export function setSmartFlowManager(manager: SmartFlowManager): void {
 interface ServerDeps {
   stateManager: StateManager
   credentialWatcher: CredentialWatcher
+  healthChecker: OandaHealthChecker
   tradeSyncer?: OandaTradeSyncer
   notificationEmitter?: NotificationEmitter
   allowedOrigins?: string[]
@@ -99,7 +101,7 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 }
 
 export async function startServer(port: number, deps: ServerDeps) {
-  const { stateManager, credentialWatcher, tradeSyncer, allowedOrigins } = deps
+  const { stateManager, credentialWatcher, healthChecker, tradeSyncer, allowedOrigins } = deps
   const connectedClients = new Set<WebSocket>()
 
   // HTTP server for REST endpoints
@@ -176,6 +178,19 @@ export async function startServer(port: number, deps: ServerDeps) {
         })
         .catch((err) => {
           console.error("[server] refresh-credentials error:", err)
+          sendJson(res, 500, { ok: false, error: "Internal error" })
+        })
+      return
+    }
+
+    if (req.method === "POST" && req.url === "/actions/oanda/refresh-health") {
+      healthChecker
+        .checkNow()
+        .then(() => {
+          sendJson(res, 200, { ok: true })
+        })
+        .catch((err) => {
+          console.error("[server] refresh-health error:", err)
           sendJson(res, 500, { ok: false, error: "Internal error" })
         })
       return

@@ -40,6 +40,7 @@ src/
 - `api-client.ts` — HTTP calls (accounts, orders, trades, candles).
 - `stream-client.ts` — SSE pricing stream (EUR_USD only for heartbeat/status).
 - `transaction-stream-client.ts` — SSE transaction stream (fills, cancels, modifications). Tracks `lastTransactionId` from stream events; on reconnection, triggers immediate reconcile to catch up on missed events.
+- **Realtime status refresh endpoints**: `POST /refresh-credentials` forces `credentialWatcher.checkNow()` so the daemon picks up a credential save/delete without waiting for the next `dbPollIntervalMs` tick. `POST /actions/oanda/refresh-health` forces `healthChecker.checkNow()` so a test-connection click in the UI surfaces the updated `status_snapshot` over WS immediately. Both are called by the corresponding web API routes (`/api/settings/oanda/credentials`, `/api/settings/oanda/test-connection`) via `apps/web/src/lib/poke-daemon-oanda.ts`.
 
 ## Trade Syncing
 

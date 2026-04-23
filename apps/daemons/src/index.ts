@@ -106,6 +106,7 @@ async function main() {
   const { broadcast } = await startServer(config.port, {
     stateManager,
     credentialWatcher,
+    healthChecker,
     tradeSyncer,
     allowedOrigins: config.allowedOrigins,
   })

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { testConnection } from "@fxflow/db"
 import type { ApiResponse, TradingMode, TestConnectionResponse } from "@fxflow/types"
+import { pokeDaemonHealthRefresh } from "@/lib/poke-daemon-oanda"
 
 export async function POST(
   request: Request,
@@ -16,6 +17,7 @@ export async function POST(
     }
 
     const result = await testConnection(body.mode)
+    await pokeDaemonHealthRefresh()
     return NextResponse.json({ ok: true, data: result })
   } catch (error) {
     console.error("[POST /api/settings/oanda/test-connection]", error)

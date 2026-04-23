@@ -6,6 +6,7 @@ import type {
   SaveCredentialsRequest,
   TradingMode,
 } from "@fxflow/types"
+import { pokeDaemonCredentialRefresh } from "@/lib/poke-daemon-oanda"
 
 export async function PUT(request: Request): Promise<NextResponse<ApiResponse<OandaCredentials>>> {
   try {
@@ -23,6 +24,7 @@ export async function PUT(request: Request): Promise<NextResponse<ApiResponse<Oa
     }
 
     const result = await saveCredentials(body)
+    await pokeDaemonCredentialRefresh()
     return NextResponse.json({ ok: true, data: result })
   } catch (error) {
     console.error("[PUT /api/settings/oanda/credentials]", error)
@@ -47,6 +49,7 @@ export async function DELETE(
     }
 
     const tradingMode = await deleteCredentials(body.mode)
+    await pokeDaemonCredentialRefresh()
     return NextResponse.json({ ok: true, data: { tradingMode } })
   } catch (error) {
     console.error("[DELETE /api/settings/oanda/credentials]", error)
