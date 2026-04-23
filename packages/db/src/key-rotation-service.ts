@@ -7,20 +7,25 @@
  * @module key-rotation-service
  */
 import { db } from "./client"
-import { reEncrypt } from "./encryption"
+import { decrypt, reEncrypt } from "./encryption"
 
-/** Encrypted field descriptor: table accessor, field name, and how to read/write it. */
+/** Encrypted field descriptor: table accessor, field name, and how to read/write/clear it. */
 interface EncryptedField {
   label: string
   read: () => Promise<string | null>
   write: (ciphertext: string) => Promise<void>
+  clear: () => Promise<void>
 }
 
 /** Build the list of all encrypted fields across the database. */
 function getEncryptedFields(): EncryptedField[] {
   return [
-    // Settings: OANDA tokens and account IDs
-    ...["practiceToken", "liveToken", "practiceAccountId", "liveAccountId"].map(
+    // Settings: OANDA tokens only — account IDs are stored as plaintext
+    // (see settings-service.saveCredentials), so they are NOT on this list.
+    // Including them here would have been harmless for rotateEncryptionKeys
+    // (reEncrypt silently skips non-ciphertext) but actively destructive for
+    // clearUndecryptableSecrets, which was seen in the wild as a LRN.
+    ...["practiceToken", "liveToken"].map(
       (field): EncryptedField => ({
         label: `Settings.${field}`,
         read: async () => {
@@ -29,6 +34,9 @@ function getEncryptedFields(): EncryptedField[] {
         },
         write: async (ciphertext: string) => {
           await db.settings.update({ where: { id: 1 }, data: { [field]: ciphertext } })
+        },
+        clear: async () => {
+          await db.settings.update({ where: { id: 1 }, data: { [field]: null } })
         },
       }),
     ),
@@ -43,6 +51,9 @@ function getEncryptedFields(): EncryptedField[] {
         write: async (ciphertext: string) => {
           await db.aiSettings.update({ where: { id: 1 }, data: { [field]: ciphertext } })
         },
+        clear: async () => {
+          await db.aiSettings.update({ where: { id: 1 }, data: { [field]: null } })
+        },
       }),
     ),
     // AiTraderConfig: FRED and Alpha Vantage API keys
@@ -56,9 +67,46 @@ function getEncryptedFields(): EncryptedField[] {
         write: async (ciphertext: string) => {
           await db.aiTraderConfig.update({ where: { id: 1 }, data: { [field]: ciphertext } })
         },
+        clear: async () => {
+          await db.aiTraderConfig.update({ where: { id: 1 }, data: { [field]: null } })
+        },
       }),
     ),
   ]
+}
+
+/**
+ * Null out any encrypted field whose ciphertext cannot be decrypted with the
+ * current (or previous) ENCRYPTION_KEY.
+ *
+ * This happens when the operator rotates the encryption key without also
+ * running `rotateEncryptionKeys()` — the old ciphertext is effectively garbage
+ * from the application's perspective. Leaving it in the DB causes every
+ * startup to log a noisy "Failed to decrypt X" error and, in some code paths
+ * (e.g. `getDecryptedFinnhubKey`) silently returns null for a field that the
+ * UI still thinks is configured, misleading the user.
+ *
+ * Safe to call on every startup: fields that decrypt successfully are left
+ * untouched, and fields that are already null are skipped.
+ *
+ * @returns The list of labels whose orphan ciphertext was cleared.
+ */
+export async function clearUndecryptableSecrets(): Promise<string[]> {
+  const fields = getEncryptedFields()
+  const cleared: string[] = []
+
+  for (const field of fields) {
+    const stored = await field.read()
+    if (!stored) continue
+    try {
+      decrypt(stored)
+    } catch {
+      await field.clear()
+      cleared.push(field.label)
+    }
+  }
+
+  return cleared
 }
 
 /**

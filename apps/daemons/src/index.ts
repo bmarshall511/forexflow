@@ -551,10 +551,62 @@ async function main() {
     }
   }
 
-  // 13. Start credential watching (triggers initial load + OANDA connection)
+  // 13. Clear orphan ciphertext (encrypted fields that can't decrypt with the
+  // current ENCRYPTION_KEY — leftover from a prior key that's no longer set).
+  // Leaving them in the DB produces noisy startup errors on every boot AND
+  // misleads the UI into thinking those credentials are configured when they
+  // decrypt to nothing. Safe: only nulls unreadable values.
+  try {
+    const { clearUndecryptableSecrets } = await import("@fxflow/db")
+    const cleared = await clearUndecryptableSecrets()
+    if (cleared.length > 0) {
+      console.log(
+        `[secret-repair] Cleared ${cleared.length} orphan encrypted field(s): ${cleared.join(", ")}. Re-enter via the Settings UI if you still need them.`,
+      )
+    }
+  } catch (err) {
+    console.error("[secret-repair] Failed to scan for orphan secrets:", (err as Error).message)
+  }
+
+  // 13b. Recover OANDA account IDs from the token if the token decrypts but
+  // the account ID was lost (e.g. from a past repair pass that incorrectly
+  // treated the plaintext account ID as orphan ciphertext). The token alone is
+  // enough to list the account IDs it grants access to via `GET /v3/accounts`.
+  try {
+    const { getSettings, revealToken, saveCredentials } = await import("@fxflow/db")
+    const { oandaGet } = await import("./oanda/api-client.js")
+    const settings = await getSettings()
+    for (const mode of ["practice", "live"] as const) {
+      const creds = settings.oanda[mode]
+      if (!creds.hasToken || creds.accountId) continue
+      try {
+        const token = await revealToken(mode)
+        const { accounts } = await oandaGet<{ accounts: { id: string }[] }>({
+          mode,
+          token,
+          path: "/v3/accounts",
+        })
+        const first = accounts[0]?.id
+        if (first) {
+          await saveCredentials({ mode, accountId: first })
+          console.log(
+            `[secret-repair] Recovered ${mode} account ID from OANDA token: ${first}. If you have multiple accounts and this isn't the right one, change it in Settings > OANDA.`,
+          )
+        }
+      } catch (err) {
+        console.warn(
+          `[secret-repair] Could not recover ${mode} account ID from token: ${(err as Error).message}`,
+        )
+      }
+    }
+  } catch (err) {
+    console.error("[secret-repair] Account ID recovery skipped:", (err as Error).message)
+  }
+
+  // 14. Start credential watching (triggers initial load + OANDA connection)
   await credentialWatcher.start()
 
-  // 14. Start health checker, account data collector, and trade syncer
+  // 15. Start health checker, account data collector, and trade syncer
   healthChecker.start()
   accountDataCollector.start()
   tradeSyncer.start()

@@ -18,7 +18,7 @@ export {
   cleanupExpiredSessions,
 } from "./auth-service"
 export { encrypt, decrypt, reEncrypt } from "./encryption"
-export { rotateEncryptionKeys } from "./key-rotation-service"
+export { rotateEncryptionKeys, clearUndecryptableSecrets } from "./key-rotation-service"
 export {
   getSettings,
   setTradingMode,

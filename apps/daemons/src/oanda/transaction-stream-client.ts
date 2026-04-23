@@ -3,7 +3,7 @@ import type { StateManager } from "../state-manager.js"
 import type { AccountDataCollector } from "./account-data-collector.js"
 import type { OandaTradeSyncer } from "./trade-syncer.js"
 import {
-  getRestUrl,
+  getStreamUrl,
   type OandaTransactionStreamEvent,
   type OandaTransactionStreamHeartbeat,
 } from "./api-client.js"
@@ -50,8 +50,13 @@ export class TransactionStreamClient {
     this.disconnect()
     this.abortController = new AbortController()
 
-    // Transaction stream uses REST URL, not stream URL
-    const baseUrl = getRestUrl(mode)
+    // OANDA's transaction stream lives on the streaming host
+    // (stream-fxpractice.oanda.com / stream-fxtrade.oanda.com), NOT the REST
+    // host. The REST host rejects this path with a misleading "Invalid value
+    // specified for 'transactionID'" HTTP 400 — the older comment here that
+    // said "REST URL, not stream URL" was wrong and caused an infinite
+    // reconnect loop.
+    const baseUrl = getStreamUrl(mode)
     const url = `${baseUrl}/v3/accounts/${accountId}/transactions/stream`
 
     console.log(`[tx-stream] Connecting to ${mode} transaction stream...`)
