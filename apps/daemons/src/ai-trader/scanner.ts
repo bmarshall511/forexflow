@@ -12,6 +12,7 @@ import type {
   AiTraderSession,
   AiTraderTechnique,
   AnyDaemonMessage,
+  TradingMode,
 } from "@fxflow/types"
 import { AI_MODEL_OPTIONS } from "@fxflow/types"
 import {
@@ -842,9 +843,11 @@ export class AiTraderScanner {
       // Fire-and-forget — never blocks the scan cycle.
       const topNearMisses = [...allNearMisses].sort((a, b) => b.rawRR - a.rawRR).slice(0, 20)
       if (topNearMisses.length > 0) {
+        const scanAccount = creds.mode
         void (async () => {
           for (const nm of topNearMisses) {
             await createNearMiss({
+              account: scanAccount,
               instrument: nm.instrument,
               direction: nm.direction,
               profile: nm.profile,
@@ -897,7 +900,7 @@ export class AiTraderScanner {
         for (let i = 0; i < topCandidates.length; i++) {
           const signal = topCandidates[i]!
           try {
-            const result = await this.processTier2And3(signal, config)
+            const result = await this.processTier2And3(signal, config, creds.mode)
             if (result === "tier2_pass" || result === "tier3_pass" || result === "placed")
               tier2Passed++
             if (result === "tier3_pass" || result === "placed") tier3Passed++
@@ -1014,6 +1017,7 @@ export class AiTraderScanner {
   private async processTier2And3(
     signal: Tier1Signal,
     config: AiTraderConfigData,
+    account: TradingMode,
   ): Promise<
     "tier2_fail" | "tier2_pass" | "tier3_fail" | "tier3_pass" | "gate_blocked" | "placed"
   > {
@@ -1073,6 +1077,7 @@ export class AiTraderScanner {
       tier2Info?: { confidence: number; passed: boolean },
     ) => {
       const opp = await createOpportunity({
+        account,
         instrument: signal.instrument,
         direction: signal.direction,
         profile: signal.profile,
@@ -1198,6 +1203,7 @@ export class AiTraderScanner {
         },
       )
       const gateOpp = await createOpportunity({
+        account,
         instrument: signal.instrument,
         direction: signal.direction,
         profile: signal.profile,
@@ -1507,6 +1513,7 @@ export class AiTraderScanner {
     }
 
     const opportunity = await createOpportunity({
+      account,
       instrument: signal.instrument,
       direction: signal.direction,
       profile: signal.profile,

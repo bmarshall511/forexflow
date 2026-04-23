@@ -8,6 +8,7 @@
 
 import { recordTradeFinderOutcome, findSetupByResultSourceId } from "@fxflow/db"
 import { getPipSize } from "@fxflow/shared"
+import type { TradingMode } from "@fxflow/types"
 
 /**
  * Record a Trade Finder trade outcome when it closes.
@@ -15,11 +16,13 @@ import { getPipSize } from "@fxflow/shared"
  * @param sourceTradeId - OANDA trade ID
  * @param realizedPL - The trade's realized P&L
  * @param exitPrice - Exit price (null for cancelled orders)
+ * @param account - Active OANDA account the closing trade was on
  */
 export async function recordTradeFinderClose(
   sourceTradeId: string,
   realizedPL: number,
   exitPrice: number | null,
+  account: TradingMode,
 ): Promise<void> {
   // Find the setup that generated this trade
   const setup = await findSetupByResultSourceId(sourceTradeId)
@@ -43,6 +46,7 @@ export async function recordTradeFinderClose(
   }
 
   await recordTradeFinderOutcome({
+    account,
     timeframeSet: setup.timeframeSet,
     instrument: setup.instrument,
     scoreTotal: setup.scores.total,

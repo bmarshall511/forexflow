@@ -12,6 +12,7 @@ import type {
   SmartFlowActivityEvent,
   SmartFlowActivityType,
   SmartFlowActivityContext,
+  TradingMode,
 } from "@fxflow/types"
 import { createActivityLog, getActivityLogs, clearActivityLogs } from "@fxflow/db"
 
@@ -22,9 +23,23 @@ let initialized = false
 type BroadcastFn = (type: string, data: unknown) => void
 let broadcastFn: BroadcastFn | null = null
 
+/**
+ * Resolver that returns the active OANDA account at the moment an event fires.
+ * Wired once from `index.ts` so activity-feed doesn't need a StateManager
+ * reference. Null means no credentials are configured — events without an
+ * account are dropped (writing a row we can't attribute would pollute history).
+ */
+type AccountResolver = () => TradingMode | null
+let accountResolver: AccountResolver | null = null
+
 /** Set the broadcast function for WebSocket delivery. */
 export function setActivityBroadcast(fn: BroadcastFn): void {
   broadcastFn = fn
+}
+
+/** Set the resolver that supplies the active trading account at emit time. */
+export function setActivityAccountResolver(fn: AccountResolver): void {
+  accountResolver = fn
 }
 
 /** Load recent activity from DB into memory cache. Call once on daemon startup. */
@@ -83,18 +98,27 @@ export function emitActivity(
   cache.push(event)
   if (cache.length > MAX_CACHED) cache.shift()
 
-  // Persist to DB (fire-and-forget)
-  createActivityLog({
-    type: event.type,
-    message: event.message,
-    detail: event.detail,
-    severity: event.severity,
-    instrument: event.instrument,
-    tradeId: event.tradeId,
-    configId: event.configId,
-  }).catch((err) => {
-    console.warn("[smart-flow-activity] DB write failed:", (err as Error).message)
-  })
+  // Persist to DB (fire-and-forget). Drop the write if no account is active —
+  // unattributed rows would commingle practice/live history in analytics.
+  const account = accountResolver?.() ?? null
+  if (account) {
+    createActivityLog({
+      account,
+      type: event.type,
+      message: event.message,
+      detail: event.detail,
+      severity: event.severity,
+      instrument: event.instrument,
+      tradeId: event.tradeId,
+      configId: event.configId,
+    }).catch((err) => {
+      console.warn("[smart-flow-activity] DB write failed:", (err as Error).message)
+    })
+  } else {
+    console.warn(
+      `[smart-flow-activity] Skipping DB write for ${event.type}: no active OANDA account`,
+    )
+  }
 
   return event
 }

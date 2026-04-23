@@ -145,7 +145,17 @@ export class ReflectionEngine {
         return
       }
 
+      // Reflections are scoped to the account the original trade was on —
+      // lessons from practice shouldn't be attributed to live history.
+      if (opp.account !== "practice" && opp.account !== "live") {
+        console.warn(
+          `[reflection] Skipping reflection for ${opp.instrument}: opportunity has no account attribution`,
+        )
+        return
+      }
+
       await createReflection({
+        account: opp.account,
         opportunityId: opp.id,
         instrument: opp.instrument,
         direction: opp.direction,

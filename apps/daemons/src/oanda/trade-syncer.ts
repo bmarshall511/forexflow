@@ -8,6 +8,7 @@ import type {
   PlaceOrderRequest,
   PlaceOrderResponseData,
   CloseContext,
+  TradingMode,
 } from "@fxflow/types"
 
 type CloseAttribution = {
@@ -978,6 +979,7 @@ export class OandaTradeSyncer {
     if (filled) {
       // Market fills: sourceId is the correct trade ID — safe to pre-seed
       dbTrade = await upsertTrade({
+        account: creds.mode,
         source: "oanda",
         sourceTradeId: sourceId,
         status: "open",
@@ -1428,7 +1430,7 @@ export class OandaTradeSyncer {
         for (const tx of page.transactions) {
           if (tx.type !== "ORDER_FILL") continue
           const fill = tx as OandaOrderFillTransactionDetailed
-          await this.processBackfillFill(fill)
+          await this.processBackfillFill(fill, creds.mode)
           totalProcessed++
         }
       }
@@ -1440,13 +1442,17 @@ export class OandaTradeSyncer {
     }
   }
 
-  private async processBackfillFill(fill: OandaOrderFillTransactionDetailed): Promise<void> {
+  private async processBackfillFill(
+    fill: OandaOrderFillTransactionDetailed,
+    account: TradingMode,
+  ): Promise<void> {
     // Handle trade opens
     if (fill.tradeOpened) {
       const units = parseFloat(fill.units) || 0
       const direction: TradeDirection = units > 0 ? "long" : "short"
 
       const dbRecord = await upsertTrade({
+        account,
         source: "oanda",
         sourceTradeId: fill.tradeOpened.tradeID,
         status: "closed", // Backfill assumes trades are closed (we'll update open ones during reconcile)
@@ -1632,6 +1638,7 @@ export class OandaTradeSyncer {
 
           for (const order of instrumentOrders) {
             const dbRecord = await upsertTrade({
+              account: creds.mode,
               source: "oanda",
               sourceTradeId: order.sourceOrderId,
               status: "pending",
@@ -1720,6 +1727,7 @@ export class OandaTradeSyncer {
             // Detect orders that transitioned pending → open (just filled)
             const wasKnownPending = this.knownPendingSourceIds.has(trade.sourceTradeId)
             const dbRecord = await upsertTrade({
+              account: creds.mode,
               source: "oanda",
               sourceTradeId: trade.sourceTradeId,
               status: "open",
@@ -1850,7 +1858,7 @@ export class OandaTradeSyncer {
     let closedToday: ClosedTradeData[] = []
     try {
       const forexDayStart = getForexDayStart(new Date())
-      closedToday = await getClosedTradesToday(forexDayStart)
+      closedToday = await getClosedTradesToday(forexDayStart, creds.mode)
     } catch (error) {
       console.error("[trade-syncer] Failed to fetch closed trades:", (error as Error).message)
     }

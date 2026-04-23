@@ -6,6 +6,7 @@ import type {
   SmartFlowSettingsData,
   SmartFlowPreset,
   AnyDaemonMessage,
+  TradingMode,
 } from "@fxflow/types"
 import { SMART_FLOW_DEFAULT_PAIRS, SMART_FLOW_DEFAULT_SCAN_MODES } from "@fxflow/types"
 import { isMarketExpectedOpen, detectRegime, computeRSI, getPipSize } from "@fxflow/shared"
@@ -77,6 +78,8 @@ export class SmartFlowMarketScanner {
   private getOpenTradeCount: (() => number) | null = null
   private getSpreadForInstrument: ((instrument: string) => number | null) | null = null
   private onOpportunityApproved: ((configId: string) => Promise<void>) | null = null
+  /** Resolver for the active OANDA account — wired by index.ts from StateManager. */
+  private getAccount: (() => TradingMode | null) | null = null
 
   constructor(broadcast: (msg: AnyDaemonMessage) => void) {
     this.broadcast = broadcast
@@ -106,6 +109,9 @@ export class SmartFlowMarketScanner {
   }
   setOnOpportunityApproved(fn: (configId: string) => Promise<void>): void {
     this.onOpportunityApproved = fn
+  }
+  setAccountFn(fn: () => TradingMode | null): void {
+    this.getAccount = fn
   }
 
   // ─── Lifecycle ────────────────────────────────────────────────────────
@@ -223,6 +229,15 @@ export class SmartFlowMarketScanner {
       // Credentials check — prevent scanning when OANDA is not connected
       if (!this.apiUrl || !this.token) {
         this.updateProgress("idle", "Waiting for OANDA connection")
+        this.scheduleScan(30_000)
+        return
+      }
+
+      // Resolve the active account up front — every opportunity / config
+      // the scanner writes this cycle must be stamped with it.
+      const account = this.getAccount?.() ?? null
+      if (!account) {
+        this.updateProgress("idle", "No active OANDA account")
         this.scheduleScan(30_000)
         return
       }
@@ -395,6 +410,7 @@ export class SmartFlowMarketScanner {
 
         // Create opportunity record (always, even if filtered)
         const opportunity = await createSmartFlowOpportunity({
+          account,
           instrument: signal.instrument,
           direction: signal.direction,
           scanMode: signal.scanMode,
@@ -539,6 +555,7 @@ export class SmartFlowMarketScanner {
           } = presetConfig as Record<string, unknown>
 
           const config = await createSmartFlowConfig({
+            account,
             instrument: signal.instrument,
             name: `Scanner: ${signal.scanMode.replace("_", " ")} — ${signal.instrument.replace("_", "/")}`,
             direction: signal.direction,

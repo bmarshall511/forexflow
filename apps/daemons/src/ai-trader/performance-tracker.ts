@@ -3,6 +3,7 @@ import type {
   AiTraderSession,
   AiTraderTechnique,
   AiTraderStrategyPerformanceData,
+  TradingMode,
 } from "@fxflow/types"
 import {
   recalculatePerformance,
@@ -22,6 +23,7 @@ export class PerformanceTracker {
    * Updates 4 dimension combos: overall, per-instrument, per-session, per-technique.
    */
   async recordOutcome(params: {
+    account: TradingMode
     profile: AiTraderProfile
     instrument: string
     session: AiTraderSession | null
@@ -43,9 +45,19 @@ export class PerformanceTracker {
     // Recalculate 4 dimensions in parallel
     await Promise.all([
       // Overall for profile
-      this.updateDimension(params.profile, null, null, null, periodStart, periodEnd, trade),
+      this.updateDimension(
+        params.account,
+        params.profile,
+        null,
+        null,
+        null,
+        periodStart,
+        periodEnd,
+        trade,
+      ),
       // Per instrument
       this.updateDimension(
+        params.account,
         params.profile,
         params.instrument,
         null,
@@ -57,6 +69,7 @@ export class PerformanceTracker {
       // Per session
       params.session
         ? this.updateDimension(
+            params.account,
             params.profile,
             null,
             params.session,
@@ -69,6 +82,7 @@ export class PerformanceTracker {
       // Per technique
       params.technique
         ? this.updateDimension(
+            params.account,
             params.profile,
             null,
             null,
@@ -82,6 +96,7 @@ export class PerformanceTracker {
   }
 
   private async updateDimension(
+    account: TradingMode,
     profile: AiTraderProfile,
     instrument: string | null,
     session: string | null,
@@ -90,11 +105,13 @@ export class PerformanceTracker {
     periodEnd: Date,
     newTrade: TradeStatsInput,
   ): Promise<void> {
-    // Get existing stats for this period and add the new trade
+    // Get existing stats for this period (scoped to the same account so
+    // practice and live aggregates don't commingle) and add the new trade.
     const existing = await getPerformanceStats({
       profile,
       instrument: instrument ?? undefined,
       session: session ?? undefined,
+      account,
       daysBack: 31, // Current month
     })
 
@@ -141,6 +158,7 @@ export class PerformanceTracker {
       periodStart,
       periodEnd,
       trades,
+      account,
     )
   }
 

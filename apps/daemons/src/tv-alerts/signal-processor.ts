@@ -197,12 +197,25 @@ export class SignalProcessor {
 
     const direction = payload.action
 
+    // Resolve active account for per-account history isolation. Stamped at
+    // creation only — if the user switches modes after this, the record keeps
+    // its original account attribution. Drop the signal outright if we have
+    // no credentials; writing an account-less row is a bug.
+    const activeAccount = this.stateManager.getCredentials()?.mode
+    if (!activeAccount) {
+      console.warn(
+        `[signal-processor] Dropping signal for ${instrument} ${direction}: no active OANDA credentials`,
+      )
+      return
+    }
+
     // Dedup check: reject if a recent signal with the same instrument+direction exists
     if (config.dedupWindowSeconds > 0) {
       const recent = await getRecentSignal(instrument, direction, config.dedupWindowSeconds)
       if (recent) {
         // Still record the signal so it appears in history, but mark as rejected
         const dup = await createSignal({
+          account: activeAccount,
           source: "ut_bot_alerts",
           instrument,
           direction,
@@ -232,6 +245,7 @@ export class SignalProcessor {
 
     // Create initial signal record
     const signal = await createSignal({
+      account: activeAccount,
       source: "ut_bot_alerts",
       instrument,
       direction,

@@ -328,7 +328,12 @@ async function main() {
       .then(async ({ resolveOutcomes, db }) => {
         const trade = await db.trade.findUnique({
           where: { id: tradeId },
-          select: { realizedPL: true, exitPrice: true, sourceTradeId: true },
+          select: {
+            realizedPL: true,
+            exitPrice: true,
+            sourceTradeId: true,
+            account: true,
+          },
         })
         if (trade) {
           const outcome =
@@ -349,11 +354,15 @@ async function main() {
           // Stop managing TV Alerts trade + feed P&L to circuit breaker
           if (trade.sourceTradeId)
             tvAlertsTradeManager.onTradeClosed(trade.sourceTradeId, trade.realizedPL)
-          if (trade.sourceTradeId) {
+          // Trade Finder performance needs the canonical per-trade account
+          // stamped at placement, not the current active mode (the user may
+          // have switched accounts since this trade opened).
+          if (trade.sourceTradeId && (trade.account === "practice" || trade.account === "live")) {
             void recordTradeFinderClose(
               trade.sourceTradeId,
               trade.realizedPL,
               trade.exitPrice,
+              trade.account,
             ).then(() => void evaluateAndTune())
           }
         }
@@ -458,6 +467,7 @@ async function main() {
   }
   const sourcePriorityManager = new SourcePriorityManager(positionManager, sourcePriorityBroadcast)
   sourcePriorityManager.setTradeSyncer(tradeSyncer)
+  sourcePriorityManager.setAccountResolver(() => stateManager.getCredentials()?.mode ?? null)
   setSourcePriorityManager(sourcePriorityManager)
   await sourcePriorityManager.loadConfig()
 
@@ -521,6 +531,9 @@ async function main() {
   sfScanner.setOnOpportunityApproved(async (configId: string) => {
     await smartFlowManager.placeMarketEntry(configId)
   })
+  // Account resolver: opportunities/configs the scanner writes must be
+  // stamped with the currently-active OANDA mode.
+  sfScanner.setAccountFn(() => stateManager.getCredentials()?.mode ?? null)
   smartFlowManager.setScanner(sfScanner)
   await sfScanner.start()
 

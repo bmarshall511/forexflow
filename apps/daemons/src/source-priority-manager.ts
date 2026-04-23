@@ -6,6 +6,7 @@ import type {
   SourcePriorityLogEntry,
   SourceAutoRank,
   TradeSource,
+  TradingMode,
 } from "@fxflow/types"
 import {
   getSourcePriorityConfig,
@@ -74,6 +75,8 @@ export class SourcePriorityManager {
   private locks = new Map<string, LockEntry>()
   private config: SourcePriorityConfigData | null = null
   private tradeSyncer: TradeSyncerRef | null = null
+  /** Resolver for the active OANDA account — wired from index.ts via setAccountResolver. */
+  private accountResolver: (() => TradingMode | null) | null = null
 
   /** Cached auto-select rankings (null = never computed). */
   private autoRanks: SourceAutoRank[] | null = null
@@ -88,6 +91,10 @@ export class SourcePriorityManager {
 
   setTradeSyncer(syncer: TradeSyncerRef): void {
     this.tradeSyncer = syncer
+  }
+
+  setAccountResolver(fn: () => TradingMode | null): void {
+    this.accountResolver = fn
   }
 
   // ─── Config ───────────────────────────────────────────────────────────
@@ -390,7 +397,8 @@ export class SourcePriorityManager {
 
   // ─── Internal Helpers ─────────────────────────────────────────────────
 
-  /** Fire-and-forget log to DB. */
+  /** Fire-and-forget log to DB. Skips the write if no active OANDA account
+   *  is resolvable — an unattributed row would dirty cross-account analytics. */
   private logDecision(
     instrument: string,
     requestingSource: PlacementSource,
@@ -399,7 +407,15 @@ export class SourcePriorityManager {
     existingSource: string | null,
     existingTradeId: string | null,
   ): void {
+    const account = this.accountResolver?.() ?? null
+    if (!account) {
+      console.warn(
+        `[source-priority] Skipping ${action} log for ${instrument}: no active OANDA account`,
+      )
+      return
+    }
     createPriorityLog({
+      account,
       instrument,
       requestingSource,
       action,

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { listPriceAlerts, createPriceAlert, cancelAllAlerts } from "@fxflow/db"
+import { listPriceAlerts, createPriceAlert, cancelAllAlerts, getSettings } from "@fxflow/db"
 import type { ApiResponse, PriceAlertData } from "@fxflow/types"
 import { getServerDaemonUrl } from "@/lib/daemon-url"
 import { z } from "zod"
@@ -19,7 +19,8 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Pr
     const { searchParams } = req.nextUrl
     const status = searchParams.get("status") ?? undefined
     const instrument = searchParams.get("instrument") ?? undefined
-    const alerts = await listPriceAlerts({ status, instrument })
+    const settings = await getSettings()
+    const alerts = await listPriceAlerts({ status, instrument, account: settings.tradingMode })
     return NextResponse.json({ ok: true, data: alerts })
   } catch (error) {
     console.error("[GET /api/alerts]", error)
@@ -41,8 +42,10 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<P
       )
     }
 
+    const settings = await getSettings()
     const alert = await createPriceAlert({
       ...parsed.data,
+      account: settings.tradingMode,
       expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : undefined,
     })
 

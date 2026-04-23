@@ -8,6 +8,7 @@ import type {
   TradeFinderCapUtilization,
   TradeFinderCircuitBreakerState,
   TradeDirection,
+  TradingMode,
   ZoneData,
   TrendData,
   CurveData,
@@ -300,7 +301,7 @@ export class TradeFinderScanner {
         this.currentPair = pair.instrument
         this.broadcastScanStatus()
         try {
-          await this.scanPair(pair, config, apiUrl, creds.token, riskPercent, balance)
+          await this.scanPair(pair, config, apiUrl, creds.token, riskPercent, balance, creds.mode)
         } catch (err) {
           console.warn(`[trade-finder] Error scanning ${pair.instrument}:`, err)
         }
@@ -348,6 +349,7 @@ export class TradeFinderScanner {
     token: string,
     riskPercent: number,
     accountBalance: number,
+    account: TradingMode,
   ): Promise<void> {
     const speed: TradeFinderTimeframeSpeed = pair.timeframeSpeed ?? "standard"
     const tfMap = getTimeframeSetMap(speed)
@@ -602,6 +604,7 @@ export class TradeFinderScanner {
       const detectionSession = classifySession()
 
       const setupInput: CreateSetupInput = {
+        account,
         instrument,
         direction,
         timeframeSet: pair.timeframeSet,

@@ -40,7 +40,7 @@ import {
 import { getPresetDefaults } from "./preset-defaults.js"
 import { evaluateConfigHealth } from "./config-health.js"
 import { getAdaptiveMinRR, checkCorrelation } from "./entry-filters.js"
-import { emitActivity, setActivityBroadcast } from "./activity-feed.js"
+import { emitActivity, setActivityBroadcast, setActivityAccountResolver } from "./activity-feed.js"
 import type { StateManager } from "../state-manager.js"
 import { getRestUrl } from "../oanda/api-client.js"
 import { CandleCache, fetchOandaCandles } from "../trade-finder/candle-cache.js"
@@ -153,6 +153,10 @@ export class SmartFlowManager {
         data,
       } as unknown as AnyDaemonMessage)
     })
+    // Supply the currently-active OANDA account to activity-feed so every
+    // persisted event is stamped with it. Reads at emit time (not construct
+    // time) so mode switches take effect immediately.
+    setActivityAccountResolver(() => this.stateManager.getCredentials()?.mode ?? null)
   }
 
   setTradeSyncer(syncer: TradeSyncerRef): void {
@@ -283,6 +287,9 @@ export class SmartFlowManager {
     const config = await getSmartFlowConfig(configId)
     if (!config) return { success: false, error: `Config not found: ${configId}` }
 
+    const account = this.stateManager.getCredentials()?.mode
+    if (!account) return { success: false, error: "No active OANDA credentials" }
+
     if (this.spm) {
       const check = await this.spm.canPlace(config.instrument, "smart_flow")
       if (!check.allowed) {
@@ -389,6 +396,7 @@ export class SmartFlowManager {
       }
 
       const trade = await createSmartFlowTrade({
+        account,
         configId: config.id,
         sourceTradeId: result.sourceId,
         status: result.filled ? "open" : "pending",
@@ -429,7 +437,10 @@ export class SmartFlowManager {
   async createSmartEntry(configId: string): Promise<PlaceResult> {
     const config = await getSmartFlowConfig(configId)
     if (!config) return { success: false, error: `Config not found: ${configId}` }
+    const account = this.stateManager.getCredentials()?.mode
+    if (!account) return { success: false, error: "No active OANDA credentials" }
     const trade = await createSmartFlowTrade({
+      account,
       configId: config.id,
       status: "waiting_entry",
       currentPhase: "entry",

@@ -220,16 +220,21 @@ export class TradeManager {
         closedAt: new Date(),
       })
 
-      // Record to performance tracker
-      await this.performanceTracker.recordOutcome({
-        profile: opp.profile,
-        instrument: opp.instrument,
-        session: opp.session,
-        technique: opp.primaryTechnique,
-        realizedPL,
-        riskRewardRatio: opp.riskRewardRatio,
-        outcome,
-      })
+      // Record to performance tracker — skip if the opportunity predates the
+      // account-isolation migration (account === "unknown") since aggregating
+      // into an "unknown" bucket would pollute per-account post-mortems.
+      if (opp.account === "practice" || opp.account === "live") {
+        await this.performanceTracker.recordOutcome({
+          account: opp.account,
+          profile: opp.profile,
+          instrument: opp.instrument,
+          session: opp.session,
+          technique: opp.primaryTechnique,
+          realizedPL,
+          riskRewardRatio: opp.riskRewardRatio,
+          outcome,
+        })
+      }
 
       // Broadcast
       this.broadcast({
