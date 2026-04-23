@@ -20,12 +20,15 @@ import type {
   SmartFlowEntryCondition,
   SmartFlowAiActionToggles,
   SmartFlowAiConfidenceThresholds,
+  TradingMode,
 } from "@fxflow/types"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Input for creating a new SmartFlow config. Excludes auto-generated fields. */
 export interface CreateSmartFlowConfigInput {
+  /** OANDA account this config operates against. Stamped at create only. */
+  account?: TradingMode
   instrument: string
   name: string
   direction: "long" | "short"
@@ -190,6 +193,7 @@ function toConfigData(row: SmartFlowConfigRow): SmartFlowConfigData {
 function buildPrismaData(input: Partial<CreateSmartFlowConfigInput>): Record<string, unknown> {
   const data: Record<string, unknown> = {}
 
+  if (input.account !== undefined) data.account = input.account
   if (input.instrument !== undefined) data.instrument = input.instrument
   if (input.name !== undefined) data.name = input.name
   if (input.direction !== undefined) data.direction = input.direction
@@ -279,9 +283,11 @@ async function deactivateOthers(
 
 /**
  * List all SmartFlow configs, ordered by instrument then creation date.
+ * Pass `account` to restrict to a single OANDA account (practice vs. live).
  */
-export async function getSmartFlowConfigs(): Promise<SmartFlowConfigData[]> {
+export async function getSmartFlowConfigs(account?: TradingMode): Promise<SmartFlowConfigData[]> {
   const rows = await db.smartFlowConfig.findMany({
+    where: account ? { account } : undefined,
     orderBy: [{ instrument: "asc" }, { createdAt: "desc" }],
   })
   return rows.map(toConfigData)
@@ -292,9 +298,12 @@ export async function getSmartFlowConfigs(): Promise<SmartFlowConfigData[]> {
  */
 export async function getSmartFlowConfigsByInstrument(
   instrument: string,
+  account?: TradingMode,
 ): Promise<SmartFlowConfigData[]> {
+  const where: Record<string, unknown> = { instrument }
+  if (account) where.account = account
   const rows = await db.smartFlowConfig.findMany({
-    where: { instrument },
+    where,
     orderBy: { createdAt: "desc" },
   })
   return rows.map(toConfigData)
@@ -307,10 +316,11 @@ export async function getSmartFlowConfigsByInstrument(
 export async function getActiveSmartFlowConfig(
   instrument: string,
   direction: "long" | "short",
+  account?: TradingMode,
 ): Promise<SmartFlowConfigData | null> {
-  const row = await db.smartFlowConfig.findFirst({
-    where: { instrument, direction, isActive: true },
-  })
+  const where: Record<string, unknown> = { instrument, direction, isActive: true }
+  if (account) where.account = account
+  const row = await db.smartFlowConfig.findFirst({ where })
   return row ? toConfigData(row) : null
 }
 

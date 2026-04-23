@@ -7,6 +7,7 @@
  * @module trade-finder-performance-service
  */
 import { db } from "./client"
+import type { TradingMode } from "@fxflow/types"
 
 export interface TradeFinderPerformanceData {
   dimension: string
@@ -29,6 +30,8 @@ export interface TradeFinderPerformanceData {
 }
 
 export interface RecordOutcomeInput {
+  /** OANDA account the trade was placed on. */
+  account?: TradingMode
   timeframeSet: string
   instrument: string
   scoreTotal: number
@@ -73,10 +76,12 @@ export async function getTradeFinderPerformance(options?: {
   dimension?: string
   dimensionKey?: string
   daysBack?: number
+  account?: TradingMode
 }): Promise<TradeFinderPerformanceData[]> {
   const where: Record<string, unknown> = {}
   if (options?.dimension) where.dimension = options.dimension
   if (options?.dimensionKey) where.dimensionKey = options.dimensionKey
+  if (options?.account) where.account = options.account
   if (options?.daysBack && options.daysBack > 0) {
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - options.daysBack)
@@ -179,9 +184,12 @@ async function upsertPerformanceRecord(
   periodEnd: Date,
   input: RecordOutcomeInput,
 ): Promise<void> {
-  // Find existing record for this period
+  // Find existing record for this period — scoped by account so practice and
+  // live aggregates stay isolated even under the same dimension key.
+  const findWhere: Record<string, unknown> = { dimension, dimensionKey, periodStart }
+  if (input.account) findWhere.account = input.account
   const existing = await db.tradeFinderPerformance.findFirst({
-    where: { dimension, dimensionKey, periodStart },
+    where: findWhere,
   })
 
   const isWin = input.outcome === "win"
@@ -233,6 +241,7 @@ async function upsertPerformanceRecord(
   } else {
     await db.tradeFinderPerformance.create({
       data: {
+        ...(input.account ? { account: input.account } : {}),
         dimension,
         dimensionKey,
         periodStart,

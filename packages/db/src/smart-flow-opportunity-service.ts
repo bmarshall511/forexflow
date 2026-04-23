@@ -4,6 +4,7 @@ import type {
   SmartFlowOpportunityStatus,
   SmartFlowOpportunityScores,
   SmartFlowScanMode,
+  TradingMode,
 } from "@fxflow/types"
 import { safeIso, safeJsonParse } from "./utils"
 
@@ -62,11 +63,13 @@ export async function getSmartFlowOpportunities(opts?: {
   status?: SmartFlowOpportunityStatus
   scanMode?: SmartFlowScanMode
   limit?: number
+  account?: TradingMode
 }): Promise<SmartFlowOpportunityData[]> {
   const client = db
   const where: Record<string, unknown> = {}
   if (opts?.status) where.status = opts.status
   if (opts?.scanMode) where.scanMode = opts.scanMode
+  if (opts?.account) where.account = opts.account
 
   const rows = await client.smartFlowOpportunity.findMany({
     where,
@@ -85,21 +88,23 @@ export async function getSmartFlowOpportunity(
   return toOpportunityData(row as unknown as Record<string, unknown>)
 }
 
-export async function countTodaySmartFlowOpportunities(): Promise<number> {
+export async function countTodaySmartFlowOpportunities(account?: TradingMode): Promise<number> {
   const client = db
   const today = new Date()
   today.setUTCHours(0, 0, 0, 0)
-  return client.smartFlowOpportunity.count({
-    where: {
-      detectedAt: { gte: today },
-      status: { in: ["placed", "filled", "closed", "approved"] },
-    },
-  })
+  const where: Record<string, unknown> = {
+    detectedAt: { gte: today },
+    status: { in: ["placed", "filled", "closed", "approved"] },
+  }
+  if (account) where.account = account
+  return client.smartFlowOpportunity.count({ where })
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export interface CreateSmartFlowOpportunityInput {
+  /** OANDA account this opportunity was detected for. */
+  account?: TradingMode
   instrument: string
   direction: "long" | "short"
   scanMode: SmartFlowScanMode
@@ -125,6 +130,7 @@ export async function createSmartFlowOpportunity(
   const client = db
   const row = await client.smartFlowOpportunity.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       instrument: input.instrument,
       direction: input.direction,
       scanMode: input.scanMode,

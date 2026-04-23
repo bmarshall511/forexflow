@@ -19,6 +19,7 @@ import type {
   TradeFinderTheoreticalOutcome,
   TradeFinderSession,
   TradeDirection,
+  TradingMode,
   ZoneData,
   TrendData,
   CurveData,
@@ -117,27 +118,44 @@ function toSetupData(row: {
 // ─── Queries ────────────────────────────────────────────────────────────────
 
 /** Get all active/approaching setups, ordered by score descending */
-export async function getActiveSetups(): Promise<TradeFinderSetupData[]> {
+export async function getActiveSetups(account?: TradingMode): Promise<TradeFinderSetupData[]> {
+  const where: Record<string, unknown> = { status: { in: ["active", "approaching"] } }
+  if (account) where.account = account
   const rows = await db.tradeFinderSetup.findMany({
-    where: { status: { in: ["active", "approaching"] } },
+    where,
     orderBy: { scoreTotal: "desc" },
   })
   return rows.map(toSetupData)
 }
 
 /** Get setups for a specific instrument */
-export async function getSetupsByInstrument(instrument: string): Promise<TradeFinderSetupData[]> {
+export async function getSetupsByInstrument(
+  instrument: string,
+  account?: TradingMode,
+): Promise<TradeFinderSetupData[]> {
+  const where: Record<string, unknown> = {
+    instrument,
+    status: { in: ["active", "approaching"] },
+  }
+  if (account) where.account = account
   const rows = await db.tradeFinderSetup.findMany({
-    where: { instrument, status: { in: ["active", "approaching"] } },
+    where,
     orderBy: { scoreTotal: "desc" },
   })
   return rows.map(toSetupData)
 }
 
 /** Get setup history (placed, filled, invalidated, expired) */
-export async function getSetupHistory(limit = 50): Promise<TradeFinderSetupData[]> {
+export async function getSetupHistory(
+  limit = 50,
+  account?: TradingMode,
+): Promise<TradeFinderSetupData[]> {
+  const where: Record<string, unknown> = {
+    status: { in: ["placed", "filled", "invalidated", "expired"] },
+  }
+  if (account) where.account = account
   const rows = await db.tradeFinderSetup.findMany({
-    where: { status: { in: ["placed", "filled", "invalidated", "expired"] } },
+    where,
     orderBy: { lastUpdatedAt: "desc" },
     take: limit,
   })
@@ -154,6 +172,8 @@ export async function getSetup(id: string): Promise<TradeFinderSetupData | null>
 
 /** Fields required to create a new trade finder setup. */
 export interface CreateSetupInput {
+  /** OANDA account this setup was detected for. */
+  account?: TradingMode
   instrument: string
   direction: TradeDirection
   timeframeSet: TradeFinderTimeframeSet
@@ -182,6 +202,7 @@ export interface CreateSetupInput {
 export async function createSetup(input: CreateSetupInput): Promise<TradeFinderSetupData> {
   const row = await db.tradeFinderSetup.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       instrument: input.instrument,
       direction: input.direction,
       timeframeSet: input.timeframeSet,

@@ -16,6 +16,7 @@ import type {
   AiTraderMarketRegime,
   AiTraderSession,
   TradeDirection,
+  TradingMode,
 } from "@fxflow/types"
 
 /** Trade outcome for reflections — cancelled trades are excluded. */
@@ -72,6 +73,8 @@ function toReflectionData(row: {
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface CreateReflectionInput {
+  /** OANDA account the closed trade was placed on. */
+  account?: TradingMode
   opportunityId: string
   instrument: string
   direction: TradeDirection
@@ -100,6 +103,7 @@ export async function createReflection(
 ): Promise<AiTraderReflectionData> {
   const row = await db.aiTraderReflection.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       opportunityId: input.opportunityId,
       instrument: input.instrument,
       direction: input.direction,
@@ -134,10 +138,15 @@ export async function getRelevantReflections(
   instrument: string,
   profile: AiTraderProfile,
   limit = 3,
+  account?: TradingMode,
 ): Promise<AiTraderReflectionData[]> {
-  // First: same instrument + same profile
+  // First: same instrument + same profile (optionally same account — lessons
+  // from practice inform live and vice versa, so account scoping is opt-in
+  // rather than default).
+  const exactWhere: Record<string, unknown> = { instrument, profile }
+  if (account) exactWhere.account = account
   const exact = await db.aiTraderReflection.findMany({
-    where: { instrument, profile },
+    where: exactWhere,
     orderBy: { createdAt: "desc" },
     take: limit,
   })
@@ -150,12 +159,14 @@ export async function getRelevantReflections(
   // Fill remaining slots from same profile, different instrument
   const remaining = limit - results.length
   const existingIds = results.map((r) => r.id)
+  const broaderWhere: Record<string, unknown> = {
+    profile,
+    instrument: { not: instrument },
+    id: { notIn: existingIds },
+  }
+  if (account) broaderWhere.account = account
   const broader = await db.aiTraderReflection.findMany({
-    where: {
-      profile,
-      instrument: { not: instrument },
-      id: { notIn: existingIds },
-    },
+    where: broaderWhere,
     orderBy: { createdAt: "desc" },
     take: remaining,
   })

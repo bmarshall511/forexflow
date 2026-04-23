@@ -26,12 +26,15 @@ import type {
   TVSignalPnLBucket,
   TVSignalRecentResult,
   TVSignalPairStats,
+  TradingMode,
 } from "@fxflow/types"
 
 // ─── Input Types ──────────────────────────────────────────────────────────────
 
 /** Fields required to create a new TV alert signal record. */
 export interface CreateSignalInput {
+  /** OANDA account the signal was received against. */
+  account?: TradingMode
   source?: string
   instrument: string
   direction: string
@@ -52,6 +55,7 @@ export interface ListSignalsOptions {
   status?: string
   instrument?: string
   source?: string
+  account?: TradingMode
   dateFrom?: Date
   dateTo?: Date
 }
@@ -128,6 +132,7 @@ export async function createSignal(input: CreateSignalInput): Promise<TVAlertSig
 
   const row = await db.tVAlertSignal.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       source: input.source ?? "ut_bot_alerts",
       instrument: input.instrument,
       direction: input.direction,
@@ -216,6 +221,7 @@ export async function listSignals(opts: ListSignalsOptions = {}): Promise<TVSign
   if (opts.status) where.status = opts.status
   if (opts.instrument) where.instrument = opts.instrument
   if (opts.source) where.source = opts.source
+  if (opts.account) where.account = opts.account
 
   if (opts.dateFrom || opts.dateTo) {
     const receivedAt: Record<string, Date> = {}
@@ -247,11 +253,13 @@ export async function listSignals(opts: ListSignalsOptions = {}): Promise<TVSign
 /** Get aggregated performance stats for signals. */
 export async function getSignalPerformanceStats(opts?: {
   source?: string
+  account?: TradingMode
   from?: Date
   to?: Date
 }): Promise<TVSignalPerformanceStats> {
   const where: Record<string, unknown> = {}
   if (opts?.source) where.source = opts.source
+  if (opts?.account) where.account = opts.account
   if (opts?.from || opts?.to) {
     const receivedAt: Record<string, Date> = {}
     if (opts?.from) receivedAt.gte = opts.from
@@ -391,16 +399,16 @@ export async function getActiveAutoTradeIds(): Promise<string[]> {
 
 /** Count signals received in the current/last trading session.
  *  On weekends, shows the last active trading day's count instead of 0. */
-export async function getTodaySignalCount(): Promise<number> {
+export async function getTodaySignalCount(account?: TradingMode): Promise<number> {
   const sessionStart = getLastTradingSessionStart(new Date())
-  return db.tVAlertSignal.count({
-    where: { receivedAt: { gte: sessionStart } },
-  })
+  const where: Record<string, unknown> = { receivedAt: { gte: sessionStart } }
+  if (account) where.account = account
+  return db.tVAlertSignal.count({ where })
 }
 
 /** Batch: get all auto-trade data in a single pass (count, IDs, today P&L, signal count).
  *  Uses getLastTradingSessionStart so weekend queries show last session's data. */
-export async function getAutoTradesSummary(): Promise<{
+export async function getAutoTradesSummary(account?: TradingMode): Promise<{
   activeAutoTradeIds: string[]
   activeAutoPositions: number
   todayAutoPL: number
@@ -408,13 +416,21 @@ export async function getAutoTradesSummary(): Promise<{
 }> {
   const forexDayStart = getLastTradingSessionStart(new Date())
 
+  const signalWhere: Record<string, unknown> = {
+    status: "executed",
+    resultTradeId: { not: null },
+  }
+  if (account) signalWhere.account = account
+  const countWhere: Record<string, unknown> = { receivedAt: { gte: forexDayStart } }
+  if (account) countWhere.account = account
+
   // Single query for all executed signals with trade IDs
   const [executedSignals, signalCountToday] = await Promise.all([
     db.tVAlertSignal.findMany({
-      where: { status: "executed", resultTradeId: { not: null } },
+      where: signalWhere,
       select: { resultTradeId: true, processedAt: true },
     }),
-    db.tVAlertSignal.count({ where: { receivedAt: { gte: forexDayStart } } }),
+    db.tVAlertSignal.count({ where: countWhere }),
   ])
 
   const allTradeIds = executedSignals.map((s) => s.resultTradeId).filter(Boolean) as string[]
@@ -422,9 +438,12 @@ export async function getAutoTradesSummary(): Promise<{
     return { activeAutoTradeIds: [], activeAutoPositions: 0, todayAutoPL: 0, signalCountToday }
   }
 
-  // Single batch query for all related trades
+  // Single batch query for all related trades (account filter belongs on the
+  // trade join since the trade row is the authoritative source for P&L).
+  const tradeWhere: Record<string, unknown> = { sourceTradeId: { in: allTradeIds } }
+  if (account) tradeWhere.account = account
   const trades = await db.trade.findMany({
-    where: { sourceTradeId: { in: allTradeIds } },
+    where: tradeWhere,
     select: { sourceTradeId: true, status: true, realizedPL: true, financing: true },
   })
 

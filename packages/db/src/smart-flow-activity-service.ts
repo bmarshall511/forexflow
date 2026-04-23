@@ -1,7 +1,8 @@
 import { db } from "./client"
-import type { SmartFlowActivityEvent, SmartFlowActivityType } from "@fxflow/types"
+import type { SmartFlowActivityEvent, SmartFlowActivityType, TradingMode } from "@fxflow/types"
 
 export async function createActivityLog(input: {
+  account?: TradingMode
   type: SmartFlowActivityType
   message: string
   detail?: string | null
@@ -12,6 +13,7 @@ export async function createActivityLog(input: {
 }): Promise<string> {
   const row = await db.smartFlowActivityLog.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       type: input.type,
       message: input.message,
       detail: input.detail ?? null,
@@ -24,8 +26,12 @@ export async function createActivityLog(input: {
   return row.id
 }
 
-export async function getActivityLogs(limit = 100): Promise<SmartFlowActivityEvent[]> {
+export async function getActivityLogs(
+  limit = 100,
+  account?: TradingMode,
+): Promise<SmartFlowActivityEvent[]> {
   const rows = await db.smartFlowActivityLog.findMany({
+    where: account ? { account } : undefined,
     orderBy: { createdAt: "desc" },
     take: limit,
   })

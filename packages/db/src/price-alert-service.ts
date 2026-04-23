@@ -7,7 +7,12 @@
  * @module price-alert-service
  */
 import { db } from "./client"
-import type { PriceAlertData, PriceAlertDirection, PriceAlertStatus } from "@fxflow/types"
+import type {
+  PriceAlertData,
+  PriceAlertDirection,
+  PriceAlertStatus,
+  TradingMode,
+} from "@fxflow/types"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,6 +49,7 @@ function toPriceAlertData(row: {
 
 /** Create a new price alert. */
 export async function createPriceAlert(data: {
+  account?: TradingMode
   instrument: string
   direction: PriceAlertDirection
   targetPrice: number
@@ -54,6 +60,7 @@ export async function createPriceAlert(data: {
 }): Promise<PriceAlertData> {
   const row = await db.priceAlert.create({
     data: {
+      ...(data.account ? { account: data.account } : {}),
       instrument: data.instrument,
       direction: data.direction,
       targetPrice: data.targetPrice,
@@ -70,10 +77,12 @@ export async function createPriceAlert(data: {
 export async function listPriceAlerts(filters?: {
   status?: string
   instrument?: string
+  account?: TradingMode
 }): Promise<PriceAlertData[]> {
   const where: Record<string, unknown> = {}
   if (filters?.status) where.status = filters.status
   if (filters?.instrument) where.instrument = filters.instrument
+  if (filters?.account) where.account = filters.account
 
   const rows = await db.priceAlert.findMany({
     where,
@@ -127,18 +136,25 @@ export async function triggerPriceAlert(id: string): Promise<PriceAlertData> {
 }
 
 /** Get all active alerts for an instrument (used by the daemon monitor). */
-export async function getActiveAlertsForInstrument(instrument: string): Promise<PriceAlertData[]> {
+export async function getActiveAlertsForInstrument(
+  instrument: string,
+  account?: TradingMode,
+): Promise<PriceAlertData[]> {
+  const where: Record<string, unknown> = { instrument, status: "active" }
+  if (account) where.account = account
   const rows = await db.priceAlert.findMany({
-    where: { instrument, status: "active" },
+    where,
     orderBy: { targetPrice: "asc" },
   })
   return rows.map(toPriceAlertData)
 }
 
 /** Get distinct instruments that have active alerts (for subscription management). */
-export async function getActiveAlertInstruments(): Promise<string[]> {
+export async function getActiveAlertInstruments(account?: TradingMode): Promise<string[]> {
+  const where: Record<string, unknown> = { status: "active" }
+  if (account) where.account = account
   const rows = await db.priceAlert.findMany({
-    where: { status: "active" },
+    where,
     select: { instrument: true },
     distinct: ["instrument"],
   })

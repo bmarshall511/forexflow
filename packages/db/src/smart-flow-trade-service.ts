@@ -18,6 +18,7 @@ import type {
   SmartFlowPartialCloseEntry,
   SmartFlowAiSuggestion,
   SmartFlowPreset,
+  TradingMode,
 } from "@fxflow/types"
 import { getPipSize } from "@fxflow/shared"
 
@@ -155,6 +156,8 @@ const CONFIG_INCLUDE = {
 
 /** Fields required to create a new SmartFlow trade. */
 export interface CreateSmartFlowTradeInput {
+  /** OANDA account this trade was placed against. Derivable from config but stamped explicitly for query speed. */
+  account?: TradingMode
   configId: string
   tradeId?: string
   sourceTradeId?: string
@@ -185,6 +188,7 @@ export async function createSmartFlowTrade(
 ): Promise<SmartFlowTradeData> {
   const row = await db.smartFlowTrade.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       configId: input.configId,
       tradeId: input.tradeId ?? null,
       sourceTradeId: input.sourceTradeId ?? null,
@@ -235,9 +239,13 @@ export async function getSmartFlowTradeBySourceId(
 }
 
 /** Get all non-closed SmartFlow trades with config, ordered by creation date descending. */
-export async function getActiveSmartFlowTrades(): Promise<SmartFlowTradeData[]> {
+export async function getActiveSmartFlowTrades(
+  account?: TradingMode,
+): Promise<SmartFlowTradeData[]> {
+  const where: Record<string, unknown> = { status: { not: "closed" } }
+  if (account) where.account = account
   const rows = await db.smartFlowTrade.findMany({
-    where: { status: { not: "closed" } },
+    where,
     include: CONFIG_INCLUDE,
     orderBy: { createdAt: "desc" },
   })
@@ -247,9 +255,12 @@ export async function getActiveSmartFlowTrades(): Promise<SmartFlowTradeData[]> 
 /** Get SmartFlow trades filtered by status. */
 export async function getSmartFlowTradesByStatus(
   status: SmartFlowTradeStatus,
+  account?: TradingMode,
 ): Promise<SmartFlowTradeData[]> {
+  const where: Record<string, unknown> = { status }
+  if (account) where.account = account
   const rows = await db.smartFlowTrade.findMany({
-    where: { status },
+    where,
     include: CONFIG_INCLUDE,
     orderBy: { createdAt: "desc" },
   })
@@ -482,6 +493,7 @@ export interface SmartFlowHistoryOptions {
   limit?: number
   offset?: number
   configId?: string
+  account?: TradingMode
 }
 
 /** Get paginated closed SmartFlow trades, newest first. */
@@ -495,6 +507,7 @@ export async function getSmartFlowTradeHistory(
   if (options?.configId) {
     where.configId = options.configId
   }
+  if (options?.account) where.account = options.account
 
   const rows = await db.smartFlowTrade.findMany({
     where,

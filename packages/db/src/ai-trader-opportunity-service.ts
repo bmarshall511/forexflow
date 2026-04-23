@@ -20,6 +20,7 @@ import type {
   AiTraderProfile,
   TradeDirection,
   TradeOutcome,
+  TradingMode,
 } from "@fxflow/types"
 
 // ─── Mappers ────────────────────────────────────────────────────────────────
@@ -141,6 +142,8 @@ function toOpportunityData(row: {
 
 /** Fields required to create a new AI trader opportunity. */
 export interface CreateOpportunityInput {
+  /** OANDA account this opportunity was detected for. */
+  account?: TradingMode
   instrument: string
   direction: TradeDirection
   profile: AiTraderProfile
@@ -176,6 +179,7 @@ export async function createOpportunity(
 ): Promise<AiTraderOpportunityData> {
   const row = await db.aiTraderOpportunity.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       instrument: input.instrument,
       direction: input.direction,
       profile: input.profile,
@@ -297,9 +301,13 @@ const HISTORY_STATUSES: AiTraderOpportunityStatus[] = ["closed", "expired", "rej
  *
  * @returns Array of active opportunity data
  */
-export async function getActiveOpportunities(): Promise<AiTraderOpportunityData[]> {
+export async function getActiveOpportunities(
+  account?: TradingMode,
+): Promise<AiTraderOpportunityData[]> {
+  const where: Record<string, unknown> = { status: { in: ACTIVE_STATUSES } }
+  if (account) where.account = account
   const rows = await db.aiTraderOpportunity.findMany({
-    where: { status: { in: ACTIVE_STATUSES } },
+    where,
     orderBy: { confidence: "desc" },
   })
   return rows.map(toOpportunityData)
@@ -311,9 +319,14 @@ export async function getActiveOpportunities(): Promise<AiTraderOpportunityData[
  * @param limit - Maximum number of records to return (default: 50)
  * @returns Array of historical opportunity data
  */
-export async function getOpportunityHistory(limit = 50): Promise<AiTraderOpportunityData[]> {
+export async function getOpportunityHistory(
+  limit = 50,
+  account?: TradingMode,
+): Promise<AiTraderOpportunityData[]> {
+  const where: Record<string, unknown> = { status: { in: HISTORY_STATUSES } }
+  if (account) where.account = account
   const rows = await db.aiTraderOpportunity.findMany({
-    where: { status: { in: HISTORY_STATUSES } },
+    where,
     orderBy: { closedAt: "desc" },
     take: limit,
   })
@@ -362,10 +375,10 @@ export async function findOpportunityByResultSourceId(
  *
  * @returns Number of open AI trades
  */
-export async function countOpenAiTrades(): Promise<number> {
-  return db.aiTraderOpportunity.count({
-    where: { status: { in: ["placed", "filled", "managed"] } },
-  })
+export async function countOpenAiTrades(account?: TradingMode): Promise<number> {
+  const where: Record<string, unknown> = { status: { in: ["placed", "filled", "managed"] } }
+  if (account) where.account = account
+  return db.aiTraderOpportunity.count({ where })
 }
 
 /**
@@ -392,6 +405,7 @@ export interface OpportunityListFilters {
   instrument?: string
   profile?: AiTraderProfile
   direction?: TradeDirection
+  account?: TradingMode
   search?: string
   sort?: "confidence" | "detectedAt" | "realizedPL" | "riskRewardRatio"
   sortDir?: "asc" | "desc"
@@ -413,6 +427,7 @@ export async function getAllOpportunities(
     instrument,
     profile,
     direction,
+    account,
     search,
     sort = "detectedAt",
     sortDir = "desc",
@@ -434,6 +449,9 @@ export async function getAllOpportunities(
   }
   if (direction) {
     where.direction = direction
+  }
+  if (account) {
+    where.account = account
   }
   if (search) {
     where.OR = [
@@ -617,6 +635,8 @@ export async function cleanupOldOpportunities(days = 90): Promise<number> {
  * swallowed because near-miss logging must never block a scan cycle.
  */
 export interface CreateNearMissInput {
+  /** OANDA account this near-miss was observed on. */
+  account?: TradingMode
   instrument: string
   direction: "long" | "short"
   profile: string
@@ -631,6 +651,7 @@ export async function createNearMiss(input: CreateNearMissInput): Promise<void> 
   try {
     await db.aiTraderNearMiss.create({
       data: {
+        ...(input.account ? { account: input.account } : {}),
         instrument: input.instrument,
         direction: input.direction,
         profile: input.profile,

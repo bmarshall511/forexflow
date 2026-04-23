@@ -8,12 +8,14 @@
  * @module ai-trader-performance-service
  */
 import { db } from "./client"
-import type { AiTraderProfile, AiTraderStrategyPerformanceData } from "@fxflow/types"
+import type { AiTraderProfile, AiTraderStrategyPerformanceData, TradingMode } from "@fxflow/types"
 
 // ─── Input Types ────────────────────────────────────────────────────────────
 
 /** Fields required to upsert a performance stats record. */
 export interface UpsertPerformanceInput {
+  /** OANDA account these stats represent. */
+  account?: TradingMode
   profile: AiTraderProfile
   instrument: string | null
   session: string | null
@@ -96,6 +98,7 @@ export async function getPerformanceStats(options?: {
   profile?: AiTraderProfile
   instrument?: string
   session?: string
+  account?: TradingMode
   daysBack?: number
 }): Promise<AiTraderStrategyPerformanceData[]> {
   const daysBack = options?.daysBack ?? 90
@@ -106,6 +109,7 @@ export async function getPerformanceStats(options?: {
       ...(options?.profile ? { profile: options.profile } : {}),
       ...(options?.instrument ? { instrument: options.instrument } : {}),
       ...(options?.session ? { session: options.session } : {}),
+      ...(options?.account ? { account: options.account } : {}),
       periodStart: { gte: cutoff },
     },
     orderBy: { periodStart: "desc" },
@@ -122,6 +126,7 @@ export async function getPerformanceStats(options?: {
  */
 export async function getOverallStats(
   daysBack = 90,
+  account?: TradingMode,
 ): Promise<AiTraderStrategyPerformanceData | null> {
   const cutoff = new Date(Date.now() - daysBack * 86_400_000)
 
@@ -130,6 +135,7 @@ export async function getOverallStats(
       instrument: null,
       session: null,
       technique: null,
+      ...(account ? { account } : {}),
       periodStart: { gte: cutoff },
     },
     _sum: { totalTrades: true, wins: true, losses: true, breakevens: true, totalPL: true },
@@ -175,11 +181,13 @@ export async function upsertPerformanceStats(input: UpsertPerformanceInput): Pro
       instrument: input.instrument,
       session: input.session,
       technique: input.technique,
+      ...(input.account ? { account: input.account } : {}),
       periodStart: input.periodStart,
     },
   })
 
   const data = {
+    ...(input.account ? { account: input.account } : {}),
     profile: input.profile,
     instrument: input.instrument,
     session: input.session,
@@ -224,6 +232,7 @@ export async function recalculatePerformance(
   periodStart: Date,
   periodEnd: Date,
   trades: TradeStatsInput[],
+  account?: TradingMode,
 ): Promise<void> {
   // Exclude cancelled (unfilled) orders from performance metrics
   const filledTrades = trades.filter((t) => t.outcome !== "cancelled")
@@ -262,6 +271,7 @@ export async function recalculatePerformance(
   }
 
   await upsertPerformanceStats({
+    ...(account ? { account } : {}),
     profile,
     instrument,
     session,

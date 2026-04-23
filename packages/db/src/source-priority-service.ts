@@ -4,6 +4,7 @@ import type {
   SourcePriorityConfigData,
   SourcePriorityLogEntry,
   SourcePriorityAction,
+  TradingMode,
 } from "@fxflow/types"
 
 // ─── Config ────────────────────────────────────────────────────────────────
@@ -77,6 +78,8 @@ export async function updateSourcePriorityConfig(
 // ─── Priority Log ──────────────────────────────────────────────────────────
 
 export interface CreatePriorityLogInput {
+  /** OANDA account the placement attempt was for. */
+  account?: TradingMode
   instrument: string
   requestingSource: string
   existingSource?: string | null
@@ -89,6 +92,7 @@ export async function createPriorityLog(input: CreatePriorityLogInput): Promise<
   const client = db
   await client.sourcePriorityLog.create({
     data: {
+      ...(input.account ? { account: input.account } : {}),
       instrument: input.instrument,
       requestingSource: input.requestingSource,
       existingSource: input.existingSource ?? null,
@@ -103,11 +107,13 @@ export async function listPriorityLogs(options?: {
   limit?: number
   instrument?: string
   source?: string
+  account?: TradingMode
 }): Promise<SourcePriorityLogEntry[]> {
   const client = db
   const where: Record<string, unknown> = {}
   if (options?.instrument) where.instrument = options.instrument
   if (options?.source) where.requestingSource = options.source
+  if (options?.account) where.account = options.account
 
   const rows = await client.sourcePriorityLog.findMany({
     where,
@@ -150,16 +156,20 @@ export async function cleanupOldPriorityLogs(daysToKeep = 30): Promise<number> {
 
 export async function getWinRateBySource(
   windowDays: number,
+  account?: TradingMode,
 ): Promise<Map<PlacementSource, { wins: number; total: number; winRate: number }>> {
   const client = db
   const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000)
 
+  const where: Record<string, unknown> = {
+    status: "closed",
+    closedAt: { gte: cutoff },
+    realizedPL: { not: 0 },
+  }
+  if (account) where.account = account
+
   const trades = await client.trade.findMany({
-    where: {
-      status: "closed",
-      closedAt: { gte: cutoff },
-      realizedPL: { not: 0 },
-    },
+    where,
     select: { metadata: true, realizedPL: true },
   })
 
