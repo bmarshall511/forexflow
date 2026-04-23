@@ -157,7 +157,7 @@ const CONFIG_INCLUDE = {
 /** Fields required to create a new SmartFlow trade. */
 export interface CreateSmartFlowTradeInput {
   /** OANDA account this trade was placed against. Derivable from config but stamped explicitly for query speed. */
-  account?: TradingMode
+  account: TradingMode
   configId: string
   tradeId?: string
   sourceTradeId?: string
@@ -188,7 +188,7 @@ export async function createSmartFlowTrade(
 ): Promise<SmartFlowTradeData> {
   const row = await db.smartFlowTrade.create({
     data: {
-      ...(input.account ? { account: input.account } : {}),
+      account: input.account,
       configId: input.configId,
       tradeId: input.tradeId ?? null,
       sourceTradeId: input.sourceTradeId ?? null,

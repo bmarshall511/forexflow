@@ -21,6 +21,7 @@ import type {
   TradeDirection,
   TradeOutcome,
   TradingMode,
+  TradingAccount,
 } from "@fxflow/types"
 
 // ─── Mappers ────────────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ import type {
  */
 function toOpportunityData(row: {
   id: string
+  account: string
   instrument: string
   direction: string
   profile: string
@@ -87,6 +89,7 @@ function toOpportunityData(row: {
 }): AiTraderOpportunityData {
   return {
     id: row.id,
+    account: row.account as TradingAccount,
     instrument: row.instrument,
     direction: row.direction as TradeDirection,
     profile: row.profile as AiTraderProfile,
@@ -143,7 +146,7 @@ function toOpportunityData(row: {
 /** Fields required to create a new AI trader opportunity. */
 export interface CreateOpportunityInput {
   /** OANDA account this opportunity was detected for. */
-  account?: TradingMode
+  account: TradingMode
   instrument: string
   direction: TradeDirection
   profile: AiTraderProfile
@@ -179,7 +182,7 @@ export async function createOpportunity(
 ): Promise<AiTraderOpportunityData> {
   const row = await db.aiTraderOpportunity.create({
     data: {
-      ...(input.account ? { account: input.account } : {}),
+      account: input.account,
       instrument: input.instrument,
       direction: input.direction,
       profile: input.profile,
@@ -636,7 +639,7 @@ export async function cleanupOldOpportunities(days = 90): Promise<number> {
  */
 export interface CreateNearMissInput {
   /** OANDA account this near-miss was observed on. */
-  account?: TradingMode
+  account: TradingMode
   instrument: string
   direction: "long" | "short"
   profile: string
@@ -651,7 +654,7 @@ export async function createNearMiss(input: CreateNearMissInput): Promise<void> 
   try {
     await db.aiTraderNearMiss.create({
       data: {
-        ...(input.account ? { account: input.account } : {}),
+        account: input.account,
         instrument: input.instrument,
         direction: input.direction,
         profile: input.profile,

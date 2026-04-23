@@ -28,7 +28,7 @@ import type {
 /** Input for creating a new SmartFlow config. Excludes auto-generated fields. */
 export interface CreateSmartFlowConfigInput {
   /** OANDA account this config operates against. Stamped at create only. */
-  account?: TradingMode
+  account: TradingMode
   instrument: string
   name: string
   direction: "long" | "short"

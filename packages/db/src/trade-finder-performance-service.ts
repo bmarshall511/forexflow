@@ -31,7 +31,7 @@ export interface TradeFinderPerformanceData {
 
 export interface RecordOutcomeInput {
   /** OANDA account the trade was placed on. */
-  account?: TradingMode
+  account: TradingMode
   timeframeSet: string
   instrument: string
   scoreTotal: number
@@ -186,10 +186,8 @@ async function upsertPerformanceRecord(
 ): Promise<void> {
   // Find existing record for this period — scoped by account so practice and
   // live aggregates stay isolated even under the same dimension key.
-  const findWhere: Record<string, unknown> = { dimension, dimensionKey, periodStart }
-  if (input.account) findWhere.account = input.account
   const existing = await db.tradeFinderPerformance.findFirst({
-    where: findWhere,
+    where: { dimension, dimensionKey, periodStart, account: input.account },
   })
 
   const isWin = input.outcome === "win"
@@ -241,7 +239,7 @@ async function upsertPerformanceRecord(
   } else {
     await db.tradeFinderPerformance.create({
       data: {
-        ...(input.account ? { account: input.account } : {}),
+        account: input.account,
         dimension,
         dimensionKey,
         periodStart,

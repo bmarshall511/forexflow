@@ -3257,6 +3257,8 @@ export interface AiTraderScoreBreakdown {
 /** Full opportunity data for an AI-discovered trade setup */
 export interface AiTraderOpportunityData {
   id: string
+  /** OANDA account this opportunity was detected on. "unknown" for pre-migration legacy rows. */
+  account: TradingAccount
   instrument: string
   direction: TradeDirection
   profile: AiTraderProfile

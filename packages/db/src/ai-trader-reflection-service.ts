@@ -74,7 +74,7 @@ function toReflectionData(row: {
 
 export interface CreateReflectionInput {
   /** OANDA account the closed trade was placed on. */
-  account?: TradingMode
+  account: TradingMode
   opportunityId: string
   instrument: string
   direction: TradeDirection
@@ -103,7 +103,7 @@ export async function createReflection(
 ): Promise<AiTraderReflectionData> {
   const row = await db.aiTraderReflection.create({
     data: {
-      ...(input.account ? { account: input.account } : {}),
+      account: input.account,
       opportunityId: input.opportunityId,
       instrument: input.instrument,
       direction: input.direction,

@@ -34,7 +34,7 @@ import type {
 /** Fields required to create a new TV alert signal record. */
 export interface CreateSignalInput {
   /** OANDA account the signal was received against. */
-  account?: TradingMode
+  account: TradingMode
   source?: string
   instrument: string
   direction: string
@@ -132,7 +132,7 @@ export async function createSignal(input: CreateSignalInput): Promise<TVAlertSig
 
   const row = await db.tVAlertSignal.create({
     data: {
-      ...(input.account ? { account: input.account } : {}),
+      account: input.account,
       source: input.source ?? "ut_bot_alerts",
       instrument: input.instrument,
       direction: input.direction,

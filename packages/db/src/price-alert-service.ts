@@ -49,7 +49,7 @@ function toPriceAlertData(row: {
 
 /** Create a new price alert. */
 export async function createPriceAlert(data: {
-  account?: TradingMode
+  account: TradingMode
   instrument: string
   direction: PriceAlertDirection
   targetPrice: number
@@ -60,7 +60,7 @@ export async function createPriceAlert(data: {
 }): Promise<PriceAlertData> {
   const row = await db.priceAlert.create({
     data: {
-      ...(data.account ? { account: data.account } : {}),
+      account: data.account,
       instrument: data.instrument,
       direction: data.direction,
       targetPrice: data.targetPrice,

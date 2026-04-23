@@ -27,12 +27,12 @@ import type {
 export interface UpsertTradeInput {
   /**
    * Active OANDA account the trade belongs to ("practice" | "live"). Stamped
-   * at create time from the daemon's credential state; never mutated on update
-   * so that switching modes doesn't retroactively reassign historical rows.
-   * Optional for backward compat — writers that don't pass it will create
-   * rows with account="unknown" (treated as legacy by analytics).
+   * at create time from the daemon's credential state and never mutated on
+   * update — switching modes must not retroactively reassign historical rows.
+   * Required: writers that cannot resolve the active account must abort
+   * before calling this service; rows with unresolved accounts are a bug.
    */
-  account?: TradingMode
+  account: TradingMode
   source: TradeSource
   sourceTradeId: string
   status: TradeStatus
@@ -282,10 +282,9 @@ export async function upsertTrade(input: UpsertTradeInput) {
   return db.trade.upsert({
     where,
     create: {
-      // Stamp account at create only. If a caller updates an existing row via
-      // upsert they won't accidentally overwrite the original account — the
-      // update branch below never touches this field.
-      ...(input.account ? { account: input.account } : {}),
+      // Stamp account at create only — the `update` branch above deliberately
+      // never touches this field so mode switches can't reassign history.
+      account: input.account,
       source: input.source,
       sourceTradeId: input.sourceTradeId,
       status: input.status,

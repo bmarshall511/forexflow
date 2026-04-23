@@ -173,7 +173,7 @@ export async function getSetup(id: string): Promise<TradeFinderSetupData | null>
 /** Fields required to create a new trade finder setup. */
 export interface CreateSetupInput {
   /** OANDA account this setup was detected for. */
-  account?: TradingMode
+  account: TradingMode
   instrument: string
   direction: TradeDirection
   timeframeSet: TradeFinderTimeframeSet
@@ -202,7 +202,7 @@ export interface CreateSetupInput {
 export async function createSetup(input: CreateSetupInput): Promise<TradeFinderSetupData> {
   const row = await db.tradeFinderSetup.create({
     data: {
-      ...(input.account ? { account: input.account } : {}),
+      account: input.account,
       instrument: input.instrument,
       direction: input.direction,
       timeframeSet: input.timeframeSet,

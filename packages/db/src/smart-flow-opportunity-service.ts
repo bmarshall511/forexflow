@@ -104,7 +104,7 @@ export async function countTodaySmartFlowOpportunities(account?: TradingMode): P
 
 export interface CreateSmartFlowOpportunityInput {
   /** OANDA account this opportunity was detected for. */
-  account?: TradingMode
+  account: TradingMode
   instrument: string
   direction: "long" | "short"
   scanMode: SmartFlowScanMode
@@ -130,7 +130,7 @@ export async function createSmartFlowOpportunity(
   const client = db
   const row = await client.smartFlowOpportunity.create({
     data: {
-      ...(input.account ? { account: input.account } : {}),
+      account: input.account,
       instrument: input.instrument,
       direction: input.direction,
       scanMode: input.scanMode,

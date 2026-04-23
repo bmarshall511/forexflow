@@ -53,6 +53,7 @@ describe("price-alert-service", () => {
       mockPriceAlert.create.mockResolvedValue(sampleRow)
 
       const result = await createPriceAlert({
+        account: "practice",
         instrument: "EUR_USD",
         direction: "above",
         targetPrice: 1.105,
@@ -68,6 +69,7 @@ describe("price-alert-service", () => {
       expect(result.triggeredAt).toBeNull()
       expect(mockPriceAlert.create).toHaveBeenCalledWith({
         data: {
+          account: "practice",
           instrument: "EUR_USD",
           direction: "above",
           targetPrice: 1.105,
@@ -83,6 +85,7 @@ describe("price-alert-service", () => {
       mockPriceAlert.create.mockResolvedValue({ ...sampleRow, label: null })
 
       await createPriceAlert({
+        account: "practice",
         instrument: "EUR_USD",
         direction: "above",
         targetPrice: 1.105,

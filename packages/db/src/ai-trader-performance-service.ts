@@ -15,7 +15,7 @@ import type { AiTraderProfile, AiTraderStrategyPerformanceData, TradingMode } fr
 /** Fields required to upsert a performance stats record. */
 export interface UpsertPerformanceInput {
   /** OANDA account these stats represent. */
-  account?: TradingMode
+  account: TradingMode
   profile: AiTraderProfile
   instrument: string | null
   session: string | null
@@ -177,17 +177,17 @@ export async function getOverallStats(
 export async function upsertPerformanceStats(input: UpsertPerformanceInput): Promise<void> {
   const existing = await db.aiTraderStrategyPerformance.findFirst({
     where: {
+      account: input.account,
       profile: input.profile,
       instrument: input.instrument,
       session: input.session,
       technique: input.technique,
-      ...(input.account ? { account: input.account } : {}),
       periodStart: input.periodStart,
     },
   })
 
   const data = {
-    ...(input.account ? { account: input.account } : {}),
+    account: input.account,
     profile: input.profile,
     instrument: input.instrument,
     session: input.session,
@@ -232,7 +232,7 @@ export async function recalculatePerformance(
   periodStart: Date,
   periodEnd: Date,
   trades: TradeStatsInput[],
-  account?: TradingMode,
+  account: TradingMode,
 ): Promise<void> {
   // Exclude cancelled (unfilled) orders from performance metrics
   const filledTrades = trades.filter((t) => t.outcome !== "cancelled")
@@ -271,7 +271,7 @@ export async function recalculatePerformance(
   }
 
   await upsertPerformanceStats({
-    ...(account ? { account } : {}),
+    account,
     profile,
     instrument,
     session,

@@ -79,7 +79,7 @@ export async function updateSourcePriorityConfig(
 
 export interface CreatePriorityLogInput {
   /** OANDA account the placement attempt was for. */
-  account?: TradingMode
+  account: TradingMode
   instrument: string
   requestingSource: string
   existingSource?: string | null
@@ -92,7 +92,7 @@ export async function createPriorityLog(input: CreatePriorityLogInput): Promise<
   const client = db
   await client.sourcePriorityLog.create({
     data: {
-      ...(input.account ? { account: input.account } : {}),
+      account: input.account,
       instrument: input.instrument,
       requestingSource: input.requestingSource,
       existingSource: input.existingSource ?? null,
