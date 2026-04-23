@@ -6,6 +6,7 @@ import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { TabNav, TabNavButton } from "@/components/ui/tab-nav"
 import { TVASettingsConnection } from "./tva-settings-connection"
 import { TVASettingsTrading } from "./tva-settings-trading"
+import { TVASettingsWhitelist } from "./tva-settings-whitelist"
 import { TVASettingsQuality } from "./tva-settings-quality"
 import { TVASettingsTest } from "./tva-settings-test"
 import { TVASettingsManagement } from "./tva-settings-management"
@@ -109,7 +110,10 @@ export function TVAlertsSettingsPage() {
       )}
 
       {activeTab === "trading" && (
-        <TVASettingsTrading config={data} onUpdate={handleUpdate} saving={saving} />
+        <div className="space-y-6">
+          <TVASettingsTrading config={data} onUpdate={handleUpdate} saving={saving} />
+          <TVASettingsWhitelist config={data} onUpdate={handleUpdate} saving={saving} />
+        </div>
       )}
 
       {activeTab === "quality" && <TVASettingsQuality />}
