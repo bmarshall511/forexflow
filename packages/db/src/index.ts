@@ -405,6 +405,13 @@ export {
 } from "./reset-service"
 
 export {
+  getLegacyDataCounts,
+  clearLegacyData,
+  type LegacyDataCounts,
+  type ClearLegacyDataResult,
+} from "./legacy-data-service"
+
+export {
   upsertEconomicEvents,
   getUpcomingEvents,
   getEventsInRange,
