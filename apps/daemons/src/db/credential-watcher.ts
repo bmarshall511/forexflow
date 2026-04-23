@@ -7,6 +7,7 @@ export class CredentialWatcher {
   private lastMode: TradingMode | null = null
   private lastHasToken = false
   private lastAccountId: string | null = null
+  private lastError: string | null = null
 
   constructor(
     private stateManager: StateManager,
@@ -26,8 +27,14 @@ export class CredentialWatcher {
   }
 
   /** Force an immediate credential check (e.g. after a mode switch). */
-  async checkNow(): Promise<void> {
-    return this.check()
+  async checkNow(): Promise<{ ok: true } | { ok: false; error: string }> {
+    await this.check()
+    return this.lastError ? { ok: false, error: this.lastError } : { ok: true }
+  }
+
+  /** Last error message from the most recent check, or null on success. */
+  getLastError(): string | null {
+    return this.lastError
   }
 
   private async check(): Promise<void> {
@@ -38,15 +45,19 @@ export class CredentialWatcher {
       const hasToken = modeCredentials.hasToken
       const hasAccountId = !!modeCredentials.accountId
 
-      // Detect changes
+      // Detect changes relative to last successful state
       const modeChanged = this.lastMode !== mode
       const tokenChanged = this.lastHasToken !== hasToken
       const accountChanged = this.lastAccountId !== modeCredentials.accountId
-      this.lastMode = mode
-      this.lastHasToken = hasToken
-      this.lastAccountId = modeCredentials.accountId
+      const hadError = this.lastError !== null
 
-      if (modeChanged || tokenChanged || accountChanged) {
+      // IMPORTANT: defer updating "last" state until AFTER the body succeeds so
+      // a failed decrypt (wrong/missing ENCRYPTION_KEY) is retried on the next
+      // tick instead of being permanently wedged. Previously we stamped
+      // lastHasToken=true before revealToken() ran, so on throw the watcher
+      // would silently skip the retry and the daemon would remain
+      // "unconfigured" forever.
+      if (modeChanged || tokenChanged || accountChanged || hadError) {
         if (hasToken && hasAccountId) {
           const token = await revealToken(mode)
           this.stateManager.updateCredentials({
@@ -62,12 +73,22 @@ export class CredentialWatcher {
           console.log(`[cred-watcher] No credentials for ${mode} mode`)
         }
       }
+
+      this.lastMode = mode
+      this.lastHasToken = hasToken
+      this.lastAccountId = modeCredentials.accountId
+      this.lastError = null
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
+      this.lastError = msg
       console.error("[cred-watcher] Error checking credentials:", msg)
       if (msg.includes("DATABASE_URL")) {
         console.error(
           "[cred-watcher] DATABASE_URL is not set. Create apps/daemons/.env.local with DATABASE_URL and ENCRYPTION_KEY.",
+        )
+      } else if (msg.includes("ENCRYPTION_KEY") || msg.toLowerCase().includes("decrypt")) {
+        console.error(
+          "[cred-watcher] ENCRYPTION_KEY mismatch or missing. apps/daemons/.env.local must contain the same ENCRYPTION_KEY that was in effect when these credentials were saved via the web UI.",
         )
       }
     }

@@ -173,8 +173,12 @@ export async function startServer(port: number, deps: ServerDeps) {
     if (req.method === "POST" && req.url === "/refresh-credentials") {
       credentialWatcher
         .checkNow()
-        .then(() => {
-          sendJson(res, 200, { ok: true })
+        .then((result) => {
+          if (result.ok) {
+            sendJson(res, 200, { ok: true })
+          } else {
+            sendJson(res, 200, { ok: false, error: result.error })
+          }
         })
         .catch((err) => {
           console.error("[server] refresh-credentials error:", err)
