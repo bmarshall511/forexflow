@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
-import type { EquityCurvePoint } from "@fxflow/types"
+import type { EquityCurvePoint, PerformanceSummary } from "@fxflow/types"
 import { formatPnL } from "@fxflow/shared"
-import { usePositions } from "@/hooks/use-positions"
 import {
   Card,
   CardHeader,
@@ -78,8 +77,8 @@ function StatPill({
 export function PerformanceCard() {
   const [period, setPeriod] = useState<Period>("30")
   const [data, setData] = useState<EquityCurvePoint[]>([])
+  const [summary, setSummary] = useState<PerformanceSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const { summary } = usePositions()
 
   useEffect(() => {
     let cancelled = false
@@ -89,10 +88,16 @@ export function PerformanceCard() {
     from.setDate(from.getDate() - Number(period))
     const params = new URLSearchParams({ dateFrom: from.toISOString() })
 
-    fetch(`/api/analytics/equity-curve?${params}`)
-      .then(async (res) => {
-        const json = await res.json()
-        if (!cancelled && json.ok) setData(json.data)
+    // Pull equity curve + summary in parallel so win-rate / streak match the
+    // selected period rather than today-only counts from the positions hook.
+    Promise.all([
+      fetch(`/api/analytics/equity-curve?${params}`).then((res) => res.json()),
+      fetch(`/api/analytics/summary?${params}`).then((res) => res.json()),
+    ])
+      .then(([curveJson, summaryJson]) => {
+        if (cancelled) return
+        if (curveJson.ok) setData(curveJson.data)
+        if (summaryJson.ok) setSummary(summaryJson.data)
       })
       .catch((err) => console.error("[PerformanceCard] fetch error:", err))
       .finally(() => {
@@ -107,29 +112,24 @@ export function PerformanceCard() {
   const cumulativePL = data.length > 0 ? data[data.length - 1]!.cumulativePL : 0
   const pnl = formatPnL(cumulativePL)
 
-  // Calculate win streak
+  // Period-scoped win rate pulled from PerformanceSummary (realized trades in
+  // the selected window, scoped to the active account). Replaces the old
+  // today-only computation that was independent of the period toggle.
+  const winRatePct = useMemo(() => {
+    if (!summary || summary.totalTrades === 0) return null
+    return Math.round(summary.winRate * 100)
+  }, [summary])
+
+  // Streak also comes from the summary (current consecutive win/loss run
+  // across realized trades). The prior equity-curve-diff approach measured
+  // winning *days*, not winning trades.
   const streak = useMemo(() => {
-    if (data.length < 2) return null
-    let count = 0
-    let type: "W" | "L" | null = null
-
-    // Walk backwards from most recent
-    for (let i = data.length - 1; i > 0; i--) {
-      const diff = data[i]!.cumulativePL - data[i - 1]!.cumulativePL
-      const isWin = diff > 0
-      if (type === null) {
-        type = isWin ? "W" : "L"
-        count = 1
-      } else if ((isWin && type === "W") || (!isWin && type === "L")) {
-        count++
-      } else {
-        break
-      }
+    if (!summary || summary.currentStreak.count < 2) return null
+    return {
+      count: summary.currentStreak.count,
+      type: summary.currentStreak.type === "win" ? ("W" as const) : ("L" as const),
     }
-
-    if (count < 2) return null
-    return { count, type }
-  }, [data])
+  }, [summary])
 
   return (
     <Card
@@ -180,13 +180,9 @@ export function PerformanceCard() {
               <StatPill
                 icon={Target}
                 label="Win rate"
-                value={
-                  summary.todayWins + summary.todayLosses > 0
-                    ? `${Math.round((summary.todayWins / (summary.todayWins + summary.todayLosses)) * 100)}%`
-                    : "—"
-                }
+                value={winRatePct !== null ? `${winRatePct}%` : "—"}
                 className={
-                  summary.todayWins > summary.todayLosses
+                  winRatePct !== null && winRatePct >= 50
                     ? "text-status-connected"
                     : "text-muted-foreground"
                 }

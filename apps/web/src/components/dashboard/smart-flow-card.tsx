@@ -14,12 +14,14 @@ export function SmartFlowCard() {
   const enabled = settings.enabled
   const activeCount = activeTrades.length
 
-  // Today's closed P&L from SmartFlow trades
+  // Today's closed P&L from SmartFlow trades. `realizedPL` comes from the
+  // joined Trade row; `financingAccumulated` is swap cost, not P&L — summing
+  // it instead silently misreported the day's performance.
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todayPL = closedTrades
     .filter((t) => t.closedAt && new Date(t.closedAt) >= today)
-    .reduce((sum, t) => sum + (t.financingAccumulated ?? 0), 0)
+    .reduce((sum, t) => sum + (t.realizedPL ?? 0), 0)
   const hasTodayPL = todayPL !== 0
 
   return (
