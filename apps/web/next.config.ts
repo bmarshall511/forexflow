@@ -1,8 +1,26 @@
 import type { NextConfig } from "next"
 import bundleAnalyzer from "@next/bundle-analyzer"
 import { execSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
+import dotenv from "dotenv"
+
+// Single source of truth for env: repo-root `.env.local`. Historically
+// apps/web and apps/daemons each had their own, with the SAME DATABASE_URL
+// + ENCRYPTION_KEY — easy to drift, and when they drifted the daemon
+// silently failed to decrypt credentials the web had encrypted. Preload
+// the root file here so Next.js starts with root values in process.env.
+// dotenv defaults to override=false, so any stray apps/web/.env.local won't
+// silently shadow root values — but we warn the user if it exists so it
+// gets cleaned up.
+const repoRoot = resolve(import.meta.dirname, "../..")
+dotenv.config({ path: resolve(repoRoot, ".env.local") })
+dotenv.config({ path: resolve(repoRoot, ".env") })
+if (existsSync(resolve(import.meta.dirname, ".env.local"))) {
+  console.warn(
+    "[next.config] apps/web/.env.local exists — this file is deprecated. The canonical location is the repo-root .env.local. Remove apps/web/.env.local to avoid drift.",
+  )
+}
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",

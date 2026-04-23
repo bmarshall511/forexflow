@@ -274,6 +274,9 @@ importers:
       '@types/ws':
         specifier: ^8
         version: 8.18.1
+      dotenv:
+        specifier: ^16
+        version: 16.6.1
       eslint:
         specifier: ^9
         version: 9.39.3(jiti@2.6.1)

@@ -17,14 +17,16 @@ pnpm install`,
   {
     step: "3",
     title: "Configure environment",
-    code: `# Copy example env files
-cp apps/daemons/.env.example apps/daemons/.env.local
-cp apps/web/.env.example apps/web/.env.local
+    code: `# Single root env file — no per-app duplicates
+cat > .env.local <<'EOF'
+DATABASE_URL=file:../../data/fxflow.db
+ENCRYPTION_KEY=
+NEXT_PUBLIC_DAEMON_REST_URL=http://localhost:4100
+NEXT_PUBLIC_DAEMON_URL=ws://localhost:4100
+EOF
 
-# Generate an encryption key
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Paste into both .env.local files as ENCRYPTION_KEY`,
+# Generate an ENCRYPTION_KEY and paste it into .env.local
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`,
   },
   {
     step: "4",

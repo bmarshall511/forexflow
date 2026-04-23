@@ -43,6 +43,7 @@
     "@types/node": "25.3.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16",
     "eslint": "^9",
     "eslint-config-next": "^15",
     "eslint-config-prettier": "^10",

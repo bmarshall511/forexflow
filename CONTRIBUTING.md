@@ -23,13 +23,16 @@ pnpm install
 # Generate Prisma client
 pnpm --filter @fxflow/db db:generate
 
-# Copy environment files
-cp apps/daemons/.env.example apps/daemons/.env.local
-cp apps/web/.env.example apps/web/.env.local
+# Create the single root env file
+cat > .env.local <<'EOF'
+DATABASE_URL=file:../../data/fxflow.db
+ENCRYPTION_KEY=<paste a 64-char hex from the next command>
+NEXT_PUBLIC_DAEMON_REST_URL=http://localhost:4100
+NEXT_PUBLIC_DAEMON_URL=ws://localhost:4100
+EOF
 
-# Generate an encryption key
+# Generate an encryption key to fill in above
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-# Paste the output as ENCRYPTION_KEY in both .env.local files
 
 # Configure OANDA credentials via the Settings page (after starting the app)
 

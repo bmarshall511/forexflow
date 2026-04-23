@@ -36,13 +36,17 @@ pnpm install</code></pre>
   <pre><code>pnpm --filter @fxflow/db db:generate</code></pre>
 
   <h3>3. Configure environment</h3>
-  <pre><code># Copy example env files
-cp apps/daemons/.env.example apps/daemons/.env.local
-cp apps/web/.env.example apps/web/.env.local
+  <pre><code># Single root env file — no per-app duplicates
+cat &gt; .env.local &lt;&lt;'EOF'
+DATABASE_URL=file:../../data/fxflow.db
+ENCRYPTION_KEY=
+NEXT_PUBLIC_DAEMON_REST_URL=http://localhost:4100
+NEXT_PUBLIC_DAEMON_URL=ws://localhost:4100
+EOF
 
-# Generate an encryption key
+# Generate an ENCRYPTION_KEY and paste it in
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
-  <p>Paste the generated encryption key into <strong>both</strong> <code>.env.local</code> files as the <code>ENCRYPTION_KEY</code> value.</p>
+  <p>Both the daemon and the web app read from this single root <code>.env.local</code>.</p>
 
   <h3>4. Initialize and start</h3>
   <pre><code>mkdir -p data

@@ -48,8 +48,8 @@ function createPrismaClient(): PrismaClient {
   if (!url) {
     throw new Error(
       "DATABASE_URL environment variable is required — no silent fallback. " +
-        "Set it in apps/daemons/.env.local and apps/web/.env.local, typically " +
-        "`file:../../data/fxflow.db`. See apps/daemons/.env.example for the canonical value.",
+        "Set it in the repo-root .env.local (single source of truth for both " +
+        "daemon and web), typically `file:../../data/fxflow.db`.",
     )
   }
 

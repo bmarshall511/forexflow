@@ -169,16 +169,21 @@ pnpm --filter @fxflow/db db:generate
 
 ### 3. Configure environment
 
-```bash
-# Copy example env files
-cp apps/daemons/.env.example apps/daemons/.env.local
-cp apps/web/.env.example apps/web/.env.local
+Create the single root `.env.local`:
 
-# Generate an encryption key
+```bash
+cat > .env.local <<'EOF'
+DATABASE_URL=file:../../data/fxflow.db
+ENCRYPTION_KEY=
+NEXT_PUBLIC_DAEMON_REST_URL=http://localhost:4100
+NEXT_PUBLIC_DAEMON_URL=ws://localhost:4100
+EOF
+
+# Generate a 64-char hex key, then paste it into ENCRYPTION_KEY above
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Paste the generated encryption key into **both** `.env.local` files as the `ENCRYPTION_KEY` value.
+Both the daemon and the web app load from this one file.
 
 ### 4. Initialize the database
 
@@ -206,28 +211,25 @@ Open `http://localhost:3000/settings/oanda` and enter your OANDA API token and a
 
 ## Configuration
 
-### Daemon Environment Variables (`apps/daemons/.env.local`)
+### Environment Variables (`./.env.local` at the repo root)
 
-| Variable                          | Required | Default  | Description                                              |
-| --------------------------------- | -------- | -------- | -------------------------------------------------------- |
-| `DATABASE_URL`                    | Yes      | —        | Prisma database URL (e.g., `file:../../data/fxflow.db`)  |
-| `ENCRYPTION_KEY`                  | Yes      | —        | 64-char hex string for AES-256-GCM credential encryption |
-| `CF_WORKER_WS_URL`                | No       | —        | Cloudflare Worker WebSocket URL for TradingView alerts   |
-| `CF_WORKER_DAEMON_SECRET`         | No       | —        | Secret for daemon-to-Worker authentication               |
-| `DAEMON_PORT`                     | No       | `4100`   | HTTP + WebSocket server port                             |
-| `DAEMON_TRADE_RECONCILE_INTERVAL` | No       | `120000` | OANDA reconciliation interval (ms)                       |
-| `DAEMON_PRICE_THROTTLE`           | No       | `500`    | Price broadcast throttle (ms)                            |
+Both the daemon and the web app read from **one** file at the repo root. Historically each app had its own `.env.local` with duplicated `DATABASE_URL` + `ENCRYPTION_KEY` — they had to stay in lockstep or the daemon would silently fail to decrypt credentials the web UI had just encrypted. One file, no drift.
 
-See [`apps/daemons/.env.example`](apps/daemons/.env.example) for the full list of tuning variables.
+| Variable                          | Required  | Default                 | Consumed by | Description                                              |
+| --------------------------------- | --------- | ----------------------- | ----------- | -------------------------------------------------------- |
+| `DATABASE_URL`                    | Yes       | —                       | daemon, web | Prisma database URL (e.g., `file:../../data/fxflow.db`)  |
+| `ENCRYPTION_KEY`                  | Yes       | —                       | daemon, web | 64-char hex string for AES-256-GCM credential encryption |
+| `NEXT_PUBLIC_DAEMON_REST_URL`     | Yes (web) | `http://localhost:4100` | web         | Daemon REST API URL                                      |
+| `NEXT_PUBLIC_DAEMON_URL`          | Yes (web) | `ws://localhost:4100`   | web         | Daemon WebSocket URL                                     |
+| `CF_WORKER_WS_URL`                | No        | —                       | daemon      | Cloudflare Worker WebSocket URL for TradingView alerts   |
+| `CF_WORKER_DAEMON_SECRET`         | No        | —                       | daemon      | Secret for daemon-to-Worker authentication               |
+| `DAEMON_PORT`                     | No        | `4100`                  | daemon      | HTTP + WebSocket server port                             |
+| `DAEMON_TRADE_RECONCILE_INTERVAL` | No        | `120000`                | daemon      | OANDA reconciliation interval (ms)                       |
+| `DAEMON_PRICE_THROTTLE`           | No        | `500`                   | daemon      | Price broadcast throttle (ms)                            |
 
-### Web App Environment Variables (`apps/web/.env.local`)
+Generate a fresh `ENCRYPTION_KEY` with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Changing it invalidates every credential already stored in the DB — they'll need to be re-entered via the settings UI.
 
-| Variable                      | Required | Default                 | Description                        |
-| ----------------------------- | -------- | ----------------------- | ---------------------------------- |
-| `DATABASE_URL`                | Yes      | —                       | Must match daemon's DATABASE_URL   |
-| `ENCRYPTION_KEY`              | Yes      | —                       | Must match daemon's ENCRYPTION_KEY |
-| `NEXT_PUBLIC_DAEMON_REST_URL` | Yes      | `http://localhost:4100` | Daemon REST API URL                |
-| `NEXT_PUBLIC_DAEMON_URL`      | Yes      | `ws://localhost:4100`   | Daemon WebSocket URL               |
+> `apps/cf-worker/.dev.vars` stays separate because wrangler has its own loader and the Worker's `WEBHOOK_TOKEN` + `DAEMON_SECRET` are Worker-scoped secrets, not shared with the other apps.
 
 ### Cloudflare Worker (optional)
 

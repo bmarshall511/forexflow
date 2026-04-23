@@ -1,10 +1,21 @@
 import dotenv from "dotenv"
-import { resolve } from "path"
+import { resolve, dirname } from "path"
+import { fileURLToPath } from "node:url"
 
-// Load .env.local first (preferred), then .env as fallback.
-// dotenv won't override vars already set, so .env.local takes precedence.
-dotenv.config({ path: resolve(process.cwd(), ".env.local") })
-dotenv.config({ path: resolve(process.cwd(), ".env") })
+// Single source of truth: repo-root `.env.local` (with `.env` as fallback).
+// Historically apps/web and apps/daemons each had their own .env.local with
+// the SAME DATABASE_URL + ENCRYPTION_KEY — keeping them in sync was manual and
+// broke silently (the daemon would fail to decrypt user credentials that the
+// web had happily encrypted with a different key). Loading once from the repo
+// root makes drift impossible.
+//
+// Resolve root from this file's own URL (apps/daemons/src/index.ts →
+// repo-root) so the path is correct regardless of process.cwd() — tsx / turbo
+// / electron fork all set CWD differently.
+const __filename = fileURLToPath(import.meta.url)
+const repoRoot = resolve(dirname(__filename), "../../..")
+dotenv.config({ path: resolve(repoRoot, ".env.local") })
+dotenv.config({ path: resolve(repoRoot, ".env") })
 import {
   startServer,
   setCFWorkerClient,

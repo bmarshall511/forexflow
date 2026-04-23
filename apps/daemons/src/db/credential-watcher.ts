@@ -84,11 +84,11 @@ export class CredentialWatcher {
       console.error("[cred-watcher] Error checking credentials:", msg)
       if (msg.includes("DATABASE_URL")) {
         console.error(
-          "[cred-watcher] DATABASE_URL is not set. Create apps/daemons/.env.local with DATABASE_URL and ENCRYPTION_KEY.",
+          "[cred-watcher] DATABASE_URL is not set. Add DATABASE_URL to the repo-root .env.local (single source of truth for both daemon and web).",
         )
       } else if (msg.includes("ENCRYPTION_KEY") || msg.toLowerCase().includes("decrypt")) {
         console.error(
-          "[cred-watcher] ENCRYPTION_KEY mismatch or missing. apps/daemons/.env.local must contain the same ENCRYPTION_KEY that was in effect when these credentials were saved via the web UI.",
+          "[cred-watcher] ENCRYPTION_KEY is missing or has changed since these credentials were saved. The repo-root .env.local must contain the same ENCRYPTION_KEY that was in effect when the credentials were saved via the web UI.",
         )
       }
     }
