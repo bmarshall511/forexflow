@@ -172,12 +172,21 @@ export function useDashboardAnalytics<T>(
   }, [])
 
   // Initial load + fires on url / invalidateKey / enabled changes.
+  //
+  // `enabled` MUST be in the deps: deferred-mount consumers (e.g. the
+  // collapsible Edge section) mount the hook with `enabled: false`,
+  // which makes doFetch a no-op. When the user opens the panel and
+  // `enabled` flips to true, we need this effect to re-fire so the
+  // first fetch actually happens — otherwise the skeleton sits
+  // forever. doFetchRef always points at the latest doFetch closure,
+  // so calling it here picks up the true value of `enabled`.
   useEffect(() => {
+    if (!enabled) return
     const cached = cache.get(url) as CacheEntry<T> | undefined
     if (cached?.data != null) setData(cached.data)
     void doFetchRef.current(cached?.data != null)
     return () => abortRef.current?.abort()
-  }, [url, invalidateKey])
+  }, [url, invalidateKey, enabled])
 
   // Focus revalidation — refetch when tab becomes visible again.
   useEffect(() => {
