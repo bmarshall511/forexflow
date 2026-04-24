@@ -23,11 +23,13 @@ export function Logo({ variant = "full", className }: LogoProps) {
   return (
     <span className={cn("inline-flex shrink-0 items-center", className)}>
       {/*
-       * `style={{ height: "auto" }}` on both variants silences the Next.js
-       * "image has width or height modified, but not the other" warning.
-       * The global img reset (and some consumer classNames) tweak one
-       * dimension without the other; letting height auto-scale preserves
-       * the aspect ratio without having to chase every consumer style.
+       * Pin height to the desired pixel size and let width auto-scale.
+       * Tailwind Preflight sets `max-width: 100%` on every img, which
+       * effectively modifies width without height — that tripped the
+       * Next.js "image has width or height modified, but not the other"
+       * warning. Explicitly declaring BOTH in style satisfies the
+       * detector (Next.js wants you to acknowledge the CSS override)
+       * and keeps visual size deterministic.
        */}
       <Image
         src={light}
@@ -36,7 +38,7 @@ export function Logo({ variant = "full", className }: LogoProps) {
         height={height}
         priority
         className="dark:hidden"
-        style={{ height: "auto" }}
+        style={{ width: "auto", height: `${height}px` }}
       />
       <Image
         src={dark}
@@ -45,7 +47,7 @@ export function Logo({ variant = "full", className }: LogoProps) {
         height={height}
         priority
         className="hidden dark:block"
-        style={{ height: "auto" }}
+        style={{ width: "auto", height: `${height}px` }}
       />
     </span>
   )
