@@ -31,10 +31,18 @@ const VARIANTS = [
 
 type Variant = (typeof VARIANTS)[number]["value"]
 
-function buildUrl(dateFrom: Date, dateTo: Date | undefined, startingBalance: number | null) {
+/**
+ * Hero aggregator URL — intentionally does NOT include `startingBalance` in
+ * the query even though the server endpoint supports it. NAV updates on
+ * every price tick, so mixing it into the cache key caused the URL to churn
+ * every few hundred ms, which invalidated the memo, re-fired the fetch
+ * effect, and flashed the skeleton forever. The chart falls back to
+ * cumulative-P&L rendering when balance is absent, and balance alignment
+ * with live NAV is handled client-side via the `liveBalance` tail prop.
+ */
+function buildUrl(dateFrom: Date, dateTo: Date | undefined) {
   const params = new URLSearchParams({ dateFrom: dateFrom.toISOString() })
   if (dateTo) params.set("dateTo", dateTo.toISOString())
-  if (startingBalance != null) params.set("startingBalance", String(startingBalance))
   return `/api/analytics/dashboard?${params.toString()}`
 }
 
@@ -58,24 +66,25 @@ export function PerformanceHero() {
   const [variant, setVariant] = useState<Variant>("balance")
 
   const currency = accountOverview?.summary.currency ?? "USD"
+  // `nav` is read for the chart's live tail only — it is NOT part of the URL.
+  // Including it in the URL would churn the cache key on every price tick.
   const nav = accountOverview?.summary.nav ?? null
-  const startingBalanceGuess = nav
 
   // Dep on .getTime() rather than the Date object so a stray re-construction
   // upstream can't silently reintroduce the URL-churn loop.
   const fromMs = range.dateFrom.getTime()
   const toMs = range.dateTo?.getTime() ?? null
   const url = useMemo(
-    () => buildUrl(range.dateFrom, range.dateTo, startingBalanceGuess),
+    () => buildUrl(range.dateFrom, range.dateTo),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fromMs, toMs, startingBalanceGuess],
+    [fromMs, toMs],
   )
 
   // Prior-period url. Skip for allTime (no "prior" exists).
   const priorUrl = useMemo(() => {
     if (period === "allTime") return null
     const prior = priorWindow(range.dateFrom, range.dateTo)
-    return buildUrl(prior.from, prior.to, null)
+    return buildUrl(prior.from, prior.to)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, fromMs, toMs])
 
