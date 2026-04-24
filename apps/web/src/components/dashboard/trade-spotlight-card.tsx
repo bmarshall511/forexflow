@@ -81,17 +81,19 @@ export function TradeSpotlightCard({
           )}
         </button>
 
-        <AnimatedNumber
-          value={pnl.formatted}
-          className={cn(
-            "font-mono text-base font-bold tabular-nums",
-            pnl.colorIntent === "positive"
-              ? "text-status-connected"
-              : pnl.colorIntent === "negative"
-                ? "text-status-disconnected"
-                : "text-muted-foreground",
-          )}
-        />
+        <span data-private="true">
+          <AnimatedNumber
+            value={pnl.formatted}
+            className={cn(
+              "font-mono text-base font-bold tabular-nums",
+              pnl.colorIntent === "positive"
+                ? "text-status-connected"
+                : pnl.colorIntent === "negative"
+                  ? "text-status-disconnected"
+                  : "text-muted-foreground",
+            )}
+          />
+        </span>
       </div>
 
       {/* Health bar */}
