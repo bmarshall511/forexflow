@@ -33,6 +33,17 @@ export function getConfig(): DaemonConfig {
     cfWorkerDaemonSecret: process.env.CF_WORKER_DAEMON_SECRET ?? "",
     allowedOrigins: process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
-      : ["http://localhost:3000"],
+      : // Dev-mode default: Next.js picks 3000 on first boot but falls back to
+        // 3001, 3002, ... whenever 3000 is still held (e.g. after a Turbopack
+        // restart). Whitelisting the first few keeps CORS from blocking the
+        // moment the user's browser lands on a non-canonical port. Prod
+        // deployments MUST set ALLOWED_ORIGINS explicitly — this default only
+        // applies when the env var is absent.
+        [
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "http://localhost:3002",
+          "http://localhost:3003",
+        ],
   }
 }
