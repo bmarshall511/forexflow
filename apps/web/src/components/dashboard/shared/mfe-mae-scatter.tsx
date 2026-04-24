@@ -6,6 +6,7 @@ import {
   ResponsiveContainer,
   Scatter,
   ScatterChart,
+  Symbols,
   Tooltip,
   XAxis,
   YAxis,
@@ -135,26 +136,56 @@ export function MfeMaeScatter({ data, height = 240, className }: MfeMaeScatterPr
           />
           <ZAxis type="number" range={[30, 30]} />
           <Tooltip content={<ChartTooltip />} cursor={{ strokeDasharray: "3 3" }} />
+          {/*
+           * Shape differs per series so the chart reads without color —
+           * wins = triangle (pointing up = favorable), losses = diamond,
+           * breakevens = cross. Color is additive, not load-bearing.
+           */}
           <Scatter
             name="Wins"
             data={wins}
             fill="var(--color-status-connected, #22c55e)"
-            fillOpacity={0.75}
+            fillOpacity={0.85}
+            shape={<Symbols type="triangle" size={40} />}
           />
           <Scatter
             name="Losses"
             data={losses}
             fill="var(--color-status-disconnected, #ef4444)"
-            fillOpacity={0.75}
+            fillOpacity={0.85}
+            shape={<Symbols type="diamond" size={40} />}
           />
           <Scatter
             name="Breakevens"
             data={breakevens}
             fill="var(--color-muted-foreground, #888)"
-            fillOpacity={0.6}
+            fillOpacity={0.7}
+            shape={<Symbols type="cross" size={40} />}
           />
         </ScatterChart>
       </ResponsiveContainer>
+      {/* Always-visible legend with shape indicators so the chart remains
+          readable under color-blindness or when printed black-and-white. */}
+      <div className="text-muted-foreground mt-1 flex flex-wrap items-center justify-end gap-3 text-[10px]">
+        <span className="inline-flex items-center gap-1">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <polygon points="5,1 9,9 1,9" className="fill-status-connected" />
+          </svg>
+          Wins ({wins.length})
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <polygon points="5,1 9,5 5,9 1,5" className="fill-status-disconnected" />
+          </svg>
+          Losses ({losses.length})
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <path d="M2 5h6M5 2v6" className="stroke-muted-foreground" strokeWidth="1.5" />
+          </svg>
+          Breakevens ({breakevens.length})
+        </span>
+      </div>
     </div>
   )
 }

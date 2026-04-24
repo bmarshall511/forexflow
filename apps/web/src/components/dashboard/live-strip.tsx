@@ -92,6 +92,8 @@ export function LiveStrip() {
       )}
       role="region"
       aria-label="Live account metrics"
+      aria-live="polite"
+      aria-atomic="false"
     >
       <MetricTile
         icon={<Wallet className="size-3.5" />}

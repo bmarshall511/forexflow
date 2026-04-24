@@ -449,3 +449,24 @@ html[data-privacy-mode="true"] [data-private="true"]:hover,
 html[data-privacy-mode="true"] [data-private="true"]:focus-within {
   filter: blur(0);
 }
+
+/* ─── Dashboard reduced-motion overrides ────────────────────────────────── */
+
+/* Tailwind's `animate-in` + `slide-in-from-*` utilities emit CSS keyframes
+   that run unconditionally. Users with `prefers-reduced-motion: reduce`
+   should see content appear without any slide or fade animation. We keep
+   the final rendered state (opacity 1, translate 0) but skip the
+   transition-like entry. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  [class*="slide-in-from-"],
+  [class*="fade-in"] {
+    animation: none \!important;
+    transform: none \!important;
+    opacity: 1 \!important;
+  }
+
+  [class*="duration-"] {
+    transition-duration: 0ms \!important;
+  }
+}
