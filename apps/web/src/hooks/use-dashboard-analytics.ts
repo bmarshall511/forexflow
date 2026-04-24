@@ -100,11 +100,24 @@ export function useDashboardAnalytics<T>(
   const doFetch = useCallback(
     async (isBackground: boolean) => {
       if (!enabled) return
-      // Collapse concurrent requests for the same URL.
+      // Collapse concurrent requests for the same URL — sibling cards
+      // (e.g. PerformanceHero + DepthSections) share one network round trip.
       const existing = cache.get(url) as CacheEntry<T> | undefined
       if (existing?.inflight) {
-        const next = await existing.inflight
-        if (next != null) setData(next)
+        // Set loading state BEFORE awaiting, and clear it when the shared
+        // promise resolves. Without the try/finally the follower would stay
+        // stuck on the skeleton forever.
+        if (existing.data == null) setIsLoading(true)
+        try {
+          const next = await existing.inflight
+          if (next != null) setData(next)
+          setError(null)
+        } catch (err) {
+          setError(err as Error)
+        } finally {
+          setIsLoading(false)
+          setIsRefreshing(false)
+        }
         return
       }
       abortRef.current?.abort()

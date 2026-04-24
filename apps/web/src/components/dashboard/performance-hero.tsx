@@ -75,15 +75,18 @@ export function PerformanceHero() {
 
   const invalidateKey = `${period}:${rolloverKey}`
 
-  const { data, isLoading, isRefreshing } = useDashboardAnalytics<DashboardAnalyticsPayload>(url, {
-    invalidateOn: [
-      "positions_update",
-      "account_overview_update",
-      "ai_trader_trade_closed",
-      "smart_flow_trade_update",
-    ],
-    invalidateKey,
-  })
+  const { data, isLoading, isRefreshing, error } = useDashboardAnalytics<DashboardAnalyticsPayload>(
+    url,
+    {
+      invalidateOn: [
+        "positions_update",
+        "account_overview_update",
+        "ai_trader_trade_closed",
+        "smart_flow_trade_update",
+      ],
+      invalidateKey,
+    },
+  )
 
   const { data: priorData } = useDashboardAnalytics<DashboardAnalyticsPayload>(
     priorUrl ?? "/api/analytics/dashboard?skip=1",
@@ -114,6 +117,15 @@ export function PerformanceHero() {
 
       {isLoading && !data ? (
         <Skeleton className="h-[220px] w-full rounded-lg" />
+      ) : error && !data ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <TrendingUp className="text-status-disconnected size-8" aria-hidden="true" />
+          <p className="text-sm font-medium">Couldn&apos;t load performance</p>
+          <p className="text-muted-foreground max-w-xs text-xs">
+            {error.message ||
+              "The analytics endpoint returned an error. Check that the daemon is reachable and that the current account has data."}
+          </p>
+        </div>
       ) : data && data.equity.length > 0 ? (
         <PerformanceHeroChart
           equity={data.equity}
@@ -126,6 +138,9 @@ export function PerformanceHero() {
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <TrendingUp className="text-muted-foreground size-8" aria-hidden="true" />
           <p className="text-muted-foreground text-sm">No closed trades in this period</p>
+          <p className="text-muted-foreground/60 text-xs">
+            Close a trade in {currency} to see your performance curve here.
+          </p>
         </div>
       )}
 

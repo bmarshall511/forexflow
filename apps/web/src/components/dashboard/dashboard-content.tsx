@@ -9,29 +9,31 @@ import { TradeSpotlight } from "./trade-spotlight"
 import { ActivityFeed } from "./activity-feed"
 import { AutomationBar } from "./automation-bar"
 import { MarketCalendarCard } from "./market-calendar-card"
-import { AiInsightsBar } from "./ai-insights-bar"
-import { SmartFlowCard } from "./smart-flow-card"
 import { SetupPanel } from "@/components/dashboard/shared"
 import { CardErrorBoundary } from "@/components/ui/card-error-boundary"
 
 /**
- * Dashboard layout — redesigned (Phase 2 core).
+ * Dashboard layout — redesigned.
  *
  * Section order:
  *   0. Sticky header — active-account pill, period picker, privacy, conn health
  *   1. Setup Needed panel (auto-hides when clean)
- *   2. Greeting — time/market-aware context
+ *   2. Greeting — time / market-aware context
  *   3. Live strip — WS-driven Balance / Day Change / Open P&L / Margin / Active
  *   4. Performance hero — balance/cumulative curve + drawdown + 5 KPI tiles
- *   5. Live trades + Activity feed (two columns on xl)
- *   6. Automation status strip
- *   7. SmartFlow card
- *   8. Source performance breakdown (per-period)
- *   9. Market calendar (+ AI Insights bar)
+ *      (each tile is a drill target)
+ *   5. Depth sections — calendar heatmap · session clock · instrument bars ·
+ *      source waterfall · collapsible MFE/MAE
+ *   6. Live trades + Activity feed (two columns on xl)
+ *   7. Automation status strip
+ *   8. Market calendar rail
  *
- * Legacy PerformanceCard + HeroMetrics are removed — PerformanceHero and
- * LiveStrip cover their purpose with richer data (now period + account
- * scoped end-to-end).
+ * The prior layout mixed redesigned and legacy cards; that made the visual
+ * hierarchy muddy. The legacy SmartFlowCard is gone (its data lives in the
+ * AutomationBar strip + SourceWaterfall). The legacy AiInsightsBar is gone
+ * (token costs live on the Settings → AI page). HeroMetrics and
+ * PerformanceCard were replaced by LiveStrip + PerformanceHero in Phase 2,
+ * SourcePerformanceCard by SourceWaterfall in Phase 3.
  */
 export function DashboardContent() {
   return (
@@ -84,19 +86,7 @@ export function DashboardContent() {
 
         <div className="px-4 md:px-6">
           <CardErrorBoundary>
-            <SmartFlowCard />
-          </CardErrorBoundary>
-        </div>
-
-        <div className="px-4 md:px-6">
-          <CardErrorBoundary>
             <MarketCalendarCard />
-          </CardErrorBoundary>
-        </div>
-
-        <div className="px-4 md:px-6">
-          <CardErrorBoundary>
-            <AiInsightsBar />
           </CardErrorBoundary>
         </div>
       </div>

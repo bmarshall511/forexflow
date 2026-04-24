@@ -70,14 +70,15 @@ export function DepthSections() {
     [range.dateFrom, range.dateTo],
   )
 
-  const { data: agg, isLoading: aggLoading } = useDashboardAnalytics<DashboardAnalyticsPayload>(
-    aggregatorUrl,
-    {
-      invalidateOn: ["positions_update", "account_overview_update"],
-      invalidateKey,
-    },
-  )
-  const { data: byTime } = useDashboardAnalytics<{
+  const {
+    data: agg,
+    isLoading: aggLoading,
+    error: aggError,
+  } = useDashboardAnalytics<DashboardAnalyticsPayload>(aggregatorUrl, {
+    invalidateOn: ["positions_update", "account_overview_update"],
+    invalidateKey,
+  })
+  const { data: byTime, isLoading: byTimeLoading } = useDashboardAnalytics<{
     byDayOfWeek: unknown[]
     byHourOfDay: HourOfDayPerformance[]
   }>(byTimeUrl, {
@@ -85,7 +86,7 @@ export function DepthSections() {
     invalidateKey,
   })
   const [edgeOpen, setEdgeOpen] = useState(false)
-  const { data: edge } = useDashboardAnalytics<MfeMaeEntry[]>(edgeUrl, {
+  const { data: edge, isLoading: edgeLoading } = useDashboardAnalytics<MfeMaeEntry[]>(edgeUrl, {
     invalidateOn: ["positions_update"],
     invalidateKey,
     enabled: edgeOpen,
@@ -106,12 +107,26 @@ export function DepthSections() {
     }
   }, [period])
 
+  // If the aggregator errored surface it once at the top rather than
+  // showing a flashing skeleton inside every sub-card.
+  if (aggError && !agg) {
+    return (
+      <div className="bg-card border-status-disconnected/30 space-y-2 rounded-xl border p-4 text-center">
+        <h2 className="text-sm font-medium">Couldn&apos;t load analytics</h2>
+        <p className="text-muted-foreground mx-auto max-w-md text-xs">
+          {aggError.message ||
+            "The /api/analytics/dashboard endpoint returned an error. Check the daemon is reachable and that the current account has data."}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* When — calendar + session clock */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SectionCard icon={<CalendarDays className="size-4" />} title="Daily P&L">
-          {aggLoading ? (
+          {aggLoading && !agg ? (
             <Skeleton className="h-[120px] w-full rounded-lg" />
           ) : (
             <CalendarHeatmap equity={agg?.equity ?? []} weeks={26} currency={currency} />
@@ -119,22 +134,22 @@ export function DepthSections() {
         </SectionCard>
 
         <SectionCard icon={<Clock className="size-4" />} title="Best hours">
-          {byTime ? (
+          {byTimeLoading && !byTime ? (
+            <Skeleton className="mx-auto h-[200px] w-[200px] rounded-full" />
+          ) : (
             <SessionClock
-              data={byTime.byHourOfDay ?? []}
+              data={byTime?.byHourOfDay ?? []}
               currency={currency}
               size={200}
               className="mx-auto"
             />
-          ) : (
-            <Skeleton className="mx-auto h-[200px] w-[200px] rounded-full" />
           )}
         </SectionCard>
       </div>
 
       {/* Where — instrument contribution */}
       <SectionCard icon={<Coins className="size-4" />} title="Top instruments">
-        {aggLoading ? (
+        {aggLoading && !agg ? (
           <Skeleton className="h-[180px] w-full rounded-lg" />
         ) : (
           <InstrumentBars data={agg?.byInstrument ?? []} top={8} currency={currency} />
@@ -143,7 +158,7 @@ export function DepthSections() {
 
       {/* Why — source attribution */}
       <SectionCard icon={<Workflow className="size-4" />} title="What drove it?">
-        {aggLoading ? (
+        {aggLoading && !agg ? (
           <Skeleton className="h-[120px] w-full rounded-lg" />
         ) : (
           <SourceWaterfall data={agg?.source ?? []} period={sourcePeriod} currency={currency} />
@@ -177,7 +192,11 @@ export function DepthSections() {
         </button>
         {edgeOpen && (
           <div id="edge-panel" className="border-t px-4 py-3">
-            <MfeMaeScatter data={edge ?? []} height={260} />
+            {edgeLoading && !edge ? (
+              <Skeleton className="h-[260px] w-full rounded-lg" />
+            ) : (
+              <MfeMaeScatter data={edge ?? []} height={260} />
+            )}
             <p className="text-muted-foreground/70 mt-2 text-[10px]">
               Top-right = ran deep in your favor AND deep against you before closing. Left-lean wins
               = caught them early.
