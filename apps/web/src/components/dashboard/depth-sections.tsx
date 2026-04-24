@@ -12,6 +12,7 @@ import {
   CalendarHeatmap,
   InstrumentBars,
   MfeMaeScatter,
+  SectionCard,
   SessionClock,
   SourceWaterfall,
 } from "@/components/dashboard/shared"
@@ -212,29 +213,5 @@ export function DepthSections() {
         )}
       </section>
     </div>
-  )
-}
-
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
-function SectionCard({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="bg-card border-border/50 space-y-3 rounded-xl border p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground">{icon}</span>
-        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-          {title}
-        </h2>
-      </div>
-      {children}
-    </section>
   )
 }

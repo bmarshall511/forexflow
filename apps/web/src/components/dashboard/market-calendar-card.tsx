@@ -2,26 +2,33 @@
 
 import { useMemo } from "react"
 import Link from "next/link"
+import { CalendarDays, AlertTriangle, AlertCircle, type LucideIcon } from "lucide-react"
+import type { EconomicEventData } from "@fxflow/types"
 import { useCalendar } from "@/hooks/use-calendar"
 import { usePositions } from "@/hooks/use-positions"
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardAction,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { SectionCard } from "@/components/dashboard/shared"
 import { cn } from "@/lib/utils"
-import { CalendarDays, AlertTriangle, Clock, AlertCircle } from "lucide-react"
-import type { EconomicEventData, EconomicEventImpact } from "@fxflow/types"
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+/**
+ * What's next — condensed calendar rail.
+ *
+ * The prior MarketCalendarCard was a 5-row list inside a bulky `Card`
+ * primitive. In the redesigned dashboard it read as "another analytics
+ * card" rather than ambient context. This rewrite keeps the important
+ * signal (high/medium impact events that can move a trade) but compresses
+ * to **at most 5 rows** with a strong top-line urgency banner when
+ * anything ≤4h away is high-impact. Relevance highlighting is preserved —
+ * events tied to a currency in an open position get a subtle accent ring.
+ *
+ * Visual shell: shared `SectionCard` so it sits next to Depth Sections,
+ * Live Trades, and Activity Feed without introducing a fourth chrome.
+ */
+const MAX_EVENTS = 5
 
-function formatCountdown(isoTimestamp: string): string {
-  const diff = new Date(isoTimestamp).getTime() - Date.now()
-  if (diff <= 0) return "Now"
+function formatCountdown(iso: string): string {
+  const diff = new Date(iso).getTime() - Date.now()
+  if (diff <= 0) return "now"
   const minutes = Math.floor(diff / 60_000)
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
@@ -31,51 +38,47 @@ function formatCountdown(isoTimestamp: string): string {
   return `${days}d ${hours % 24}h`
 }
 
-function formatEventTime(isoTimestamp: string): string {
-  return new Date(isoTimestamp).toLocaleTimeString(undefined, {
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   })
 }
 
-const impactStyles: Record<EconomicEventImpact, { label: string; className: string }> = {
+const IMPACT_STYLE = {
   high: {
     label: "High",
-    className: "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400",
+    badge: "border-status-disconnected/30 bg-status-disconnected/10 text-status-disconnected",
   },
   medium: {
     label: "Med",
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    badge: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },
   low: {
     label: "Low",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    badge: "border-status-connected/30 bg-status-connected/10 text-status-connected",
   },
-}
-
-// ─── Urgency banner ─────────────────────────────────────────────────────────
+} as const
 
 function UrgencyBanner({ event }: { event: EconomicEventData }) {
-  const timeLeft = new Date(event.timestamp).getTime() - Date.now()
-  const isImminent = timeLeft < 60 * 60 * 1000 // < 1 hour
-  const isSoon = timeLeft < 4 * 60 * 60 * 1000 // < 4 hours
-
-  if (!isSoon) return null
-
+  const diff = new Date(event.timestamp).getTime() - Date.now()
+  if (diff < 0 || diff > 4 * 60 * 60 * 1000) return null
+  const isImminent = diff < 60 * 60 * 1000
   return (
     <div
+      role="alert"
       className={cn(
         "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium",
         isImminent
-          ? "bg-red-500/10 text-red-600 dark:text-red-400"
+          ? "bg-status-disconnected/10 text-status-disconnected"
           : "bg-amber-500/10 text-amber-600 dark:text-amber-400",
       )}
     >
-      <AlertTriangle className="size-3.5 shrink-0" />
+      <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <span className="font-semibold">{event.currency}</span>
-        <span className="mx-1">·</span>
+        <span className="mx-1 opacity-70">·</span>
         <span className="truncate">{event.title}</span>
       </div>
       <span className="shrink-0 font-mono tabular-nums">{formatCountdown(event.timestamp)}</span>
@@ -83,22 +86,20 @@ function UrgencyBanner({ event }: { event: EconomicEventData }) {
   )
 }
 
-// ─── Event row ──────────────────────────────────────────────────────────────
-
 function EventRow({ event, isRelevant }: { event: EconomicEventData; isRelevant: boolean }) {
-  const impact = impactStyles[event.impact]
-
+  const impact = IMPACT_STYLE[event.impact]
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-1 py-1.5 text-xs",
-        isRelevant && "bg-primary/5 rounded",
+        "flex items-center gap-2 rounded-md px-1.5 py-1.5 text-xs",
+        isRelevant && "ring-primary/20 bg-primary/5 ring-1",
       )}
     >
       <span
+        aria-label={`${impact.label} impact`}
         className={cn(
           "inline-flex shrink-0 items-center rounded border px-1 py-0.5 text-[10px] font-medium leading-none",
-          impact.className,
+          impact.badge,
         )}
       >
         {impact.label}
@@ -109,48 +110,41 @@ function EventRow({ event, isRelevant }: { event: EconomicEventData; isRelevant:
       <span className="min-w-0 flex-1 truncate" title={event.title}>
         {event.title}
       </span>
-      <span className="text-muted-foreground shrink-0 tabular-nums">
-        {formatEventTime(event.timestamp)}
+      <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+        {formatTime(event.timestamp)}
       </span>
-      <span className="text-muted-foreground/60 w-12 shrink-0 text-right tabular-nums">
+      <span className="text-muted-foreground/60 w-14 shrink-0 text-right text-[11px] tabular-nums">
         {formatCountdown(event.timestamp)}
       </span>
     </div>
   )
 }
 
-// ─── Main card ──────────────────────────────────────────────────────────────
-
-const MAX_EVENTS = 5
-
 export function MarketCalendarCard() {
   const { events, isLoading, error } = useCalendar(48)
   const { openWithPrices } = usePositions()
 
-  // Currencies in open positions (for relevance highlighting)
   const activeCurrencies = useMemo(() => {
-    const currencies = new Set<string>()
+    const s = new Set<string>()
     for (const t of openWithPrices) {
       const [base, quote] = t.instrument.split("_")
-      if (base) currencies.add(base)
-      if (quote) currencies.add(quote)
+      if (base) s.add(base)
+      if (quote) s.add(quote)
     }
-    return currencies
+    return s
   }, [openWithPrices])
 
-  // Sort: high first, then medium
   const displayEvents = useMemo(() => {
-    const sorted = [...events]
+    return [...events]
       .filter((e) => e.impact === "high" || e.impact === "medium")
       .sort((a, b) => {
         if (a.impact === "high" && b.impact !== "high") return -1
         if (a.impact !== "high" && b.impact === "high") return 1
         return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       })
-    return sorted.slice(0, MAX_EVENTS)
+      .slice(0, MAX_EVENTS)
   }, [events])
 
-  // Next high-impact event for urgency banner
   const nextUrgent = useMemo(
     () => events.find((e) => e.impact === "high" && new Date(e.timestamp).getTime() > Date.now()),
     [events],
@@ -158,85 +152,100 @@ export function MarketCalendarCard() {
 
   const highCount = useMemo(() => events.filter((e) => e.impact === "high").length, [events])
 
-  return (
-    <Card
-      className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500"
-      style={{ animationDelay: "300ms" }}
+  const action = (
+    <Link
+      href="/alerts"
+      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-[11px] transition-colors focus-visible:rounded focus-visible:outline-none focus-visible:ring-2"
     >
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <CalendarDays className="size-4" />
-          Market Calendar
-          {highCount > 0 && (
-            <span className="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400">
-              {highCount} high
-            </span>
-          )}
-        </CardTitle>
-        <CardAction>
-          <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
-            <Clock className="size-3" />
-            48h
-          </span>
-        </CardAction>
-      </CardHeader>
+      View full →
+    </Link>
+  )
 
-      <CardContent className="space-y-2">
-        {/* Urgency banner */}
-        {nextUrgent && <UrgencyBanner event={nextUrgent} />}
+  return (
+    <SectionCard
+      icon={<CalendarDays className="size-4" />}
+      title="What's next"
+      meta={
+        !isLoading && events.length > 0
+          ? highCount > 0
+            ? `${highCount} high · 48h`
+            : "Next 48h"
+          : undefined
+      }
+      action={action}
+    >
+      {nextUrgent && <UrgencyBanner event={nextUrgent} />}
 
-        {/* Event list */}
-        {isLoading ? (
-          <div className="space-y-2" role="status" aria-label="Loading calendar">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Skeleton className="h-4 w-8" />
-                <Skeleton className="h-4 w-8" />
-                <Skeleton className="h-4 flex-1" />
-                <Skeleton className="h-4 w-10" />
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center gap-2 py-4 text-center">
-            <AlertCircle className="text-destructive size-5" />
-            <p className="text-muted-foreground text-xs">Failed to load calendar</p>
-          </div>
-        ) : displayEvents.length === 0 ? (
-          <div className="space-y-1 rounded-lg border border-dashed p-4 text-center">
-            <CalendarDays className="text-muted-foreground mx-auto size-6" />
-            <p className="text-muted-foreground text-sm">Clear skies</p>
-            <p className="text-muted-foreground/60 text-xs">
-              No high or medium impact events in the next 48 hours
-            </p>
-          </div>
-        ) : (
-          <div className="divide-border/50 divide-y">
-            {displayEvents.map((event) => (
-              <EventRow
-                key={event.id}
-                event={event}
-                isRelevant={activeCurrencies.has(event.currency)}
-              />
-            ))}
-          </div>
+      {isLoading ? (
+        <SkeletonRows />
+      ) : error ? (
+        <ErrorState />
+      ) : displayEvents.length === 0 ? (
+        <ClearSkies />
+      ) : (
+        <ul className="divide-border/40 divide-y">
+          {displayEvents.map((event) => (
+            <li key={event.id}>
+              <EventRow event={event} isRelevant={activeCurrencies.has(event.currency)} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </SectionCard>
+  )
+}
+
+function SkeletonRows() {
+  return (
+    <div className="space-y-2" role="status" aria-label="Loading calendar">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <Skeleton className="h-4 w-8" />
+          <Skeleton className="h-4 w-8" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 w-14" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ErrorState() {
+  return <EmptyCentered Icon={AlertCircle} title="Failed to load calendar" tone="destructive" />
+}
+
+function ClearSkies() {
+  return (
+    <EmptyCentered
+      Icon={CalendarDays}
+      title="Clear skies"
+      subtitle="No high or medium impact events in the next 48 hours"
+    />
+  )
+}
+
+function EmptyCentered({
+  Icon,
+  title,
+  subtitle,
+  tone,
+}: {
+  Icon: LucideIcon
+  title: string
+  subtitle?: string
+  tone?: "destructive"
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+      <Icon
+        className={cn(
+          "size-6",
+          tone === "destructive" ? "text-status-disconnected" : "text-muted-foreground",
         )}
-
-        {events.length > MAX_EVENTS && (
-          <p className="text-muted-foreground/60 text-center text-[10px]">
-            +{events.length - MAX_EVENTS} more events
-          </p>
-        )}
-      </CardContent>
-
-      <CardFooter>
-        <Link
-          href="/alerts"
-          className="text-muted-foreground hover:text-foreground text-xs transition-colors"
-        >
-          View full calendar →
-        </Link>
-      </CardFooter>
-    </Card>
+        aria-hidden="true"
+      />
+      <p className="text-sm font-medium">{title}</p>
+      {subtitle && <p className="text-muted-foreground/70 max-w-xs text-xs">{subtitle}</p>}
+    </div>
   )
 }
