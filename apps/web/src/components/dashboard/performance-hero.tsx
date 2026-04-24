@@ -61,9 +61,14 @@ export function PerformanceHero() {
   const nav = accountOverview?.summary.nav ?? null
   const startingBalanceGuess = nav
 
+  // Dep on .getTime() rather than the Date object so a stray re-construction
+  // upstream can't silently reintroduce the URL-churn loop.
+  const fromMs = range.dateFrom.getTime()
+  const toMs = range.dateTo?.getTime() ?? null
   const url = useMemo(
     () => buildUrl(range.dateFrom, range.dateTo, startingBalanceGuess),
-    [range.dateFrom, range.dateTo, startingBalanceGuess],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fromMs, toMs, startingBalanceGuess],
   )
 
   // Prior-period url. Skip for allTime (no "prior" exists).
@@ -71,7 +76,8 @@ export function PerformanceHero() {
     if (period === "allTime") return null
     const prior = priorWindow(range.dateFrom, range.dateTo)
     return buildUrl(prior.from, prior.to, null)
-  }, [period, range.dateFrom, range.dateTo])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, fromMs, toMs])
 
   const invalidateKey = `${period}:${rolloverKey}`
 

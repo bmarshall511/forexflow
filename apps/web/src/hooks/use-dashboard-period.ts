@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   resolveDashboardPeriod,
@@ -107,7 +107,15 @@ export function useDashboardPeriod(): UseDashboardPeriodResult {
     return () => window.clearTimeout(id)
   }, [period, mode, now])
 
-  const range = resolveDashboardPeriod(period, mode, now)
+  // MUST be memoized on (period, mode, now). resolveDashboardPeriod builds
+  // brand-new Date instances every call; without useMemo, consumers that
+  // pass `range.dateFrom` into their own useMemo deps would see a "changed"
+  // reference on every render, causing URL rebuild → fetch abort/retry
+  // loops that never settle (i.e. the flashing skeleton bug).
+  const range = useMemo<DashboardPeriodRange>(
+    () => resolveDashboardPeriod(period, mode, now),
+    [period, mode, now],
+  )
 
   return { period, mode, range, rolloverKey, setPeriod, setMode }
 }

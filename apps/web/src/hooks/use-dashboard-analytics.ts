@@ -156,17 +156,28 @@ export function useDashboardAnalytics<T>(
     [url, enabled],
   )
 
-  const refetch = useCallback(() => {
-    void doFetch(true)
+  // Keep the latest doFetch in a ref so the initial-load effect doesn't have
+  // to list it as a dep. Previously `doFetch` was memoized on [url, enabled]
+  // and listed as an effect dep — any consumer that passed a non-stable url
+  // (e.g. range.dateFrom as a Date object re-created every render) would
+  // fire a new doFetch → new abort → new fetch every render, producing
+  // flashing skeletons that never settle.
+  const doFetchRef = useRef(doFetch)
+  useEffect(() => {
+    doFetchRef.current = doFetch
   }, [doFetch])
+
+  const refetch = useCallback(() => {
+    void doFetchRef.current(true)
+  }, [])
 
   // Initial load + fires on url / invalidateKey / enabled changes.
   useEffect(() => {
     const cached = cache.get(url) as CacheEntry<T> | undefined
     if (cached?.data != null) setData(cached.data)
-    void doFetch(cached?.data != null)
+    void doFetchRef.current(cached?.data != null)
     return () => abortRef.current?.abort()
-  }, [url, invalidateKey, doFetch])
+  }, [url, invalidateKey])
 
   // Focus revalidation — refetch when tab becomes visible again.
   useEffect(() => {

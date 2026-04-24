@@ -57,17 +57,24 @@ export function DepthSections() {
   const currency = accountOverview?.summary.currency ?? "USD"
   const invalidateKey = `${period}:${rolloverKey}`
 
+  // Dep on .getTime() rather than the Date object so a stray re-construction
+  // upstream can't silently reintroduce the URL-churn loop.
+  const fromMs = range.dateFrom.getTime()
+  const toMs = range.dateTo?.getTime() ?? null
   const aggregatorUrl = useMemo(
     () => buildAggregatorUrl(range.dateFrom, range.dateTo),
-    [range.dateFrom, range.dateTo],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fromMs, toMs],
   )
   const byTimeUrl = useMemo(
     () => buildByTimeUrl(range.dateFrom, range.dateTo),
-    [range.dateFrom, range.dateTo],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fromMs, toMs],
   )
   const edgeUrl = useMemo(
     () => buildEdgeUrl(range.dateFrom, range.dateTo),
-    [range.dateFrom, range.dateTo],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fromMs, toMs],
   )
 
   const {
