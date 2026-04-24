@@ -4,6 +4,9 @@ import { useMemo } from "react"
 import Link from "next/link"
 import { useDaemonStatus } from "@/hooks/use-daemon-status"
 import { usePositions } from "@/hooks/use-positions"
+import { useDashboardPeriod } from "@/hooks/use-dashboard-period"
+import { useDashboardAnalytics } from "@/hooks/use-dashboard-analytics"
+import type { DashboardAnalyticsPayload } from "@/app/api/analytics/dashboard/route"
 import { formatPnL } from "@fxflow/shared"
 import { cn } from "@/lib/utils"
 import { Radio, Search, Bot, Settings, MousePointer, Workflow } from "lucide-react"
@@ -14,8 +17,10 @@ import type { TradeSource } from "@fxflow/types"
 interface SourceStats {
   openCount: number
   unrealizedPL: number
-  closedTodayCount: number
-  closedTodayPL: number
+  /** Closed-trade count for the currently-selected dashboard period. */
+  closedCount: number
+  /** Closed-trade P&L for the currently-selected dashboard period. */
+  closedPL: number
   wins: number
   losses: number
 }
@@ -23,14 +28,36 @@ interface SourceStats {
 const EMPTY_STATS: SourceStats = {
   openCount: 0,
   unrealizedPL: 0,
-  closedTodayCount: 0,
-  closedTodayPL: 0,
+  closedCount: 0,
+  closedPL: 0,
   wins: 0,
   losses: 0,
 }
 
+type SourcePeriodKey = "today" | "thisWeek" | "thisMonth" | "thisYear" | "allTime"
+
+/**
+ * Live open-trade stats (WS-driven) merged with period-scoped closed-trade
+ * stats from the analytics aggregator. Replaces the old today-only logic
+ * so every module reads the same period as the rest of the dashboard.
+ */
 function useSourceStats() {
-  const { openWithPrices, positions } = usePositions()
+  const { openWithPrices } = usePositions()
+  const { period, range, rolloverKey } = useDashboardPeriod()
+
+  const fromMs = range.dateFrom.getTime()
+  const toMs = range.dateTo?.getTime() ?? null
+  const url = useMemo(() => {
+    const params = new URLSearchParams({ dateFrom: range.dateFrom.toISOString() })
+    if (range.dateTo) params.set("dateTo", range.dateTo.toISOString())
+    return `/api/analytics/dashboard?${params.toString()}`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromMs, toMs])
+
+  const { data } = useDashboardAnalytics<DashboardAnalyticsPayload>(url, {
+    invalidateOn: ["positions_update", "account_overview_update"],
+    invalidateKey: `${period}:${rolloverKey}`,
+  })
 
   return useMemo(() => {
     const map = new Map<TradeSource, SourceStats>()
@@ -43,26 +70,29 @@ function useSourceStats() {
       return v
     }
 
+    // Live open trades — always "right now", never period-scoped.
     for (const t of openWithPrices) {
       const s = get(t.source)
       s.openCount++
       s.unrealizedPL += t.unrealizedPL
     }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    for (const t of positions?.closed ?? []) {
-      if (new Date(t.closedAt) >= today) {
-        const s = get(t.source)
-        s.closedTodayCount++
-        s.closedTodayPL += t.realizedPL
-        if (t.realizedPL > 0) s.wins++
-        else if (t.realizedPL < 0) s.losses++
-      }
+    // Closed-trade stats pulled from the aggregator source breakdown for the
+    // active period. Each source row exposes per-period stats so there's
+    // no extra round trip.
+    const periodKey: SourcePeriodKey = period
+    for (const source of data?.source ?? []) {
+      const stats = source[periodKey]
+      if (!stats || stats.trades === 0) continue
+      const s = get(source.source as TradeSource)
+      s.closedCount += stats.trades
+      s.closedPL += stats.totalPL
+      s.wins += stats.wins
+      s.losses += stats.losses
     }
 
     return map
-  }, [openWithPrices, positions?.closed])
+  }, [openWithPrices, data, period])
 }
 
 // ─── Status dot ──────────────────────────────────────────────────────────────
@@ -108,7 +138,7 @@ function ModuleSegment({
   settingsHref,
 }: ModuleSegmentProps) {
   const hasOpenTrades = stats && stats.openCount > 0
-  const hasClosedToday = stats && stats.closedTodayCount > 0
+  const hasClosedPeriod = stats && stats.closedCount > 0
 
   return (
     <div className="border-border/50 flex flex-1 flex-col gap-1.5 border-r p-3 last:border-r-0">
@@ -132,11 +162,10 @@ function ModuleSegment({
         )}
       </div>
       <span className="text-muted-foreground truncate text-[10px]">{line1}</span>
-      {/* Live trade stats */}
-      {(hasOpenTrades || hasClosedToday) && (
+      {(hasOpenTrades || hasClosedPeriod) && (
         <div className="flex flex-wrap gap-x-3 gap-y-0.5">
           {hasOpenTrades && (
-            <span className="text-[10px] tabular-nums">
+            <span className="text-[10px] tabular-nums" data-private="true">
               <span className="text-muted-foreground">{stats.openCount} open</span>{" "}
               <span
                 className={cn(
@@ -148,16 +177,16 @@ function ModuleSegment({
               </span>
             </span>
           )}
-          {hasClosedToday && (
-            <span className="text-[10px] tabular-nums">
-              <span className="text-muted-foreground">{stats.closedTodayCount} closed</span>{" "}
+          {hasClosedPeriod && (
+            <span className="text-[10px] tabular-nums" data-private="true">
+              <span className="text-muted-foreground">{stats.closedCount} closed</span>{" "}
               <span
                 className={cn(
                   "font-medium",
-                  stats.closedTodayPL >= 0 ? "text-status-connected" : "text-status-disconnected",
+                  stats.closedPL >= 0 ? "text-status-connected" : "text-status-disconnected",
                 )}
               >
-                {formatPnL(stats.closedTodayPL, currency).formatted}
+                {formatPnL(stats.closedPL, currency).formatted}
               </span>
               {(stats.wins > 0 || stats.losses > 0) && (
                 <span className="text-muted-foreground ml-1">
@@ -178,21 +207,14 @@ function ModuleSegment({
 
 function mergeStats(...sources: (SourceStats | undefined)[]): SourceStats | null {
   let any = false
-  const merged: SourceStats = {
-    openCount: 0,
-    unrealizedPL: 0,
-    closedTodayCount: 0,
-    closedTodayPL: 0,
-    wins: 0,
-    losses: 0,
-  }
+  const merged: SourceStats = { ...EMPTY_STATS }
   for (const s of sources) {
     if (!s) continue
     any = true
     merged.openCount += s.openCount
     merged.unrealizedPL += s.unrealizedPL
-    merged.closedTodayCount += s.closedTodayCount
-    merged.closedTodayPL += s.closedTodayPL
+    merged.closedCount += s.closedCount
+    merged.closedPL += s.closedPL
     merged.wins += s.wins
     merged.losses += s.losses
   }
@@ -286,9 +308,10 @@ export function AutomationBar() {
     : "Not configured"
 
   // Manual status — always "active" since it's always available
+  const manualTotal = manualStats ? manualStats.openCount + manualStats.closedCount : 0
   const manualLine1 = manualStats
-    ? `${manualStats.openCount + manualStats.closedTodayCount} trade${manualStats.openCount + manualStats.closedTodayCount !== 1 ? "s" : ""} today`
-    : "No trades today"
+    ? `${manualTotal} trade${manualTotal !== 1 ? "s" : ""}`
+    : "No trades"
 
   return (
     <div
